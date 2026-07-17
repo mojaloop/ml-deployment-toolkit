@@ -1,0 +1,499 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-switch-overview
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Home"
+data:
+  switch-overview.json: |
+    {
+      "uid": "l1-switch-overview",
+      "title": "Switch Overview",
+      "description": "L1 entry point: is the switch healthy? Every tile links to the detailed dashboard for that domain",
+      "tags": ["home", "overview", "mojaloop"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(moja_nodejs_eventloop_lag_seconds, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "E2E Transfer Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "links": [{ "title": "Transfer Pipeline", "url": "/d/moja-transfer-pipeline" }],
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_tx_transfer_count{cluster_name=\"$cluster_name\"}[$__rate_interval])) or vector(0)",
+              "legendFormat": "transfers"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "E2E p99 Latency (SLO < 1s)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "links": [{ "title": "Transfer Pipeline", "url": "/d/moja-transfer-pipeline" }],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.8 },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(moja_tx_transfer_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p99"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Failed Transfers/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "links": [{ "title": "Transfer Pipeline", "url": "/d/moja-transfer-pipeline" }],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.01 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_tx_transfer_count{cluster_name=\"$cluster_name\", success=\"false\"}[$__rate_interval])) or vector(0)",
+              "legendFormat": "failed"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Max Kafka Consumer Lag",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "links": [{ "title": "Kafka Cluster", "url": "/d/data-kafka-overview" }],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 100 },
+                  { "color": "red", "value": 1000 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "max(kafka_consumergroup_lag{cluster_name=\"$cluster_name\"}) or vector(0)",
+              "legendFormat": "lag"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Transfer Rate & Failures",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "links": [{ "title": "Transfer Pipeline", "url": "/d/moja-transfer-pipeline" }],
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_tx_transfer_count{cluster_name=\"$cluster_name\"}[$__rate_interval])) or vector(0)",
+              "legendFormat": "transfers"
+            },
+            {
+              "expr": "sum(rate(moja_tx_transfer_count{cluster_name=\"$cluster_name\", success=\"false\"}[$__rate_interval])) or vector(0)",
+              "legendFormat": "failed"
+            }
+          ]
+        },
+        {
+          "title": "E2E Transfer Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "links": [{ "title": "Transfer Pipeline", "url": "/d/moja-transfer-pipeline" }],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": { "fillOpacity": 10, "thresholdsStyle": { "mode": "line" } },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, sum(rate(moja_tx_transfer_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(moja_tx_transfer_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p99"
+            }
+          ]
+        },
+        {
+          "title": "Nodes NotReady",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 10 },
+          "datasource": { "uid": "thanos" },
+          "links": [{ "title": "Kubernetes Cluster", "url": "/d/infra-k8s-cluster" }],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "count(kube_node_info{cluster_name=\"$cluster_name\"}) - sum(kube_node_status_condition{cluster_name=\"$cluster_name\", condition=\"Ready\", status=\"true\"})",
+              "legendFormat": "not ready"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Pods Failed",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 10 },
+          "datasource": { "uid": "thanos" },
+          "links": [{ "title": "Kubernetes Cluster", "url": "/d/infra-k8s-cluster" }],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(kube_pod_status_phase{cluster_name=\"$cluster_name\", phase=\"Failed\"}) or vector(0)",
+              "legendFormat": "failed"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Container Restarts ($__range)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 10 },
+          "datasource": { "uid": "thanos" },
+          "links": [{ "title": "Kubernetes Cluster", "url": "/d/infra-k8s-cluster" }],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 5 },
+                  { "color": "red", "value": 20 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(increase(kube_pod_container_status_restarts_total{cluster_name=\"$cluster_name\"}[$__range]))",
+              "legendFormat": "restarts"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Flux Not Ready",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 10 },
+          "datasource": { "uid": "thanos" },
+          "links": [{ "title": "Flux GitOps", "url": "/d/platform-flux" }],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "count(gotk_resource_info{cluster_name=\"$cluster_name\", ready=\"False\"}) or vector(0)",
+              "legendFormat": "not ready"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Certs Not Ready",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 10 },
+          "datasource": { "uid": "thanos" },
+          "links": [{ "title": "cert-manager", "url": "/d/platform-cert-manager" }],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "count(certmanager_certificate_ready_status{cluster_name=\"$cluster_name\", condition!=\"True\"} == 1) or vector(0)",
+              "legendFormat": "not ready"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Min Cert Expiry",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 10 },
+          "datasource": { "uid": "thanos" },
+          "links": [{ "title": "cert-manager", "url": "/d/platform-cert-manager" }],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "d",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 7 },
+                  { "color": "green", "value": 21 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "min((certmanager_certificate_expiration_timestamp_seconds{cluster_name=\"$cluster_name\"} - time()) / 86400)",
+              "legendFormat": "days"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "MySQL Up",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 14 },
+          "datasource": { "uid": "thanos" },
+          "links": [{ "title": "MySQL Overview", "url": "/d/data-mysql-overview" }],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(mysql_up{cluster_name=\"$cluster_name\"}) or vector(0)",
+              "legendFormat": "up"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Kafka Partition Issues",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 14 },
+          "datasource": { "uid": "thanos" },
+          "description": "Offline + under-replicated partitions",
+          "links": [{ "title": "Kafka Cluster", "url": "/d/data-kafka-overview" }],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "(sum(kafka_controller_kafkacontroller_offlinepartitionscount{cluster_name=\"$cluster_name\"}) or vector(0)) + (sum(kafka_server_replicamanager_underreplicatedpartitions{cluster_name=\"$cluster_name\"}) or vector(0))",
+              "legendFormat": "partitions"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Redis Up",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 14 },
+          "datasource": { "uid": "thanos" },
+          "links": [{ "title": "Redis Overview", "url": "/d/data-redis-overview" }],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(redis_up{cluster_name=\"$cluster_name\"}) or vector(0)",
+              "legendFormat": "up"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "MongoDB Up",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 14 },
+          "datasource": { "uid": "thanos" },
+          "links": [{ "title": "MongoDB Overview", "url": "/d/data-mongodb-overview" }],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(mongodb_up{cluster_name=\"$cluster_name\"}) or vector(0)",
+              "legendFormat": "up"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Vault Unsealed",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 14 },
+          "datasource": { "uid": "thanos" },
+          "links": [{ "title": "Vault", "url": "/d/platform-vault" }],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "max({__name__=~\"vault_vault_.*_core_unsealed_.*\", cluster_name=\"$cluster_name\"}) or vector(0)",
+              "legendFormat": "unsealed"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Auth 5xx/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 14 },
+          "datasource": { "uid": "thanos" },
+          "description": "Hydra + Kratos + Oathkeeper server errors",
+          "links": [{ "title": "Ory Auth", "url": "/d/platform-ory-auth" }],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "(sum(rate(http_requests_statuses_total{cluster_name=\"$cluster_name\", service=~\"hydra-admin|kratos-admin\", status_bucket=\"5xx\"}[$__rate_interval])) or vector(0)) + (sum(rate(ory_oathkeeper_requests_total{cluster_name=\"$cluster_name\", status_code=~\"5..\"}[$__rate_interval])) or vector(0))",
+              "legendFormat": "5xx"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        }
+      ],
+      "schemaVersion": 39
+    }

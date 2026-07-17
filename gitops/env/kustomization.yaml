@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - strimzi/helmrelease.yaml
+  - percona-xtradb/helmrelease.yaml
+  - percona-mongodb/helmrelease.yaml
+  - redis-operator/helmrelease.yaml
+  - vault-operator/helmrelease.yaml

@@ -1,0 +1,503 @@
+# Oathkeeper Rule CRDs for finance-portal API routes (auth required).
+# Only API routes come through oathkeeper-proxy (via HTTPRoute).
+# Shell, UIs, and Kratos are routed directly by the HTTPRoute.
+#
+# Auth: cookie_session + jwt for API endpoints.
+# Authz: remote_json (Keto RBAC) — per-action permission checks.
+# Permissions are provisioned via MojaloopRole CRDs in ory-rbac-role-permissions.yaml.
+---
+# API: transfers (reporting-hub-bop-api-svc)
+apiVersion: oathkeeper.ory.sh/v1alpha1
+kind: Rule
+metadata:
+  name: fp-transfer-api
+  namespace: ory
+spec:
+  match:
+    url: <http|https>://finance-portal.int.${domain}/api/transfers
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+  authenticators:
+    - handler: jwt
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: http://keto-read.ory.svc.cluster.local:80/relation-tuples/check
+      payload: |
+        {
+          "namespace": "permission",
+          "object": "transferApi",
+          "relation": "granted",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: header
+  upstream:
+    preserveHost: false
+    url: http://fin-portal-reporting-hub-bop-api-svc.mojaloop.svc.cluster.local:80
+---
+# API: transfers/graphql
+apiVersion: oathkeeper.ory.sh/v1alpha1
+kind: Rule
+metadata:
+  name: fp-transfer-api-graphql
+  namespace: ory
+spec:
+  match:
+    url: <http|https>://finance-portal.int.${domain}/api/transfers/graphql
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+  authenticators:
+    - handler: jwt
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: http://keto-read.ory.svc.cluster.local:80/relation-tuples/check
+      payload: |
+        {
+          "namespace": "permission",
+          "object": "transferApi",
+          "relation": "granted",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: header
+  upstream:
+    preserveHost: false
+    url: http://fin-portal-reporting-hub-bop-api-svc.mojaloop.svc.cluster.local:80
+---
+# API: IAM / role-assignment-service (strip /api/iam -> /)
+apiVersion: oathkeeper.ory.sh/v1alpha1
+kind: Rule
+metadata:
+  name: fp-api-iam
+  namespace: ory
+spec:
+  match:
+    url: <http|https>://finance-portal.int.${domain}/api/iam/<.*>
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+  authenticators:
+    - handler: jwt
+    - handler: cookie_session
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: header
+  upstream:
+    preserveHost: false
+    stripPath: /api/iam
+    url: http://fin-portal-role-assignment-service.mojaloop.svc.cluster.local:80
+---
+# API: central-admin (experience-api-svc, strip /api -> keeps /central-admin/)
+apiVersion: oathkeeper.ory.sh/v1alpha1
+kind: Rule
+metadata:
+  name: fp-api-central-admin
+  namespace: ory
+spec:
+  match:
+    url: <http|https>://finance-portal.int.${domain}/api/central-admin/<.*>
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+  authenticators:
+    - handler: jwt
+    - handler: cookie_session
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: header
+  upstream:
+    preserveHost: false
+    stripPath: /api
+    url: http://fin-portal-reporting-hub-bop-experience-api-svc.mojaloop.svc.cluster.local:80
+---
+# API: central-settlements (strip /api/central-settlements -> /v2/)
+apiVersion: oathkeeper.ory.sh/v1alpha1
+kind: Rule
+metadata:
+  name: fp-api-central-settlements
+  namespace: ory
+spec:
+  match:
+    url: <http|https>://finance-portal.int.${domain}/api/central-settlements/<.*>
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+  authenticators:
+    - handler: jwt
+    - handler: cookie_session
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: header
+  upstream:
+    preserveHost: false
+    stripPath: /api/central-settlements
+    url: http://moja-centralsettlement-service.mojaloop.svc.cluster.local:80/v2
+---
+# API: reports (reporting-legacy-api) — reportingApi permission
+apiVersion: oathkeeper.ory.sh/v1alpha1
+kind: Rule
+metadata:
+  name: fp-reporting-api
+  namespace: ory
+spec:
+  match:
+    url: <http|https>://finance-portal.int.${domain}/api/reports/<.*>
+    methods:
+      - GET
+  authenticators:
+    - handler: jwt
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: http://keto-read.ory.svc.cluster.local:80/relation-tuples/check
+      payload: |
+        {
+          "namespace": "permission",
+          "object": "reportingApi",
+          "relation": "granted",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: header
+  upstream:
+    preserveHost: false
+    url: http://fin-portal-reporting-legacy-api.mojaloop.svc.cluster.local:80
+---
+# Central-admin participants — participantView (GET)
+apiVersion: oathkeeper.ory.sh/v1alpha1
+kind: Rule
+metadata:
+  name: fp-participant-view
+  namespace: ory
+spec:
+  match:
+    url: <http|https>://finance-portal.int.${domain}/central-admin/participants<.*>
+    methods:
+      - GET
+  authenticators:
+    - handler: jwt
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: http://keto-read.ory.svc.cluster.local:80/relation-tuples/check
+      payload: |
+        {
+          "namespace": "permission",
+          "object": "participantView",
+          "relation": "granted",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: header
+  upstream:
+    preserveHost: false
+    url: http://fin-portal-reporting-hub-bop-experience-api-svc.mojaloop.svc.cluster.local:80
+---
+# Position funds in/out — positionFundsInOut (POST to accounts)
+apiVersion: oathkeeper.ory.sh/v1alpha1
+kind: Rule
+metadata:
+  name: fp-position-funds-in-out
+  namespace: ory
+spec:
+  match:
+    url: <http|https>://finance-portal.int.${domain}/central-admin/participants/<.*>/accounts<.*>
+    methods:
+      - POST
+  authenticators:
+    - handler: jwt
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: http://keto-read.ory.svc.cluster.local:80/relation-tuples/check
+      payload: |
+        {
+          "namespace": "permission",
+          "object": "positionFundsInOut",
+          "relation": "granted",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: header
+  upstream:
+    preserveHost: false
+    url: http://fin-portal-reporting-hub-bop-experience-api-svc.mojaloop.svc.cluster.local:80
+---
+# Position NDC edit — positionNDCEdit (PUT to limits)
+apiVersion: oathkeeper.ory.sh/v1alpha1
+kind: Rule
+metadata:
+  name: fp-position-ndc-edit
+  namespace: ory
+spec:
+  match:
+    url: <http|https>://finance-portal.int.${domain}/central-admin/participants/<.*>/limits
+    methods:
+      - PUT
+  authenticators:
+    - handler: jwt
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: http://keto-read.ory.svc.cluster.local:80/relation-tuples/check
+      payload: |
+        {
+          "namespace": "permission",
+          "object": "positionNDCEdit",
+          "relation": "granted",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: header
+  upstream:
+    preserveHost: false
+    url: http://fin-portal-reporting-hub-bop-experience-api-svc.mojaloop.svc.cluster.local:80
+---
+# Participant disable/enable — participantDisableEnable (PUT to accounts)
+apiVersion: oathkeeper.ory.sh/v1alpha1
+kind: Rule
+metadata:
+  name: fp-participant-disable-enable
+  namespace: ory
+spec:
+  match:
+    url: <http|https>://finance-portal.int.${domain}/central-admin/participants/<.*>/accounts<.*>
+    methods:
+      - PUT
+  authenticators:
+    - handler: jwt
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: http://keto-read.ory.svc.cluster.local:80/relation-tuples/check
+      payload: |
+        {
+          "namespace": "permission",
+          "object": "participantDisableEnable",
+          "relation": "granted",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: header
+  upstream:
+    preserveHost: false
+    url: http://fin-portal-reporting-hub-bop-experience-api-svc.mojaloop.svc.cluster.local:80
+---
+# Settlement model view — settlementView (GET /central-admin/settlementModels)
+apiVersion: oathkeeper.ory.sh/v1alpha1
+kind: Rule
+metadata:
+  name: fp-settlementmodel-view
+  namespace: ory
+spec:
+  match:
+    url: <http|https>://finance-portal.int.${domain}/central-admin/settlementModels<.*>
+    methods:
+      - GET
+  authenticators:
+    - handler: jwt
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: http://keto-read.ory.svc.cluster.local:80/relation-tuples/check
+      payload: |
+        {
+          "namespace": "permission",
+          "object": "settlementView",
+          "relation": "granted",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: header
+  upstream:
+    preserveHost: false
+    url: http://fin-portal-reporting-hub-bop-experience-api-svc.mojaloop.svc.cluster.local:80
+---
+# IAM view — iamView (GET /users|participants|roles)
+apiVersion: oathkeeper.ory.sh/v1alpha1
+kind: Rule
+metadata:
+  name: fp-iam-view
+  namespace: ory
+spec:
+  match:
+    url: <http|https>://finance-portal.int.${domain}/<(users|participants|roles)(/.*)?>
+    methods:
+      - GET
+  authenticators:
+    - handler: jwt
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: http://keto-read.ory.svc.cluster.local:80/relation-tuples/check
+      payload: |
+        {
+          "namespace": "permission",
+          "object": "iamView",
+          "relation": "granted",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: header
+  upstream:
+    preserveHost: false
+    url: http://fin-portal-role-assignment-service.mojaloop.svc.cluster.local:80
+---
+# IAM edit — iamEdit (POST/PUT/DELETE/PATCH /users|participants|roles)
+apiVersion: oathkeeper.ory.sh/v1alpha1
+kind: Rule
+metadata:
+  name: fp-iam-edit
+  namespace: ory
+spec:
+  match:
+    url: <http|https>://finance-portal.int.${domain}/<(users|participants|roles)(/.*)?>
+    methods:
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+  authenticators:
+    - handler: jwt
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: http://keto-read.ory.svc.cluster.local:80/relation-tuples/check
+      payload: |
+        {
+          "namespace": "permission",
+          "object": "iamEdit",
+          "relation": "granted",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: header
+  upstream:
+    preserveHost: false
+    url: http://fin-portal-role-assignment-service.mojaloop.svc.cluster.local:80
+---
+# Settlement view — settlementView (GET /settlement*)
+apiVersion: oathkeeper.ory.sh/v1alpha1
+kind: Rule
+metadata:
+  name: fp-settlement-view
+  namespace: ory
+spec:
+  match:
+    url: <http|https>://finance-portal.int.${domain}/settlement<.*>
+    methods:
+      - GET
+  authenticators:
+    - handler: jwt
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: http://keto-read.ory.svc.cluster.local:80/relation-tuples/check
+      payload: |
+        {
+          "namespace": "permission",
+          "object": "settlementView",
+          "relation": "granted",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: header
+  upstream:
+    preserveHost: false
+    url: http://moja-centralsettlement-service.mojaloop.svc.cluster.local:80
+---
+# Settlement initiate/finalize — settlementInitiateFinalise (POST/PUT /settlements)
+apiVersion: oathkeeper.ory.sh/v1alpha1
+kind: Rule
+metadata:
+  name: fp-settlement-initiate-finalize
+  namespace: ory
+spec:
+  match:
+    url: <http|https>://finance-portal.int.${domain}/settlements<.*>
+    methods:
+      - POST
+      - PUT
+  authenticators:
+    - handler: jwt
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: http://keto-read.ory.svc.cluster.local:80/relation-tuples/check
+      payload: |
+        {
+          "namespace": "permission",
+          "object": "settlementInitiateFinalise",
+          "relation": "granted",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: header
+  upstream:
+    preserveHost: false
+    url: http://moja-centralsettlement-service.mojaloop.svc.cluster.local:80
+---
+# Settlement close window — settlementCloseWindow (POST /settlementWindows)
+apiVersion: oathkeeper.ory.sh/v1alpha1
+kind: Rule
+metadata:
+  name: fp-settlement-close-window
+  namespace: ory
+spec:
+  match:
+    url: <http|https>://finance-portal.int.${domain}/settlementWindows<.*>
+    methods:
+      - POST
+  authenticators:
+    - handler: jwt
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: http://keto-read.ory.svc.cluster.local:80/relation-tuples/check
+      payload: |
+        {
+          "namespace": "permission",
+          "object": "settlementCloseWindow",
+          "relation": "granted",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: header
+  upstream:
+    preserveHost: false
+    url: http://moja-centralsettlement-service.mojaloop.svc.cluster.local:80

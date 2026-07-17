@@ -1,0 +1,480 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-vault
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Platform"
+data:
+  vault.json: |
+    {
+      "uid": "platform-vault",
+      "title": "Vault",
+      "tags": ["platform", "vault", "secrets"],
+      "timezone": "utc",
+      "editable": true,
+      "schemaVersion": 39,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(vault_core_handle_request_count, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Cluster Health",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "collapsed": false
+        },
+        {
+          "title": "Unsealed",
+          "description": "1 = unsealed (healthy), 0 = sealed",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "{__name__=~\"vault_vault_.*_core_unsealed_.*\",cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Active Leader",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "{__name__=~\"vault_vault_.*_core_active_.*\",cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Raft Peers",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 2 },
+                  { "color": "green", "value": 3 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "{__name__=~\"vault_vault_.*_raft_peers\",cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Autopilot Healthy",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "{__name__=~\"vault_vault_.*_autopilot_healthy\",cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Active Leases",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            }
+          },
+          "targets": [
+            {
+              "expr": "{__name__=~\"vault_vault_.*_expire_num_leases\",cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Irrevocable Leases",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "{__name__=~\"vault_vault_.*_expire_num_irrevocable_leases\",cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Request Performance",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 4 },
+          "collapsed": false
+        },
+        {
+          "title": "Request Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "rate(vault_core_handle_request_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(vault_core_handle_request_count{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "avg"
+            }
+          ]
+        },
+        {
+          "title": "Login Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "rate(vault_core_handle_login_request_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(vault_core_handle_login_request_count{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "avg"
+            }
+          ]
+        },
+        {
+          "title": "In-flight Requests",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 20 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "{__name__=~\"vault_vault_.*_core_in_flight_requests_.*\",cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Tokens & Identity",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 },
+          "collapsed": false
+        },
+        {
+          "title": "Token Count",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "{__name__=~\"vault_vault_.*_token_count_root_.*\",cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Token Operations",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "custom": { "fillOpacity": 20 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "rate(vault_token_create_count{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "create"
+            },
+            {
+              "expr": "rate(vault_token_lookup_count{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "lookup"
+            },
+            {
+              "expr": "rate(vault_token_revoke_tree_count{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "revoke"
+            }
+          ]
+        },
+        {
+          "title": "Identity Entities",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "{__name__=~\"vault_vault_.*_identity_num_entities\",cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Raft Storage",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 },
+          "collapsed": false
+        },
+        {
+          "title": "Raft Commit Time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "rate(vault_raft_commitTime_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(vault_raft_commitTime_count{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "avg"
+            }
+          ]
+        },
+        {
+          "title": "Leader Last Contact",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "rate(vault_raft_leader_lastContact_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(vault_raft_leader_lastContact_count{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "avg"
+            }
+          ]
+        },
+        {
+          "title": "Follower Index Delta",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 20 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "{__name__=~\"vault_vault_.*_raft_storage_follower_applied_index_delta_.*\",cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{__name__}}"
+            }
+          ]
+        },
+        {
+          "title": "Barrier & Cache",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+          "collapsed": false
+        },
+        {
+          "title": "Barrier Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "rate(vault_barrier_get_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(vault_barrier_get_count{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "GET"
+            },
+            {
+              "expr": "rate(vault_barrier_put_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(vault_barrier_put_count{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "PUT"
+            }
+          ]
+        },
+        {
+          "title": "Cache Hit Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "custom": { "fillOpacity": 20 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "rate(vault_cache_hit{cluster_name=\"$cluster_name\"}[$__rate_interval]) / (rate(vault_cache_hit{cluster_name=\"$cluster_name\"}[$__rate_interval]) + rate(vault_cache_miss{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "hit rate"
+            }
+          ]
+        },
+        {
+          "title": "HA RPC Echo",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "rate(vault_ha_rpc_client_echo_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(vault_ha_rpc_client_echo_count{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "latency"
+            },
+            {
+              "expr": "rate(vault_ha_rpc_client_echo_errors{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "errors"
+            }
+          ]
+        },
+        {
+          "title": "Runtime",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+          "collapsed": false
+        },
+        {
+          "title": "Memory Allocated",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "{__name__=~\"vault_vault_.*_runtime_alloc_bytes\",cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Goroutines",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "{__name__=~\"vault_vault_.*_runtime_num_goroutines\",cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        }
+      ]
+    }

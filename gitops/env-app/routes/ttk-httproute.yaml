@@ -1,0 +1,16 @@
+# TTK frontend + UI
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ttk
+  namespace: mojaloop
+spec:
+  parentRefs:
+    - name: gw-int
+      namespace: platform-system
+  hostnames:
+    - "ttk.int.${domain}"
+  rules:
+    - backendRefs:
+        - name: moja-ml-testing-toolkit-frontend
+          port: 6060

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mojaloop-db-metrics
+  namespace: data
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9104"
+    prometheus.io/path: "/metrics"
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/instance: mojaloop-db
+    app.kubernetes.io/component: pxc
+  ports:
+    - name: metrics
+      port: 9104
+      targetPort: 9104
+      protocol: TCP

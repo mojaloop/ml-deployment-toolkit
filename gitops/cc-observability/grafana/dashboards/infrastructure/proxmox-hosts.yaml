@@ -1,0 +1,498 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-proxmox-hosts
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Infrastructure"
+data:
+  proxmox-hosts.json: |
+    {
+      "uid": "infra-proxmox-hosts",
+      "title": "Proxmox Hosts",
+      "description": "Hypervisor substrate health from Proxmox VE's built-in OpenTelemetry metrics: host saturation, storage headroom, per-VM pressure (PSI) for noisy-neighbor diagnosis. Note: this feed has no cluster_name label; VMs are identified by their Proxmox name",
+      "tags": ["infrastructure", "proxmox", "hypervisor"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "node",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(proxmox_node_uptime_seconds, node)",
+            "refresh": 2,
+            "includeAll": true,
+            "multi": true,
+            "current": {}
+          },
+          {
+            "name": "vm",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(proxmox_vm_uptime_seconds{node=~\"$node\"}, name)",
+            "refresh": 2,
+            "includeAll": true,
+            "multi": true,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Hosts Reporting",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            { "expr": "count(proxmox_node_uptime_seconds)", "legendFormat": "hosts" }
+          ],
+          "options": { "colorMode": "none", "graphMode": "none" }
+        },
+        {
+          "title": "Youngest Host Uptime",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "A low value means a host rebooted recently — expected during maintenance, alarming otherwise",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 3600 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            { "expr": "min(proxmox_node_uptime_seconds)", "legendFormat": "uptime" }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "VMs Running",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            { "expr": "count(proxmox_vm_uptime_seconds{node=~\"$node\", name=~\"$vm\"})", "legendFormat": "vms" }
+          ],
+          "options": { "colorMode": "none", "graphMode": "none" }
+        },
+        {
+          "title": "Max Host CPU",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red", "value": 0.85 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            { "expr": "max(proxmox_node_cpustat_cpu_percent{node=~\"$node\"})", "legendFormat": "cpu" }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Max Host Memory",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.8 },
+                  { "color": "red", "value": 0.9 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            { "expr": "max(proxmox_node_memory_memused_bytes{node=~\"$node\"} / proxmox_node_memory_memtotal_bytes{node=~\"$node\"})", "legendFormat": "memory" }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Worst Storage Pool",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "A full pool takes down every VM on it at once",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red", "value": 0.85 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            { "expr": "max(proxmox_storage_used_bytes{node=~\"$node\"} / proxmox_storage_total_bytes{node=~\"$node\"})", "legendFormat": "storage" }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Host CPU Utilisation",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "custom": { "fillOpacity": 10, "thresholdsStyle": { "mode": "line" } },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red", "value": 0.85 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            { "expr": "proxmox_node_cpustat_cpu_percent{node=~\"$node\"}", "legendFormat": "{{node}}" }
+          ]
+        },
+        {
+          "title": "Host Load15 / Cores",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 10, "thresholdsStyle": { "mode": "line" } },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            { "expr": "proxmox_node_cpustat_avg15_ratio{node=~\"$node\"} / proxmox_node_cpustat_cpus_ratio{node=~\"$node\"}", "legendFormat": "{{node}}" }
+          ]
+        },
+        {
+          "title": "Host IOWait & Steal",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "description": "IOWait cores = CPU time stalled on storage — contention invisible from inside the VMs",
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            { "expr": "rate(proxmox_node_cpustat_iowait_seconds_total{node=~\"$node\"}[$__rate_interval])", "legendFormat": "{{node}} iowait" },
+            { "expr": "rate(proxmox_node_cpustat_steal_seconds_total{node=~\"$node\"}[$__rate_interval])", "legendFormat": "{{node}} steal" }
+          ]
+        },
+        {
+          "title": "Host Memory Utilisation",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "custom": { "fillOpacity": 10, "thresholdsStyle": { "mode": "line" } },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.8 },
+                  { "color": "red", "value": 0.9 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            { "expr": "proxmox_node_memory_memused_bytes{node=~\"$node\"} / proxmox_node_memory_memtotal_bytes{node=~\"$node\"}", "legendFormat": "{{node}}" }
+          ]
+        },
+        {
+          "title": "Host Swap Used",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "description": "Any sustained non-zero value = host memory overcommit is biting; guest VMs will stall before anything shows up inside Kubernetes",
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            { "expr": "proxmox_node_memory_swapused_bytes{node=~\"$node\"}", "legendFormat": "{{node}}" }
+          ]
+        },
+        {
+          "title": "Host Network Throughput",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            { "expr": "rate(proxmox_node_network_receive_bytes_total{node=~\"$node\"}[$__rate_interval])", "legendFormat": "{{node}} rx" },
+            { "expr": "-rate(proxmox_node_network_transmit_bytes_total{node=~\"$node\"}[$__rate_interval])", "legendFormat": "{{node}} tx" }
+          ]
+        },
+        {
+          "title": "Storage Pool Usage",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "description": "The slope is the capacity forecast — PVC growth during perf runs shows up here",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "custom": { "fillOpacity": 10, "thresholdsStyle": { "mode": "line" } },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red", "value": 0.85 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            { "expr": "proxmox_storage_used_bytes{node=~\"$node\"} / proxmox_storage_total_bytes{node=~\"$node\"}", "legendFormat": "{{node}} {{storage}}" }
+          ]
+        },
+        {
+          "title": "Storage Pool Available",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 6, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            { "expr": "proxmox_storage_avail_bytes{node=~\"$node\"}", "legendFormat": "{{node}} {{storage}}" }
+          ]
+        },
+        {
+          "title": "Host Rootfs Usage",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 6, "x": 18, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "custom": { "fillOpacity": 10, "thresholdsStyle": { "mode": "line" } },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            { "expr": "proxmox_node_blockstat_per_percent{node=~\"$node\"}", "legendFormat": "{{node}}" }
+          ]
+        },
+        {
+          "title": "Top VM CPU",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            { "expr": "topk(10, proxmox_vm_cpu_percent{node=~\"$node\", name=~\"$vm\"})", "legendFormat": "{{name}} @{{node}}" }
+          ]
+        },
+        {
+          "title": "VM CPU Pressure (PSI)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "description": "% of time the VM had runnable tasks waiting for CPU — catches vCPU overcommit even when host CPU looks fine. The noisy-neighbor detector. All-zero = healthy",
+          "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            { "expr": "proxmox_vm_pressurecpusome_ratio{node=~\"$node\", name=~\"$vm\"}", "legendFormat": "{{name}} @{{node}}" }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] } }
+        },
+        {
+          "title": "vCPU Overcommit per Host",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "description": "Sum of allocated vCPUs / physical cores; higher = more contention risk under load",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 10, "thresholdsStyle": { "mode": "line" } },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1.5 },
+                  { "color": "red", "value": 3 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            { "expr": "sum by (node) (proxmox_vm_cpus_ratio{node=~\"$node\"}) / on(node) proxmox_node_cpustat_cpus_ratio{node=~\"$node\"}", "legendFormat": "{{node}}" }
+          ]
+        },
+        {
+          "title": "VM Memory Utilisation",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            { "expr": "topk(10, proxmox_vm_mem_bytes{node=~\"$node\", name=~\"$vm\"} / proxmox_vm_maxmem_bytes{node=~\"$node\", name=~\"$vm\"})", "legendFormat": "{{name}} @{{node}}" }
+          ]
+        },
+        {
+          "title": "VM Memory Pressure (PSI)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "description": "% of time tasks stalled on memory inside the VM (exporter mislabels the unit as bytes). All-zero = healthy; not every VM exports PSI",
+          "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            { "expr": "proxmox_vm_pressurememorysome_bytes{node=~\"$node\", name=~\"$vm\"}", "legendFormat": "{{name}} @{{node}}" }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] } }
+        },
+        {
+          "title": "VM Host Memory Footprint",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "description": "Actual host RAM consumed per VM — what capacity planning must add up",
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            { "expr": "proxmox_vm_memhost_bytes{node=~\"$node\", name=~\"$vm\"}", "legendFormat": "{{name}} @{{node}}" }
+          ]
+        },
+        {
+          "title": "VM Disk I/O",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 44 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            { "expr": "rate(proxmox_vm_diskread_bytes_total{node=~\"$node\", name=~\"$vm\"}[$__rate_interval])", "legendFormat": "{{name}} read" },
+            { "expr": "-rate(proxmox_vm_diskwrite_bytes_total{node=~\"$node\", name=~\"$vm\"}[$__rate_interval])", "legendFormat": "{{name}} write" }
+          ]
+        },
+        {
+          "title": "VM IO Pressure (PSI)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 44 },
+          "datasource": { "uid": "thanos" },
+          "description": "% of time tasks stalled waiting on disk inside the VM. All-zero = healthy; not every VM exports PSI",
+          "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            { "expr": "proxmox_vm_pressureiosome_ratio{node=~\"$node\", name=~\"$vm\"}", "legendFormat": "{{name}} @{{node}}" }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] } }
+        },
+        {
+          "title": "VM Network",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 44 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            { "expr": "rate(proxmox_vm_netin_bytes_total{node=~\"$node\", name=~\"$vm\"}[$__rate_interval])", "legendFormat": "{{name}} in" },
+            { "expr": "-rate(proxmox_vm_netout_bytes_total{node=~\"$node\", name=~\"$vm\"}[$__rate_interval])", "legendFormat": "{{name}} out" }
+          ]
+        },
+        {
+          "title": "VM Placement",
+          "type": "table",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 52 },
+          "datasource": { "uid": "thanos" },
+          "description": "Which VM runs on which host — for maintenance planning and noisy-neighbor attribution",
+          "fieldConfig": {
+            "defaults": { "unit": "short" },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "Uptime" }, "properties": [ { "id": "unit", "value": "s" } ] },
+              { "matcher": { "id": "byName", "options": "Max Memory" }, "properties": [ { "id": "unit", "value": "bytes" } ] }
+            ]
+          },
+          "targets": [
+            { "expr": "proxmox_vm_uptime_seconds{node=~\"$node\", name=~\"$vm\"}", "format": "table", "instant": true, "refId": "A" },
+            { "expr": "proxmox_vm_cpus_ratio{node=~\"$node\", name=~\"$vm\"}", "format": "table", "instant": true, "refId": "B" },
+            { "expr": "proxmox_vm_maxmem_bytes{node=~\"$node\", name=~\"$vm\"}", "format": "table", "instant": true, "refId": "C" }
+          ],
+          "transformations": [
+            {
+              "id": "joinByField",
+              "options": { "byField": "name", "mode": "outer" }
+            },
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "include": { "names": ["name", "node 1", "vmid 1", "type 1", "Value #A", "Value #B", "Value #C"] }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "renameByName": {
+                  "name": "VM",
+                  "node 1": "Host",
+                  "vmid 1": "VMID",
+                  "type 1": "Type",
+                  "Value #A": "Uptime",
+                  "Value #B": "vCPUs",
+                  "Value #C": "Max Memory"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

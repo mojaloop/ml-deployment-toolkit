@@ -1,0 +1,409 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-transfer-pipeline
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Mojaloop"
+data:
+  transfer-pipeline.json: |
+    {
+      "uid": "moja-transfer-pipeline",
+      "title": "Transfer Pipeline",
+      "description": "End-to-end transfer performance: per-stage latency (prepare/position/fulfil), throughput, handler internals, notification delivery, Kafka consumer lag, FX pipeline",
+      "tags": ["mojaloop", "transfers", "performance"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(moja_nodejs_eventloop_lag_seconds, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "E2E Transfer Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_tx_transfer_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "transfers/s"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "E2E p50 Latency",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "color": { "mode": "fixed", "fixedColor": "green" } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, sum(rate(moja_tx_transfer_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p50"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "none" }
+        },
+        {
+          "title": "E2E p90 Latency",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "decimals": 3,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1 },
+                  { "color": "red", "value": 3 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_tx_transfer_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p90"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "E2E p99 Latency",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "decimals": 3,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 2 },
+                  { "color": "red", "value": 5 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(moja_tx_transfer_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p99"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Prepare Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_transfer_prepare_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "prepare/s"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Fulfil Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_transfer_fulfil_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "fulfil/s"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "E2E Transfer Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "description": "End-to-end transfer duration from ML API Adapter inbound to DFSP callback",
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, sum(rate(moja_tx_transfer_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_tx_transfer_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p90"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(moja_tx_transfer_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p99"
+            }
+          ]
+        },
+        {
+          "title": "E2E Transfer Throughput",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_tx_transfer_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "E2E transfers"
+            },
+            {
+              "expr": "sum(rate(moja_tx_transfer_prepare_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "E2E prepare"
+            },
+            {
+              "expr": "sum(rate(moja_tx_transfer_fulfil_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "E2E fulfil"
+            }
+          ]
+        },
+        {
+          "title": "Per-Stage Latency (p90)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "description": "p90 latency at each pipeline stage — identifies which stage is the bottleneck",
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_ml_transfer_prepare_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "ML Adapter prepare"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_transfer_prepare_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "CL prepare"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_transfer_position_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "CL position"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_transfer_fulfil_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "CL fulfil"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_notification_event_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "notification"
+            }
+          ]
+        },
+        {
+          "title": "Per-Stage Throughput",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "description": "Rate at each pipeline stage — divergence between stages indicates backpressure",
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_ml_transfer_prepare_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "ML Adapter prepare"
+            },
+            {
+              "expr": "sum(rate(moja_transfer_prepare_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "CL prepare"
+            },
+            {
+              "expr": "sum(rate(moja_transfer_position_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "CL position"
+            },
+            {
+              "expr": "sum(rate(moja_transfer_fulfil_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "CL fulfil"
+            },
+            {
+              "expr": "sum(rate(moja_notification_event_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "notification"
+            }
+          ]
+        },
+        {
+          "title": "Prepare Handler Internals (p90)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "description": "Internal layer breakdown of the prepare handler — identifies whether bottleneck is validation, domain logic, or DB",
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_handler_transfers_bucket{cluster_name=\"$cluster_name\", service=\"centralledger-handler-transfer-prepare\"}[$__rate_interval])) by (le))",
+              "legendFormat": "handler total"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_handlers_transfer_validator_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "validator"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_domain_transfer_bucket{cluster_name=\"$cluster_name\", service=\"centralledger-handler-transfer-prepare\"}[$__rate_interval])) by (le))",
+              "legendFormat": "domain"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_model_transfer_bucket{cluster_name=\"$cluster_name\", service=\"centralledger-handler-transfer-prepare\"}[$__rate_interval])) by (le))",
+              "legendFormat": "model (DB)"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_model_participant_bucket{cluster_name=\"$cluster_name\", service=\"centralledger-handler-transfer-prepare\"}[$__rate_interval])) by (le))",
+              "legendFormat": "participant lookup"
+            }
+          ]
+        },
+        {
+          "title": "Position Handler Internals (p90)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_transfer_position_bucket{cluster_name=\"$cluster_name\", service=\"centralledger-handler-transfer-position\"}[$__rate_interval])) by (le))",
+              "legendFormat": "position total"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_domain_position_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "domain"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_model_position_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "model (DB)"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_transfer_position_batch_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "batch position"
+            }
+          ]
+        },
+        {
+          "title": "Notification Delivery (p90)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "description": "Notification handler breakdown — event processing, delivery to DFSP, endpoint resolution",
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_notification_event_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "event total"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_notification_event_delivery_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "delivery"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_notification_event_getEndpoint_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "getEndpoint"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_notification_event_process_msg_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "process msg"
+            }
+          ]
+        },
+        {
+          "title": "Kafka Consumer Lag (Mojaloop Topics)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "description": "Consumer lag on Mojaloop Kafka topics — growing lag means handlers can't keep up with producer rate",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 10 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 100 },
+                  { "color": "red", "value": 1000 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (consumergroup, topic) (kafka_consumergroup_lag{cluster_name=\"$cluster_name\", topic=~\"topic-transfer-.*|topic-notification-.*|topic-bulk-.*\"}) > 0",
+              "legendFormat": "{{consumergroup}} / {{topic}}"
+            }
+          ]
+        },
+        {
+          "title": "FX Transfer Latency (p90)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "description": "FX transfer pipeline latency — prepare and fulfil stages",
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_fx_transfer_prepare_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "FX prepare"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_fx_transfer_fulfil_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "FX fulfil"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_ml_fx_transfer_prepare_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "ML Adapter FX prepare"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_ml_fx_transfer_fulfil_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "ML Adapter FX fulfil"
+            }
+          ]
+        },
+        {
+          "title": "FX Throughput & Errors",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_fx_transfer_prepare_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "FX prepare"
+            },
+            {
+              "expr": "sum(rate(moja_fx_transfer_fulfil_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "FX fulfil"
+            },
+            {
+              "expr": "sum(rate(moja_ml_fx_transfer_fulfil_error_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "FX fulfil errors"
+            },
+            {
+              "expr": "sum(rate(moja_ml_transfer_fulfil_error_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "transfer fulfil errors"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

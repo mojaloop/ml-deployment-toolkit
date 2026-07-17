@@ -1,0 +1,24 @@
+# Provider-specific values merged into the shared external-dns HelmRelease
+# (gitops/platform/external-dns/) via valuesFrom.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: external-dns-provider-values
+  namespace: flux-system
+data:
+  values.yaml: |
+    provider:
+      name: aws
+    env:
+      - name: AWS_DEFAULT_REGION
+        value: "${aws_region}"
+      - name: AWS_ACCESS_KEY_ID
+        valueFrom:
+          secretKeyRef:
+            name: dns-provider-credentials
+            key: access-key-id
+      - name: AWS_SECRET_ACCESS_KEY
+        valueFrom:
+          secretKeyRef:
+            name: dns-provider-credentials
+            key: secret-access-key

@@ -1,0 +1,300 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-keycloak
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Platform"
+data:
+  keycloak.json: |
+    {
+      "uid": "platform-keycloak",
+      "title": "Keycloak",
+      "tags": ["platform", "keycloak", "auth"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(base_jvm_uptime{namespace=\"keycloak\"}, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Uptime",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            {
+              "expr": "base_jvm_uptime{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}",
+              "legendFormat": "uptime"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "none" }
+        },
+        {
+          "title": "HTTP Error Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.1 },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(http_server_requests_seconds_count{cluster_name=\"$cluster_name\",namespace=\"keycloak\",status=~\"5..\"}[$__rate_interval])) or vector(0)",
+              "legendFormat": "errors/s"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Active Requests",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "http_server_active_requests{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}",
+              "legendFormat": "active"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Active Connections",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "http_server_active_connections{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}",
+              "legendFormat": "connections"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "DB Pool Active",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "agroal_active_count{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}",
+              "legendFormat": "active"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "DB Pool Awaiting",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1 },
+                  { "color": "red", "value": 3 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "agroal_awaiting_count{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}",
+              "legendFormat": "awaiting"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Login Events by Realm",
+          "type": "timeseries",
+          "description": "Successful logins per realm (hub-operators, dfsps)",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "sum by (realm) (rate(keycloak_user_events_total{cluster_name=\"$cluster_name\",event=\"login\",error=\"\"}[$__rate_interval]))",
+              "legendFormat": "{{realm}}"
+            }
+          ]
+        },
+        {
+          "title": "Login Failures by Realm",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "sum by (realm, error) (rate(keycloak_user_events_total{cluster_name=\"$cluster_name\",event=\"login\",error!=\"\"}[$__rate_interval]))",
+              "legendFormat": "{{realm}} — {{error}}"
+            }
+          ]
+        },
+        {
+          "title": "Request Rate by URI",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "topk(10, sum by (uri) (rate(http_server_requests_seconds_count{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}[$__rate_interval])))",
+              "legendFormat": "{{uri}}"
+            }
+          ]
+        },
+        {
+          "title": "Request Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (uri) (rate(http_server_requests_seconds_sum{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}[$__rate_interval])) / sum by (uri) (rate(http_server_requests_seconds_count{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}[$__rate_interval]))",
+              "legendFormat": "{{uri}}"
+            }
+          ]
+        },
+        {
+          "title": "DB Connection Pool",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "agroal_active_count{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}",
+              "legendFormat": "active"
+            },
+            {
+              "expr": "agroal_available_count{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}",
+              "legendFormat": "available"
+            },
+            {
+              "expr": "agroal_awaiting_count{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}",
+              "legendFormat": "awaiting"
+            }
+          ]
+        },
+        {
+          "title": "Heap Memory",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "base_memory_usedHeap_bytes{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}",
+              "legendFormat": "used"
+            },
+            {
+              "expr": "base_memory_committedHeap_bytes{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}",
+              "legendFormat": "committed"
+            }
+          ]
+        },
+        {
+          "title": "GC Overhead",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "jvm_gc_overhead{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}",
+              "legendFormat": "gc overhead"
+            }
+          ]
+        },
+        {
+          "title": "CPU",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "base_cpu_processCpuLoad{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}",
+              "legendFormat": "cpu"
+            }
+          ]
+        },
+        {
+          "title": "Cache Hit Ratio",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "vendor_statistics_hit_ratio{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}",
+              "legendFormat": "hit ratio"
+            }
+          ]
+        },
+        {
+          "title": "Cache Entries",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "vendor_statistics_number_of_entries{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}",
+              "legendFormat": "entries"
+            }
+          ]
+        },
+        {
+          "title": "Cache Evictions",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "vendor_statistics_evictions{cluster_name=\"$cluster_name\",namespace=\"keycloak\"}",
+              "legendFormat": "evictions"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

@@ -1,0 +1,72 @@
+# Minimal values for the Talos bootstrap Cilium manifest (extraManifests).
+# Keep this to what a node needs to reach Ready — full runtime config lives
+# in gitops/talos/cilium/helmrelease.yaml and Flux reconciles to it once the
+# cluster is up.
+#
+# Hubble must stay disabled here: with it enabled, helm template embeds
+# freshly generated TLS private keys (Secrets) in the rendered manifest,
+# which is committed to a public repo.
+
+# Kube-proxy replacement (Cilium handles all service routing)
+kubeProxyReplacement: true
+
+# With kube-proxy disabled, the in-cluster Service IP (10.96.0.1) is not
+# routable until Cilium itself is running — agent and operator must reach the
+# API server through Talos KubePrism on every node instead.
+k8sServiceHost: localhost
+k8sServicePort: 7445
+
+# IPAM mode — use Kubernetes-assigned pod CIDRs
+ipam:
+  mode: kubernetes
+
+# Talos-specific: cgroup settings
+cgroup:
+  autoMount:
+    enabled: false
+  hostRoot: /sys/fs/cgroup
+
+# Talos-specific: capabilities for restricted runtime
+securityContext:
+  capabilities:
+    ciliumAgent:
+      - CHOWN
+      - KILL
+      - NET_ADMIN
+      - NET_RAW
+      - IPC_LOCK
+      - SYS_ADMIN
+      - SYS_RESOURCE
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    cleanCiliumState:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_RESOURCE
+
+# WireGuard node-to-node encryption (ADR-013) — enabled at bootstrap so a
+# fresh cluster never runs a plaintext window before Flux takeover. Keys are
+# generated at runtime by each agent; helm renders no Secrets for this.
+# Must match gitops/talos/cilium/helmrelease.yaml.
+encryption:
+  enabled: true
+  type: wireguard
+
+# Gateway API must be enabled at bootstrap even though Flux owns the full
+# config: it sets enable-gateway-api/enable-envoy-config, and the operator
+# only registers the CiliumEnvoyConfig CRDs at startup based on those flags.
+# Flux's takeover flips the flags and rolls the agent but not the operator,
+# so agents would wait forever on CRDs the bootstrap operator never
+# registered. Renders no Secrets, so safe to commit.
+gatewayAPI:
+  enabled: true
+
+# No TLS secrets in the rendered output (see header). Flux enables Hubble
+# with cluster-generated certs after takeover.
+hubble:
+  enabled: false
+
+operator:
+  replicas: 1

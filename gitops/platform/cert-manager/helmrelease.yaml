@@ -1,0 +1,40 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: jetstack
+  namespace: flux-system
+spec:
+  interval: 24h
+  url: https://charts.jetstack.io
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cert-manager
+  namespace: flux-system
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: cert-manager
+      version: "v1.x"
+      sourceRef:
+        kind: HelmRepository
+        name: jetstack
+      interval: 12h
+  targetNamespace: cert-manager
+  install:
+    crds: Create
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  values:
+    installCRDs: true
+    config:
+      enableGatewayAPI: true
+    prometheus:
+      enabled: true

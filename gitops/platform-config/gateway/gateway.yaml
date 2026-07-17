@@ -1,0 +1,21 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: gw-int
+  namespace: platform-system
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  gatewayClassName: ${gateway_class_name}
+  listeners:
+    - name: https
+      hostname: "*.int.${domain}"
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: wildcard-int-tls
+      allowedRoutes:
+        namespaces:
+          from: All

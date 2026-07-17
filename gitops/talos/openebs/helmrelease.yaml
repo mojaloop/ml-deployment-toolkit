@@ -1,0 +1,60 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: openebs
+  namespace: flux-system
+spec:
+  interval: 24h
+  url: https://openebs.github.io/openebs
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: openebs
+  namespace: flux-system
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: openebs
+      version: "4.x"
+      sourceRef:
+        kind: HelmRepository
+        name: openebs
+      interval: 12h
+  targetNamespace: openebs-system
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    # Only enable localpv hostpath provisioner
+    localpv-provisioner:
+      enabled: true
+      hostpathClass:
+        enabled: true
+        isDefaultClass: true
+
+    # Disable all other engines and sub-charts
+    engines:
+      local:
+        lvm:
+          enabled: false
+        zfs:
+          enabled: false
+      replicated:
+        mayastor:
+          enabled: false
+    openebs-crds:
+      csi:
+        volumeSnapshots:
+          enabled: false
+    loki:
+      enabled: false
+    minio:
+      enabled: false
+    alloy:
+      enabled: false

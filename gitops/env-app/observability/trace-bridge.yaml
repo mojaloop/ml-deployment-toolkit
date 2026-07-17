@@ -1,0 +1,44 @@
+# moja-trace-bridge: Event-SDK trace events (Kafka topic-event-trace) → Tempo OTLP.
+# Source: tools/trace-bridge/ in this repo.
+# Produces traces only when Mojaloop services run with EVENT_SDK TRACE: kafka
+# (gitops/env-app/mojaloop/helmrelease.yaml eventSdkConfig) — idle otherwise.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trace-bridge
+  namespace: mojaloop
+  labels:
+    app.kubernetes.io/name: trace-bridge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: trace-bridge
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: trace-bridge
+    spec:
+      containers:
+        - name: trace-bridge
+          image: ghcr.io/kiswend/moja-trace-bridge:0.1.1
+          env:
+            - name: KAFKA_BROKERS
+              value: "${kafka_host}:${kafka_port}"
+            - name: TRACE_TOPIC
+              value: topic-event-trace
+            - name: OTLP_URL
+              value: "${tempo_url}"
+            - name: TLS_SKIP
+              value: "true"
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

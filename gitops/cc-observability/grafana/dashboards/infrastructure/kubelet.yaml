@@ -1,0 +1,380 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-kubelet
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Infrastructure"
+data:
+  kubelet.json: |
+    {
+      "uid": "infra-kubelet",
+      "title": "Kubelet",
+      "description": "Kubelet health: running pods, runtime operations, pod start latency, PLEG relist, cgroup manager, storage ops, volume stats",
+      "tags": ["infrastructure", "kubernetes", "kubelet"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(kubelet_node_name, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          },
+          {
+            "name": "node",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(kubelet_node_name{cluster_name=\"$cluster_name\"}, node)",
+            "refresh": 2,
+            "includeAll": true,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+
+        {
+          "title": "Overview",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "collapsed": false
+        },
+        {
+          "title": "Running Pods",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "sum(kubelet_running_pods{cluster_name=\"$cluster_name\", node=~\"$node\"})",
+              "legendFormat": "pods"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Running Containers",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "sum(kubelet_running_containers{cluster_name=\"$cluster_name\", node=~\"$node\", container_state=\"running\"})",
+              "legendFormat": "containers"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Runtime Errors (5m)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.1 },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(kubelet_runtime_operations_errors_total{cluster_name=\"$cluster_name\", node=~\"$node\"}[5m]))",
+              "legendFormat": "errors/s"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Started Container Errors (5m)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(increase(kubelet_started_containers_errors_total{cluster_name=\"$cluster_name\", node=~\"$node\"}[5m])) or vector(0)",
+              "legendFormat": "errors"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Active Pods",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "sum(kubelet_active_pods{cluster_name=\"$cluster_name\", node=~\"$node\"})",
+              "legendFormat": "active"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Desired Pods",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "sum(kubelet_desired_pods{cluster_name=\"$cluster_name\", node=~\"$node\"})",
+              "legendFormat": "desired"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+
+        {
+          "title": "Runtime Operations",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+          "collapsed": false
+        },
+        {
+          "title": "Runtime Operation Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (operation_type) (rate(kubelet_runtime_operations_total{cluster_name=\"$cluster_name\", node=~\"$node\"}[5m]))",
+              "legendFormat": "{{ operation_type }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "Runtime Operation Errors",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (operation_type) (rate(kubelet_runtime_operations_errors_total{cluster_name=\"$cluster_name\", node=~\"$node\"}[5m]))",
+              "legendFormat": "{{ operation_type }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "Runtime Operation Duration (p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 14 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (operation_type, le) (rate(kubelet_runtime_operations_duration_seconds_bucket{cluster_name=\"$cluster_name\", node=~\"$node\"}[5m])))",
+              "legendFormat": "{{ operation_type }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+
+        {
+          "title": "Pod Lifecycle",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+          "collapsed": false
+        },
+        {
+          "title": "Pod Start Duration (p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 23 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (le) (rate(kubelet_pod_start_duration_seconds_bucket{cluster_name=\"$cluster_name\", node=~\"$node\"}[5m])))",
+              "legendFormat": "p99"
+            },
+            {
+              "expr": "histogram_quantile(0.50, sum by (le) (rate(kubelet_pod_start_duration_seconds_bucket{cluster_name=\"$cluster_name\", node=~\"$node\"}[5m])))",
+              "legendFormat": "p50"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "Pod Worker Duration (p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 23 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (le) (rate(kubelet_pod_worker_duration_seconds_bucket{cluster_name=\"$cluster_name\", node=~\"$node\"}[5m])))",
+              "legendFormat": "p99"
+            },
+            {
+              "expr": "histogram_quantile(0.50, sum by (le) (rate(kubelet_pod_worker_duration_seconds_bucket{cluster_name=\"$cluster_name\", node=~\"$node\"}[5m])))",
+              "legendFormat": "p50"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "Pod Sandbox Creation (p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 23 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (le) (rate(kubelet_run_podsandbox_duration_seconds_bucket{cluster_name=\"$cluster_name\", node=~\"$node\"}[5m])))",
+              "legendFormat": "p99"
+            },
+            {
+              "expr": "histogram_quantile(0.50, sum by (le) (rate(kubelet_run_podsandbox_duration_seconds_bucket{cluster_name=\"$cluster_name\", node=~\"$node\"}[5m])))",
+              "legendFormat": "p50"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+
+        {
+          "title": "PLEG & cgroup",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+          "collapsed": false
+        },
+        {
+          "title": "PLEG Relist Duration (p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 32 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (le, node) (rate(kubelet_pleg_relist_duration_seconds_bucket{cluster_name=\"$cluster_name\", node=~\"$node\"}[5m])))",
+              "legendFormat": "{{ node }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "PLEG Relist Interval (p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 32 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (le, node) (rate(kubelet_pleg_relist_interval_seconds_bucket{cluster_name=\"$cluster_name\", node=~\"$node\"}[5m])))",
+              "legendFormat": "{{ node }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "cgroup Manager Duration (p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 32 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (le, operation_type) (rate(kubelet_cgroup_manager_duration_seconds_bucket{cluster_name=\"$cluster_name\", node=~\"$node\"}[5m])))",
+              "legendFormat": "{{ operation_type }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+
+        {
+          "title": "Storage Operations",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
+          "collapsed": false
+        },
+        {
+          "title": "Storage Operation Duration (p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (operation_name, le) (rate(storage_operation_duration_seconds_bucket{cluster_name=\"$cluster_name\", node=~\"$node\"}[5m])))",
+              "legendFormat": "{{ operation_name }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "Image Pull Duration (p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (le) (rate(kubelet_image_pull_duration_seconds_bucket{cluster_name=\"$cluster_name\", node=~\"$node\"}[5m])))",
+              "legendFormat": "p99"
+            },
+            {
+              "expr": "histogram_quantile(0.50, sum by (le) (rate(kubelet_image_pull_duration_seconds_bucket{cluster_name=\"$cluster_name\", node=~\"$node\"}[5m])))",
+              "legendFormat": "p50"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+
+        {
+          "title": "API Server Requests",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 49 },
+          "collapsed": false
+        },
+        {
+          "title": "API Request Rate by Code",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 50 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (code) (rate(rest_client_requests_total{cluster_name=\"$cluster_name\", node=~\"$node\", job=\"prometheus.scrape.kubelet\"}[5m]))",
+              "legendFormat": "{{ code }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        }
+      ],
+      "schemaVersion": 39
+    }

@@ -1,0 +1,455 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-kube-apiserver
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Infrastructure"
+data:
+  kube-apiserver.json: |
+    {
+      "uid": "infra-kube-apiserver",
+      "title": "Kube API Server",
+      "description": "API server availability, request rate, latency, APF queuing, etcd latency, watches, and resource usage",
+      "tags": ["infrastructure", "kubernetes", "apiserver"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(apiserver_request_total, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+
+        {
+          "title": "Availability & Errors",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "collapsed": false
+        },
+        {
+          "title": "Availability (5m)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 3,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 0.99 },
+                  { "color": "green", "value": 0.999 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "1 - (sum(rate(apiserver_request_total{cluster_name=\"$cluster_name\", code=~\"5..\"}[5m])) / sum(rate(apiserver_request_total{cluster_name=\"$cluster_name\"}[5m])))",
+              "legendFormat": "availability"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Request Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(apiserver_request_total{cluster_name=\"$cluster_name\"}[5m]))",
+              "legendFormat": "req/s"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area" }
+        },
+        {
+          "title": "Error Rate (5xx)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.1 },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(apiserver_request_total{cluster_name=\"$cluster_name\", code=~\"5..\"}[5m])) or vector(0)",
+              "legendFormat": "5xx/s"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Inflight Requests",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "sum(apiserver_current_inflight_requests{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "inflight"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area" }
+        },
+        {
+          "title": "Long-Running Requests (current)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "description": "Gauge of in-flight long-running requests (mostly WATCH connections). The big number is the current value by design; the sparkline behind it follows the selected time range",
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "sum(apiserver_longrunning_requests{cluster_name=\"$cluster_name\"}) or vector(0)",
+              "legendFormat": "long-running"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area" }
+        },
+        {
+          "title": "Terminated Requests (5m)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(increase(apiserver_request_terminations_total{cluster_name=\"$cluster_name\"}[5m])) or vector(0)",
+              "legendFormat": "terminated"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+
+        {
+          "title": "Request Rate by Verb",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (verb) (rate(apiserver_request_total{cluster_name=\"$cluster_name\"}[5m]))",
+              "legendFormat": "{{ verb }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "Request Rate by Response Code",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (code) (rate(apiserver_request_total{cluster_name=\"$cluster_name\"}[5m]))",
+              "legendFormat": "{{ code }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+
+        {
+          "title": "Latency",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+          "collapsed": false
+        },
+        {
+          "title": "Request Latency by Verb (p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (verb, le) (rate(apiserver_request_duration_seconds_bucket{cluster_name=\"$cluster_name\", verb!~\"WATCH|CONNECT\"}[5m])))",
+              "legendFormat": "{{ verb }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "Request Latency Percentiles (non-watch)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum by (le) (rate(apiserver_request_duration_seconds_bucket{cluster_name=\"$cluster_name\", verb!~\"WATCH|CONNECT\"}[5m])))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.90, sum by (le) (rate(apiserver_request_duration_seconds_bucket{cluster_name=\"$cluster_name\", verb!~\"WATCH|CONNECT\"}[5m])))",
+              "legendFormat": "p90"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum by (le) (rate(apiserver_request_duration_seconds_bucket{cluster_name=\"$cluster_name\", verb!~\"WATCH|CONNECT\"}[5m])))",
+              "legendFormat": "p99"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+
+        {
+          "title": "etcd",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+          "collapsed": false
+        },
+        {
+          "title": "etcd Request Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 23 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (operation) (rate(etcd_requests_total{cluster_name=\"$cluster_name\"}[5m]))",
+              "legendFormat": "{{ operation }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "etcd Request Latency (p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 23 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (operation, le) (rate(etcd_request_duration_seconds_bucket{cluster_name=\"$cluster_name\"}[5m])))",
+              "legendFormat": "{{ operation }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "etcd Errors",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 23 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 10 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (operation) (rate(etcd_request_errors_total{cluster_name=\"$cluster_name\"}[5m])) or vector(0)",
+              "legendFormat": "{{ operation }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+
+        {
+          "title": "Priority & Fairness (APF)",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+          "collapsed": false
+        },
+        {
+          "title": "Executing Requests by Priority Level",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 32 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (priority_level) (apiserver_flowcontrol_current_executing_requests{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "{{ priority_level }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "Queued Requests by Priority Level",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 32 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 5 },
+                  { "color": "red", "value": 20 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (priority_level) (apiserver_flowcontrol_current_inqueue_requests{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "{{ priority_level }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "APF Queue Wait Duration (p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 32 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (priority_level, le) (rate(apiserver_flowcontrol_request_wait_duration_seconds_bucket{cluster_name=\"$cluster_name\"}[5m])))",
+              "legendFormat": "{{ priority_level }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+
+        {
+          "title": "Watches & Storage",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
+          "collapsed": false
+        },
+        {
+          "title": "Watch Events Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 41 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(apiserver_watch_events_total{cluster_name=\"$cluster_name\"}[5m]))",
+              "legendFormat": "events/s"
+            }
+          ]
+        },
+        {
+          "title": "Watch Event Size (p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 41 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (le) (rate(apiserver_watch_events_sizes_bucket{cluster_name=\"$cluster_name\"}[5m])))",
+              "legendFormat": "p99"
+            }
+          ]
+        },
+        {
+          "title": "Stored Objects by Resource",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 41 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "topk(15, sum by (resource) (apiserver_storage_objects{cluster_name=\"$cluster_name\"}))",
+              "legendFormat": "{{ resource }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull"] } }
+        },
+
+        {
+          "title": "Resources",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 49 },
+          "collapsed": false
+        },
+        {
+          "title": "CPU Usage",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 50 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "rate(process_cpu_seconds_total{cluster_name=\"$cluster_name\", job=\"prometheus.scrape.apiserver\"}[5m])",
+              "legendFormat": "cpu cores"
+            }
+          ]
+        },
+        {
+          "title": "Memory Usage",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 50 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "process_resident_memory_bytes{cluster_name=\"$cluster_name\", job=\"prometheus.scrape.apiserver\"}",
+              "legendFormat": "RSS"
+            }
+          ]
+        },
+        {
+          "title": "Inflight Requests (reads vs writes)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 50 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (request_kind) (apiserver_current_inflight_requests{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "{{ request_kind }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        }
+      ],
+      "schemaVersion": 39
+    }

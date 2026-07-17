@@ -1,0 +1,25 @@
+# cert-manager Certificate for the Hub's JWS signing key.
+# Issued by Vault PKI via vault-pki-issuer (scheme CA).
+# Shared by all switch signing services (ml-api-adapter-handler-notification,
+# quoting-service-handler, account-lookup-service) so a single public key can be
+# distributed to DFSPs. Public key is extracted from tls.crt by the companion
+# jws-pubkey-job and registered with MCM via POST /api/hub/jwscerts.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: switch-jws
+  namespace: mojaloop
+spec:
+  secretName: switch-jws
+  duration: 720h      # 30 days
+  renewBefore: 360h   # renew 15 days before expiry
+  issuerRef:
+    name: vault-pki-issuer
+    kind: ClusterIssuer
+  privateKey:
+    algorithm: RSA
+    size: 4096
+    rotationPolicy: Always
+  commonName: "${hub_participant_name}.${domain}"
+  dnsNames:
+    - "${hub_participant_name}.${domain}"

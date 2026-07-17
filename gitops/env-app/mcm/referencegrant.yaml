@@ -1,0 +1,15 @@
+# Allow HTTPRoutes in the mcm namespace to reference Services in ory namespace.
+# Required for MCM HTTPRoute to route to kratos-public and oathkeeper-proxy.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-mcm-httproute-ref
+  namespace: ory
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: mcm
+  to:
+    - group: ""
+      kind: Service

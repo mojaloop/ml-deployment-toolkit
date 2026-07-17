@@ -1,0 +1,46 @@
+# MCM API cross-namespace RBAC
+# 1. Vault K8s auth: token review binding (allows Vault to verify MCM SA tokens)
+# 2. Mojaloop namespace: job creation for DFSP onboarding
+---
+# ClusterRoleBinding for Vault Kubernetes auth — allows token review
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mcm-tokenreview-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: connection-manager-api
+    namespace: mcm
+---
+# Role in mojaloop namespace — MCM creates jobs for DFSP onboarding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mcm-onboarding
+  namespace: mojaloop
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets", "configmaps"]
+    verbs: ["get", "list", "watch"]
+---
+# Bind MCM API SA to the onboarding role in mojaloop namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mcm-onboarding
+  namespace: mojaloop
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: mcm-onboarding
+subjects:
+  - kind: ServiceAccount
+    name: connection-manager-api
+    namespace: mcm

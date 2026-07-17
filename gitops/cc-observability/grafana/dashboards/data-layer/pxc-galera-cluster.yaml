@@ -1,0 +1,393 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-pxc-galera-cluster
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Data Layer"
+data:
+  pxc-galera-cluster.json: |
+    {
+      "uid": "data-pxc-galera",
+      "title": "PXC / Galera Cluster",
+      "description": "Percona XtraDB Cluster replication health: cluster state, flow control, queues, replication latency, certification conflicts",
+      "tags": ["data-layer", "mysql", "pxc", "galera", "performance"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(mysql_global_status_wsrep_cluster_size, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Cluster Size",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 2 },
+                  { "color": "green", "value": 3 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "max(mysql_global_status_wsrep_cluster_size{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "nodes"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Cluster Status",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "1 = Primary (healthy), 0 = Non-Primary (split-brain risk)",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "mappings": [
+                { "type": "value", "options": { "1": { "text": "Primary", "color": "green" } } },
+                { "type": "value", "options": { "0": { "text": "Non-Primary", "color": "red" } } }
+              ]
+            }
+          },
+          "targets": [
+            {
+              "expr": "min(mysql_global_status_wsrep_cluster_status{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "status"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "All Nodes Ready",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "1 = ready to accept queries",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "min(mysql_global_status_wsrep_ready{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "ready"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Flow Control Paused",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Fraction of time replication was paused due to flow control. >0 means a node is falling behind.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.01 },
+                  { "color": "red", "value": 0.1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "max(mysql_global_status_wsrep_flow_control_paused{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "paused"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Cert Failures/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Certification failures = write conflicts between nodes",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.1 },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(mysql_global_status_wsrep_local_cert_failures{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "cert failures"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Repl Latency (avg)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "decimals": 4,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.01 },
+                  { "color": "red", "value": 0.1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "max(mysql_galera_evs_repl_latency_avg_seconds{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "avg"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Node State",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "description": "wsrep_local_state: 1=Joining, 2=Donor/Desynced, 3=Joined, 4=Synced (healthy)",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "max": 5,
+              "custom": { "fillOpacity": 10 },
+              "mappings": [
+                { "type": "value", "options": { "1": { "text": "Joining" }, "2": { "text": "Donor" }, "3": { "text": "Joined" }, "4": { "text": "Synced" } } }
+              ]
+            }
+          },
+          "targets": [
+            {
+              "expr": "mysql_global_status_wsrep_local_state{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Replication Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "description": "EVS replication latency between cluster nodes",
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "mysql_galera_evs_repl_latency_avg_seconds{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}} avg"
+            },
+            {
+              "expr": "mysql_galera_evs_repl_latency_max_seconds{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}} max"
+            },
+            {
+              "expr": "mysql_galera_evs_repl_latency_min_seconds{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}} min"
+            }
+          ]
+        },
+        {
+          "title": "Flow Control Events",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "description": "Flow control sent = this node asked others to slow down. Recv = this node was asked to slow down.",
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "rate(mysql_global_status_wsrep_flow_control_sent{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} sent"
+            },
+            {
+              "expr": "rate(mysql_global_status_wsrep_flow_control_recv{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} recv"
+            }
+          ]
+        },
+        {
+          "title": "Flow Control Paused Fraction",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "description": "Fraction of time since last status query that replication was paused",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "custom": { "fillOpacity": 20 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.01 },
+                  { "color": "red", "value": 0.1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "mysql_global_status_wsrep_flow_control_paused{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Receive Queue",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "description": "Incoming replication apply queue. Growing queue = node falling behind.",
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "mysql_global_status_wsrep_local_recv_queue{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}} current"
+            },
+            {
+              "expr": "mysql_global_status_wsrep_local_recv_queue_avg{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}} avg"
+            }
+          ]
+        },
+        {
+          "title": "Send Queue",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "description": "Outgoing replication send queue. Growing = network or peer bottleneck.",
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "mysql_global_status_wsrep_local_send_queue{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}} current"
+            },
+            {
+              "expr": "mysql_global_status_wsrep_local_send_queue_avg{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}} avg"
+            }
+          ]
+        },
+        {
+          "title": "Replication Traffic",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "rate(mysql_global_status_wsrep_replicated_bytes{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} replicated (out)"
+            },
+            {
+              "expr": "rate(mysql_global_status_wsrep_received_bytes{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} received (in)"
+            }
+          ]
+        },
+        {
+          "title": "Transactions",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "description": "Local commits vs replicated writesets vs certification failures",
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "rate(mysql_global_status_wsrep_local_commits{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} local commits"
+            },
+            {
+              "expr": "rate(mysql_global_status_wsrep_replicated{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} replicated"
+            },
+            {
+              "expr": "rate(mysql_global_status_wsrep_local_cert_failures{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} cert failures"
+            },
+            {
+              "expr": "rate(mysql_global_status_wsrep_local_bf_aborts{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} bf aborts"
+            }
+          ]
+        },
+        {
+          "title": "Certification Dependency Distance",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "description": "Average distance between highest and lowest sequence number that can be applied in parallel. Higher = more parallelism potential.",
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "mysql_global_status_wsrep_cert_deps_distance{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Galera Cache Size",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "description": "GCache holds writesets for IST (incremental state transfer). If a rejoining node needs data older than gcache, full SST is required.",
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "mysql_galera_gcache_size_bytes{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

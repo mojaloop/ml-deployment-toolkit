@@ -1,0 +1,35 @@
+# openebs-storage-patch.yaml
+machine:
+  # # Enable HugePages for Mayastor (minimum 1024 pages = 2GiB)
+  # sysctls:
+  #   vm.nr_hugepages: "1024"
+
+  # Mount the second disk for Mayastor WITHOUT formatting
+  # Talos will make it available but won't partition/format it
+  disks:
+    - device: /dev/sdb
+
+  # Configure kubelet mounts and labels
+  kubelet:
+    extraMounts:
+      # Mount for OpenEBS hostpath (first disk)
+      - destination: /var/openebs/local
+        type: bind
+        source: /var/openebs/local
+        options:
+          - bind
+          - rshared
+          - rw
+
+      # Mount for Mayastor data plane
+      - destination: /var/local
+        type: bind
+        source: /var/local
+        options:
+          - rbind
+          - rshared
+          - rw
+
+    # Label nodes for Mayastor
+    extraArgs:
+      node-labels: "openebs.io/engine=mayastor"

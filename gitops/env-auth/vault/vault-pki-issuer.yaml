@@ -1,0 +1,49 @@
+# ServiceAccount used by cert-manager to authenticate to Vault PKI
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-pki-issuer
+  namespace: cert-manager
+---
+# Allow cert-manager to create tokens for the vault-pki-issuer SA
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vault-pki-issuer-token
+  namespace: cert-manager
+rules:
+  - apiGroups: [""]
+    resources: ["serviceaccounts/token"]
+    resourceNames: ["vault-pki-issuer"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vault-pki-issuer-token
+  namespace: cert-manager
+subjects:
+  - kind: ServiceAccount
+    name: cert-manager-cert-manager
+    namespace: cert-manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vault-pki-issuer-token
+---
+# cert-manager ClusterIssuer backed by Vault PKI (scheme CA)
+# Issues Hub server certs via server-cert-role for the extapi mTLS endpoint
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: vault-pki-issuer
+spec:
+  vault:
+    path: pki/sign/server-cert-role
+    server: http://vault.vault.svc.cluster.local:8200
+    auth:
+      kubernetes:
+        role: cert-manager-vault-issuer
+        mountPath: /v1/auth/kubernetes
+        serviceAccountRef:
+          name: vault-pki-issuer

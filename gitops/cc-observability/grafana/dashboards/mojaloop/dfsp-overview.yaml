@@ -1,0 +1,269 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-dfsp-overview
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Mojaloop"
+data:
+  dfsp-overview.json: |
+    {
+      "uid": "dfsp-overview",
+      "title": "DFSP Overview",
+      "description": "Per-DFSP view: VM host metrics, sdk-scheme-adapter phase latencies and Node.js runtime, Redis (SDK cache/pub-sub). Select the DFSP with the dfsp variable. Data ships from the integration-toolkit obs profile (alloy + node + redis exporter).",
+      "tags": ["mojaloop", "dfsp", "performance"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "dfsp",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(up{cluster_name=~\"dfsp.*\"}, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "VM CPU busy",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 2, "max": 1, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.7 }, { "color": "red", "value": 0.9 } ] } } },
+          "targets": [ { "expr": "1 - avg(rate(node_cpu_seconds_total{cluster_name=\"$dfsp\", mode=\"idle\"}[$__rate_interval]))", "legendFormat": "busy" } ],
+          "options": { "colorMode": "background", "graphMode": "area" }
+        },
+        {
+          "title": "VM memory used",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 2, "max": 1, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.7 }, { "color": "red", "value": 0.9 } ] } } },
+          "targets": [ { "expr": "1 - (node_memory_MemAvailable_bytes{cluster_name=\"$dfsp\"} / node_memory_MemTotal_bytes{cluster_name=\"$dfsp\"})", "legendFormat": "used" } ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "SDK e2e transfer p90",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 2, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1.5 }, { "color": "red", "value": 2 } ] } } },
+          "targets": [ { "expr": "histogram_quantile(0.9, sum by (le) (rate(mojaloop_connector_outbound_transfer_latency_bucket{cluster_name=\"$dfsp\"}[$__rate_interval])))", "legendFormat": "p90" } ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Redis status",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "mappings": [ { "type": "value", "options": { "1": { "text": "UP", "color": "green" }, "0": { "text": "DOWN", "color": "red" } } } ] } },
+          "targets": [ { "expr": "redis_up{cluster_name=\"$dfsp\"}", "legendFormat": "redis" } ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Redis clients",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [ { "expr": "redis_connected_clients{cluster_name=\"$dfsp\"}", "legendFormat": "connected" } ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "SDK in-flight requests",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [ { "expr": "sum(mojaloop_connector_default_nodejs_active_requests_total{cluster_name=\"$dfsp\"})", "legendFormat": "active" } ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "SDK outbound phase latency (p50)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            { "expr": "histogram_quantile(0.5, sum by (le) (rate(mojaloop_connector_outbound_party_lookup_latency_bucket{cluster_name=\"$dfsp\"}[$__rate_interval])))", "legendFormat": "party lookup" },
+            { "expr": "histogram_quantile(0.5, sum by (le) (rate(mojaloop_connector_outbound_quote_request_latency_bucket{cluster_name=\"$dfsp\"}[$__rate_interval])))", "legendFormat": "quote" },
+            { "expr": "histogram_quantile(0.5, sum by (le) (rate(mojaloop_connector_outbound_transfer_latency_bucket{cluster_name=\"$dfsp\"}[$__rate_interval])))", "legendFormat": "transfer" }
+          ]
+        },
+        {
+          "title": "SDK outbound phase latency (p90)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            { "expr": "histogram_quantile(0.9, sum by (le) (rate(mojaloop_connector_outbound_party_lookup_latency_bucket{cluster_name=\"$dfsp\"}[$__rate_interval])))", "legendFormat": "party lookup" },
+            { "expr": "histogram_quantile(0.9, sum by (le) (rate(mojaloop_connector_outbound_quote_request_latency_bucket{cluster_name=\"$dfsp\"}[$__rate_interval])))", "legendFormat": "quote" },
+            { "expr": "histogram_quantile(0.9, sum by (le) (rate(mojaloop_connector_outbound_transfer_latency_bucket{cluster_name=\"$dfsp\"}[$__rate_interval])))", "legendFormat": "transfer" }
+          ]
+        },
+        {
+          "title": "Redis ops & latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            { "expr": "rate(redis_commands_processed_total{cluster_name=\"$dfsp\"}[$__rate_interval])", "legendFormat": "commands/s" },
+            { "expr": "1000 * sum(rate(redis_commands_duration_seconds_total{cluster_name=\"$dfsp\"}[$__rate_interval])) / sum(rate(redis_commands_processed_total{cluster_name=\"$dfsp\"}[$__rate_interval]))", "legendFormat": "avg cmd ms" }
+          ]
+        },
+        {
+          "title": "Redis pub/sub channels & blocked clients",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            { "expr": "redis_pubsub_channels{cluster_name=\"$dfsp\"}", "legendFormat": "pubsub channels" },
+            { "expr": "redis_blocked_clients{cluster_name=\"$dfsp\"}", "legendFormat": "blocked clients" }
+          ]
+        },
+        {
+          "title": "VM CPU by mode",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            { "expr": "avg by (mode) (rate(node_cpu_seconds_total{cluster_name=\"$dfsp\", mode!=\"idle\"}[$__rate_interval]))", "legendFormat": "{{mode}}" }
+          ]
+        },
+        {
+          "title": "SDK Node.js GC time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            { "expr": "sum(rate(mojaloop_connector_default_nodejs_gc_duration_seconds_sum{cluster_name=\"$dfsp\"}[$__rate_interval]))", "legendFormat": "gc s/s" }
+          ]
+        },
+        {
+          "title": "VM node detail",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 }
+        },
+        {
+          "title": "Memory detail",
+          "description": "MemAvailable < ~150MB on these 2GB VMs means page-cache thrash is imminent (2026-07-03 incident). Redis overlay shows SDK state accumulation.",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 29 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            { "expr": "node_memory_MemAvailable_bytes{cluster_name=\"$dfsp\"}", "legendFormat": "available" },
+            { "expr": "node_memory_Cached_bytes{cluster_name=\"$dfsp\"}", "legendFormat": "page cache" },
+            { "expr": "node_memory_MemFree_bytes{cluster_name=\"$dfsp\"}", "legendFormat": "free" },
+            { "expr": "redis_memory_used_bytes{cluster_name=\"$dfsp\"}", "legendFormat": "redis used" }
+          ]
+        },
+        {
+          "title": "Pressure (PSI): time stalled on resource",
+          "description": "Fraction of wall time at least one task was stalled waiting for the resource. Memory pressure > 0.05 = thrashing.",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 29 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            { "expr": "rate(node_pressure_memory_waiting_seconds_total{cluster_name=\"$dfsp\"}[$__rate_interval])", "legendFormat": "memory" },
+            { "expr": "rate(node_pressure_cpu_waiting_seconds_total{cluster_name=\"$dfsp\"}[$__rate_interval])", "legendFormat": "cpu" },
+            { "expr": "rate(node_pressure_io_waiting_seconds_total{cluster_name=\"$dfsp\"}[$__rate_interval])", "legendFormat": "io" }
+          ]
+        },
+        {
+          "title": "Major page faults",
+          "description": "Sustained majfault/s = executable pages being evicted and re-read from disk (thrash).",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 29 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            { "expr": "rate(node_vmstat_pgmajfault{cluster_name=\"$dfsp\"}[$__rate_interval])", "legendFormat": "major faults/s" }
+          ]
+        },
+        {
+          "title": "Disk throughput",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 37 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            { "expr": "sum(rate(node_disk_read_bytes_total{cluster_name=\"$dfsp\"}[$__rate_interval]))", "legendFormat": "read" },
+            { "expr": "sum(rate(node_disk_written_bytes_total{cluster_name=\"$dfsp\"}[$__rate_interval]))", "legendFormat": "write" }
+          ]
+        },
+        {
+          "title": "Disk latency & queue",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 37 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            { "expr": "sum(rate(node_disk_read_time_seconds_total{cluster_name=\"$dfsp\"}[$__rate_interval])) / sum(rate(node_disk_reads_completed_total{cluster_name=\"$dfsp\"}[$__rate_interval]))", "legendFormat": "read await" },
+            { "expr": "sum(rate(node_disk_write_time_seconds_total{cluster_name=\"$dfsp\"}[$__rate_interval])) / sum(rate(node_disk_writes_completed_total{cluster_name=\"$dfsp\"}[$__rate_interval]))", "legendFormat": "write await" },
+            { "expr": "sum(rate(node_disk_io_time_weighted_seconds_total{cluster_name=\"$dfsp\"}[$__rate_interval]))", "legendFormat": "queue depth (weighted)" }
+          ]
+        },
+        {
+          "title": "Network",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 37 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            { "expr": "sum(rate(node_network_receive_bytes_total{cluster_name=\"$dfsp\", device!=\"lo\"}[$__rate_interval]))", "legendFormat": "rx" },
+            { "expr": "sum(rate(node_network_transmit_bytes_total{cluster_name=\"$dfsp\", device!=\"lo\"}[$__rate_interval]))", "legendFormat": "tx" }
+          ]
+        },
+        {
+          "title": "Load & blocked processes",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 45 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            { "expr": "node_load1{cluster_name=\"$dfsp\"}", "legendFormat": "load1" },
+            { "expr": "node_load5{cluster_name=\"$dfsp\"}", "legendFormat": "load5" },
+            { "expr": "count(count by (cpu) (node_cpu_seconds_total{cluster_name=\"$dfsp\"}))", "legendFormat": "cpus" },
+            { "expr": "node_procs_blocked{cluster_name=\"$dfsp\"}", "legendFormat": "blocked (D-state)" }
+          ]
+        },
+        {
+          "title": "Filesystem used",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 45 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            { "expr": "1 - (node_filesystem_avail_bytes{cluster_name=\"$dfsp\", fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{cluster_name=\"$dfsp\", fstype!~\"tmpfs|overlay\"})", "legendFormat": "{{mountpoint}}" }
+          ]
+        },
+        {
+          "title": "Redis keys & evictions",
+          "description": "With maxmemory 256mb + allkeys-lru (2026-07-03 fix), evictions kicking in is normal once the cap is reached; unbounded key growth is not.",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 45 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            { "expr": "sum(redis_db_keys{cluster_name=\"$dfsp\"})", "legendFormat": "keys" },
+            { "expr": "rate(redis_evicted_keys_total{cluster_name=\"$dfsp\"}[$__rate_interval])", "legendFormat": "evictions/s" },
+            { "expr": "rate(redis_expired_keys_total{cluster_name=\"$dfsp\"}[$__rate_interval])", "legendFormat": "expirations/s" }
+          ]
+        }
+      ]
+    }

@@ -1,0 +1,115 @@
+apiVersion: psmdb.percona.com/v1
+kind: PerconaServerMongoDB
+metadata:
+  name: bulk-mongodb
+  namespace: data
+spec:
+  crVersion: "1.21.0"
+  image: percona/percona-server-mongodb:7.0
+  allowUnsafeConfigurations: true
+  secrets:
+    users: bulk-mongodb-secrets
+  backup:
+    enabled: true
+    image: percona/percona-backup-mongodb:2.9.0
+    storages:
+      s3-backup:
+        type: s3
+        s3:
+          bucket: ${backup_s3_bucket}
+          region: ${backup_s3_region}
+          endpointUrl: ${backup_s3_endpoint}
+          prefix: ${cluster_name}/mongodb
+          credentialsSecret: backup-s3-credentials
+    tasks:
+      - name: daily
+        enabled: true
+        schedule: "0 1 * * *"
+        keep: 7
+        storageName: s3-backup
+    pitr:
+      enabled: true
+  users:
+    - name: mlos
+      db: mlos
+      roles:
+        - name: readWrite
+          db: mlos
+      passwordSecretRef:
+        name: bulk-mongodb-app-secrets
+        key: MONGODB_APP_PASSWORD
+    - name: ttk
+      db: ttk
+      roles:
+        - name: readWrite
+          db: ttk
+      passwordSecretRef:
+        name: bulk-mongodb-app-secrets
+        key: MONGODB_APP_PASSWORD
+    - name: reporting
+      db: reporting_events
+      roles:
+        - name: readWrite
+          db: reporting_events
+      passwordSecretRef:
+        name: bulk-mongodb-app-secrets
+        key: MONGODB_APP_PASSWORD
+  replsets:
+    - name: rs0
+      size: 3
+      tolerations:
+        - key: "node-role"
+          operator: "Equal"
+          value: "db"
+          effect: "NoSchedule"
+      affinity:
+        advanced:
+          nodeAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                preference:
+                  matchExpressions:
+                    - key: node-role
+                      operator: In
+                      values: ["db"]
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/component: mongod
+                  topologyKey: kubernetes.io/hostname
+      sidecars:
+        - name: mongodb-exporter
+          image: percona/mongodb_exporter:0.43.1
+          args:
+            - --compatible-mode
+            - --discovering-mode
+            - --collect-all
+          env:
+            - name: MONGODB_URI
+              value: "mongodb://clusterMonitor:${mongodb_root_password}@localhost:27017/admin?ssl=false"
+          ports:
+            - containerPort: 9216
+              name: metrics
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+      resources:
+        requests:
+          memory: 512Mi
+          cpu: 100m
+        limits:
+          memory: 1Gi
+          cpu: 500m
+      volumeSpec:
+        persistentVolumeClaim:
+          resources:
+            requests:
+              storage: ${mongodb_storage}
+  sharding:
+    enabled: false

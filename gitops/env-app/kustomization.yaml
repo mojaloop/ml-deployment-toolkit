@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ory-rbac-role-permissions.yaml
+  - mojaloop/helmrelease.yaml
+  - mojaloop/switch-jws-cert.yaml
+  - mojaloop/switch-jws-pubkey-job.yaml
+  - mcm/helmrelease.yaml
+  - mcm/secrets.yaml
+  - mcm/oathkeeper-rules.yaml
+  - mcm/referencegrant.yaml
+  - mcm/rbac.yaml
+  - mcm/vault-agent-configmap.yaml
+  - mcm/vault-agent-deployment.yaml
+  - mcm/vault-agent-rbac.yaml
+  - finance-portal/helmrelease.yaml
+  - finance-portal/externalsecret-role-assign-svc.yaml
+  - finance-portal/externalsecret-reporting-events-db.yaml
+  - finance-portal/oathkeeper-rules.yaml
+  - finance-portal/referencegrant.yaml
+  # gw-ext routes (DFSP-facing — SIMPLE TLS via Cilium Gateway)
+  - routes/mcm-ext-httproute.yaml
+  - routes/hydra-ext-httproute.yaml
+  - routes/referencegrant-ext.yaml
+  # extapi mTLS (DFSP-facing — mutual TLS via standalone Envoy Deployment)
+  - routes/extapi-service.yaml
+  - routes/extapi-cert.yaml
+  - routes/extapi-envoy-config.yaml
+  - routes/extapi-envoy-deployment.yaml
+  - observability/trace-bridge.yaml
+  # gw-int routes (internal ops)
+  - routes/intapi-httproute.yaml
+  - routes/ttk-httproute.yaml
+  - routes/ttk-backend-httproute.yaml
+  - routes/simulator-httproute.yaml
+  - routes/settlement-httproute.yaml
+  - routes/tx-requests-httproute.yaml

@@ -1,0 +1,634 @@
+# Vault Agent configuration for DFSP onboarding automation.
+#
+# This ConfigMap contains two HCL configs and a cleanup script consumed by the
+# vault-agent Deployment:
+#   - init-config.hcl: runs once (init container) to bootstrap default whitelist secrets
+#   - config.hcl:      runs continuously to watch Vault and create K8s/Cilium resources
+#   - clean-jobs.sh:   called by config.hcl Template 2 to clean up old onboarding Jobs
+#
+# IMPORTANT — KV-v1 paths throughout:
+#   MCM API v2.x uses node-vault which writes to "secret/mcm/..." directly (KV-v1 convention).
+#   It does NOT prepend "data/" as KV-v2 requires. The Vault secret/ mount is therefore
+#   configured as KV-v1 (see vault.yaml). All paths here follow KV-v1 conventions:
+#     - List:  secrets "secret/onboarding_pm4mls/"     (NOT secret/metadata/...)
+#     - Read:  secret  "secret/onboarding_pm4mls/X"    (NOT secret/data/...)
+#     - Data:  .Data.host                              (NOT .Data.data.host)
+#   If you ever switch to KV-v2, every path and .Data accessor must be updated.
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-agent-config
+  namespace: mcm
+data:
+  # ---------------------------------------------------------------------------
+  # init-config.hcl — Bootstrap (runs once via init container, then exits)
+  #
+  # Purpose: Ensure whitelist secrets exist in Vault before the main agent starts.
+  # Without these, the whitelist template would fail to render on first boot.
+  #
+  # How it works:
+  #   1. Authenticates to Vault using K8s service account (role: mcm)
+  #   2. Starts a local API proxy on 127.0.0.1:8100 so the vault CLI can use
+  #      the auto-auth token without manual token management
+  #   3. Renders a dummy template whose command bootstraps the whitelist secrets:
+  #      - If whitelist_fsps exists   → do nothing (vault read succeeds)
+  #      - If whitelist_fsps missing  → create it with loopback default
+  #      - Same for whitelist_pm4mls
+  #   4. Exits (exit_after_auth = true)
+  # ---------------------------------------------------------------------------
+  init-config.hcl: |
+    auto_auth {
+      method "kubernetes" {
+        mount_path = "auth/kubernetes"
+        config = {
+          role = "mcm"
+        }
+      }
+      sink {
+        type = "file"
+        config = {
+          path = "/home/vault/.token"
+        }
+      }
+    }
+
+    # Local API proxy: the template command below uses "vault read/write" which
+    # needs an authenticated Vault endpoint. The proxy injects the auto-auth
+    # token automatically so we don't have to pass -token flags.
+    api_proxy {
+      use_auto_auth_token = "force"
+    }
+
+    listener "tcp" {
+      address     = "127.0.0.1:8100"
+      tls_disable = true
+    }
+
+    exit_after_auth = true
+    pid_file        = "/home/vault/.pid"
+
+    template {
+      # The template content is irrelevant — we only need the command to run.
+      # Vault Agent requires a template to trigger a command, so we use a placeholder.
+      contents    = "placeholder"
+      destination = "/vault/secrets/tmp/init-done"
+      # KV-v1 CLI: "vault read/write secret/X" (not "vault kv get/put -mount=secret X")
+      command     = "export VAULT_ADDR=http://127.0.0.1:8100 && (vault read secret/whitelist_fsps || vault write secret/whitelist_fsps loopback=127.0.0.1/32) && (vault read secret/whitelist_pm4mls || vault write secret/whitelist_pm4mls loopback=127.0.0.1/32)"
+    }
+
+    vault {
+      address = "http://vault.vault.svc.cluster.local:8200"
+    }
+
+  # ---------------------------------------------------------------------------
+  # config.hcl — Main agent (runs continuously in the vault-agent container)
+  #
+  # Watches Vault for changes and renders two templates:
+  #
+  # Template 1 — DFSP callback mTLS (callback.yaml)
+  #   Iterates all DFSPs in secret/onboarding_pm4mls/ and creates:
+  #   - Per-DFSP TLS Secret: client cert bundle for outbound mTLS origination
+  #   - Combined CA bundle Secret: concatenation of all DFSP CAs (for inbound mTLS verification)
+  #   - CiliumEnvoyConfig: outbound mTLS origination via per-DFSP Envoy clusters
+  #   - CiliumNetworkPolicy: redirects egress to DFSP FQDNs through Envoy
+  #
+  # Template 2 — DFSP onboarding provisioning (onboarding.yaml)
+  #   Iterates all DFSPs in secret/onboarding_pm4mls/ and creates per-DFSP:
+  #   - ConfigMap:   TTK CLI config with DFSP-specific provisioning parameters
+  #   - Job:         runs TTK CLI to provision the DFSP in Mojaloop central-ledger
+  #   After applying, runs clean-jobs.sh to retain only the 5 most recent Jobs.
+  #
+  # All templates apply resources to the mojaloop namespace via kubectl.
+  # The vault-agent SA has RBAC permissions for this (see vault-agent-rbac.yaml).
+  # ---------------------------------------------------------------------------
+  config.hcl: |
+    auto_auth {
+      method "kubernetes" {
+        mount_path = "auth/kubernetes"
+        config = {
+          role = "mcm"
+        }
+      }
+      sink {
+        type = "file"
+        config = {
+          path = "/home/vault/.token"
+        }
+      }
+    }
+
+    exit_after_auth = false
+    pid_file        = "/home/vault/.pid"
+
+    # -------------------------------------------------------------------------
+    # Template 1: DFSP callback mTLS resources
+    #
+    # MCM API writes DFSP onboarding data to Vault at:
+    #   secret/onboarding_pm4mls/{dfsp_name}
+    # with fields: host, fqdn, ca_bundle, client_key, client_cert_chain
+    #
+    # This template iterates those secrets and creates the Cilium resources
+    # needed for:
+    #   1. Outbound mTLS — Mojaloop callbacks to each DFSP (CEC + CNP)
+    #   2. Inbound mTLS client verification — combined CA bundle Secret
+    #
+    # KV-v1 path conventions:
+    #   - List path:  "secret/onboarding_pm4mls/"  (trailing slash = list)
+    #   - Read path:  "secret/onboarding_pm4mls/{name}"
+    #   - Data access: .Data.host (flat — no .Data.data nesting)
+    #
+    # When no DFSPs are onboarded, the template renders empty and kubectl
+    # apply fails; the fallback deletes all labeled resources (correct: nothing
+    # should exist). When DFSPs exist, --prune removes orphaned resources for
+    # DFSPs that were removed from Vault since the last render.
+    # -------------------------------------------------------------------------
+    template {
+      contents = <<EOH
+    {{ range secrets "secret/onboarding_pm4mls/" }}
+    {{ with secret (printf "secret/onboarding_pm4mls/%s" .) }}
+    ---
+    # TLS Secret: holds the DFSP's client certificate bundle for outbound mTLS origination.
+    # Referenced by the CiliumEnvoyConfig's per-DFSP UpstreamTlsContext via SDS.
+    # Must live in cilium-secrets namespace — Cilium SDS for envoyConfig only reads from there
+    # (envoyConfig.secretsNamespace.name is hardcoded to cilium-secrets in the chart).
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: {{ .Data.host }}-clientcert-tls
+      namespace: cilium-secrets
+      labels:
+        app.kubernetes.io/managed-by: vault-agent
+        vault-agent/template: callback
+    type: kubernetes.io/tls
+    stringData:
+      ca.crt: |
+    {{ .Data.ca_bundle | indent 4 }}
+      tls.key: |
+    {{ .Data.client_key | indent 4 }}
+      tls.crt: |
+    {{ .Data.client_cert_chain | indent 4 }}
+    {{ end }}{{ end }}
+    ---
+    # Combined CA bundle: concatenation of all DFSP CA certificates.
+    # Referenced by the inbound cilium-gateway-gw-extapi CiliumEnvoyConfig for client cert verification.
+    # When a DFSP connects, Envoy validates their client cert against this bundle.
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: dfsp-ca-bundle
+      namespace: mojaloop
+      labels:
+        app.kubernetes.io/managed-by: vault-agent
+        vault-agent/template: callback
+    stringData:
+      ca.crt: |
+    {{ with secret "pki/cert/ca" }}{{ .Data.certificate | indent 4 }}
+    {{ end }}
+    {{ range secrets "secret/onboarding_pm4mls/" }}{{ with secret (printf "secret/onboarding_pm4mls/%s" .) }}{{ .Data.ca_bundle | indent 4 }}
+    {{ end }}{{ end }}
+    ---
+    # CiliumEnvoyConfig: outbound mTLS origination for DFSP callbacks.
+    # When Mojaloop pods send HTTP to a DFSP FQDN, the CiliumNetworkPolicy below
+    # redirects egress through this CEC's Envoy listener, which originates mTLS
+    # using per-DFSP client certificates.
+    apiVersion: cilium.io/v2
+    kind: CiliumEnvoyConfig
+    metadata:
+      name: dfsp-callback-mtls
+      namespace: mojaloop
+      labels:
+        app.kubernetes.io/managed-by: vault-agent
+        vault-agent/template: callback
+    spec:
+      resources:
+        - "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+          name: dfsp-egress-listener
+          filter_chains:
+            - filters:
+                - name: envoy.filters.network.http_connection_manager
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                    stat_prefix: dfsp_egress
+                    codec_type: AUTO
+                    access_log:
+                      - name: envoy.access_loggers.stdout
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+                          log_format:
+                            json_format:
+                              timestamp: "%START_TIME%"
+                              method: "%REQ(:METHOD)%"
+                              path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+                              protocol: "%PROTOCOL%"
+                              response_code: "%RESPONSE_CODE%"
+                              response_flags: "%RESPONSE_FLAGS%"
+                              bytes_received: "%BYTES_RECEIVED%"
+                              bytes_sent: "%BYTES_SENT%"
+                              duration_ms: "%DURATION%"
+                              upstream_cluster: "%UPSTREAM_CLUSTER%"
+                              upstream_host: "%UPSTREAM_HOST%"
+                              downstream_address: "%DOWNSTREAM_REMOTE_ADDRESS%"
+                              tls_version: "%UPSTREAM_TLS_VERSION%"
+                              request_id: "%REQ(X-REQUEST-ID)%"
+                              fspiop_source: "%REQ(FSPIOP-SOURCE)%"
+                              fspiop_destination: "%REQ(FSPIOP-DESTINATION)%"
+                    http_filters:
+                      - name: envoy.filters.http.router
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                    route_config:
+                      name: dfsp_routes
+                      virtual_hosts:
+    {{ range secrets "secret/onboarding_pm4mls/" }}{{ with secret (printf "secret/onboarding_pm4mls/%s" .) }}
+                        - name: {{ .Data.host }}
+                          domains: ["{{ .Data.fqdn }}", "{{ .Data.fqdn }}:*"]
+                          routes:
+                            - match:
+                                prefix: "/"
+                              route:
+                                cluster: {{ .Data.host }}-cluster
+    {{ end }}{{ end }}
+    {{ range secrets "secret/onboarding_pm4mls/" }}{{ with secret (printf "secret/onboarding_pm4mls/%s" .) }}
+        - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+          name: {{ .Data.host }}-cluster
+          type: STRICT_DNS
+          connect_timeout: 3s
+          load_assignment:
+            cluster_name: {{ .Data.host }}-cluster
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: {{ .Data.fqdn }}
+                          port_value: 443
+          transport_socket:
+            name: envoy.transport_sockets.tls
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+              sni: {{ .Data.fqdn }}
+              common_tls_context:
+                tls_certificate_sds_secret_configs:
+                  - name: "cilium-secrets/{{ .Data.host }}-clientcert-tls"
+                    sds_config:
+                      api_config_source:
+                        api_type: GRPC
+                        grpc_services:
+                          - envoy_grpc:
+                              cluster_name: xds-grpc-cilium
+    {{ end }}{{ end }}
+    ---
+    # CiliumNetworkPolicy: redirect DFSP-bound egress through the CEC Envoy listener.
+    # Scoped to switch services that originate FSPIOP callbacks back to DFSPs.
+    # Source for the canonical list: ml-perf-whitepaper-ws/.../mtls_switch/defaults/main.yml
+    # (the four "moja-*" callback Deployments). With endpointSelector: {} the policy
+    # would intercept ALL TCP/80+443 egress in the mojaloop namespace and redirect it
+    # to a plain-HTTP Envoy listener — breaking unrelated HTTPS (e.g. PXC PITR → MinIO).
+    apiVersion: cilium.io/v2
+    kind: CiliumNetworkPolicy
+    metadata:
+      name: dfsp-callback-egress
+      namespace: mojaloop
+      labels:
+        app.kubernetes.io/managed-by: vault-agent
+        vault-agent/template: callback
+    spec:
+      endpointSelector:
+        matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+              - ml-api-adapter-handler-notification
+              - account-lookup-service
+              - quoting-service
+              - quoting-service-handler
+              # - bulk-api-adapter-handler-notification   # add when bulk FSPIOP flows are enabled
+              # - transaction-requests-service            # add when transactionRequests callbacks are enabled
+      egress:
+        - toEndpoints:
+            - matchLabels:
+                io.kubernetes.pod.namespace: kube-system
+                k8s-app: kube-dns
+          toPorts:
+            - ports:
+                - port: "53"
+                  protocol: UDP
+              rules:
+                dns:
+                  - matchPattern: "*"
+        - toFQDNs:
+    {{ range secrets "secret/onboarding_pm4mls/" }}{{ with secret (printf "secret/onboarding_pm4mls/%s" .) }}
+            - matchName: "{{ .Data.fqdn }}"
+    {{ end }}{{ end }}
+          toPorts:
+            - ports:
+                - port: "80"
+                  protocol: TCP
+                - port: "443"
+                  protocol: TCP
+              listener:
+                name: dfsp-egress-listener
+                envoyConfig:
+                  kind: CiliumEnvoyConfig
+                  name: dfsp-callback-mtls
+        - toEntities:
+            - world
+            - cluster
+      EOH
+      destination = "/vault/secrets/tmp/callback.yaml"
+      # Apply without -n flag so kubectl honors metadata.namespace for each resource
+      # (per-DFSP TLS secrets live in cilium-secrets; CEC/CNP/dfsp-ca-bundle live in mojaloop).
+      # Prune is omitted because --prune scope is per-namespace and we apply across two namespaces;
+      # orphan cleanup for removed DFSPs is a known limitation to address separately.
+      command     = "/tools/kubectl apply -f /vault/secrets/tmp/callback.yaml || true"
+    }
+
+    # -------------------------------------------------------------------------
+    # Template 2: DFSP onboarding provisioning (previously Template 3)
+    #
+    # Creates a ConfigMap + Job per DFSP to run the TTK CLI and provision the
+    # DFSP in Mojaloop's central-ledger (create participant, set limits, fund
+    # settlement accounts, register callback endpoints).
+    #
+    # For standard DFSPs: runs new_dfsp.json collection
+    # For FXP DFSPs (fxpCurrencies set): runs new_fxp.json per currency
+    #
+    # After applying, runs clean-jobs.sh to retain only the 5 most recent
+    # Jobs per DFSP prefix, preventing unbounded Job accumulation.
+    #
+    # Vault secret fields (from secret/onboarding_pm4mls/{name}, KV-v1):
+    #   .Data.host            — DFSP identifier, ConfigMap/Job naming
+    #   .Data.fqdn            — Callback URL
+    #   .Data.currency_code   — Provisioning currency
+    #   .Data.isProxy         — Proxy flag
+    #   .Data.fxpCurrencies   — FXP currencies (triggers multi-currency flow)
+    #   .Data.timeStamp       — Unique Job naming (format YYYY-MM-DD-HH-MM-SS)
+    # -------------------------------------------------------------------------
+    template {
+      contents = <<EOH
+    {{ range secrets "secret/onboarding_pm4mls/" }}
+    {{ with secret (printf "secret/onboarding_pm4mls/%s" .) }}
+    ---
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: {{ .Data.host }}-ml-ttk-add-dfsp-conf
+      namespace: mojaloop
+      labels:
+        app.kubernetes.io/managed-by: vault-agent
+        vault-agent/template: onboarding
+    data:
+      cli-add-dfsp-config.json: |
+        {"logLevel":"2","mode":"outbound"}
+      cli-add-dfsp-environment.json: |
+        {
+          "inputValues": {
+            "HOST_ACCOUNT_LOOKUP_SERVICE": "http://moja-account-lookup-service",
+            "HOST_ACCOUNT_LOOKUP_ADMIN": "http://moja-account-lookup-service-admin",
+            "HOST_CENTRAL_LEDGER": "http://moja-centralledger-service",
+            "HOST_ORACLE_MSISDN": "http://moja-als-msisdn-oracle",
+            "DFSP_CALLBACK_URL": "http://{{ .Data.fqdn }}",
+            "DFSP_NAME": "{{ .Data.host }}",
+            "HUB_NAME": "${hub_participant_name}",
+            "currency": "{{ .Data.currency_code }}",
+            "fundsIn": "${onboarding_funds_in}",
+            "isProxy": "{{ .Data.isProxy }}",
+            "hub_operator": "NOT_APPLICABLE",
+            "NET_DEBIT_CAP": "${onboarding_net_debit_cap}",
+            "dfspEmail": "{{ .Data.dfspEmail }}"
+          }
+        }
+    ---
+    apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: {{ .Data.host }}-onboard-dfsp-{{ .Data.timeStamp }}
+      namespace: mojaloop
+      labels:
+        app.kubernetes.io/managed-by: vault-agent
+        vault-agent/template: onboarding
+    spec:
+      template:
+        spec:
+          volumes:
+            - name: {{ .Data.host }}-ml-ttk-add-dfsp-conf
+              configMap:
+                name: {{ .Data.host }}-ml-ttk-add-dfsp-conf
+                items:
+                  - key: cli-add-dfsp-config.json
+                    path: cli-add-dfsp-config.json
+                  - key: cli-add-dfsp-environment.json
+                    path: cli-add-dfsp-environment.json
+                defaultMode: 420
+            - name: tmp
+              emptyDir: {}
+            - name: release-cd
+              configMap:
+                name: release-cd
+                defaultMode: 420
+                optional: true
+
+          containers:
+            - name: ml-ttk-add-dfsp
+              image: mojaloop/ml-testing-toolkit-client-lib:v1.10.3
+              command:
+                - /bin/sh
+                - '-c'
+              args:
+                - >
+                  until nslookup github.com; do sleep 5;done;
+                  echo "Downloading the test collection...";
+
+                  wget
+                  https://github.com/mojaloop/testing-toolkit-test-cases/archive/v17.2.0.zip
+                  -O /tmp/downloaded-test-collections.zip;
+
+                  mkdir /tmp/test_cases;
+
+                  unzip -d /tmp/test_cases -o /tmp/downloaded-test-collections.zip;
+
+                  fxp_currencies="{{ .Data.fxpCurrencies }}"
+
+                  if [ -z "$fxp_currencies" ]; then
+
+                    npm run cli -- \
+                      -c cli-add-dfsp-config.json \
+                      -e cli-add-dfsp-environment.json \
+                      -i /tmp/test_cases/testing-toolkit-test-cases-17.2.0/collections/hub/provisioning/new_participants/new_dfsp.json \
+                      -u http://moja-ml-testing-toolkit-backend:5050 \
+                      --report-format html \
+                      --report-auto-filename-enable true \
+                      --extra-summary-information="Test Suite:Provisioning DFSP,Environment:ttk.int.${domain}" \
+                      --save-report true \
+                      --report-folder /tmp \
+                      --report-name {{ .Data.host }}-onboard-dfsp \
+                      --save-report-base-url https://ttk.int.${domain};
+                    export TEST_RUNNER_EXIT_CODE="$?";
+
+                  else
+
+                    for fxp_currency in $fxp_currencies; do
+                      echo "Onboarding FXP currency $fxp_currency"
+                      node -e "const x=require('./cli-add-dfsp-environment.json');x.inputValues.fxpCurrency='$fxp_currency';console.log(JSON.stringify(x))" > /tmp/fxp.json
+                      npm run cli -- \
+                        -c cli-add-dfsp-config.json \
+                        -e /tmp/fxp.json \
+                        -i /tmp/test_cases/testing-toolkit-test-cases-17.2.0/collections/hub/provisioning/new_participants/new_fxp.json \
+                        -u http://moja-ml-testing-toolkit-backend:5050 \
+                        --report-format html \
+                        --report-auto-filename-enable true \
+                        --extra-summary-information="Test Suite:Provisioning FXP currency $fxp_currency,Environment:ttk.int.${domain}" \
+                        --save-report true \
+                        --report-folder /tmp \
+                        --report-name {{ .Data.host }}-onboard-fxp-$fxp_currency \
+                        --save-report-base-url https://ttk.int.${domain};
+                      export TEST_RUNNER_EXIT_CODE="$?";
+                      if [ "$TEST_RUNNER_EXIT_CODE" -ne 0 ]; then break; fi;
+                    done;
+
+                  fi
+
+                  echo "Test Runner finished with exit code:
+                  $TEST_RUNNER_EXIT_CODE";
+
+                  exit $TEST_RUNNER_EXIT_CODE;
+              env:
+                - name: NPM_CONFIG_UPDATE_NOTIFIER
+                  value: "false"
+              securityContext:
+                readOnlyRootFilesystem: true
+              resources: {}
+              volumeMounts:
+                - name: {{ .Data.host }}-ml-ttk-add-dfsp-conf
+                  mountPath: /opt/app/cli-add-dfsp-environment.json
+                  subPath: cli-add-dfsp-environment.json
+                - name: {{ .Data.host }}-ml-ttk-add-dfsp-conf
+                  mountPath: /opt/app/cli-add-dfsp-config.json
+                  subPath: cli-add-dfsp-config.json
+                - name: release-cd
+                  mountPath: /etc/release_cd
+                - name: tmp
+                  mountPath: /tmp
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+              imagePullPolicy: IfNotPresent
+          restartPolicy: Never
+          terminationGracePeriodSeconds: 30
+          dnsPolicy: ClusterFirst
+          securityContext: {}
+          schedulerName: default-scheduler
+      completionMode: NonIndexed
+      suspend: false
+
+    {{ end }}{{ end }}
+      EOH
+      destination = "/vault/secrets/tmp/onboarding.yaml"
+      command     = "/tools/kubectl apply --prune -l vault-agent/template=onboarding --prune-allowlist=/v1/ConfigMap -n mojaloop -f /vault/secrets/tmp/onboarding.yaml 2>/dev/null || /tools/kubectl delete configmap -n mojaloop -l vault-agent/template=onboarding --ignore-not-found 2>/dev/null || true; sh /etc/vault/clean-jobs.sh"
+    }
+
+    vault {
+      address = "http://vault.vault.svc.cluster.local:8200"
+    }
+
+  # ---------------------------------------------------------------------------
+  # clean-jobs.sh — Job cleanup script (mounted at /etc/vault/clean-jobs.sh)
+  #
+  # Called by Template 2 after applying onboarding resources. Retains only the
+  # 5 most recent Jobs per DFSP prefix, deleting older ones to prevent
+  # unbounded Job accumulation.
+  #
+  # Adapted for the hashicorp/vault:1.18.4 image:
+  #   - Uses /tools/kubectl (downloaded by init container)
+  #   - Uses jsonpath instead of jq (not available in vault image)
+  #   - Hardcoded config values (avoids Flux ${var:-default} substitution)
+  # ---------------------------------------------------------------------------
+  clean-jobs.sh: |
+    #!/bin/sh
+
+    # Script to delete old Kubernetes jobs, retaining only the 5 most recent jobs per prefix.
+    # Jobs must have timestamp suffix format: YYYY-MM-DD-HH-MM-SS
+    # Example: test-fxp-onboard-dfsp-2026-01-29-14-34-08
+
+    set -e
+
+    # Configuration (hardcoded to avoid Flux ${var:-default} substitution conflicts)
+    CLEAN_RETAIN_COUNT=5
+    CLEAN_NAMESPACE=mojaloop
+    CLEAN_DRY_RUN=false
+
+    # Function to extract job prefix (everything before the timestamp)
+    get_job_prefix() {
+        job_name=$1
+        # Remove timestamp pattern from the end: -YYYY-MM-DD-HH-MM-SS
+        echo "$job_name" | sed -E 's/-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{2}$//'
+    }
+
+    # Function to validate timestamp suffix
+    has_timestamp_suffix() {
+        job_name=$1
+        echo "$job_name" | grep -qE -- 'onboard-dfsp-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{2}$'
+    }
+
+    # Get all jobs in namespace (using jsonpath — jq not available in vault image)
+    echo "Fetching jobs from namespace: $CLEAN_NAMESPACE"
+    job_list=$(/tools/kubectl get jobs -n "$CLEAN_NAMESPACE" -o jsonpath='{.items[*].metadata.name}')
+
+    if [ -z "$job_list" ]; then
+        echo "No jobs found in namespace $CLEAN_NAMESPACE"
+        exit 0
+    fi
+
+    # Convert space-separated jsonpath output to newline-separated
+    jobs=$(echo "$job_list" | tr ' ' '\n')
+
+    # Create temporary directory for grouping
+    tmpdir=$(mktemp -d /vault/secrets/tmp/clean-XXXXXX)
+    trap 'rm -rf "$tmpdir"' EXIT
+
+    # Group jobs by prefix (using filesystem instead of associative arrays)
+    for job in $jobs; do
+        if has_timestamp_suffix "$job"; then
+            prefix=$(get_job_prefix "$job")
+            echo "$job" >> "$tmpdir/$prefix"
+        else
+            echo "Skipping job without timestamp suffix: $job"
+        fi
+    done
+
+    # Process each job group
+    for prefix_file in "$tmpdir"/*; do
+        [ -e "$prefix_file" ] || continue
+        prefix=$(basename "$prefix_file")
+
+        echo ""
+        echo "Processing job group: $prefix"
+
+        # Sort jobs by timestamp (descending - newest first)
+        sorted_jobs=$(sort -r "$prefix_file")
+
+        # Count jobs
+        job_count=$(echo "$sorted_jobs" | wc -l)
+        echo "Found $job_count jobs with prefix: $prefix"
+
+        if [ "$job_count" -le "$CLEAN_RETAIN_COUNT" ]; then
+            echo "Retaining all $job_count jobs (under limit of $CLEAN_RETAIN_COUNT)"
+            continue
+        fi
+
+        # Skip the first CLEAN_RETAIN_COUNT jobs and delete the rest
+        jobs_to_delete=$(echo "$sorted_jobs" | tail -n +"$((CLEAN_RETAIN_COUNT + 1))")
+        delete_count=$(echo "$jobs_to_delete" | wc -l)
+
+        echo "Retaining $CLEAN_RETAIN_COUNT newest jobs"
+        echo "Deleting $delete_count old jobs"
+
+        echo "$jobs_to_delete" | while IFS= read -r job_to_delete; do
+            if [ "$CLEAN_DRY_RUN" = "true" ]; then
+                echo "[DRY RUN] Would delete job: $job_to_delete"
+            else
+                echo "Deleting job: $job_to_delete"
+                /tools/kubectl delete job "$job_to_delete" -n "$CLEAN_NAMESPACE"
+            fi
+        done
+    done

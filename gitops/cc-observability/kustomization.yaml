@@ -1,0 +1,68 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  # Shared HelmRepository
+  - grafana-helmrepo.yaml
+
+  # Thanos (rendered from kube-thanos Jsonnet)
+  - thanos/
+
+  # ExternalSecrets
+  - loki/externalsecret.yaml
+  - tempo/externalsecret.yaml
+
+  # HelmReleases
+  - loki/helmrelease.yaml
+  - tempo/helmrelease.yaml
+  - grafana/helmrelease.yaml
+
+  # Grafana SMTP credentials (chart smtp.existingSecret)
+  - grafana/smtp-secret.yaml
+
+  # Grafana Alerting — contact points (Secret), policy and rules (ConfigMaps)
+  - grafana/alerting/contact-points.yaml
+  - grafana/alerting/notification-policy.yaml
+  - grafana/alerting/rules-infrastructure.yaml
+  - grafana/alerting/rules-mojaloop.yaml
+  - grafana/alerting/rules-data-layer.yaml
+  - grafana/alerting/rules-platform.yaml
+
+  # Grafana Dashboards — Home (L1 entry point)
+  - grafana/dashboards/switch-overview.yaml
+
+  # Grafana Dashboards — Infrastructure
+  - grafana/dashboards/infrastructure/node-overview.yaml
+  - grafana/dashboards/infrastructure/kubernetes-cluster.yaml
+  - grafana/dashboards/infrastructure/pod-resources.yaml
+  - grafana/dashboards/infrastructure/coredns.yaml
+  - grafana/dashboards/infrastructure/cilium-network.yaml
+  - grafana/dashboards/infrastructure/kube-apiserver.yaml
+  - grafana/dashboards/infrastructure/kubelet.yaml
+  - grafana/dashboards/infrastructure/persistent-volumes.yaml
+  - grafana/dashboards/infrastructure/namespace-resources.yaml
+  - grafana/dashboards/infrastructure/proxmox-hosts.yaml
+
+  # Grafana Dashboards — Data Layer
+  - grafana/dashboards/data-layer/mysql-overview.yaml
+  - grafana/dashboards/data-layer/pxc-galera-cluster.yaml
+  - grafana/dashboards/data-layer/redis-overview.yaml
+  - grafana/dashboards/data-layer/kafka-overview.yaml
+  - grafana/dashboards/data-layer/mongodb-overview.yaml
+
+  # Grafana Dashboards — Platform
+  - grafana/dashboards/platform/cert-manager.yaml
+  - grafana/dashboards/platform/external-dns.yaml
+  - grafana/dashboards/platform/vault.yaml
+  - grafana/dashboards/platform/keycloak.yaml
+  - grafana/dashboards/platform/ory-auth.yaml
+  - grafana/dashboards/platform/oathkeeper.yaml
+  - grafana/dashboards/platform/flux.yaml
+
+  # Grafana Dashboards — Mojaloop
+  - grafana/dashboards/mojaloop/transfer-pipeline.yaml
+  - grafana/dashboards/mojaloop/account-lookup-service.yaml
+  - grafana/dashboards/mojaloop/nodejs-runtime.yaml
+  - grafana/dashboards/mojaloop/quoting-service.yaml
+  - grafana/dashboards/mojaloop/dfsp-mtls-gateway.yaml
+  - grafana/dashboards/mojaloop/load-test.yaml
+  - grafana/dashboards/mojaloop/dfsp-overview.yaml

@@ -1,0 +1,357 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-cilium-network
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Infrastructure"
+data:
+  cilium-network.json: |
+    {
+      "uid": "infra-cilium-network",
+      "title": "Cilium Network",
+      "description": "Cilium CNI and Hubble: traffic forwarding, drops, policy enforcement, endpoints, BPF maps, node health, HTTP flows, TCP flags",
+      "tags": ["infrastructure", "cilium", "network", "hubble"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(cilium_endpoint, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Endpoints",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "sum(cilium_endpoint{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "endpoints"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "none" }
+        },
+        {
+          "title": "Identities",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "sum(cilium_identity{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "identities"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "none" }
+        },
+        {
+          "title": "Policies",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "sum(cilium_policy{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "policies"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "none" }
+        },
+        {
+          "title": "Drop Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "pps",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1 },
+                  { "color": "red", "value": 10 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(cilium_drop_count_total{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "drops/s"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area" }
+        },
+        {
+          "title": "Forward Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "pps", "decimals": 0 } },
+          "targets": [
+            {
+              "expr": "sum(rate(cilium_forward_count_total{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "fwd/s"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Failing Controllers",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(cilium_controllers_failing{cluster_name=\"$cluster_name\"}) or vector(0)",
+              "legendFormat": "failing"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Traffic Forwarded",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (direction) (rate(cilium_forward_bytes_total{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "{{direction}}"
+            }
+          ]
+        },
+        {
+          "title": "Packet Drops by Reason",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "description": "Drops by reason — policy denied, invalid, CT miss, etc. Non-zero drops need investigation.",
+          "fieldConfig": { "defaults": { "unit": "pps", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (reason) (rate(cilium_drop_count_total{cluster_name=\"$cluster_name\"}[$__rate_interval])) > 0",
+              "legendFormat": "{{reason}}"
+            }
+          ]
+        },
+        {
+          "title": "Hubble Flows Processed",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (type, verdict) (rate(hubble_flows_processed_total{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "{{type}} {{verdict}}"
+            }
+          ]
+        },
+        {
+          "title": "Hubble Drops by Reason",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (reason, protocol) (rate(hubble_drop_total{cluster_name=\"$cluster_name\"}[$__rate_interval])) > 0",
+              "legendFormat": "{{reason}} ({{protocol}})"
+            }
+          ]
+        },
+        {
+          "title": "HTTP Request Rate (Hubble L7)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "description": "L7 HTTP request rate observed by Hubble — by method, status code, and reporter",
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (method, status) (rate(hubble_http_requests_total{cluster_name=\"$cluster_name\"}[$__rate_interval])) > 0",
+              "legendFormat": "{{method}} {{status}}"
+            }
+          ]
+        },
+        {
+          "title": "HTTP Request Latency (Hubble L7)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, sum(rate(hubble_http_request_duration_seconds_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(hubble_http_request_duration_seconds_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p90"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(hubble_http_request_duration_seconds_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p99"
+            }
+          ]
+        },
+        {
+          "title": "TCP Flags",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "description": "TCP flag distribution — SYN for new connections, RST for resets, FIN for graceful close",
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (flag) (rate(hubble_tcp_flags_total{cluster_name=\"$cluster_name\"}[$__rate_interval])) > 0",
+              "legendFormat": "{{flag}}"
+            }
+          ]
+        },
+        {
+          "title": "ICMP Traffic",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (type) (rate(hubble_icmp_total{cluster_name=\"$cluster_name\"}[$__rate_interval])) > 0",
+              "legendFormat": "{{type}}"
+            }
+          ]
+        },
+        {
+          "title": "Endpoint State",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "description": "Endpoint lifecycle states — ready, waiting-for-identity, not-ready, disconnecting, etc.",
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (state) (cilium_endpoint_state{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "{{state}}"
+            }
+          ]
+        },
+        {
+          "title": "Policy L7 Decisions",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (type) (rate(cilium_policy_l7_total{cluster_name=\"$cluster_name\"}[$__rate_interval])) > 0",
+              "legendFormat": "{{type}}"
+            }
+          ]
+        },
+        {
+          "title": "BPF Map Pressure",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
+          "datasource": { "uid": "thanos" },
+          "description": "BPF map utilization (entries/capacity). High pressure means maps are filling up — may cause drops.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "custom": { "fillOpacity": 10 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red", "value": 0.9 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "cilium_bpf_map_pressure{cluster_name=\"$cluster_name\"} > 0",
+              "legendFormat": "{{pod}} {{map_name}}"
+            }
+          ]
+        },
+        {
+          "title": "Node Health Connectivity",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
+          "datasource": { "uid": "thanos" },
+          "description": "Node-to-node connectivity latency via Cilium health probes",
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.9, sum by (le, pod) (rate(cilium_node_health_connectivity_latency_seconds_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])))",
+              "legendFormat": "{{pod}} p90"
+            }
+          ]
+        },
+        {
+          "title": "Agent CPU & Memory",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 52 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "cilium_process_resident_memory_bytes{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}} RSS"
+            }
+          ]
+        },
+        {
+          "title": "Conntrack GC",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 52 },
+          "datasource": { "uid": "thanos" },
+          "description": "Connection tracking garbage collection — entries cleaned and duration",
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (pod, status) (cilium_datapath_conntrack_gc_entries{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "{{pod}} {{status}}"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

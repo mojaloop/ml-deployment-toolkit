@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mojaloop-kafka-metrics
+  namespace: data
+  labels:
+    strimzi.io/cluster: mojaloop-kafka
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9404"
+    prometheus.io/path: "/metrics"
+spec:
+  clusterIP: None
+  selector:
+    strimzi.io/cluster: mojaloop-kafka
+    strimzi.io/kind: Kafka
+  ports:
+    - name: metrics
+      port: 9404
+      targetPort: 9404
+      protocol: TCP

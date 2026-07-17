@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - observability-namespace.yaml
+  - external-dns-namespace.yaml
+  - metrics-server/helmrelease.yaml
+  - cert-manager/helmrelease.yaml
+  - external-dns/helmrelease.yaml
+  - external-secrets/helmrelease.yaml
+  - vpa/helmrelease.yaml
+  - goldilocks/helmrelease.yaml
+  - reloader/helmrelease.yaml

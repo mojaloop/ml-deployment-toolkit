@@ -1,0 +1,278 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-external-dns
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Platform"
+data:
+  external-dns.json: |
+    {
+      "uid": "platform-external-dns",
+      "title": "external-dns",
+      "tags": ["platform", "external-dns", "dns"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(external_dns_source_endpoints_total, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Last Sync Age",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 300 },
+                  { "color": "red", "value": 600 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "time() - external_dns_controller_last_sync_timestamp_seconds{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "sync age"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Source Endpoints",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "external_dns_source_endpoints_total{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "source endpoints"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Registry Endpoints",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "external_dns_registry_endpoints_total{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "registry endpoints"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Consecutive Soft Errors",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 3 },
+                  { "color": "red", "value": 5 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "external_dns_controller_consecutive_soft_errors{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "soft errors"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Registry Errors/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.01 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "rate(external_dns_registry_errors_total{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "registry errors/s"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Source Errors/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.01 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "rate(external_dns_source_errors_total{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "source errors/s"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Verified Records by Type",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "external_dns_controller_verified_records{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{record_type}}"
+            }
+          ]
+        },
+        {
+          "title": "Source vs Registry Records",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "external_dns_source_records{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "source {{record_type}}"
+            },
+            {
+              "expr": "external_dns_registry_records{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "registry {{record_type}}"
+            }
+          ]
+        },
+        {
+          "title": "Registry Errors",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "rate(external_dns_registry_errors_total{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "registry errors/s"
+            }
+          ]
+        },
+        {
+          "title": "Source Errors",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "rate(external_dns_source_errors_total{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "source errors/s"
+            }
+          ]
+        },
+        {
+          "title": "No-op Runs",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "rate(external_dns_controller_no_op_runs_total{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "no-op runs/s"
+            }
+          ]
+        },
+        {
+          "title": "DNS Provider API Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "rate(external_dns_http_request_duration_seconds_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(external_dns_http_request_duration_seconds_count{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "avg latency"
+            }
+          ]
+        },
+        {
+          "title": "Provider Apply Changes",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "rate(external_dns_provider_cache_apply_changes_calls{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "apply changes/s"
+            }
+          ]
+        },
+        {
+          "title": "Recent Record Changes (logs)",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 28 },
+          "datasource": { "uid": "loki" },
+          "description": "external-dns metrics only expose record COUNTS — the record names live in its logs; this shows create/update/delete operations in the selected range",
+          "targets": [
+            {
+              "expr": "{cluster_name=\"$cluster_name\", namespace=\"external-dns\"} |~ \"(?i)(creat|updat|delet|upsert|applying|changes)\""
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "wrapLogMessage": true,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none"
+          }
+        }
+      ],
+      "schemaVersion": 39
+    }

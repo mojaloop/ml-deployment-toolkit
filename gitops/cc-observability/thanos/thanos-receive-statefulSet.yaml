@@ -1,0 +1,153 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/component: database-write-hashring
+    app.kubernetes.io/instance: thanos-receive
+    app.kubernetes.io/name: thanos-receive
+    app.kubernetes.io/version: v0.41.0
+  name: thanos-receive
+  namespace: observability
+spec:
+  minReadySeconds: 0
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: database-write-hashring
+      app.kubernetes.io/instance: thanos-receive
+      app.kubernetes.io/name: thanos-receive
+  serviceName: thanos-receive
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: database-write-hashring
+        app.kubernetes.io/instance: thanos-receive
+        app.kubernetes.io/name: thanos-receive
+        app.kubernetes.io/version: v0.41.0
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - thanos-receive
+                    - key: app.kubernetes.io/instance
+                      operator: In
+                      values:
+                        - thanos-receive
+                namespaces:
+                  - observability
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+            - podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - thanos-receive
+                    - key: app.kubernetes.io/instance
+                      operator: In
+                      values:
+                        - thanos-receive
+                namespaces:
+                  - observability
+                topologyKey: topology.kubernetes.io/zone
+              weight: 100
+      containers:
+        - args:
+            - receive
+            - --log.level=info
+            - --log.format=logfmt
+            - --grpc-address=0.0.0.0:10901
+            - --http-address=0.0.0.0:10902
+            - --remote-write.address=0.0.0.0:19291
+            - --receive.replication-factor=1
+            - --tsdb.path=/var/thanos/receive
+            - --tsdb.retention=6h
+            - --label=replica="$(NAME)"
+            - --label=receive="true"
+            - --objstore.config=$(OBJSTORE_CONFIG)
+            - --receive.local-endpoint=$(NAME).thanos-receive.$(NAMESPACE):10901
+          env:
+            - name: NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: HOST_IP_ADDRESS
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: OBJSTORE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  key: objstore.yml
+                  name: thanos-objstore-config
+          image: quay.io/thanos/thanos:v0.41.0
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 8
+            httpGet:
+              path: /-/healthy
+              port: 10902
+              scheme: HTTP
+            periodSeconds: 30
+          name: thanos-receive
+          ports:
+            - containerPort: 10901
+              name: grpc
+            - containerPort: 10902
+              name: http
+            - containerPort: 19291
+              name: remote-write
+          readinessProbe:
+            failureThreshold: 20
+            httpGet:
+              path: /-/ready
+              port: 10902
+              scheme: HTTP
+            periodSeconds: 5
+          resources:
+            limits:
+              memory: 1536Mi
+            requests:
+              cpu: 271m
+              memory: 443Mi
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+            - mountPath: /var/thanos/receive
+              name: data
+              readOnly: false
+      nodeSelector:
+        kubernetes.io/os: linux
+      securityContext:
+        fsGroup: 65534
+        runAsGroup: 65532
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: thanos-receive
+      terminationGracePeriodSeconds: 900
+      volumes: []
+  volumeClaimTemplates:
+    - metadata:
+        labels:
+          app.kubernetes.io/component: database-write-hashring
+          app.kubernetes.io/instance: thanos-receive
+          app.kubernetes.io/name: thanos-receive
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 2Gi

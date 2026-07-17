@@ -1,0 +1,54 @@
+# Workload classes for Talos Kubernetes nodes
+# Global versions are the single source of truth for Talos/Kubernetes versions
+
+# Global Talos/Kubernetes versions
+talos_version: "v1.13.3"
+kubernetes_version: "1.36.1"
+
+# Talos image factory schematic (extensions baked into the image)
+talos_image:
+  schematic: "88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b"
+  arch: "amd64"
+
+# --- Workload classes ---
+classes:
+  control-plane:
+    talos_type: "controlplane"
+    talos_patches:
+      - patch-cilium-install.yaml
+
+  worker-general:
+    talos_type: "worker"
+    talos_patches:
+      - patch-cilium-install.yaml
+      - patch-openebs.yaml  
+
+  mixed-plane:
+    talos_type: "controlplane"
+    talos_patches:
+      - patch-cilium-install.yaml
+      - patch-openebs.yaml
+      - patch-allow-scheduling-on-cp.yaml
+
+  worker-kafka:
+    talos_type: "worker"
+    talos_patches:
+      - patch-cilium-install.yaml
+    node_labels:
+      node-role: "kafka"
+    node_taints:
+      - key: "node-role"
+        value: "kafka"
+        effect: "NoSchedule"
+
+  worker-db:
+    talos_type: "worker"
+    talos_patches:
+      - patch-cilium-install.yaml
+      - patch-openebs.yaml
+    node_labels:
+      node-role: "db"
+    node_taints:
+      - key: "node-role"
+        value: "db"
+        effect: "NoSchedule"

@@ -1,0 +1,46 @@
+# Stakater Reloader watches Secrets and ConfigMaps and triggers rolling restarts
+# on workloads annotated with `secret.reloader.stakater.com/reload` or
+# `configmap.reloader.stakater.com/reload`. Used by the Hub JWS pipeline to
+# propagate switch-jws rotations to all signing pods and the jws-pubkey-job.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: stakater
+  namespace: flux-system
+spec:
+  interval: 24h
+  url: https://stakater.github.io/stakater-charts
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: reloader
+  namespace: flux-system
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: reloader
+      version: "2.x"
+      sourceRef:
+        kind: HelmRepository
+        name: stakater
+      interval: 12h
+  targetNamespace: platform-system
+  install:
+    createNamespace: false
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    reloader:
+      watchGlobally: true
+      deployment:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 128Mi

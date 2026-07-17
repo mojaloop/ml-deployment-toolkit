@@ -1,0 +1,313 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-coredns
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Infrastructure"
+data:
+  coredns.json: |
+    {
+      "uid": "infra-coredns",
+      "title": "CoreDNS",
+      "description": "CoreDNS performance: request rate, latency, cache hit ratio, upstream forwarding, errors",
+      "tags": ["infrastructure", "dns", "coredns"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(coredns_dns_requests_total, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Requests/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 0 } },
+          "targets": [
+            {
+              "expr": "sum(rate(coredns_dns_requests_total{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "req/s"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Cache Hit Ratio",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 0.5 },
+                  { "color": "green", "value": 0.8 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(coredns_cache_hits_total{cluster_name=\"$cluster_name\"}[$__rate_interval])) / sum(rate(coredns_cache_requests_total{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "hit ratio"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Latency p90",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "decimals": 4,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.01 },
+                  { "color": "red", "value": 0.1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(coredns_dns_request_duration_seconds_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p90"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Cache Entries",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "sum(coredns_cache_entries{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "entries"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Panics",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(coredns_panics_total{cluster_name=\"$cluster_name\"}) or vector(0)",
+              "legendFormat": "panics"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Forward Errors",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(coredns_forward_healthcheck_broken_total{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "healthcheck broken/s"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Request Rate by Type",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (type) (rate(coredns_dns_requests_total{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "{{type}}"
+            }
+          ]
+        },
+        {
+          "title": "Response Rate by Rcode",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "description": "NOERROR = success, NXDOMAIN = name not found, SERVFAIL = server error",
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (rcode) (rate(coredns_dns_responses_total{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "{{rcode}}"
+            }
+          ]
+        },
+        {
+          "title": "Request Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, sum(rate(coredns_dns_request_duration_seconds_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(coredns_dns_request_duration_seconds_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p90"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(coredns_dns_request_duration_seconds_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p99"
+            }
+          ]
+        },
+        {
+          "title": "Cache Hit / Miss Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "sum by (type) (rate(coredns_cache_hits_total{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "hit {{type}}"
+            },
+            {
+              "expr": "sum(rate(coredns_cache_misses_total{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "miss"
+            }
+          ]
+        },
+        {
+          "title": "Cache Entries by Type",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (type) (coredns_cache_entries{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "{{type}}"
+            }
+          ]
+        },
+        {
+          "title": "Upstream Forward Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "description": "Latency for forwarded requests to upstream DNS servers",
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, sum(rate(coredns_proxy_request_duration_seconds_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "proxy p50"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(coredns_proxy_request_duration_seconds_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "proxy p90"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(coredns_proxy_request_duration_seconds_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "proxy p99"
+            }
+          ]
+        },
+        {
+          "title": "Request Size",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, sum(rate(coredns_dns_request_size_bytes_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "request p50"
+            },
+            {
+              "expr": "histogram_quantile(0.5, sum(rate(coredns_dns_response_size_bytes_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "response p50"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(coredns_dns_request_size_bytes_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "request p99"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(coredns_dns_response_size_bytes_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "response p99"
+            }
+          ]
+        },
+        {
+          "title": "K8s DNS Programming Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "description": "Time from Kubernetes service/endpoint change to DNS record update — high values mean stale DNS",
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, sum(rate(coredns_kubernetes_dns_programming_duration_seconds_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(coredns_kubernetes_dns_programming_duration_seconds_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p99"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

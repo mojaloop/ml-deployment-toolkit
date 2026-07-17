@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="850" viewBox="0 0 1280 850" font-family="Helvetica Neue, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+    <marker id="arrowIndigo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1280" height="850" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="40" y="48" font-size="21" font-weight="700" fill="#0f172a">Mojaloop Switch — High-Level Design</text>
+  <text x="40" y="72" font-size="12.5" fill="#64748b">Deployed system view · Proxmox / Talos infrastructure</text>
+
+  <!-- ================= Switch container ================= -->
+  <rect x="280" y="100" width="690" height="700" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="300" y="126" font-size="15" font-weight="700" fill="#334155">Switch — App Environment cluster</text>
+
+  <!-- ===== Row 1: Mojaloop application ===== -->
+  <rect x="300" y="140" width="460" height="220" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="315" y="162" font-size="13" font-weight="700" fill="#3730a3">Mojaloop application</text>
+
+  <!-- mTLS edge strip -->
+  <rect x="315" y="175" width="90" height="170" rx="6" fill="#e0e7ff" stroke="#6366f1"/>
+  <text x="360" y="238" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">Participant</text>
+  <text x="360" y="254" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">mTLS edge</text>
+  <text x="360" y="284" font-size="10" fill="#4f46e5" text-anchor="middle">Envoy in</text>
+  <text x="360" y="299" font-size="10" fill="#4f46e5" text-anchor="middle">Cilium out</text>
+
+  <!-- Core services -->
+  <rect x="420" y="175" width="325" height="75" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
+  <text x="582" y="196" font-size="12" font-weight="700" fill="#3730a3" text-anchor="middle">Core services</text>
+  <text x="582" y="218" font-size="11" fill="#334155" text-anchor="middle">central ledger · account lookup · quoting · settlement</text>
+  <text x="582" y="236" font-size="10" fill="#64748b" text-anchor="middle">FSPIOP / ISO 20022 APIs · JWS signing</text>
+
+  <!-- MCM -->
+  <rect x="420" y="262" width="155" height="83" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
+  <text x="497" y="284" font-size="12" font-weight="700" fill="#3730a3" text-anchor="middle">MCM</text>
+  <text x="497" y="303" font-size="10.5" fill="#334155" text-anchor="middle">Connection Manager</text>
+  <text x="497" y="319" font-size="10" fill="#64748b" text-anchor="middle">participant onboarding,</text>
+  <text x="497" y="333" font-size="10" fill="#64748b" text-anchor="middle">certificates &amp; endpoints</text>
+
+  <!-- Finance Portal -->
+  <rect x="590" y="262" width="155" height="83" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
+  <text x="667" y="284" font-size="12" font-weight="700" fill="#3730a3" text-anchor="middle">Finance Portal</text>
+  <text x="667" y="303" font-size="10.5" fill="#334155" text-anchor="middle">positions · funds in/out</text>
+  <text x="667" y="319" font-size="10" fill="#64748b" text-anchor="middle">settlements</text>
+
+  <!-- ===== Vault (beside app block) ===== -->
+  <rect x="775" y="140" width="180" height="220" rx="8" fill="#fff7ed" stroke="#f97316" stroke-width="1.5"/>
+  <text x="865" y="232" font-size="16" font-weight="700" fill="#9a3412" text-anchor="middle">Vault</text>
+  <text x="865" y="255" font-size="12" fill="#c2410c" text-anchor="middle">secrets &amp; PKI</text>
+  <text x="865" y="283" font-size="10.5" fill="#64748b" text-anchor="middle">issues credentials and</text>
+  <text x="865" y="298" font-size="10.5" fill="#64748b" text-anchor="middle">TLS certificates for</text>
+  <text x="865" y="313" font-size="10.5" fill="#64748b" text-anchor="middle">every layer</text>
+
+  <!-- ===== Row 2: IAM + Data layer ===== -->
+  <rect x="300" y="400" width="150" height="130" rx="8" fill="#faf5ff" stroke="#a855f7" stroke-width="1.5"/>
+  <text x="375" y="424" font-size="13" font-weight="700" fill="#6b21a8" text-anchor="middle">IAM</text>
+  <text x="375" y="450" font-size="11" fill="#334155" text-anchor="middle">Keycloak</text>
+  <text x="375" y="469" font-size="11" fill="#334155" text-anchor="middle">Ory Kratos</text>
+  <text x="375" y="488" font-size="11" fill="#334155" text-anchor="middle">Ory Oathkeeper</text>
+  <text x="375" y="512" font-size="10" fill="#64748b" text-anchor="middle">SSO &amp; access control</text>
+
+  <rect x="470" y="400" width="485" height="130" rx="8" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+  <text x="712" y="424" font-size="13" font-weight="700" fill="#065f46" text-anchor="middle">Data layer</text>
+  <rect x="527" y="440" width="80" height="22" rx="11" fill="#ffffff" stroke="#6ee7b7"/>
+  <text x="567" y="455" font-size="11" fill="#334155" text-anchor="middle">MySQL (PXC)</text>
+  <rect x="619" y="440" width="95" height="22" rx="11" fill="#ffffff" stroke="#6ee7b7"/>
+  <text x="666" y="455" font-size="11" fill="#334155" text-anchor="middle">Kafka (Strimzi)</text>
+  <rect x="726" y="440" width="105" height="22" rx="11" fill="#ffffff" stroke="#6ee7b7"/>
+  <text x="778" y="455" font-size="11" fill="#334155" text-anchor="middle">MongoDB (PSMDB)</text>
+  <rect x="843" y="440" width="55" height="22" rx="11" fill="#ffffff" stroke="#6ee7b7"/>
+  <text x="870" y="455" font-size="11" fill="#334155" text-anchor="middle">Redis</text>
+  <text x="712" y="492" font-size="10.5" fill="#64748b" text-anchor="middle">replicated, operator-managed clusters · scheduled backups to S3</text>
+
+  <!-- ===== Row 3: Platform services + Observability agent ===== -->
+  <rect x="300" y="560" width="460" height="100" rx="8" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <text x="530" y="582" font-size="13" font-weight="700" fill="#334155" text-anchor="middle">Platform services</text>
+  <rect x="360" y="592" width="240" height="20" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="480" y="606" font-size="10.5" fill="#334155" text-anchor="middle">Gateway API — gw-ext · gw-extapi · gw-int</text>
+  <rect x="610" y="592" width="90" height="20" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="655" y="606" font-size="10.5" fill="#334155" text-anchor="middle">cert-manager</text>
+  <rect x="366" y="620" width="95" height="20" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="413" y="634" font-size="10.5" fill="#334155" text-anchor="middle">external-dns</text>
+  <rect x="473" y="620" width="110" height="20" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="528" y="634" font-size="10.5" fill="#334155" text-anchor="middle">external-secrets</text>
+  <rect x="595" y="620" width="100" height="20" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="645" y="634" font-size="10.5" fill="#334155" text-anchor="middle">Flux — GitOps</text>
+
+  <rect x="775" y="560" width="180" height="100" rx="8" fill="#f0fdfa" stroke="#14b8a6" stroke-width="1.5"/>
+  <text x="865" y="582" font-size="12.5" font-weight="700" fill="#115e59" text-anchor="middle">Observability agent</text>
+  <text x="865" y="606" font-size="10.5" fill="#334155" text-anchor="middle">Alloy · node-exporter</text>
+  <text x="865" y="622" font-size="10.5" fill="#334155" text-anchor="middle">kube-state-metrics · traces</text>
+  <text x="865" y="644" font-size="10" fill="#64748b" text-anchor="middle">ships telemetry off-cluster</text>
+
+  <!-- ===== Row 4: Foundation ===== -->
+  <rect x="300" y="680" width="655" height="30" rx="4" fill="#e2e8f0" stroke="#94a3b8" stroke-width="0.75"/>
+  <text x="627" y="699" font-size="11.5" fill="#334155" text-anchor="middle">Kubernetes · Cilium CNI</text>
+  <rect x="300" y="714" width="655" height="30" rx="4" fill="#d5dce6" stroke="#94a3b8" stroke-width="0.75"/>
+  <text x="627" y="733" font-size="11.5" fill="#334155" text-anchor="middle">Talos Linux — immutable, API-managed OS</text>
+  <rect x="300" y="748" width="655" height="30" rx="4" fill="#c8d2df" stroke="#94a3b8" stroke-width="0.75"/>
+  <text x="627" y="767" font-size="11.5" fill="#334155" text-anchor="middle">Proxmox VE — virtual machines</text>
+
+  <!-- ================= External actors ================= -->
+  <!-- Participants -->
+  <rect x="40" y="185" width="180" height="115" rx="8" fill="#ffffff" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="130" y="223" font-size="13" font-weight="700" fill="#0f172a" text-anchor="middle">Participants</text>
+  <text x="130" y="241" font-size="11" fill="#334155" text-anchor="middle">(DFSPs)</text>
+  <text x="130" y="266" font-size="10.5" fill="#64748b" text-anchor="middle">banks · wallets · MMOs</text>
+
+  <!-- Hub operators -->
+  <rect x="40" y="410" width="180" height="100" rx="8" fill="#ffffff" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="130" y="446" font-size="13" font-weight="700" fill="#0f172a" text-anchor="middle">Hub operators</text>
+  <text x="130" y="470" font-size="10.5" fill="#64748b" text-anchor="middle">business &amp; platform teams</text>
+
+  <!-- S3 backup target -->
+  <rect x="1020" y="415" width="210" height="90" rx="8" fill="#ffffff" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="1125" y="448" font-size="12.5" font-weight="700" fill="#0f172a" text-anchor="middle">S3 backup target</text>
+  <text x="1125" y="470" font-size="10.5" fill="#64748b" text-anchor="middle">MinIO or any S3 API</text>
+  <text x="1125" y="486" font-size="10.5" fill="#64748b" text-anchor="middle">(e.g. Tooling Cluster)</text>
+
+  <!-- Observability backend -->
+  <rect x="1020" y="555" width="210" height="110" rx="8" fill="#ffffff" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="1125" y="590" font-size="12.5" font-weight="700" fill="#0f172a" text-anchor="middle">Observability backend</text>
+  <text x="1125" y="612" font-size="10.5" fill="#334155" text-anchor="middle">Thanos · Loki · Grafana</text>
+  <text x="1125" y="630" font-size="10.5" fill="#64748b" text-anchor="middle">Tooling Cluster or external</text>
+
+  <!-- ================= Arrows ================= -->
+  <!-- Participants <-> mTLS edge -->
+  <line x1="224" y1="245" x2="311" y2="245" stroke="#6366f1" stroke-width="3" marker-start="url(#arrowIndigo)" marker-end="url(#arrowIndigo)"/>
+  <text x="267" y="232" font-size="10.5" font-weight="600" fill="#4f46e5" text-anchor="middle">mTLS · FSPIOP</text>
+
+  <!-- Operators -> IAM -->
+  <line x1="224" y1="460" x2="296" y2="460" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="259" y="448" font-size="10" fill="#475569" text-anchor="middle">SSO</text>
+
+  <!-- Mojaloop app -> Data layer -->
+  <line x1="600" y1="362" x2="600" y2="396" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- IAM fronts operator UIs (dashed, up) -->
+  <line x1="430" y1="396" x2="430" y2="366" stroke="#a855f7" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <text x="442" y="385" font-size="9.5" fill="#7e22ce">fronts UIs &amp; APIs</text>
+
+  <!-- Data layer -> S3 -->
+  <line x1="957" y1="460" x2="1016" y2="460" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="986" y="448" font-size="10" fill="#475569" text-anchor="middle">backups</text>
+
+  <!-- Observability agent -> backend -->
+  <line x1="957" y1="610" x2="1016" y2="610" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="986" y="598" font-size="10" fill="#475569" text-anchor="middle">telemetry</text>
+
+  <!-- Legend -->
+  <rect x="300" y="816" width="14" height="14" rx="3" fill="#ffffff" stroke="#64748b" stroke-dasharray="4 3"/>
+  <text x="322" y="827" font-size="10.5" fill="#64748b">dashed border — outside the Switch</text>
+</svg>

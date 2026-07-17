@@ -1,0 +1,354 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-redis-overview
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Data Layer"
+data:
+  redis-overview.json: |
+    {
+      "uid": "data-redis-overview",
+      "title": "Redis Overview",
+      "description": "Redis health: memory, connections, hit ratio, command latency, persistence, replication",
+      "tags": ["data-layer", "redis", "performance"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(redis_up, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          },
+          {
+            "name": "instance",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(redis_up{cluster_name=\"$cluster_name\"}, pod)",
+            "refresh": 2,
+            "includeAll": true,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Uptime",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            {
+              "expr": "min(redis_uptime_in_seconds{cluster_name=\"$cluster_name\", pod=~\"$instance\"})",
+              "legendFormat": "uptime"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "none" }
+        },
+        {
+          "title": "Connected Clients",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "sum(redis_connected_clients{cluster_name=\"$cluster_name\", pod=~\"$instance\"})",
+              "legendFormat": "clients"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Hit Ratio",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 0.8 },
+                  { "color": "green", "value": 0.95 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(redis_keyspace_hits_total{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])) / (sum(rate(redis_keyspace_hits_total{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])) + sum(rate(redis_keyspace_misses_total{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])))",
+              "legendFormat": "hit ratio"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Memory Usage",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red", "value": 0.9 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "max(redis_memory_used_bytes{cluster_name=\"$cluster_name\", pod=~\"$instance\"} / redis_memory_max_bytes{cluster_name=\"$cluster_name\", pod=~\"$instance\"} > 0)",
+              "legendFormat": "used/max"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Ops/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 0 } },
+          "targets": [
+            {
+              "expr": "sum(rate(redis_commands_processed_total{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval]))",
+              "legendFormat": "ops"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Evictions",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(redis_evicted_keys_total{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval]))",
+              "legendFormat": "evictions/s"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Memory",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "redis_memory_used_bytes{cluster_name=\"$cluster_name\", pod=~\"$instance\"}",
+              "legendFormat": "{{pod}} used"
+            },
+            {
+              "expr": "redis_memory_used_rss_bytes{cluster_name=\"$cluster_name\", pod=~\"$instance\"}",
+              "legendFormat": "{{pod}} RSS"
+            },
+            {
+              "expr": "redis_memory_max_bytes{cluster_name=\"$cluster_name\", pod=~\"$instance\"} > 0",
+              "legendFormat": "{{pod}} maxmemory"
+            },
+            {
+              "expr": "redis_memory_used_dataset_bytes{cluster_name=\"$cluster_name\", pod=~\"$instance\"}",
+              "legendFormat": "{{pod}} dataset"
+            }
+          ]
+        },
+        {
+          "title": "Fragmentation Ratio",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "description": "RSS/used ratio. >1.5 means significant fragmentation. <1 means swapping (critical).",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 10 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 },
+                  { "color": "yellow", "value": 1.5 },
+                  { "color": "red", "value": 2 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "redis_mem_fragmentation_ratio{cluster_name=\"$cluster_name\", pod=~\"$instance\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Hit / Miss Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "rate(redis_keyspace_hits_total{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} hits"
+            },
+            {
+              "expr": "rate(redis_keyspace_misses_total{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} misses"
+            }
+          ]
+        },
+        {
+          "title": "Command Latency (avg)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "description": "Average latency per command type = duration / calls",
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "topk(10, rate(redis_commands_duration_seconds_total{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval]) / rate(redis_commands_total{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval]) > 0)",
+              "legendFormat": "{{pod}} {{cmd}}"
+            }
+          ]
+        },
+        {
+          "title": "Command Rate (top 10)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "topk(10, sum by (cmd) (rate(redis_commands_total{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])))",
+              "legendFormat": "{{cmd}}"
+            }
+          ]
+        },
+        {
+          "title": "Connections",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "redis_connected_clients{cluster_name=\"$cluster_name\", pod=~\"$instance\"}",
+              "legendFormat": "{{pod}} connected"
+            },
+            {
+              "expr": "redis_blocked_clients{cluster_name=\"$cluster_name\", pod=~\"$instance\"}",
+              "legendFormat": "{{pod}} blocked"
+            },
+            {
+              "expr": "rate(redis_rejected_connections_total{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} rejected/s"
+            }
+          ]
+        },
+        {
+          "title": "Network I/O",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "rate(redis_net_input_bytes_total{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} input"
+            },
+            {
+              "expr": "rate(redis_net_output_bytes_total{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} output"
+            }
+          ]
+        },
+        {
+          "title": "Keys & Expiry",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (db) (redis_db_keys{cluster_name=\"$cluster_name\", pod=~\"$instance\"})",
+              "legendFormat": "{{db}} keys"
+            },
+            {
+              "expr": "sum by (db) (redis_db_keys_expiring{cluster_name=\"$cluster_name\", pod=~\"$instance\"})",
+              "legendFormat": "{{db}} expiring"
+            }
+          ]
+        },
+        {
+          "title": "CPU Usage",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "rate(redis_cpu_user_seconds_total{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} user"
+            },
+            {
+              "expr": "rate(redis_cpu_sys_seconds_total{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} system"
+            }
+          ]
+        },
+        {
+          "title": "Persistence & Fork",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "description": "Fork latency impacts all clients during BGSAVE/BGREWRITE. Long forks on large datasets cause latency spikes.",
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "redis_latest_fork_seconds{cluster_name=\"$cluster_name\", pod=~\"$instance\"}",
+              "legendFormat": "{{pod}} last fork"
+            },
+            {
+              "expr": "redis_rdb_last_bgsave_duration_sec{cluster_name=\"$cluster_name\", pod=~\"$instance\"}",
+              "legendFormat": "{{pod}} last bgsave"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

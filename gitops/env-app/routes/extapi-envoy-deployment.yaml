@@ -1,0 +1,96 @@
+# Envoy Deployment for extapi mTLS gateway.
+#
+# Replaces CiliumEnvoyConfig which cannot handle external (north-south) traffic
+# due to Cilium's east/west L7 LB BPF path requiring pod identities.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: extapi-envoy
+  namespace: mojaloop
+spec:
+  replicas: ${extapi_envoy_replicas}
+  selector:
+    matchLabels:
+      app: extapi-envoy
+  template:
+    metadata:
+      labels:
+        app: extapi-envoy
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9901"
+        prometheus.io/path: "/stats/prometheus"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: extapi-envoy
+                topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: envoy
+          image: envoyproxy/envoy:v1.32-latest
+          args: ["-c", "/etc/envoy/envoy.yaml"]
+          ports:
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+            - name: admin
+              containerPort: 9901
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: admin
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /server_info
+              port: admin
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            # 128Mi limit caused repeated OOMKills under load-test connection
+            # volume (2026-07-02, see perf/RESULTS.md) — funded by kafka/alloy
+            # right-sizing in the same change
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/envoy
+              readOnly: true
+            - name: tls
+              mountPath: /etc/envoy/tls
+              readOnly: true
+            - name: ca
+              mountPath: /etc/envoy/ca
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: extapi-envoy-config
+        - name: tls
+          secret:
+            secretName: extapi-tls
+        - name: ca
+          secret:
+            secretName: dfsp-ca-bundle

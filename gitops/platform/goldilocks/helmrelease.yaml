@@ -1,0 +1,43 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: goldilocks
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: vpa
+  interval: 30m
+  chart:
+    spec:
+      chart: goldilocks
+      version: "9.x"
+      sourceRef:
+        kind: HelmRepository
+        name: fairwinds-stable
+      interval: 12h
+  targetNamespace: goldilocks
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    dashboard:
+      replicaCount: 1
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          memory: 128Mi
+    controller:
+      flags:
+        on-by-default: "true"
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          memory: 128Mi

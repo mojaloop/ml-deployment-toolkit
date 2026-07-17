@@ -1,0 +1,33 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: ot-helm
+  namespace: flux-system
+spec:
+  interval: 24h
+  url: https://ot-container-kit.github.io/helm-charts/
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: redis-operator
+  namespace: flux-system
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: redis-operator
+      version: "0.x"
+      sourceRef:
+        kind: HelmRepository
+        name: ot-helm
+      interval: 12h
+  targetNamespace: env-system
+  install:
+    crds: Create
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3

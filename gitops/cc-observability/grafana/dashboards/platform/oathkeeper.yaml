@@ -1,0 +1,236 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-oathkeeper
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Platform"
+data:
+  oathkeeper.json: |
+    {
+      "uid": "platform-oathkeeper",
+      "title": "Oathkeeper Gateway",
+      "description": "Ory Oathkeeper auth proxy: request rates, auth decisions (allow/deny), latency per path. Note: the service label is oathkeeper's listener (oathkeeper-proxy = decision traffic, oathkeeper-api = rules/judge API)",
+      "tags": ["platform", "ory", "oathkeeper", "auth"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(ory_oathkeeper_requests_total, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Up",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Scrape health — distinguishes 'oathkeeper down' from 'no traffic' (request panels are empty until traffic flows)",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "max(up{cluster_name=\"$cluster_name\", service=\"oathkeeper-metrics\"}) or vector(0)",
+              "legendFormat": "up"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Proxy Requests/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 5, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(ory_oathkeeper_requests_total{cluster_name=\"$cluster_name\", namespace=\"ory\", service=\"oathkeeper-proxy\"}[$__rate_interval]))",
+              "legendFormat": ""
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Auth Denials/s (401/403)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 5, "x": 9, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Requests rejected by authentication or authorization; a sudden spike means either an attack or a broken client/credential",
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 2 } },
+          "targets": [
+            {
+              "expr": "sum(rate(ory_oathkeeper_requests_total{cluster_name=\"$cluster_name\", namespace=\"ory\", service=\"oathkeeper-proxy\", status_code=~\"401|403\"}[$__rate_interval])) or vector(0)",
+              "legendFormat": ""
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "5xx/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 5, "x": 14, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(ory_oathkeeper_requests_total{cluster_name=\"$cluster_name\", namespace=\"ory\", status_code=~\"5..\"}[$__rate_interval])) or vector(0)",
+              "legendFormat": ""
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Proxy Latency p99",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 5, "x": 19, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Includes the auth decision AND the proxied upstream response time",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.5 },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(ory_oathkeeper_requests_duration_seconds_bucket{cluster_name=\"$cluster_name\", namespace=\"ory\", service=\"oathkeeper-proxy\"}[$__rate_interval])) by (le))",
+              "legendFormat": ""
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Requests by Status Code",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (status_code) (rate(ory_oathkeeper_requests_total{cluster_name=\"$cluster_name\", namespace=\"ory\", service=\"oathkeeper-proxy\"}[$__rate_interval]))",
+              "legendFormat": "{{status_code}}"
+            }
+          ]
+        },
+        {
+          "title": "Proxy Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, sum(rate(ory_oathkeeper_requests_duration_seconds_bucket{cluster_name=\"$cluster_name\", namespace=\"ory\", service=\"oathkeeper-proxy\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(ory_oathkeeper_requests_duration_seconds_bucket{cluster_name=\"$cluster_name\", namespace=\"ory\", service=\"oathkeeper-proxy\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p90"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(ory_oathkeeper_requests_duration_seconds_bucket{cluster_name=\"$cluster_name\", namespace=\"ory\", service=\"oathkeeper-proxy\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p99"
+            }
+          ]
+        },
+        {
+          "title": "Top Paths by Request Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "topk(10, sum by (request) (rate(ory_oathkeeper_requests_total{cluster_name=\"$cluster_name\", namespace=\"ory\", service=\"oathkeeper-proxy\"}[$__rate_interval])))",
+              "legendFormat": "{{request}}"
+            }
+          ]
+        },
+        {
+          "title": "Denied Requests by Path (401/403)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "description": "Where rejections happen — pinpoints the client or rule generating denials",
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "sum by (request, status_code) (rate(ory_oathkeeper_requests_total{cluster_name=\"$cluster_name\", namespace=\"ory\", service=\"oathkeeper-proxy\", status_code=~\"401|403\"}[$__rate_interval])) > 0",
+              "legendFormat": "{{request}} ({{status_code}})"
+            }
+          ]
+        },
+        {
+          "title": "Traffic by Listener",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "description": "proxy = auth-gated application traffic; api = oathkeeper's own rules/judge API",
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (service) (rate(ory_oathkeeper_requests_total{cluster_name=\"$cluster_name\", namespace=\"ory\"}[$__rate_interval]))",
+              "legendFormat": "{{service}}"
+            }
+          ]
+        },
+        {
+          "title": "Error Rate by Listener (4xx/5xx)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (service) (rate(ory_oathkeeper_requests_total{cluster_name=\"$cluster_name\", namespace=\"ory\", status_code=~\"4..\"}[$__rate_interval])) or vector(0)",
+              "legendFormat": "{{service}} 4xx"
+            },
+            {
+              "expr": "sum by (service) (rate(ory_oathkeeper_requests_total{cluster_name=\"$cluster_name\", namespace=\"ory\", status_code=~\"5..\"}[$__rate_interval])) or vector(0)",
+              "legendFormat": "{{service}} 5xx"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

@@ -1,0 +1,193 @@
+# Envoy bootstrap configuration for extapi mTLS gateway.
+#
+# Terminates TLS with mutual authentication:
+#   - Server cert: extapi-tls (cert-manager, Vault PKI)
+#   - Client verification: dfsp-ca-bundle (vault-agent rendered, combined DFSP CAs)
+#
+# Routes requests by FSPIOP path prefix to Mojaloop backend services.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: extapi-envoy-config
+  namespace: mojaloop
+data:
+  envoy.yaml: |
+    admin:
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 9901
+
+    static_resources:
+      listeners:
+        - name: extapi-listener
+          address:
+            socket_address:
+              address: 0.0.0.0
+              port_value: 8443
+          filter_chains:
+            - transport_socket:
+                name: envoy.transport_sockets.tls
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+                  require_client_certificate: true
+                  common_tls_context:
+                    tls_certificates:
+                      - certificate_chain:
+                          filename: /etc/envoy/tls/tls.crt
+                        private_key:
+                          filename: /etc/envoy/tls/tls.key
+                        watched_directory:
+                          path: /etc/envoy/tls
+                    validation_context:
+                      watched_directory:
+                        path: /etc/envoy/ca
+                      trusted_ca:
+                        filename: /etc/envoy/ca/ca.crt
+              filters:
+                - name: envoy.filters.network.http_connection_manager
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                    stat_prefix: extapi_mtls
+                    codec_type: AUTO
+                    access_log:
+                      - name: envoy.access_loggers.stdout
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+                          log_format:
+                            json_format:
+                              timestamp: "%START_TIME%"
+                              method: "%REQ(:METHOD)%"
+                              path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+                              protocol: "%PROTOCOL%"
+                              response_code: "%RESPONSE_CODE%"
+                              response_flags: "%RESPONSE_FLAGS%"
+                              bytes_received: "%BYTES_RECEIVED%"
+                              bytes_sent: "%BYTES_SENT%"
+                              duration_ms: "%DURATION%"
+                              upstream_cluster: "%UPSTREAM_CLUSTER%"
+                              upstream_host: "%UPSTREAM_HOST%"
+                              client_address: "%DOWNSTREAM_REMOTE_ADDRESS%"
+                              client_cert_subject: "%DOWNSTREAM_PEER_SUBJECT%"
+                              client_cert_serial: "%DOWNSTREAM_PEER_SERIAL%"
+                              tls_version: "%DOWNSTREAM_TLS_VERSION%"
+                              request_id: "%REQ(X-REQUEST-ID)%"
+                              fspiop_source: "%REQ(FSPIOP-SOURCE)%"
+                              fspiop_destination: "%REQ(FSPIOP-DESTINATION)%"
+                    http_filters:
+                      - name: envoy.filters.http.router
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                    route_config:
+                      name: extapi_routes
+                      virtual_hosts:
+                        - name: extapi
+                          domains: ["*"]
+                          routes:
+                            # Account Lookup Service
+                            - match:
+                                prefix: "/participants"
+                              route:
+                                cluster: account-lookup-service
+                            - match:
+                                prefix: "/parties"
+                              route:
+                                cluster: account-lookup-service
+                            # Quoting Service
+                            - match:
+                                prefix: "/quotes"
+                              route:
+                                cluster: quoting-service
+                            - match:
+                                prefix: "/fxQuotes"
+                              route:
+                                cluster: quoting-service
+                            - match:
+                                prefix: "/bulkQuotes"
+                              route:
+                                cluster: quoting-service
+                            # ML API Adapter (transfers)
+                            - match:
+                                prefix: "/transfers"
+                              route:
+                                cluster: ml-api-adapter-service
+                            - match:
+                                prefix: "/fxTransfers"
+                              route:
+                                cluster: ml-api-adapter-service
+                            # Bulk API Adapter (bulk transfers)
+                            - match:
+                                prefix: "/bulkTransfers"
+                              route:
+                                cluster: bulk-api-adapter-service
+                            # Transaction Requests Service
+                            - match:
+                                prefix: "/transactionRequests"
+                              route:
+                                cluster: transaction-requests-service
+                            - match:
+                                prefix: "/authorizations"
+                              route:
+                                cluster: transaction-requests-service
+
+      clusters:
+        - name: account-lookup-service
+          type: STRICT_DNS
+          connect_timeout: 5s
+          load_assignment:
+            cluster_name: account-lookup-service
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: moja-account-lookup-service.mojaloop.svc.cluster.local
+                          port_value: 80
+        - name: quoting-service
+          type: STRICT_DNS
+          connect_timeout: 5s
+          load_assignment:
+            cluster_name: quoting-service
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: moja-quoting-service.mojaloop.svc.cluster.local
+                          port_value: 80
+        - name: ml-api-adapter-service
+          type: STRICT_DNS
+          connect_timeout: 5s
+          load_assignment:
+            cluster_name: ml-api-adapter-service
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: moja-ml-api-adapter-service.mojaloop.svc.cluster.local
+                          port_value: 80
+        - name: bulk-api-adapter-service
+          type: STRICT_DNS
+          connect_timeout: 5s
+          load_assignment:
+            cluster_name: bulk-api-adapter-service
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: moja-bulk-api-adapter-service.mojaloop.svc.cluster.local
+                          port_value: 80
+        - name: transaction-requests-service
+          type: STRICT_DNS
+          connect_timeout: 5s
+          load_assignment:
+            cluster_name: transaction-requests-service
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: moja-transaction-requests-service.mojaloop.svc.cluster.local
+                          port_value: 80

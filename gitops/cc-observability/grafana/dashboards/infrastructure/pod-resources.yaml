@@ -1,0 +1,299 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-pod-resources
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Infrastructure"
+data:
+  pod-resources.json: |
+    {
+      "uid": "infra-pod-resources",
+      "title": "Pod Resources",
+      "description": "Per-namespace/pod CPU, memory, disk I/O, throttling, network — for capacity planning and performance analysis",
+      "tags": ["infrastructure", "pods", "performance"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(container_cpu_usage_seconds_total{image!=\"\"}, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          },
+          {
+            "name": "namespace",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(container_cpu_usage_seconds_total{cluster_name=\"$cluster_name\", image!=\"\"}, namespace)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "CPU Usage by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{cluster_name=\"$cluster_name\", namespace=\"$namespace\", image!=\"\"}[$__rate_interval]))",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "CPU Throttling by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Percentage of CPU periods that were throttled. High throttling means the pod needs more CPU limit or the node is overcommitted.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "custom": { "fillOpacity": 10 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.1 },
+                  { "color": "red", "value": 0.25 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(container_cpu_cfs_throttled_periods_total{cluster_name=\"$cluster_name\", namespace=\"$namespace\", image!=\"\"}[$__rate_interval])) / sum by (pod) (rate(container_cpu_cfs_periods_total{cluster_name=\"$cluster_name\", namespace=\"$namespace\", image!=\"\"}[$__rate_interval]))",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "description": "Only containers WITH a CPU limit emit throttling metrics; namespaces without limits show nothing. Zero = healthy (no throttling)",
+          "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] } }
+        },
+        {
+          "title": "Memory Working Set by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (pod) (container_memory_working_set_bytes{cluster_name=\"$cluster_name\", namespace=\"$namespace\", image!=\"\"})",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Memory vs Limit by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "datasource": { "uid": "thanos" },
+          "description": "Memory working set as % of memory limit. Approaching 100% means OOM risk. Only pods WITH a memory limit appear — a blank panel means no pod in this namespace sets one",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "custom": { "fillOpacity": 10 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red", "value": 0.9 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (pod) (container_memory_working_set_bytes{cluster_name=\"$cluster_name\", namespace=\"$namespace\", image!=\"\"}) / sum by (pod) (kube_pod_container_resource_limits{cluster_name=\"$cluster_name\", namespace=\"$namespace\", resource=\"memory\"}) > 0",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Network Receive by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "Bps",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(container_network_receive_bytes_total{cluster_name=\"$cluster_name\", namespace=\"$namespace\"}[$__rate_interval]))",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Network Transmit by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "Bps",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(container_network_transmit_bytes_total{cluster_name=\"$cluster_name\", namespace=\"$namespace\"}[$__rate_interval]))",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Disk Read Throughput by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "Bps",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(container_fs_reads_bytes_total{cluster_name=\"$cluster_name\", namespace=\"$namespace\", image!=\"\"}[$__rate_interval]))",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Disk Write Throughput by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "Bps",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(container_fs_writes_bytes_total{cluster_name=\"$cluster_name\", namespace=\"$namespace\", image!=\"\"}[$__rate_interval]))",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Container Restarts",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+          "datasource": { "uid": "thanos" },
+          "description": "Only restarting containers are drawn — empty means no restarts in the selected range (that's good)",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 10, "drawStyle": "bars" }
+            }
+          },
+          "targets": [
+            {
+              "expr": "increase(kube_pod_container_status_restarts_total{cluster_name=\"$cluster_name\", namespace=\"$namespace\"}[$__rate_interval]) > 0",
+              "legendFormat": "{{pod}} / {{container}}"
+            }
+          ]
+        },
+        {
+          "title": "PVC Usage in Namespace",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+          "datasource": { "uid": "thanos" },
+          "description": "Per-container filesystem usage isn't exposed by this container runtime (cAdvisor reports device-level only), so this shows PVC utilisation for the namespace instead",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "custom": { "fillOpacity": 10 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red", "value": 0.85 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "kubelet_volume_stats_used_bytes{cluster_name=\"$cluster_name\", namespace=\"$namespace\"} / kubelet_volume_stats_capacity_bytes{cluster_name=\"$cluster_name\", namespace=\"$namespace\"}",
+              "legendFormat": "{{persistentvolumeclaim}}"
+            }
+          ]
+        },
+        {
+          "title": "Top CPU Consumers",
+          "type": "bargauge",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            }
+          },
+          "options": { "orientation": "horizontal", "displayMode": "gradient" },
+          "targets": [
+            {
+              "expr": "topk(10, sum by (pod) (rate(container_cpu_usage_seconds_total{cluster_name=\"$cluster_name\", namespace=\"$namespace\", image!=\"\"}[$__rate_interval])))",
+              "legendFormat": "{{pod}}",
+              "instant": true
+            }
+          ]
+        },
+        {
+          "title": "Top Memory Consumers",
+          "type": "bargauge",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            }
+          },
+          "options": { "orientation": "horizontal", "displayMode": "gradient" },
+          "targets": [
+            {
+              "expr": "topk(10, sum by (pod) (container_memory_working_set_bytes{cluster_name=\"$cluster_name\", namespace=\"$namespace\", image!=\"\"}))",
+              "legendFormat": "{{pod}}",
+              "instant": true
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

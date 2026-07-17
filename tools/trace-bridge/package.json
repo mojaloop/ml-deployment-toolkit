@@ -1,0 +1,14 @@
+{
+  "name": "moja-trace-bridge",
+  "version": "0.1.0",
+  "description": "Forwards Mojaloop Event-SDK trace events from Kafka to an OTLP/HTTP endpoint (Tempo)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "kafkajs": "^2.2.4",
+    "lz4js": "^0.2.0"
+  },
+  "license": "Apache-2.0"
+}

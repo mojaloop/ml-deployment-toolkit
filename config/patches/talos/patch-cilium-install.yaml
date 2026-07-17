@@ -1,0 +1,14 @@
+cluster:
+  network:
+    cni:
+      name: none
+  proxy:
+    disabled: true
+  extraManifests:
+    - "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/experimental-install.yaml"
+    - "https://raw.githubusercontent.com/kiswend/ml-deployment-toolkit/main/config/manifests/cilium-1.19.4.yaml"
+machine:
+  features:
+    hostDNS:
+      enabled: true
+      forwardKubeDNSToHost: false # Cilium + Talos GitHub issue #35153

@@ -1,0 +1,325 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-nodejs-runtime
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Mojaloop"
+data:
+  nodejs-runtime.json: |
+    {
+      "uid": "moja-nodejs-runtime",
+      "title": "Node.js Runtime",
+      "description": "Node.js runtime health across all Mojaloop services: event loop lag, heap, GC, CPU, memory, file descriptors",
+      "tags": ["mojaloop", "nodejs", "runtime", "performance"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(moja_nodejs_eventloop_lag_seconds, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          },
+          {
+            "name": "service",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(moja_nodejs_eventloop_lag_seconds{cluster_name=\"$cluster_name\"}, service)",
+            "refresh": 2,
+            "includeAll": true,
+            "multi": true,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Services",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "count(count by (service) (moja_nodejs_eventloop_lag_seconds{cluster_name=\"$cluster_name\", service=~\"$service\"}))",
+              "legendFormat": "services"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "none" }
+        },
+        {
+          "title": "Pods",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "count(moja_nodejs_eventloop_lag_seconds{cluster_name=\"$cluster_name\", service=~\"$service\"})",
+              "legendFormat": "pods"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "none" }
+        },
+        {
+          "title": "Max Event Loop Lag",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "decimals": 3,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.1 },
+                  { "color": "red", "value": 0.5 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "max(moja_nodejs_eventloop_lag_p99_seconds{cluster_name=\"$cluster_name\", service=~\"$service\"})",
+              "legendFormat": "max p99"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Total RSS",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes" } },
+          "targets": [
+            {
+              "expr": "sum(moja_process_resident_memory_bytes{cluster_name=\"$cluster_name\", service=~\"$service\"})",
+              "legendFormat": "total RSS"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "none" }
+        },
+        {
+          "title": "Total CPU",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 2 } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_process_cpu_seconds_total{cluster_name=\"$cluster_name\", service=~\"$service\"}[$__rate_interval]))",
+              "legendFormat": "total CPU cores"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Max Heap %",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red", "value": 0.9 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "max(moja_nodejs_heap_size_used_bytes{cluster_name=\"$cluster_name\", service=~\"$service\"} / moja_nodejs_heap_size_total_bytes{cluster_name=\"$cluster_name\", service=~\"$service\"})",
+              "legendFormat": "max heap %"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Event Loop Lag p99 by Service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "description": "Event loop lag is the primary Node.js performance indicator. High lag means the event loop is blocked by synchronous work, GC pauses, or CPU saturation.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": { "fillOpacity": 10 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.1 },
+                  { "color": "red", "value": 0.5 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "avg by (service) (moja_nodejs_eventloop_lag_p99_seconds{cluster_name=\"$cluster_name\", service=~\"$service\"})",
+              "legendFormat": "{{service}}"
+            }
+          ]
+        },
+        {
+          "title": "Event Loop Lag p50 by Service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "avg by (service) (moja_nodejs_eventloop_lag_p50_seconds{cluster_name=\"$cluster_name\", service=~\"$service\"})",
+              "legendFormat": "{{service}}"
+            }
+          ]
+        },
+        {
+          "title": "Heap Used by Service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "avg by (service) (moja_nodejs_heap_size_used_bytes{cluster_name=\"$cluster_name\", service=~\"$service\"})",
+              "legendFormat": "{{service}}"
+            }
+          ]
+        },
+        {
+          "title": "Heap Utilization by Service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "description": "Heap used / heap total — approaching 100% triggers more frequent GC and potential OOM",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "custom": { "fillOpacity": 10 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red", "value": 0.9 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "avg by (service) (moja_nodejs_heap_size_used_bytes{cluster_name=\"$cluster_name\", service=~\"$service\"} / moja_nodejs_heap_size_total_bytes{cluster_name=\"$cluster_name\", service=~\"$service\"})",
+              "legendFormat": "{{service}}"
+            }
+          ]
+        },
+        {
+          "title": "GC Pause Duration p99 by Service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "description": "GC pause p99 — long pauses directly cause event loop lag spikes",
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (service, le) (rate(moja_nodejs_gc_duration_seconds_bucket{cluster_name=\"$cluster_name\", service=~\"$service\"}[$__rate_interval])))",
+              "legendFormat": "{{service}}"
+            }
+          ]
+        },
+        {
+          "title": "GC Rate by Service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (service) (rate(moja_nodejs_gc_duration_seconds_count{cluster_name=\"$cluster_name\", service=~\"$service\"}[$__rate_interval]))",
+              "legendFormat": "{{service}}"
+            }
+          ]
+        },
+        {
+          "title": "CPU by Service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (service) (rate(moja_process_cpu_seconds_total{cluster_name=\"$cluster_name\", service=~\"$service\"}[$__rate_interval]))",
+              "legendFormat": "{{service}}"
+            }
+          ]
+        },
+        {
+          "title": "RSS Memory by Service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "avg by (service) (moja_process_resident_memory_bytes{cluster_name=\"$cluster_name\", service=~\"$service\"})",
+              "legendFormat": "{{service}}"
+            }
+          ]
+        },
+        {
+          "title": "File Descriptors by Service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "avg by (service) (moja_process_open_fds{cluster_name=\"$cluster_name\", service=~\"$service\"})",
+              "legendFormat": "{{service}} open"
+            },
+            {
+              "expr": "avg by (service) (moja_process_max_fds{cluster_name=\"$cluster_name\", service=~\"$service\"})",
+              "legendFormat": "{{service}} max"
+            }
+          ]
+        },
+        {
+          "title": "Active Handles & Resources by Service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "avg by (service) (moja_nodejs_active_handles{cluster_name=\"$cluster_name\", service=~\"$service\"})",
+              "legendFormat": "{{service}} handles"
+            },
+            {
+              "expr": "avg by (service) (moja_nodejs_active_resources{cluster_name=\"$cluster_name\", service=~\"$service\"})",
+              "legendFormat": "{{service}} resources"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

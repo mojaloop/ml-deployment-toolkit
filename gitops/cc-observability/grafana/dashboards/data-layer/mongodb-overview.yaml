@@ -1,0 +1,313 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-mongodb-overview
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Data Layer"
+data:
+  mongodb-overview.json: |
+    {
+      "uid": "data-mongodb-overview",
+      "title": "MongoDB Overview",
+      "description": "MongoDB (bulk/reporting) health: replica set state, operations, connections, WiredTiger cache, replication lag",
+      "tags": ["data-layer", "mongodb", "performance"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(mongodb_up, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          },
+          {
+            "name": "instance",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(mongodb_up{cluster_name=\"$cluster_name\"}, pod)",
+            "refresh": 2,
+            "includeAll": true,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Instances Up",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(mongodb_up{cluster_name=\"$cluster_name\", pod=~\"$instance\"}) or vector(0)",
+              "legendFormat": "up"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Primaries",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Exactly 1 is healthy; 0 = no primary (writes blocked), 2+ = split brain",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 },
+                  { "color": "red", "value": 2 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "count(max by (member_idx) (mongodb_rs_members_state{cluster_name=\"$cluster_name\", member_state=\"PRIMARY\"})) or vector(0)",
+              "legendFormat": "primaries"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Connections",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "sum(mongodb_ss_connections{cluster_name=\"$cluster_name\", pod=~\"$instance\", conn_type=\"current\"})",
+              "legendFormat": "current"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Operations/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(mongodb_ss_opcounters{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval]))",
+              "legendFormat": "ops"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Max Replication Lag",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "0 when the replica set has a single member",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 10 },
+                  { "color": "red", "value": 60 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "max((max(mongodb_rs_members_optimeDate{cluster_name=\"$cluster_name\", member_state=\"PRIMARY\"}) - on() group_right() mongodb_rs_members_optimeDate{cluster_name=\"$cluster_name\", member_state=\"SECONDARY\"}) / 1000) or vector(0)",
+              "legendFormat": "lag"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Resident Memory",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "decmbytes" } },
+          "targets": [
+            {
+              "expr": "sum(mongodb_ss_mem_resident{cluster_name=\"$cluster_name\", pod=~\"$instance\"})",
+              "legendFormat": "resident"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Operations by Type",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "sum by (legacy_op_type) (rate(mongodb_ss_opcounters{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval]))",
+              "legendFormat": "{{legacy_op_type}}"
+            }
+          ]
+        },
+        {
+          "title": "Document Operations",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "sum by (doc_op_type) (rate(mongodb_ss_metrics_document{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval]))",
+              "legendFormat": "{{doc_op_type}}"
+            }
+          ]
+        },
+        {
+          "title": "Connections (Current vs Available)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (pod, conn_type) (mongodb_ss_connections{cluster_name=\"$cluster_name\", pod=~\"$instance\", conn_type=~\"current|available\"})",
+              "legendFormat": "{{pod}} {{conn_type}}"
+            }
+          ]
+        },
+        {
+          "title": "Network Throughput",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(mongodb_ss_network_bytesIn{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval]))",
+              "legendFormat": "{{pod}} in"
+            },
+            {
+              "expr": "-sum by (pod) (rate(mongodb_ss_network_bytesOut{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval]))",
+              "legendFormat": "{{pod}} out"
+            }
+          ]
+        },
+        {
+          "title": "WiredTiger Cache",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "description": "Sustained usage near the configured maximum causes eviction pressure and latency",
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (pod) (mongodb_ss_wt_cache_bytes_currently_in_the_cache{cluster_name=\"$cluster_name\", pod=~\"$instance\"})",
+              "legendFormat": "{{pod}} in cache"
+            },
+            {
+              "expr": "sum by (pod) (mongodb_ss_wt_cache_maximum_bytes_configured{cluster_name=\"$cluster_name\", pod=~\"$instance\"})",
+              "legendFormat": "{{pod}} max configured"
+            }
+          ]
+        },
+        {
+          "title": "Queued Operations",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "description": "Operations waiting for locks; sustained non-zero values indicate contention",
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (pod, count_type) (mongodb_ss_globalLock_currentQueue{cluster_name=\"$cluster_name\", pod=~\"$instance\", count_type=~\"readers|writers\"})",
+              "legendFormat": "{{pod}} {{count_type}}"
+            }
+          ]
+        },
+        {
+          "title": "Replication Lag",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "(max(mongodb_rs_members_optimeDate{cluster_name=\"$cluster_name\", member_state=\"PRIMARY\"}) - on() group_right() mongodb_rs_members_optimeDate{cluster_name=\"$cluster_name\", member_state=\"SECONDARY\"}) / 1000",
+              "legendFormat": "member {{member_idx}}"
+            }
+          ]
+        },
+        {
+          "title": "Memory (Resident / Virtual)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "decmbytes", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (pod) (mongodb_ss_mem_resident{cluster_name=\"$cluster_name\", pod=~\"$instance\"})",
+              "legendFormat": "{{pod}} resident"
+            },
+            {
+              "expr": "sum by (pod) (mongodb_ss_mem_virtual{cluster_name=\"$cluster_name\", pod=~\"$instance\"})",
+              "legendFormat": "{{pod}} virtual"
+            }
+          ]
+        },
+        {
+          "title": "Replica Set Member State",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "description": "State code per member: 1=PRIMARY, 2=SECONDARY, other values indicate recovery/election states",
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10, "drawStyle": "line", "lineInterpolation": "stepAfter" } } },
+          "targets": [
+            {
+              "expr": "max by (member_idx, member_state) (mongodb_rs_members_state{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "member {{member_idx}} ({{member_state}})"
+            }
+          ]
+        },
+        {
+          "title": "Asserts",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "description": "Server-side assertion counters; rising regular/user asserts point at errors worth checking in logs",
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (assert_type) (rate(mongodb_ss_asserts{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval]))",
+              "legendFormat": "{{assert_type}}"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

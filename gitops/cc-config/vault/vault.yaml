@@ -1,0 +1,148 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault
+  namespace: vault
+---
+# RBAC: allow vault SA to manage secrets in vault ns (for unseal keys)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vault-secrets
+  namespace: vault
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vault-secrets
+  namespace: vault
+subjects:
+  - kind: ServiceAccount
+    name: vault
+    namespace: vault
+roleRef:
+  kind: Role
+  name: vault-secrets
+  apiGroup: rbac.authorization.k8s.io
+---
+# RBAC: allow vault SA to review tokens (for Kubernetes auth method)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vault-auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: vault
+    namespace: vault
+roleRef:
+  kind: ClusterRole
+  name: system:auth-delegator
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: vault.banzaicloud.com/v1alpha1
+kind: Vault
+metadata:
+  name: vault
+  namespace: vault
+spec:
+  size: ${vault_replicas}
+  image: hashicorp/vault:1.18.4
+  bankVaultsImage: ghcr.io/bank-vaults/bank-vaults:v1.31.3
+
+  serviceType: ClusterIP
+  serviceAccount: vault
+
+  # Auto-unseal using K8s secret (operator stores unseal keys automatically)
+  unsealConfig:
+    options:
+      preFlightChecks: true
+    kubernetes:
+      secretNamespace: vault
+
+  # Vault server configuration
+  config:
+    storage:
+      file:
+        path: "/vault/file"
+    listener:
+      tcp:
+        address: "0.0.0.0:8200"
+        tls_disable: true
+    telemetry:
+      statsd_address: localhost:9125
+    api_addr: http://vault.vault:8200
+    ui: true
+
+  # Declarative Vault configuration (applied by bank-vaults sidecar after unseal)
+  externalConfig:
+    policies:
+      - name: allow_secrets
+        rules: |
+          path "secret/*" {
+            capabilities = ["create", "read", "update", "delete", "list"]
+          }
+
+    auth:
+      - type: kubernetes
+        roles:
+          - name: external-secrets
+            bound_service_account_names:
+              - external-secrets-external-secrets
+            bound_service_account_namespaces:
+              - external-secrets
+            policies: allow_secrets
+            ttl: 1h
+
+    secrets:
+      - path: secret
+        type: kv
+        description: "KV-v2 secret store"
+        options:
+          version: 2
+
+    startupSecrets:
+      - type: kv
+        path: secret/data/minio
+        data:
+          data:
+            rootUser: "${minio_root_user}"
+            rootPassword: "${minio_root_password}"
+      - type: kv
+        path: secret/data/harbor
+        data:
+          data:
+            adminPassword: "${harbor_admin_password}"
+      - type: kv
+        path: secret/data/dns-provider
+        data:
+          data:
+            credentials: "${dns_provider_credentials}"
+      - type: kv
+        path: secret/data/observability
+        data:
+          data:
+            grafanaAdminPassword: "${grafana_admin_password}"
+
+  # Persistent storage for Vault data
+  volumeMounts:
+    - name: vault-file
+      mountPath: /vault/file
+
+  volumes:
+    - name: vault-file
+      persistentVolumeClaim:
+        claimName: vault-file
+
+  volumeClaimTemplates:
+    - metadata:
+        name: vault-file
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

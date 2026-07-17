@@ -1,0 +1,152 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: cilium
+  namespace: flux-system
+spec:
+  interval: 24h
+  url: https://helm.cilium.io/
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cilium
+  namespace: flux-system
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: cilium
+      version: "1.19.4"
+      sourceRef:
+        kind: HelmRepository
+        name: cilium
+      interval: 12h
+  targetNamespace: cilium
+  install:
+    crds: Create
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  values:
+    # Kube-proxy replacement (Cilium handles all service routing)
+    kubeProxyReplacement: true
+
+    # Reach the API server via Talos KubePrism on every node — with kube-proxy
+    # disabled, the in-cluster Service VIP only works while Cilium's own
+    # datapath is up. Must match rendering/cilium/values.yaml so the takeover
+    # doesn't leave agent/operator depending on the VIP.
+    k8sServiceHost: localhost
+    k8sServicePort: 7445
+
+    # IPAM mode — use Kubernetes-assigned pod CIDRs
+    ipam:
+      mode: kubernetes
+
+    # Talos-specific: cgroup settings
+    cgroup:
+      autoMount:
+        enabled: false
+      hostRoot: /sys/fs/cgroup
+
+    # Talos-specific: capabilities for restricted runtime
+    securityContext:
+      capabilities:
+        ciliumAgent:
+          - CHOWN
+          - KILL
+          - NET_ADMIN
+          - NET_RAW
+          - IPC_LOCK
+          - SYS_ADMIN
+          - SYS_RESOURCE
+          - DAC_OVERRIDE
+          - FOWNER
+          - SETGID
+          - SETUID
+        cleanCiliumState:
+          - NET_ADMIN
+          - SYS_ADMIN
+          - SYS_RESOURCE
+
+    # Gateway API support (CRDs installed via Talos extraManifests)
+    gatewayAPI:
+      enabled: true
+
+    # LB-IPAM for on-prem load balancer
+    lbIPAM:
+      enabled: true
+
+    # L2 announcements for LB IPs
+    l2announcements:
+      enabled: true
+
+    # WireGuard node-to-node encryption of pod traffic (ADR-013). Keys are
+    # generated at runtime by each agent — nothing rendered, nothing to seed.
+    # Must match rendering/cilium/values.yaml so rebuilt clusters boot
+    # encrypted instead of waiting for Flux takeover.
+    encryption:
+      enabled: true
+      type: wireguard
+
+    # Same trap as operator.rollOutPods below, agent-side: the agent reads
+    # cilium-config only at startup, and flag flips (e.g. enable-wireguard)
+    # don't touch the DaemonSet template — without this, config changes land
+    # in the ConfigMap but never take effect on running nodes.
+    rollOutCiliumPods: true
+
+    # Cilium agent Prometheus metrics (port 9962)
+    prometheus:
+      enabled: true
+
+    # Note: prometheus.enabled=true already adds prometheus.io/scrape and
+    # prometheus.io/port annotations to agent pods — no podAnnotations needed
+
+    # Hubble observability and metrics
+    hubble:
+      enabled: true
+      relay:
+        enabled: true
+      ui:
+        enabled: true
+      metrics:
+        enabled:
+          - dns
+          - drop
+          - tcp
+          - flow
+          - icmp
+          - httpV2:exemplars=true;labelsContext=source_ip,source_namespace,source_workload,destination_ip,destination_namespace,destination_workload,traffic_direction
+        dashboards:
+          enabled: false
+
+    # Envoy proxy (external) with prometheus metrics for CEC visibility
+    envoy:
+      enabled: true
+      prometheus:
+        enabled: true
+
+    # Operator settings. rollOutPods adds a cilium-config checksum annotation
+    # to the operator pod template so config changes (bootstrap → Flux
+    # takeover, future flag flips) restart the operator — it only registers
+    # feature-gated CRDs at startup.
+    operator:
+      replicas: 1
+      rollOutPods: true
+
+    # Agent resource limits (prevent OOM during BPF compilation). CPU limit
+    # must leave headroom for endpoint restore after a node reboot: at 1000m
+    # the agent gets throttled rebuilding BPF state on a loaded node (~90
+    # endpoints), misses its startup/liveness probes, and kubelet SIGKILLs it
+    # into a CrashLoopBackOff that takes the node's datapath down with it.
+    resources:
+      requests:
+        cpu: 100m
+        memory: 400Mi
+      limits:
+        cpu: 2000m
+        memory: 1Gi
+

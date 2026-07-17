@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bulk-mongodb-metrics
+  namespace: data
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9216"
+    prometheus.io/path: "/metrics"
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/instance: bulk-mongodb
+    app.kubernetes.io/component: mongod
+  ports:
+    - name: metrics
+      port: 9216
+      targetPort: 9216
+      protocol: TCP

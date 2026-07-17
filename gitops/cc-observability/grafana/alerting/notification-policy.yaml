@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-alerting-notification-policy
+  namespace: observability
+  labels:
+    grafana_alert: "1"
+data:
+  notification-policy.yaml: |
+    apiVersion: 1
+    policies:
+      - orgId: 1
+        receiver: ops
+        group_by: ["alertname", "cluster_name"]
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h

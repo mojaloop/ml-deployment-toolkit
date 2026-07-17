@@ -1,0 +1,59 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "schedule": ["before 7am on monday"],
+  "timezone": "UTC",
+  "flux": {
+    "fileMatch": ["gitops/.+\\.yaml$"]
+  },
+  "packageRules": [
+    {
+      "description": "Terraform providers",
+      "matchManagers": ["terraform"],
+      "groupName": "terraform providers",
+      "automerge": false
+    },
+    {
+      "description": "Platform Helm charts (cert-manager, external-dns, external-secrets, metrics-server)",
+      "matchManagers": ["flux"],
+      "matchFileNames": ["gitops/platform/**"],
+      "groupName": "platform helm charts"
+    },
+    {
+      "description": "Networking (Cilium)",
+      "matchManagers": ["flux"],
+      "matchFileNames": ["gitops/talos/cilium/**"],
+      "groupName": "networking helm charts"
+    },
+    {
+      "description": "Data layer operators (Percona, Strimzi, Redis, MongoDB)",
+      "matchManagers": ["flux"],
+      "matchFileNames": ["gitops/env/**"],
+      "groupName": "data operator helm charts"
+    },
+    {
+      "description": "Application charts (Mojaloop, MCM, Finance Portal)",
+      "matchManagers": ["flux"],
+      "matchFileNames": ["gitops/env-app/**"],
+      "groupName": "application helm charts"
+    },
+    {
+      "description": "Control center (Vault, Harbor, MinIO)",
+      "matchManagers": ["flux"],
+      "matchFileNames": ["gitops/cc/**", "gitops/cc-config/**"],
+      "groupName": "control center helm charts"
+    },
+    {
+      "description": "Ory stack (Kratos, Keto, Oathkeeper, BOF, Selfservice UI)",
+      "matchManagers": ["flux"],
+      "matchFileNames": ["gitops/env-auth/ory/**"],
+      "groupName": "ory helm charts"
+    },
+    {
+      "description": "Separate major updates for review",
+      "matchUpdateTypes": ["major"],
+      "separateMinorPatch": true
+    }
+  ],
+  "ignorePaths": ["legacy/**"]
+}

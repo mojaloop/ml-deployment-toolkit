@@ -1,0 +1,25 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: tempo
+  namespace: observability
+spec:
+  parentRefs:
+    - name: gw-int
+      namespace: platform-system
+  hostnames:
+    - "tempo.int.${domain}"
+  rules:
+    # OTLP/HTTP ingest (moja-trace-bridge in env clusters → Tempo)
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/traces
+      backendRefs:
+        - name: tempo
+          port: 4318
+    # All other requests (Grafana queries) → Tempo query API
+    # (Tempo's HTTP server listens on 3200; the service has no 3100)
+    - backendRefs:
+        - name: tempo
+          port: 3200

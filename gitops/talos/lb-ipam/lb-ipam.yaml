@@ -1,0 +1,18 @@
+apiVersion: "cilium.io/v2alpha1"
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: default-pool
+spec:
+  blocks:
+    - start: "${lb_ipam_start}"
+      stop: "${lb_ipam_stop}"
+---
+apiVersion: "cilium.io/v2alpha1"
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: default-l2-policy
+spec:
+  interfaces:
+    - ^eth[0-9]+
+  externalIPs: true
+  loadBalancerIPs: true

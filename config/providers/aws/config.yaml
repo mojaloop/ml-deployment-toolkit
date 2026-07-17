@@ -1,0 +1,6 @@
+# AWS Infrastructure Configuration
+# Provider-specific settings for EKS managed Kubernetes
+
+# VPC defaults
+vpc:
+  cidr: "10.0.0.0/16"

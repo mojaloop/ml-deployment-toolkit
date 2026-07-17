@@ -1,0 +1,15 @@
+# Allow HTTPRoutes in the ory namespace to reference Services in mojaloop namespace.
+# Required for finance-portal HTTPRoute to route directly to backend services.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-ory-httproute-ref
+  namespace: mojaloop
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: ory
+  to:
+    - group: ""
+      kind: Service

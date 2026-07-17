@@ -1,0 +1,20 @@
+# ReferenceGrant allowing HTTPRoutes from app namespaces to reference gw-ext
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-gw-ext-ref
+  namespace: platform-system
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: mojaloop
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: mcm
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: keycloak
+  to:
+    - group: gateway.networking.k8s.io
+      kind: Gateway

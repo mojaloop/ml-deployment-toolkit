@@ -1,0 +1,264 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-account-lookup-service
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Mojaloop"
+data:
+  account-lookup-service.json: |
+    {
+      "uid": "moja-als",
+      "title": "Account Lookup Service",
+      "description": "ALS operations: parties/participants request rates, ingress/egress/domain latency, oracle lookups, error callbacks.",
+      "tags": ["mojaloop", "als", "performance"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(moja_nodejs_eventloop_lag_seconds{service=\"account-lookup-service\"}, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Parties Requests/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_ing_getPartiesByTypeAndID_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "parties/s"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Participants Requests/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_ing_getParticipantsByTypeAndID_count{cluster_name=\"$cluster_name\"}[$__rate_interval])) + sum(rate(moja_ing_postParticipantsbyTypeAndID_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "participants/s"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Parties p90",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_ing_getPartiesByTypeAndID_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p90"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "none" }
+        },
+        {
+          "title": "Oracle Requests/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_egress_oracleRequest_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "oracle/s"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Error Callbacks/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "(sum(rate(moja_ing_putPartiesErrorByTypeIDAndSubID_count{cluster_name=\"$cluster_name\"}[$__rate_interval])) or vector(0)) + (sum(rate(moja_ing_putParticipantsErrorByTypeAndID_count{cluster_name=\"$cluster_name\"}[$__rate_interval])) or vector(0))",
+              "legendFormat": "errors/s"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Egress Send p90",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_egress_sendRequestToParticipant_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p90"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "none" }
+        },
+        {
+          "title": "Ingress Rates — Parties",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_ing_getPartiesByTypeAndID_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "GET parties"
+            },
+            {
+              "expr": "sum(rate(moja_ing_putPartiesByTypeAndID_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "PUT parties"
+            },
+            {
+              "expr": "sum(rate(moja_ing_putPartiesErrorByTypeIDAndSubID_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "PUT parties error"
+            }
+          ]
+        },
+        {
+          "title": "Ingress Rates — Participants",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_ing_getParticipantsByTypeAndID_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "GET participants"
+            },
+            {
+              "expr": "sum(rate(moja_ing_postParticipantsbyTypeAndID_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "POST participants"
+            },
+            {
+              "expr": "sum(rate(moja_ing_deleteParticipantsByTypeAndID_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "DELETE participants"
+            },
+            {
+              "expr": "sum(rate(moja_ing_putParticipantsErrorByTypeAndID_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "PUT participants error"
+            }
+          ]
+        },
+        {
+          "title": "Ingress Latency — Parties (p90)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_ing_getPartiesByTypeAndID_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "GET parties p90"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_ing_putPartiesByTypeAndID_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "PUT parties p90"
+            },
+            {
+              "expr": "histogram_quantile(0.5, sum(rate(moja_ing_getPartiesByTypeAndID_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "GET parties p50"
+            }
+          ]
+        },
+        {
+          "title": "Ingress Latency — Participants (p90)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_ing_getParticipantsByTypeAndID_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "GET participants p90"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_ing_postParticipantsbyTypeAndID_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "POST participants p90"
+            }
+          ]
+        },
+        {
+          "title": "Egress Latency (p90)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "description": "Outbound call latency — oracle lookups, participant endpoint resolution, FSPIOP requests to DFSPs",
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_egress_oracleRequest_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "oracle request"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_egress_sendRequestToParticipant_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "send to participant"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_egress_getParticipantEndpoint_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "get endpoint"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_egress_validateParticipant_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "validate participant"
+            }
+          ]
+        },
+        {
+          "title": "Egress Throughput",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_egress_oracleRequest_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "oracle requests"
+            },
+            {
+              "expr": "sum(rate(moja_egress_sendRequestToParticipant_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "send to participant"
+            },
+            {
+              "expr": "sum(rate(moja_egress_getParticipantEndpoint_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "get endpoint"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

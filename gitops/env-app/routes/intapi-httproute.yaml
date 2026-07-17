@@ -1,0 +1,57 @@
+# FSPIOP internal API mirror — same routes as extapi but on gw-int
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: intapi
+  namespace: mojaloop
+spec:
+  parentRefs:
+    - name: gw-int
+      namespace: platform-system
+  hostnames:
+    - "intapi.int.${domain}"
+  rules:
+    # Account Lookup Service
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /participants
+        - path:
+            type: PathPrefix
+            value: /parties
+      backendRefs:
+        - name: moja-account-lookup-service
+          port: 80
+    # Quoting Service
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /quotes
+        - path:
+            type: PathPrefix
+            value: /fxQuotes
+      backendRefs:
+        - name: moja-quoting-service
+          port: 80
+    # ML API Adapter (transfers)
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /transfers
+        - path:
+            type: PathPrefix
+            value: /fxTransfers
+      backendRefs:
+        - name: moja-ml-api-adapter-service
+          port: 80
+    # Transaction Requests Service
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /transactionRequests
+        - path:
+            type: PathPrefix
+            value: /authorizations
+      backendRefs:
+        - name: moja-transaction-requests-service
+          port: 80

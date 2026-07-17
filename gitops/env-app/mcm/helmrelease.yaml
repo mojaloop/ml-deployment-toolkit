@@ -1,0 +1,126 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: mcm
+  namespace: flux-system
+spec:
+  interval: 10m
+  chart:
+    spec:
+      chart: connection-manager
+      version: "17.2.0"
+      sourceRef:
+        kind: HelmRepository
+        name: mojaloop
+      interval: 12h
+  releaseName: mcm
+  targetNamespace: mcm
+  timeout: 10m
+  install:
+    createNamespace: false
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      retries: -1
+      strategy: uninstall
+  valuesFrom:
+    - kind: ConfigMap
+      name: mcm-values-override
+      valuesKey: values.yaml
+      optional: true
+  values:
+    db:
+      user: mcm
+      passwordSecret: mcm-db-secret
+      passwordSecretKey: mysql-password
+      host: "${mysql_host}"
+      port: 3306
+      schema: mcm
+
+    api:
+      image:
+        name: ndelma/connection-manager-api
+        version: pr-202-v4
+      ports:
+        portName: api
+      url: "https://mcm.int.${domain}"
+      clientUrl: "https://mcm.int.${domain}"
+      switchFQDN: "${domain}"
+      switchId: "${hub_participant_name}"
+
+      env:
+        IAM_ENABLED: "true"
+        IAM_AUTO_CREATE_ACCOUNTS: "true"
+        HYDRA_ADMIN_URL: "http://hydra-admin.ory.svc.cluster.local:4445"
+        HYDRA_PUBLIC_URL: "http://hydra-public.ory.svc.cluster.local:4444"
+        KRATOS_ADMIN_URL: "http://kratos-admin.ory.svc.cluster.local:80"
+        KRATOS_PUBLIC_URL: "http://kratos-public.ory.svc.cluster.local:80"
+        KETO_WRITE_URL: "http://keto-write.ory.svc.cluster.local:80"
+        KETO_READ_URL: "http://keto-read.ory.svc.cluster.local:80"
+        KETO_HUB_OBJECT: "${hub_participant_name}"
+
+      openid:
+        enabled: false
+
+      keycloak:
+        enabled: false
+        autoCreateAccounts: false
+
+      certManager:
+        enabled: true
+        serverCertSecretName: extapi-tls
+        serverCertSecretNamespace: mojaloop
+
+      vault:
+        auth:
+          k8s:
+            enabled: true
+            token: /var/run/secrets/kubernetes.io/serviceaccount/token
+            role: mcm
+            mountPoint: kubernetes
+        endpoint: "http://vault.vault.svc.cluster.local:8200"
+        mounts:
+          pki: pki
+          kv: secret/mcm
+          dfspClientCertBundle: secret/onboarding_pm4mls
+          dfspInternalIPWhitelistBundle: secret/whitelist_pm4mls
+          dfspExternalIPWhitelistBundle: secret/whitelist_fsps
+        pkiServerRole: server-cert-role
+        pkiClientRole: client-cert-role
+        signExpiryHours: 43800
+        keyLength: 4096
+
+      serviceAccount:
+        name: connection-manager-api
+        externallyManaged: false
+
+      keto:
+        enabled: true
+        writeUrl: http://keto-write.ory.svc.cluster.local:80
+
+    ui:
+      checkSessionUrl: "https://mcm.int.${domain}/kratos/sessions/whoami"
+      loginUrl: "https://auth.int.${domain}/kratos/self-service/login/browser"
+      loginProvider: kratos
+      logoutUrl: "/kratos/self-service/logout/browser"
+      oauth:
+        enabled: false
+
+    migrations:
+      enabled: true
+      deletePolicy: before-hook-creation
+      env:
+        VAULT_AUTH_METHOD: K8S
+        VAULT_K8S_TOKEN_FILE: /var/run/secrets/kubernetes.io/serviceaccount/token
+        VAULT_K8S_ROLE: mcm
+        VAULT_K8S_AUTH_MOUNT_POINT: kubernetes
+        VAULT_ENDPOINT: "http://vault.vault.svc.cluster.local:8200"
+        VAULT_MOUNT_PKI: pki
+        VAULT_MOUNT_KV: secret/mcm
+        VAULT_PKI_SERVER_ROLE: server-cert-role
+        VAULT_PKI_CLIENT_ROLE: client-cert-role
+        SWITCH_ID: "${hub_participant_name}"
+
+    ingress:
+      enabled: false

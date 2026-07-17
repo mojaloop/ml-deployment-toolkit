@@ -1,0 +1,441 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-kafka-overview
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Data Layer"
+data:
+  kafka-overview.json: |
+    {
+      "uid": "data-kafka-overview",
+      "title": "Kafka Cluster",
+      "description": "Kafka broker health: throughput, partitions, replication, request rates, consumer lag, log size, KRaft controller, JVM heap/GC",
+      "tags": ["data-layer", "kafka", "strimzi", "performance"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(kafka_brokers, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          },
+          {
+            "name": "topic",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(kafka_topic_partitions{cluster_name=\"$cluster_name\"}, topic)",
+            "refresh": 2,
+            "includeAll": true,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Brokers",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "green" } } },
+          "targets": [
+            {
+              "expr": "max(kafka_brokers{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "brokers"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Active Controller",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(kafka_controller_kafkacontroller_activecontrollercount{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "controllers"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Offline Partitions",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(kafka_controller_kafkacontroller_offlinepartitionscount{cluster_name=\"$cluster_name\"}) or vector(0)",
+              "legendFormat": "offline"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Under-Replicated",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1 },
+                  { "color": "red", "value": 5 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(kafka_server_replicamanager_underreplicatedpartitions{cluster_name=\"$cluster_name\"}) or vector(0)",
+              "legendFormat": "under-replicated"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Messages In/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 0 } },
+          "targets": [
+            {
+              "expr": "sum(rate(kafka_server_brokertopicmetrics_messagesin_total{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "msg/s"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Max Consumer Lag",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1000 },
+                  { "color": "red", "value": 10000 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "max(kafka_consumergroup_lag{cluster_name=\"$cluster_name\"}) or vector(0)",
+              "legendFormat": "max lag"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Broker Throughput (Bytes)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(kafka_server_brokertopicmetrics_bytesin_total{cluster_name=\"$cluster_name\", topic=\"\"}[$__rate_interval]))",
+              "legendFormat": "{{pod}} in"
+            },
+            {
+              "expr": "sum by (pod) (-rate(kafka_server_brokertopicmetrics_bytesout_total{cluster_name=\"$cluster_name\", topic=\"\"}[$__rate_interval]))",
+              "legendFormat": "{{pod}} out"
+            }
+          ]
+        },
+        {
+          "title": "Messages In by Topic",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (topic) (rate(kafka_server_brokertopicmetrics_messagesin_total{cluster_name=\"$cluster_name\", topic=~\"$topic\", topic!=\"\"}[$__rate_interval])) > 0",
+              "legendFormat": "{{topic}}"
+            }
+          ]
+        },
+        {
+          "title": "Consumer Group Lag",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "description": "Consumer lag per group — critical for Mojaloop transfer processing latency",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 10 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1000 },
+                  { "color": "red", "value": 10000 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (consumergroup, topic) (kafka_consumergroup_lag{cluster_name=\"$cluster_name\", topic=~\"$topic\"}) > 0",
+              "legendFormat": "{{consumergroup}} / {{topic}}"
+            }
+          ]
+        },
+        {
+          "title": "Consumer Group Members",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (consumergroup) (kafka_consumergroup_members{cluster_name=\"$cluster_name\"}) > 0",
+              "legendFormat": "{{consumergroup}}"
+            }
+          ]
+        },
+        {
+          "title": "Partitions per Broker",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "description": "Partition and leader count distribution across brokers — imbalance indicates need for rebalance",
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "kafka_server_replicamanager_partitioncount{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}} partitions"
+            },
+            {
+              "expr": "kafka_server_replicamanager_leadercount{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}} leaders"
+            }
+          ]
+        },
+        {
+          "title": "ISR Shrink / Expand",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "description": "ISR shrinks indicate replicas falling behind. Frequent shrinks signal disk/network issues.",
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "rate(kafka_server_replicamanager_isrshrinks_total{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} shrink"
+            },
+            {
+              "expr": "rate(kafka_server_replicamanager_isrexpands_total{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} expand"
+            }
+          ]
+        },
+        {
+          "title": "Request Rate by Type",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(kafka_server_brokertopicmetrics_totalproducerequests_total{cluster_name=\"$cluster_name\", topic=\"\"}[$__rate_interval]))",
+              "legendFormat": "produce"
+            },
+            {
+              "expr": "sum(rate(kafka_server_brokertopicmetrics_totalfetchrequests_total{cluster_name=\"$cluster_name\", topic=\"\"}[$__rate_interval]))",
+              "legendFormat": "fetch"
+            },
+            {
+              "expr": "sum(rate(kafka_server_brokertopicmetrics_failedproducerequests_total{cluster_name=\"$cluster_name\", topic=\"\"}[$__rate_interval]))",
+              "legendFormat": "failed produce"
+            },
+            {
+              "expr": "sum(rate(kafka_server_brokertopicmetrics_failedfetchrequests_total{cluster_name=\"$cluster_name\", topic=\"\"}[$__rate_interval]))",
+              "legendFormat": "failed fetch"
+            }
+          ]
+        },
+        {
+          "title": "Replication Traffic",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(kafka_server_brokertopicmetrics_replicationbytesin_total{cluster_name=\"$cluster_name\", topic=\"\"}[$__rate_interval]))",
+              "legendFormat": "{{pod}} replication in"
+            },
+            {
+              "expr": "sum by (pod) (rate(kafka_server_brokertopicmetrics_replicationbytesout_total{cluster_name=\"$cluster_name\", topic=\"\"}[$__rate_interval]))",
+              "legendFormat": "{{pod}} replication out"
+            }
+          ]
+        },
+        {
+          "title": "Log Size by Topic",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (topic) (kafka_log_log_size{cluster_name=\"$cluster_name\", topic=~\"$topic\"})",
+              "legendFormat": "{{topic}}"
+            }
+          ]
+        },
+        {
+          "title": "Topic Partition Health",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "description": "Under-replicated and non-preferred leader partitions per topic",
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (topic) (kafka_topic_partition_under_replicated_partition{cluster_name=\"$cluster_name\", topic=~\"$topic\"}) > 0",
+              "legendFormat": "{{topic}} under-replicated"
+            },
+            {
+              "expr": "sum by (topic) (kafka_topic_partition_leader_is_preferred{cluster_name=\"$cluster_name\", topic=~\"$topic\"} == 0)",
+              "legendFormat": "{{topic}} non-preferred leader"
+            }
+          ]
+        },
+        {
+          "title": "Request Handler / Network Processor Idle",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
+          "datasource": { "uid": "thanos" },
+          "description": "Request handler idle shows broker processing capacity. Network processor idle shows network thread headroom. Values <0.7 indicate saturation.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "custom": { "fillOpacity": 10 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 0.3 },
+                  { "color": "green", "value": 0.7 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "kafka_server_kafkarequesthandlerpool_requesthandleravgidle_percent{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}} request handler idle"
+            },
+            {
+              "expr": "kafka_network_socketserver_networkprocessoravgidle_percent{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}} network processor idle"
+            }
+          ]
+        },
+        {
+          "title": "KRaft Controller",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
+          "datasource": { "uid": "thanos" },
+          "description": "KRaft raft channel metrics — connection count, incoming/outgoing bytes",
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "kafka_server_raftchannelmetrics_connection_count{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{pod}} connections"
+            },
+            {
+              "expr": "rate(kafka_server_raftchannelmetrics_incoming_byte_total{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} incoming bytes/s"
+            },
+            {
+              "expr": "rate(kafka_server_raftchannelmetrics_outgoing_byte_total{cluster_name=\"$cluster_name\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} outgoing bytes/s"
+            }
+          ]
+        },
+        {
+          "title": "JVM Heap (Brokers)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 52 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "jvm_memory_used_bytes{cluster_name=\"$cluster_name\", namespace=\"data\", service=\"mojaloop-kafka-metrics\", area=\"heap\"}",
+              "legendFormat": "{{pod}} heap used"
+            },
+            {
+              "expr": "jvm_memory_max_bytes{cluster_name=\"$cluster_name\", namespace=\"data\", service=\"mojaloop-kafka-metrics\", area=\"heap\"}",
+              "legendFormat": "{{pod}} heap max"
+            }
+          ]
+        },
+        {
+          "title": "JVM GC (Brokers)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 52 },
+          "datasource": { "uid": "thanos" },
+          "description": "GC pause time rate — high values indicate GC pressure affecting broker latency",
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "rate(jvm_gc_collection_seconds_sum{cluster_name=\"$cluster_name\", namespace=\"data\", service=\"mojaloop-kafka-metrics\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} {{gc}} time/s"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

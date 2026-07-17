@@ -1,0 +1,11 @@
+# Prepended to the rendered Cilium manifest: helm template does not emit the
+# release namespace, and Talos enforces baseline Pod Security admission by
+# default — the privileged labels are required for the agent pods to schedule.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cilium
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/warn: privileged
+    pod-security.kubernetes.io/audit: privileged

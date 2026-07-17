@@ -1,0 +1,250 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-alerting-rules-infrastructure
+  namespace: observability
+  labels:
+    grafana_alert: "1"
+data:
+  rules-infrastructure.yaml: |
+    apiVersion: 1
+    groups:
+      - orgId: 1
+        name: infrastructure
+        folder: Alerts
+        interval: 1m
+        rules:
+          - uid: cluster-stopped-reporting
+            title: Cluster stopped reporting metrics
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: thanos
+                model:
+                  expr: count by (cluster_name) (max_over_time(up[24h])) unless count by (cluster_name) (max_over_time(up[2m]))
+                  instant: true
+                  refId: A
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: A
+                  refId: C
+                  conditions:
+                    - evaluator: { type: gt, params: [0] }
+            noDataState: OK
+            execErrState: Error
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: 'Cluster {{ $labels.cluster_name }} reported metrics in the last 24h but has been silent for 2+ minutes — dead agent or broken remote-write (push model produces no error, only silence). Occasional fire-then-resolve during Alloy rollouts is expected at this sensitivity.'
+          - uid: node-not-ready
+            title: Node NotReady
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: thanos
+                model:
+                  expr: count by (cluster_name) (kube_node_info) - sum by (cluster_name) (kube_node_status_condition{condition="Ready", status="true"})
+                  instant: true
+                  refId: A
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: A
+                  refId: C
+                  conditions:
+                    - evaluator: { type: gt, params: [0] }
+            noDataState: OK
+            execErrState: Error
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: '{{ $values.A }} node(s) NotReady in cluster {{ $labels.cluster_name }}.'
+          - uid: node-memory-pressure
+            title: Node memory above 85%
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: thanos
+                model:
+                  expr: 1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)
+                  instant: true
+                  refId: A
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: A
+                  refId: C
+                  conditions:
+                    - evaluator: { type: gt, params: [0.85] }
+            noDataState: OK
+            execErrState: Error
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: 'Node {{ $labels.node }} in {{ $labels.cluster_name }} memory above 85% for 10m.'
+          - uid: node-disk-usage
+            title: Node disk above 80%
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: thanos
+                model:
+                  expr: 1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay", mountpoint=~"/|/var"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay", mountpoint=~"/|/var"})
+                  instant: true
+                  refId: A
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: A
+                  refId: C
+                  conditions:
+                    - evaluator: { type: gt, params: [0.8] }
+            noDataState: OK
+            execErrState: Error
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: 'Node {{ $labels.node }} in {{ $labels.cluster_name }} disk ({{ $labels.mountpoint }}) above 80%.'
+          - uid: node-cpu-saturation
+            title: Node CPU saturated (load15/cores > 1)
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: thanos
+                model:
+                  expr: node_load15 / count without (cpu) (count without (mode) (node_cpu_seconds_total{mode="idle"}))
+                  instant: true
+                  refId: A
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: A
+                  refId: C
+                  conditions:
+                    - evaluator: { type: gt, params: [1] }
+            noDataState: OK
+            execErrState: Error
+            for: 15m
+            labels:
+              severity: warning
+            annotations:
+              summary: 'Node {{ $labels.node }} in {{ $labels.cluster_name }} load15 exceeds core count for 15m.'
+          - uid: pods-failed
+            title: Pods in Failed phase
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: thanos
+                model:
+                  expr: sum by (cluster_name) (kube_pod_status_phase{phase="Failed"})
+                  instant: true
+                  refId: A
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: A
+                  refId: C
+                  conditions:
+                    - evaluator: { type: gt, params: [0] }
+            noDataState: OK
+            execErrState: Error
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: '{{ $values.A }} pod(s) in Failed phase in cluster {{ $labels.cluster_name }}.'
+          - uid: container-restart-spike
+            title: Container restart spike
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: thanos
+                model:
+                  expr: sum by (cluster_name, namespace, pod) (increase(kube_pod_container_status_restarts_total[1h]))
+                  instant: true
+                  refId: A
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: A
+                  refId: C
+                  conditions:
+                    - evaluator: { type: gt, params: [3] }
+            noDataState: OK
+            execErrState: Error
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: 'Pod {{ $labels.namespace }}/{{ $labels.pod }} in {{ $labels.cluster_name }} restarted more than 3 times in the last hour.'
+          - uid: oom-kills
+            title: OOM kills detected
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: thanos
+                model:
+                  expr: sum by (cluster_name, namespace, pod) (increase(container_oom_events_total[1h]))
+                  instant: true
+                  refId: A
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: A
+                  refId: C
+                  conditions:
+                    - evaluator: { type: gt, params: [0] }
+            noDataState: OK
+            execErrState: Error
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: 'Pod {{ $labels.namespace }}/{{ $labels.pod }} in {{ $labels.cluster_name }} was OOM-killed in the last hour.'
+          - uid: pvc-near-full
+            title: PVC above 85%
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: thanos
+                model:
+                  expr: kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes
+                  instant: true
+                  refId: A
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: A
+                  refId: C
+                  conditions:
+                    - evaluator: { type: gt, params: [0.85] }
+            noDataState: OK
+            execErrState: Error
+            for: 10m
+            labels:
+              severity: critical
+            annotations:
+              summary: 'PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} in {{ $labels.cluster_name }} above 85% — full volume means outage.'

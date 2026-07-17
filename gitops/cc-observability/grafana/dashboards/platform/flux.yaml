@@ -1,0 +1,219 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-flux
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Platform"
+data:
+  flux.json: |
+    {
+      "uid": "platform-flux",
+      "title": "Flux GitOps",
+      "description": "Flux reconciliation health: resource readiness (gotk_resource_info via kube-state-metrics), reconcile errors and durations per controller",
+      "tags": ["platform", "flux", "gitops"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(gotk_resource_info, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Resources Ready",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "count(gotk_resource_info{cluster_name=\"$cluster_name\", ready=\"True\"})",
+              "legendFormat": "ready"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "none" }
+        },
+        {
+          "title": "Resources Not Ready",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "A not-ready Kustomization or HelmRelease means the cluster has drifted from git",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "count(gotk_resource_info{cluster_name=\"$cluster_name\", ready=\"False\"}) or vector(0)",
+              "legendFormat": "not ready"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Suspended",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Suspended resources are excluded from reconciliation — deliberate, but easy to forget",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "count(gotk_resource_info{cluster_name=\"$cluster_name\", suspended=\"true\"}) or vector(0)",
+              "legendFormat": "suspended"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Reconcile Errors/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.01 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(controller_runtime_reconcile_total{cluster_name=\"$cluster_name\", namespace=\"flux-system\", result=\"error\"}[$__rate_interval])) or vector(0)",
+              "legendFormat": "errors"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Attention Needed (Not Ready / Suspended)",
+          "type": "table",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "targets": [
+            {
+              "expr": "gotk_resource_info{cluster_name=\"$cluster_name\", ready=\"False\"} or gotk_resource_info{cluster_name=\"$cluster_name\", suspended=\"true\"}",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "transformations": [
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "include": {
+                  "names": ["customresource_kind", "exported_namespace", "name", "ready", "suspended", "revision"]
+                }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "renameByName": {
+                  "customresource_kind": "Kind",
+                  "exported_namespace": "Namespace",
+                  "name": "Name",
+                  "ready": "Ready",
+                  "suspended": "Suspended",
+                  "revision": "Revision"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "title": "Reconciliations by Result",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (result) (rate(controller_runtime_reconcile_total{cluster_name=\"$cluster_name\", namespace=\"flux-system\"}[$__rate_interval]))",
+              "legendFormat": "{{result}}"
+            }
+          ]
+        },
+        {
+          "title": "Reconcile Errors by Controller",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (controller) (rate(controller_runtime_reconcile_total{cluster_name=\"$cluster_name\", namespace=\"flux-system\", result=\"error\"}[$__rate_interval])) or vector(0)",
+              "legendFormat": "{{controller}}"
+            }
+          ]
+        },
+        {
+          "title": "Reconcile Duration p99 by Kind",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "description": "How long applies take per Flux kind; creeping durations mean growing manifests or a struggling API server",
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (kind, le) (rate(gotk_reconcile_duration_seconds_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])))",
+              "legendFormat": "{{kind}}"
+            }
+          ]
+        },
+        {
+          "title": "Work Queue Depth",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "description": "Sustained non-zero depth means controllers can't keep up with reconciliation demand",
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (controller, name) (workqueue_depth{cluster_name=\"$cluster_name\", namespace=\"flux-system\"})",
+              "legendFormat": "{{controller}} {{name}}"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

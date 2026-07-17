@@ -1,0 +1,98 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaNodePool
+metadata:
+  name: dual-role
+  namespace: data
+  labels:
+    strimzi.io/cluster: mojaloop-kafka
+spec:
+  replicas: 3
+  roles:
+    - controller
+    - broker
+  template:
+    pod:
+      tolerations:
+        - key: "node-role"
+          operator: "Equal"
+          value: "kafka"
+          effect: "NoSchedule"
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: node-role
+                    operator: In
+                    values: ["kafka"]
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    strimzi.io/cluster: mojaloop-kafka
+                topologyKey: kubernetes.io/hostname
+  storage:
+    type: jbod
+    volumes:
+      - id: 0
+        type: persistent-claim
+        size: ${kafka_storage}
+        deleteClaim: false
+  resources:
+    # Memory-bound lab nodes: cap broker working set (heap is pinned to 512m
+    # via spec.kafka.jvmOptions; the rest of the limit is page cache headroom)
+    requests:
+      memory: 768Mi
+      cpu: 500m
+    limits:
+      memory: 1280Mi
+      cpu: "1"
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: mojaloop-kafka
+  namespace: data
+  annotations:
+    strimzi.io/node-pools: enabled
+    strimzi.io/kraft: enabled
+spec:
+  kafka:
+    version: "4.1.1"
+    # Fixed small heap for the lab's throughput (~10 TPS target); without this
+    # the JVM sizes itself from the container limit and RSS creeps to ~1.7Gi
+    jvmOptions:
+      "-Xms": "512m"
+      "-Xmx": "512m"
+    metricsConfig:
+      type: jmxPrometheusExporter
+      valueFrom:
+        configMapKeyRef:
+          name: kafka-metrics
+          key: kafka-metrics-config.yml
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+    config:
+      offsets.topic.replication.factor: 3
+      transaction.state.log.replication.factor: 3
+      transaction.state.log.min.isr: 2
+      default.replication.factor: 3
+      min.insync.replicas: 2
+      num.partitions: ${kafka_default_partitions}
+  entityOperator:
+    topicOperator: {}
+  kafkaExporter:
+    groupRegex: ".*"
+    topicRegex: ".*"
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 128Mi

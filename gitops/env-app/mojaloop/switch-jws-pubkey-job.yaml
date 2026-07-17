@@ -1,0 +1,93 @@
+# Extracts the Hub's JWS public key from the switch-jws Secret (managed by
+# cert-manager) and registers it with MCM via POST /api/hub/jwscerts. MCM stores
+# it under dfspId = SWITCH_ID, which aligns with HUB_PARTICIPANT.NAME. The
+# mcm-agent on each DFSP polls /api/dfsps/jwscerts every ~60s, detects the new
+# entry, and forwards it to the sdk-scheme-adapter's in-memory JWS keyring.
+#
+# Runs as a Deployment (not a Job) so Stakater Reloader can restart it whenever
+# cert-manager rotates switch-jws — re-uploading the new public key.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: switch-jws-pubkey-job
+  namespace: mojaloop
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: switch-jws-pubkey-job
+  namespace: mojaloop
+  annotations:
+    secret.reloader.stakater.com/reload: "switch-jws"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: switch-jws-pubkey-job
+  template:
+    metadata:
+      labels:
+        app: switch-jws-pubkey-job
+    spec:
+      serviceAccountName: switch-jws-pubkey-job
+      initContainers:
+        - name: extract-pubkey
+          image: alpine/openssl:3.3.2
+          command:
+            - sh
+            - -c
+            - |
+              openssl x509 -pubkey -noout -in /cert/tls.crt > /data/pubkey.pem
+              date +%s > /data/created_at
+              echo "Extracted public key from switch-jws cert"
+          volumeMounts:
+            - name: cert
+              mountPath: /cert
+              readOnly: true
+            - name: data
+              mountPath: /data
+        - name: upload-to-mcm
+          image: curlimages/curl:8.6.0
+          command:
+            - sh
+            - -ec
+            - |
+              CREATED_AT=$(cat /data/created_at)
+              PUB_KEY=$(cat /data/pubkey.pem)
+              # Build JSON with proper newline escaping via printf
+              BODY=$(printf '{"publicKey":"%s","createdAt":%s}' \
+                "$(echo "$PUB_KEY" | sed 's/$/\\n/' | tr -d '\n')" \
+                "$CREATED_AT")
+              echo "Registering Hub JWS pub key with MCM (createdAt=$CREATED_AT)..."
+              HTTP=$(curl -sS -o /data/resp -w '%{http_code}' \
+                -X POST http://mcm-connection-manager-api.mcm.svc.cluster.local:3001/api/hub/jwscerts \
+                -H 'Content-Type: application/json' \
+                -H 'Accept: application/json' \
+                -d "$BODY")
+              echo "MCM response ($HTTP):"
+              cat /data/resp; echo
+              case "$HTTP" in
+                2*) echo "OK" ;;
+                *) echo "ERROR: MCM returned HTTP $HTTP"; exit 1 ;;
+              esac
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.9
+          resources:
+            requests:
+              cpu: 1m
+              memory: 8Mi
+            limits:
+              memory: 16Mi
+      volumes:
+        - name: cert
+          secret:
+            secretName: switch-jws
+            items:
+              - key: tls.crt
+                path: tls.crt
+        - name: data
+          emptyDir: {}

@@ -1,0 +1,321 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-load-test
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Mojaloop"
+data:
+  load-test.json: |
+    {
+      "uid": "moja-load-test",
+      "title": "Load Test (k6)",
+      "description": "k6 client-side e2e latency (SLO p99 < 1s) over switch pipeline internals, Kafka lag, event loop lag and data layer. Runs are labelled by testid (see perf/k6/README.md). k6 series carry no cluster_name label; switch panels filter on $cluster_name.",
+      "tags": ["mojaloop", "k6", "performance"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "10s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "testid",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(k6_http_reqs_total, testid)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          },
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(moja_nodejs_eventloop_lag_seconds, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Injected Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(k6_http_reqs_total{testid=\"$testid\"}[$__rate_interval]))",
+              "legendFormat": "transfers/s"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Client E2E p50",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 } },
+          "targets": [
+            {
+              "expr": "max(k6_http_req_duration_p50{testid=\"$testid\"})",
+              "legendFormat": "p50"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "none" }
+        },
+        {
+          "title": "Client E2E p99 (SLO < 1s)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "decimals": 3,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.8 },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "max(k6_http_req_duration_p99{testid=\"$testid\"})",
+              "legendFormat": "p99"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "HTTP Failure Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.01 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "avg(k6_http_req_failed_rate{testid=\"$testid\"})",
+              "legendFormat": "failed"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Transfers COMPLETED",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 0.99 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "avg(k6_checks_rate{testid=\"$testid\"})",
+              "legendFormat": "completed"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Dropped Iterations",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "> 0 means the load generator could not sustain the arrival rate — the bottleneck is k6/the workstation, not the switch.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 2,
+              "noValue": "0",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.001 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(k6_dropped_iterations_total{testid=\"$testid\"}[$__rate_interval]))",
+              "legendFormat": "dropped/s"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Client E2E Latency (k6)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "max(k6_http_req_duration_p50{testid=\"$testid\"})",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "max(k6_http_req_duration_p90{testid=\"$testid\"})",
+              "legendFormat": "p90"
+            },
+            {
+              "expr": "max(k6_http_req_duration_p99{testid=\"$testid\"})",
+              "legendFormat": "p99"
+            }
+          ]
+        },
+        {
+          "title": "Injected Rate & VUs",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(k6_http_reqs_total{testid=\"$testid\"}[$__rate_interval]))",
+              "legendFormat": "transfers/s"
+            },
+            {
+              "expr": "max(k6_vus{testid=\"$testid\"})",
+              "legendFormat": "in-flight VUs"
+            }
+          ]
+        },
+        {
+          "title": "Switch E2E Transfer Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "description": "Switch-internal prepare→fulfil latency. The gap to client e2e latency is DFSP + network time.",
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, sum(rate(moja_tx_transfer_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_tx_transfer_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p90"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(moja_tx_transfer_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p99"
+            }
+          ]
+        },
+        {
+          "title": "Per-Stage Latency (p90)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_transfer_prepare_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "prepare"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_transfer_position_batch_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "position (batch)"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_transfer_fulfil_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "fulfil"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(moja_notification_event_delivery_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (le))",
+              "legendFormat": "notification delivery"
+            }
+          ]
+        },
+        {
+          "title": "Kafka Consumer Lag (Mojaloop Topics)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "sum by (consumergroup, topic) (kafka_consumergroup_lag{cluster_name=\"$cluster_name\", topic=~\"topic-.*\"})",
+              "legendFormat": "{{consumergroup}} / {{topic}}"
+            }
+          ]
+        },
+        {
+          "title": "Node.js Event Loop Lag p99",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "avg by (service) (moja_nodejs_eventloop_lag_p99_seconds{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "{{service}}"
+            }
+          ]
+        },
+        {
+          "title": "MySQL Threads",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "mysql_global_status_threads_running{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "running {{pod}}"
+            },
+            {
+              "expr": "mysql_global_status_threads_connected{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "connected {{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Node CPU Utilisation",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "1 - avg by (node) (rate(node_cpu_seconds_total{mode=\"idle\", cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "{{node}}"
+            }
+          ]
+        }
+      ]
+    }

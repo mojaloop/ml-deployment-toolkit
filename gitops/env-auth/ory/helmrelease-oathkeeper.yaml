@@ -1,0 +1,162 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: oathkeeper
+  namespace: flux-system
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: oathkeeper
+      version: "0.62.1"
+      sourceRef:
+        kind: HelmRepository
+        name: ory
+      interval: 12h
+  targetNamespace: ory
+  install:
+    createNamespace: false
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      retries: -1
+      strategy: uninstall
+  values:
+    replicaCount: ${oathkeeper_replicas}
+    global:
+      ory:
+        oathkeeper:
+          maester:
+            mode: controller
+
+    fullnameOverride: "oathkeeper"
+
+    oathkeeper:
+      config:
+        log:
+          level: info
+          format: json
+        access_rules:
+          matching_strategy: regexp
+
+        authenticators:
+          jwt:
+            enabled: true
+            config:
+              jwks_urls:
+                - "http://hydra-public.ory.svc.cluster.local:4444/.well-known/jwks.json"
+              trusted_issuers:
+                - "https://hydra.ext.${domain}"
+              # NOTE: no target_audience. The DFSP-side @mojaloop/mcm-client sends
+              # client_credentials WITHOUT an `audience` param, so Hydra issues a
+              # token with no `aud` claim. Authorization is still enforced per-DFSP
+              # by Keto (subject = Hydra client_id = dfspId). Re-add target_audience
+              # only if the DFSP client is upgraded to request aud=connection-manager-api.
+              # Hydra lazily generates its JWT signing keyset on first use; the
+              # first machine-token validation can exceed the 1s default and 401.
+              jwks_max_wait: 5s
+          cookie_session:
+            enabled: true
+            config:
+              check_session_url: http://kratos-public/sessions/whoami
+              preserve_path: true
+              preserve_query: true
+              extra_from: "@this"
+              # Keto subjects are the Kratos identity id (humans) / Hydra
+              # client_id (machines). MUST be identity.id, not the email.
+              subject_from: "identity.id"
+              only:
+              - ory_kratos_session
+          anonymous:
+            enabled: true
+            config:
+              subject: guest
+          noop:
+            enabled: true
+
+        authorizers:
+          allow:
+            enabled: true
+          keto_engine_acp_ory:
+            enabled: true
+            config:
+              base_url: "http://keto-read"
+              required_action: "read"
+              required_resource: "unknown"
+              flavor: "regex"
+          remote_json:
+            enabled: true
+            config:
+              remote: http://keto-read/relation-tuples/check
+              payload: |
+                {
+                  "subject": "{{ print .Subject }}",
+                  "resource": "{{ printIndex .MatchContext.RegexpCaptureGroups 0 }}"
+                }
+
+        mutators:
+          id_token:
+            enabled: true
+            config:
+              issuer_url: http://oathkeeper-api:4456/
+              jwks_url: http://oathkeeper-api:4456/.well-known/jwks.json
+          header:
+            enabled: true
+            config:
+              headers:
+                X-User: '{{ print .Subject }}'
+                X-Email: '{{ with .Extra.identity }}{{ print .traits.email }}{{ end }}'
+                X-DFSP-ID: '{{ with .Extra.identity }}{{ with .metadata_public }}{{ with .dfspId }}{{ . }}{{ end }}{{ end }}{{ end }}'
+                X-Roles: '[{{ if .Extra.identity }}{{ with .Extra.identity.metadata_public }}{{ with .role }}"{{ . }}"{{ end }}{{ with .dfspId }}"dfsp:{{ . }}"{{ end }}{{ end }}{{ else }}"dfsp:{{ print .Subject }}"{{ end }}]'
+          noop:
+            enabled: true
+
+        errors:
+          fallback:
+            - json
+          handlers:
+            json:
+              enabled: true
+              config:
+                verbose: true
+            redirect:
+              enabled: false
+
+        serve:
+          proxy:
+            port: 4455
+          api:
+            port: 4456
+
+      managedAccessRules: false
+
+    maester:
+      enabled: true
+      oathkeeperFullnameOverride: 'oathkeeper'
+
+    oathkeeper-maester:
+      fullnameOverride: 'oathkeeper-maester'
+      oathkeeperFullnameOverride: 'oathkeeper'
+      clusterWideAccess: true
+      deployment:
+        envs:
+        - name: authorizersAvailable
+          value: allow,deny,noop,remote_json,keto_engine_acp_ory
+
+    # Access rules are managed via Rule CRDs (picked up by maester controller),
+    # not inline. See gitops/env-app/ory-blank-rule.yaml and future Rule CRDs.
+
+    service:
+      proxy:
+        enabled: true
+        port: 4455
+      api:
+        enabled: true
+        port: 4456
+      metrics:
+        enabled: true
+        annotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/port: "9000"
+          prometheus.io/path: "/metrics"

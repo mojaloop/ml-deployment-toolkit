@@ -1,0 +1,373 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-ory-auth
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Platform"
+data:
+  ory-auth.json: |
+    {
+      "uid": "platform-ory-auth",
+      "title": "Ory Auth (Hydra + Kratos + Keto)",
+      "tags": ["platform", "ory", "hydra", "kratos", "keto", "auth"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "schemaVersion": 39,
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(http_requests_total{namespace=\"ory\"}, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Hydra Requests/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total{cluster_name=\"$cluster_name\",service=\"hydra-admin\"}[$__rate_interval]))",
+              "legendFormat": ""
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Hydra 5xx/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_statuses_total{cluster_name=\"$cluster_name\",service=\"hydra-admin\",status_bucket=\"5xx\"}[$__rate_interval])) or vector(0)",
+              "legendFormat": ""
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Kratos Requests/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total{cluster_name=\"$cluster_name\",service=\"kratos-admin\"}[$__rate_interval]))",
+              "legendFormat": ""
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Kratos 5xx/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_statuses_total{cluster_name=\"$cluster_name\",service=\"kratos-admin\",status_bucket=\"5xx\"}[$__rate_interval])) or vector(0)",
+              "legendFormat": ""
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Keto gRPC Checks/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(grpc_server_handled_total{cluster_name=\"$cluster_name\",grpc_service=~\".*CheckService\"}[$__rate_interval]))",
+              "legendFormat": ""
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Keto gRPC Errors/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(grpc_server_handled_total{cluster_name=\"$cluster_name\",grpc_code!=\"OK\"}[$__rate_interval])) or vector(0)",
+              "legendFormat": ""
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Kratos Request Rate by Endpoint",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "topk(10, sum by (endpoint) (rate(http_requests_total{cluster_name=\"$cluster_name\",service=\"kratos-admin\"}[$__rate_interval])))",
+              "legendFormat": "{{endpoint}}"
+            }
+          ]
+        },
+        {
+          "title": "Kratos Error Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (status_bucket) (rate(http_requests_statuses_total{cluster_name=\"$cluster_name\",service=\"kratos-admin\"}[$__rate_interval]))",
+              "legendFormat": "{{status_bucket}}"
+            }
+          ]
+        },
+        {
+          "title": "Kratos Request Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, sum(rate(http_requests_duration_seconds_bucket{cluster_name=\"$cluster_name\",service=\"kratos-admin\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(http_requests_duration_seconds_bucket{cluster_name=\"$cluster_name\",service=\"kratos-admin\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p90"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(http_requests_duration_seconds_bucket{cluster_name=\"$cluster_name\",service=\"kratos-admin\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p99"
+            }
+          ]
+        },
+        {
+          "title": "Kratos Latency by Endpoint (p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "topk(5, histogram_quantile(0.99, sum by (endpoint, le) (rate(http_response_time_seconds_bucket{cluster_name=\"$cluster_name\",service=\"kratos-admin\"}[$__rate_interval]))))",
+              "legendFormat": "{{endpoint}}"
+            }
+          ]
+        },
+        {
+          "title": "Keto gRPC Check Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "sum by (grpc_code) (rate(grpc_server_handled_total{cluster_name=\"$cluster_name\",grpc_service=~\".*CheckService\"}[$__rate_interval]))",
+              "legendFormat": "{{grpc_code}}"
+            }
+          ]
+        },
+        {
+          "title": "Keto gRPC Check Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, sum(rate(grpc_server_handling_seconds_bucket{cluster_name=\"$cluster_name\",grpc_service=~\".*CheckService\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(grpc_server_handling_seconds_bucket{cluster_name=\"$cluster_name\",grpc_service=~\".*CheckService\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p90"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(grpc_server_handling_seconds_bucket{cluster_name=\"$cluster_name\",grpc_service=~\".*CheckService\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p99"
+            }
+          ]
+        },
+        {
+          "title": "Keto gRPC Rate by Service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "sum by (grpc_service) (rate(grpc_server_handled_total{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "{{grpc_service}}"
+            }
+          ]
+        },
+        {
+          "title": "Hydra Token Issuance by Code",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "description": "2xx = tokens issued; 400/401 = failed grants or bad client credentials",
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (code) (rate(http_requests_total{cluster_name=\"$cluster_name\",service=\"hydra-admin\",endpoint=~\".*/oauth2/token\"}[$__rate_interval]))",
+              "legendFormat": "{{code}}"
+            }
+          ]
+        },
+        {
+          "title": "Hydra Token Endpoint Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, sum(rate(http_requests_duration_seconds_bucket{cluster_name=\"$cluster_name\",service=\"hydra-admin\",endpoint=~\".*/oauth2/token\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_requests_duration_seconds_bucket{cluster_name=\"$cluster_name\",service=\"hydra-admin\",endpoint=~\".*/oauth2/token\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p95"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(http_requests_duration_seconds_bucket{cluster_name=\"$cluster_name\",service=\"hydra-admin\",endpoint=~\".*/oauth2/token\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p99"
+            }
+          ]
+        },
+        {
+          "title": "Hydra JWKS & Introspection",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "description": "JWKS is the hot path with JWT access tokens (a spike means consumers are not caching keys); introspection should stay near zero",
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total{cluster_name=\"$cluster_name\",service=\"hydra-admin\",endpoint=~\".*jwks.json\"}[$__rate_interval])) or vector(0)",
+              "legendFormat": "jwks"
+            },
+            {
+              "expr": "sum(rate(http_requests_total{cluster_name=\"$cluster_name\",service=\"hydra-admin\",endpoint=~\".*oauth2/introspect\"}[$__rate_interval])) or vector(0)",
+              "legendFormat": "introspect"
+            }
+          ]
+        },
+        {
+          "title": "Hydra Request Rate by Endpoint",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "topk(10, sum by (endpoint) (rate(http_requests_total{cluster_name=\"$cluster_name\",service=\"hydra-admin\"}[$__rate_interval])))",
+              "legendFormat": "{{endpoint}}"
+            }
+          ]
+        },
+        {
+          "title": "Hydra Request Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.5, sum(rate(http_requests_duration_seconds_bucket{cluster_name=\"$cluster_name\",service=\"hydra-admin\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.9, sum(rate(http_requests_duration_seconds_bucket{cluster_name=\"$cluster_name\",service=\"hydra-admin\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p90"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(http_requests_duration_seconds_bucket{cluster_name=\"$cluster_name\",service=\"hydra-admin\"}[$__rate_interval])) by (le))",
+              "legendFormat": "p99"
+            }
+          ]
+        },
+        {
+          "title": "Goroutines",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "go_goroutines{cluster_name=\"$cluster_name\",namespace=\"ory\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Memory Allocated",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "go_memstats_alloc_bytes{cluster_name=\"$cluster_name\",namespace=\"ory\"}",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        }
+      ]
+    }

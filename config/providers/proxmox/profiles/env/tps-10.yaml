@@ -1,0 +1,135 @@
+# -----------------------------------------------------------------------------
+# TPS Profile: tps-1 (Minimal Mojaloop Switch)
+# Provider: Proxmox
+# Derived from: deployment template h2c1w3 + current gitops defaults
+# -----------------------------------------------------------------------------
+
+# --- Infrastructure topology ---
+infra:
+  instances:
+    - name: c-0
+      placement_group: placement-group-1
+      cores: 6
+      memory: 8192
+      workload_class: control-plane
+      storage:
+        - interface: scsi0
+          size: 32
+          # storage_pool: local-lvm  # per-disk override (default: infra.proxmox.storage.disks)
+      tags:
+        - ml
+        - ml-master
+
+    - name: c-1
+      placement_group: placement-group-2
+      cores: 4
+      memory: 8192
+      workload_class: control-plane
+      storage:
+        - interface: scsi0
+          size: 32
+          # storage_pool: local-lvm  # per-disk override (default: infra.proxmox.storage.disks)
+      tags:
+        - ml
+        - ml-master
+
+    - name: c-2
+      placement_group: placement-group-3
+      cores: 4
+      memory: 8192
+      workload_class: control-plane
+      storage:
+        - interface: scsi0
+          size: 32
+          # storage_pool: local-lvm  # per-disk override (default: infra.proxmox.storage.disks)
+
+    - name: w-0
+      placement_group: placement-group-1
+      cores: 4
+      memory: 16384
+      workload_class: worker-general
+      storage:
+        - interface: scsi0
+          size: 64
+        - interface: scsi1
+          size: 64
+      tags:
+        - ml
+        - ml-worker
+
+    - name: w-1
+      placement_group: placement-group-2
+      cores: 8
+      memory: 16384
+      workload_class: worker-general
+      storage:
+        - interface: scsi0
+          size: 64
+        - interface: scsi1
+          size: 64
+      tags:
+        - ml
+        - ml-worker
+
+    - name: w-2
+      placement_group: placement-group-3
+      cores: 8
+      memory: 16384
+      workload_class: worker-general
+      storage:
+        - interface: scsi0
+          size: 64
+        - interface: scsi1
+          size: 64
+      tags:
+        - ml
+        - ml-worker
+
+# --- Application horizontal scaling (pod replicas) ---
+app:
+  # Account Lookup Service
+  als_service_replicas: 1
+  als_admin_replicas: 1
+  als_oracle_replicas: 1
+  # Quoting Service
+  qs_service_replicas: 1
+  qs_handler_replicas: 3
+  # Central Ledger
+  cl_service_replicas: 1
+  cl_handler_prepare_replicas: 1
+  cl_handler_position_batch_replicas: 1
+  cl_handler_fulfil_replicas: 1
+  cl_handler_get_replicas: 1
+  cl_handler_timeout_replicas: 1
+  cl_handler_admin_replicas: 1
+  # Central Settlement
+  cs_service_replicas: 1
+  cs_handler_deferred_replicas: 1
+  cs_handler_rules_replicas: 1
+  # Transaction Requests
+  tx_requests_replicas: 1
+  # ML API Adapter
+  ml_adapter_service_replicas: 1
+  ml_adapter_handler_notification_replicas: 6
+  # External API (mTLS Envoy proxy)
+  extapi_envoy_replicas: 2
+  # MCM
+  mcm_replicas: 1
+  # Auth
+  kratos_replicas: 1
+  keto_replicas: 1
+  hydra_replicas: 1
+  oathkeeper_replicas: 1
+
+# --- Data layer tuning (replicas stay 3 for raft HA) ---
+data:
+  # Kafka
+  kafka_default_partitions: 6
+  kafka_storage: "8Gi"
+  # MySQL
+  mysql_innodb_buffer_pool_size: "512M"
+  mysql_max_connections: 2000
+  mysql_innodb_flush_log_at_trx_commit: 1
+  mysql_storage: "8Gi"
+  # MongoDB
+  mongodb_storage: "3Gi"

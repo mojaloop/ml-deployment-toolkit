@@ -1,0 +1,380 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-mysql-overview
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Data Layer"
+data:
+  mysql-overview.json: |
+    {
+      "uid": "data-mysql-overview",
+      "title": "MySQL Overview",
+      "description": "MySQL server health: connections, QPS, InnoDB buffer pool, handlers, temp tables, locks, network",
+      "tags": ["data-layer", "mysql", "performance"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(mysql_up, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          },
+          {
+            "name": "instance",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(mysql_up{cluster_name=\"$cluster_name\"}, pod)",
+            "refresh": 2,
+            "includeAll": true,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Uptime",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            {
+              "expr": "min(mysql_global_status_uptime{cluster_name=\"$cluster_name\", pod=~\"$instance\"})",
+              "legendFormat": "uptime"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "none" }
+        },
+        {
+          "title": "Instances Up",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "fixed", "fixedColor": "green" }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(mysql_up{cluster_name=\"$cluster_name\", pod=~\"$instance\"})",
+              "legendFormat": "up"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "QPS",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 0 } },
+          "targets": [
+            {
+              "expr": "sum(rate(mysql_global_status_queries{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval]))",
+              "legendFormat": "qps"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Threads Connected",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "sum(mysql_global_status_threads_connected{cluster_name=\"$cluster_name\", pod=~\"$instance\"})",
+              "legendFormat": "connected"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Slow Queries/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.1 },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(mysql_global_status_slow_queries{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval]))",
+              "legendFormat": "slow"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Aborted Connects/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(mysql_global_status_aborted_connects{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval]))",
+              "legendFormat": "aborted"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none" }
+        },
+        {
+          "title": "Connections",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "mysql_global_status_threads_connected{cluster_name=\"$cluster_name\", pod=~\"$instance\"}",
+              "legendFormat": "{{pod}} connected"
+            },
+            {
+              "expr": "mysql_global_status_threads_running{cluster_name=\"$cluster_name\", pod=~\"$instance\"}",
+              "legendFormat": "{{pod}} running"
+            },
+            {
+              "expr": "mysql_global_variables_max_connections{cluster_name=\"$cluster_name\", pod=~\"$instance\"}",
+              "legendFormat": "{{pod}} max_connections"
+            }
+          ]
+        },
+        {
+          "title": "Queries Per Second",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "rate(mysql_global_status_queries{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} queries"
+            },
+            {
+              "expr": "rate(mysql_global_status_questions{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} questions"
+            }
+          ]
+        },
+        {
+          "title": "Command Breakdown",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "description": "Rate of SELECT, INSERT, UPDATE, DELETE, COMMIT commands",
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (command) (rate(mysql_global_status_commands_total{cluster_name=\"$cluster_name\", pod=~\"$instance\", command=~\"select|insert|update|delete|commit|rollback\"}[$__rate_interval]))",
+              "legendFormat": "{{command}}"
+            }
+          ]
+        },
+        {
+          "title": "Handler Operations",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "description": "Internal handler calls — read_rnd_next indicates full table scans",
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (handler) (rate(mysql_global_status_handlers_total{cluster_name=\"$cluster_name\", pod=~\"$instance\", handler=~\"read_rnd_next|read_next|read_key|write|update|delete\"}[$__rate_interval]))",
+              "legendFormat": "{{handler}}"
+            }
+          ]
+        },
+        {
+          "title": "InnoDB Buffer Pool Hit Ratio",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "description": "Buffer pool read request hit ratio — should be >99%. Low ratio means data is being read from disk.",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0.9,
+              "max": 1,
+              "custom": { "fillOpacity": 10 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 0.95 },
+                  { "color": "green", "value": 0.99 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "1 - (rate(mysql_global_status_innodb_buffer_pool_reads{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval]) / rate(mysql_global_status_innodb_buffer_pool_read_requests{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval]))",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "InnoDB Buffer Pool Usage",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "mysql_global_status_innodb_buffer_pool_bytes_data{cluster_name=\"$cluster_name\", pod=~\"$instance\"}",
+              "legendFormat": "{{pod}} data"
+            },
+            {
+              "expr": "mysql_global_status_innodb_buffer_pool_bytes_dirty{cluster_name=\"$cluster_name\", pod=~\"$instance\"}",
+              "legendFormat": "{{pod}} dirty"
+            },
+            {
+              "expr": "mysql_global_variables_innodb_buffer_pool_size{cluster_name=\"$cluster_name\", pod=~\"$instance\"}",
+              "legendFormat": "{{pod}} pool size"
+            }
+          ]
+        },
+        {
+          "title": "InnoDB Row Operations",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (operation) (rate(mysql_global_status_innodb_row_ops_total{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval]))",
+              "legendFormat": "{{operation}}"
+            }
+          ]
+        },
+        {
+          "title": "InnoDB Row Lock Waits",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "description": "Row lock waits indicate contention. Current waits show active blocking.",
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "rate(mysql_global_status_innodb_row_lock_waits{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} lock waits/s"
+            },
+            {
+              "expr": "mysql_global_status_innodb_row_lock_current_waits{cluster_name=\"$cluster_name\", pod=~\"$instance\"}",
+              "legendFormat": "{{pod}} current waits"
+            }
+          ]
+        },
+        {
+          "title": "Temp Tables (Disk vs Memory)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "description": "Disk temp tables are expensive. High ratio of disk-to-total means tmp_table_size or max_heap_table_size may need tuning.",
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "rate(mysql_global_status_created_tmp_tables{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} tmp tables/s"
+            },
+            {
+              "expr": "rate(mysql_global_status_created_tmp_disk_tables{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} tmp disk tables/s"
+            }
+          ]
+        },
+        {
+          "title": "Network Throughput",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "rate(mysql_global_status_bytes_received{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} received"
+            },
+            {
+              "expr": "rate(mysql_global_status_bytes_sent{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} sent"
+            }
+          ]
+        },
+        {
+          "title": "Table Locks",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "rate(mysql_global_status_table_locks_immediate{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} immediate"
+            },
+            {
+              "expr": "rate(mysql_global_status_table_locks_waited{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} waited"
+            }
+          ]
+        },
+        {
+          "title": "InnoDB I/O",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "rate(mysql_global_status_innodb_data_reads{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} data reads/s"
+            },
+            {
+              "expr": "rate(mysql_global_status_innodb_data_writes{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} data writes/s"
+            },
+            {
+              "expr": "rate(mysql_global_status_innodb_data_fsyncs{cluster_name=\"$cluster_name\", pod=~\"$instance\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} fsyncs/s"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

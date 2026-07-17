@@ -1,0 +1,47 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: external-dns
+  namespace: flux-system
+spec:
+  interval: 24h
+  url: https://kubernetes-sigs.github.io/external-dns/
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: external-dns
+  namespace: flux-system
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: external-dns
+      version: "1.20.x"
+      sourceRef:
+        kind: HelmRepository
+        name: external-dns
+      interval: 12h
+  targetNamespace: external-dns
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    podAnnotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "7979"
+    sources:
+      - service
+      - gateway-httproute
+    domainFilters:
+      - ${domain}
+    txtOwnerId: ${cluster_name}
+    policy: sync
+  # Provider-specific values (provider name, credential env vars) come from the
+  # dns/{provider} kustomization — stays unready until that ConfigMap exists.
+  valuesFrom:
+    - kind: ConfigMap
+      name: external-dns-provider-values

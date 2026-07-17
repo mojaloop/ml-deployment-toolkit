@@ -1,0 +1,319 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-quoting-service
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Mojaloop"
+data:
+  quoting-service.json: |
+    {
+      "uid": "moja-quoting-service",
+      "title": "Quoting Service",
+      "description": "Quote request totals, handler latency, model processing, database cache hits, event loop lag",
+      "tags": ["mojaloop", "quoting", "performance"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(moja_nodejs_eventloop_lag_seconds{service=\"quoting-service\"}, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+
+        {
+          "title": "Quote Request Totals",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "collapsed": false
+        },
+        {
+          "title": "POST /quotes",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "sum(moja_quotes_post_count{cluster_name=\"$cluster_name\"}) or vector(0)",
+              "legendFormat": "total"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area" }
+        },
+        {
+          "title": "GET /quotes/{id}",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "sum(moja_quotes_id_get_count{cluster_name=\"$cluster_name\"}) or vector(0)",
+              "legendFormat": "total"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area" }
+        },
+        {
+          "title": "PUT /quotes/{id}",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short" } },
+          "targets": [
+            {
+              "expr": "sum(moja_quotes_id_put_count{cluster_name=\"$cluster_name\"}) or vector(0)",
+              "legendFormat": "total"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area" }
+        },
+        {
+          "title": "PUT /quotes/{id}/error",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(moja_quotes_id_put_error_count{cluster_name=\"$cluster_name\"}) or vector(0)",
+              "legendFormat": "total"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area" }
+        },
+
+        {
+          "title": "Quote Handler Performance",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+          "collapsed": false
+        },
+        {
+          "title": "Handler Processing Time (avg)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "avg by (success) (rate(moja_quotes_post_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(moja_quotes_post_count{cluster_name=\"$cluster_name\"}[$__rate_interval]) >= 0)",
+              "legendFormat": "POST /quotes success:{{ success }}"
+            },
+            {
+              "expr": "avg by (success) (rate(moja_quotes_id_put_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(moja_quotes_id_put_count{cluster_name=\"$cluster_name\"}[$__rate_interval]) >= 0)",
+              "legendFormat": "PUT /quotes/{id} success:{{ success }}"
+            },
+            {
+              "expr": "avg by (success) (rate(moja_quotes_id_get_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(moja_quotes_id_get_count{cluster_name=\"$cluster_name\"}[$__rate_interval]) >= 0)",
+              "legendFormat": "GET /quotes/{id} success:{{ success }}"
+            },
+            {
+              "expr": "avg by (success) (rate(moja_quotes_id_put_error_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(moja_quotes_id_put_error_count{cluster_name=\"$cluster_name\"}[$__rate_interval]) >= 0)",
+              "legendFormat": "PUT /quotes/{id}/error success:{{ success }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "Handler Throughput",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "sum by (success) (rate(moja_quotes_post_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "POST /quotes success:{{ success }}"
+            },
+            {
+              "expr": "sum by (success) (rate(moja_quotes_id_put_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "PUT /quotes/{id} success:{{ success }}"
+            },
+            {
+              "expr": "sum by (success) (rate(moja_quotes_id_get_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "GET /quotes/{id} success:{{ success }}"
+            },
+            {
+              "expr": "sum by (success) (rate(moja_quotes_id_put_error_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "PUT /quotes/{id}/error success:{{ success }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "Handler Latency Percentiles (POST /quotes)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum by (le) (rate(moja_quotes_post_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.90, sum by (le) (rate(moja_quotes_post_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])))",
+              "legendFormat": "p90"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_quotes_post_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])))",
+              "legendFormat": "p99"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "Handler Latency Percentiles (PUT /quotes/{id})",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum by (le) (rate(moja_quotes_id_put_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.90, sum by (le) (rate(moja_quotes_id_put_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])))",
+              "legendFormat": "p90"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_quotes_id_put_bucket{cluster_name=\"$cluster_name\"}[$__rate_interval])))",
+              "legendFormat": "p99"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+
+        {
+          "title": "Quote Model",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+          "collapsed": false
+        },
+        {
+          "title": "Model Processing Time (avg)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "avg by (success) (rate(moja_model_quote_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(moja_model_quote_count{cluster_name=\"$cluster_name\"}[$__rate_interval]) >= 0)",
+              "legendFormat": "model success:{{ success }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "Model Throughput",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (success) (rate(moja_model_quote_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "model success:{{ success }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+
+        {
+          "title": "Database Cache",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+          "collapsed": false
+        },
+        {
+          "title": "Cache Hit/Miss Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (queryName, hit) (rate(moja_database_get_cache_value_count{cluster_name=\"$cluster_name\", pod=~\".*quoting.*\"}[$__rate_interval]))",
+              "legendFormat": "{{ queryName }} hit:{{ hit }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"], "sortBy": "Mean", "sortDesc": true } }
+        },
+
+        {
+          "title": "Runtime",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
+          "collapsed": false
+        },
+        {
+          "title": "Event Loop Lag",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 41 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "moja_nodejs_eventloop_lag_seconds{cluster_name=\"$cluster_name\", pod=~\".*quoting.*\"}",
+              "legendFormat": "{{ pod }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "Heap Used",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 41 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "moja_nodejs_heap_size_used_bytes{cluster_name=\"$cluster_name\", pod=~\".*quoting.*\"}",
+              "legendFormat": "{{ pod }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "CPU Usage",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 41 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "rate(moja_process_cpu_seconds_total{cluster_name=\"$cluster_name\", pod=~\".*quoting.*\"}[$__rate_interval])",
+              "legendFormat": "{{ pod }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        }
+      ],
+      "schemaVersion": 39
+    }

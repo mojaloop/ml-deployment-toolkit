@@ -1,0 +1,120 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-alerting-rules-data-layer
+  namespace: observability
+  labels:
+    grafana_alert: "1"
+data:
+  rules-data-layer.yaml: |
+    apiVersion: 1
+    groups:
+      - orgId: 1
+        name: data-layer
+        folder: Alerts
+        interval: 1m
+        rules:
+          - uid: mysql-down
+            title: MySQL instance down
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: thanos
+                model:
+                  expr: min by (cluster_name) (mysql_up)
+                  instant: true
+                  refId: A
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: A
+                  refId: C
+                  conditions:
+                    - evaluator: { type: lt, params: [1] }
+            noDataState: OK
+            execErrState: Error
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: 'MySQL instance down in {{ $labels.cluster_name }} for 5m.'
+          - uid: redis-down
+            title: Redis instance down
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: thanos
+                model:
+                  expr: min by (cluster_name) (redis_up)
+                  instant: true
+                  refId: A
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: A
+                  refId: C
+                  conditions:
+                    - evaluator: { type: lt, params: [1] }
+            noDataState: OK
+            execErrState: Error
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: 'Redis instance down in {{ $labels.cluster_name }} for 5m.'
+          - uid: mongodb-down
+            title: MongoDB instance down
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: thanos
+                model:
+                  expr: min by (cluster_name) (mongodb_up)
+                  instant: true
+                  refId: A
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: A
+                  refId: C
+                  conditions:
+                    - evaluator: { type: lt, params: [1] }
+            noDataState: OK
+            execErrState: Error
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: 'MongoDB instance down in {{ $labels.cluster_name }} for 5m.'
+          - uid: kafka-partition-issues
+            title: Kafka offline or under-replicated partitions
+            condition: C
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: thanos
+                model:
+                  expr: sum by (cluster_name) (kafka_controller_kafkacontroller_offlinepartitionscount) + sum by (cluster_name) (kafka_server_replicamanager_underreplicatedpartitions)
+                  instant: true
+                  refId: A
+              - refId: C
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  expression: A
+                  refId: C
+                  conditions:
+                    - evaluator: { type: gt, params: [0] }
+            noDataState: OK
+            execErrState: Error
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: 'Kafka in {{ $labels.cluster_name }} has offline or under-replicated partitions.'

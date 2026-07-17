@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: harbor-proxy-cache-setup
+  namespace: harbor
+  labels:
+    app.kubernetes.io/part-of: mojaloop
+    mojaloop.io/layer: control-center
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: harbor-proxy-cache-setup
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: setup
+          image: alpine:3
+          command: ["/bin/sh", "/scripts/setup.sh"]
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+            - name: admin-secret
+              mountPath: /secrets
+              readOnly: true
+            - name: oci-secret
+              mountPath: /oci-secrets
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: harbor-proxy-cache-setup
+            defaultMode: 0755
+        - name: admin-secret
+          secret:
+            secretName: harbor-admin
+        - name: oci-secret
+          secret:
+            secretName: oci-credentials

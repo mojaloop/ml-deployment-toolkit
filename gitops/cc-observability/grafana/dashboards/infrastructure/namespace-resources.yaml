@@ -1,0 +1,186 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-namespace-resources
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Infrastructure"
+data:
+  namespace-resources.json: |
+    {
+      "uid": "infra-namespace-resources",
+      "title": "Namespace Resources",
+      "description": "Per-namespace CPU/memory usage vs requests/limits, network bandwidth, and CPU throttling",
+      "tags": ["infrastructure", "kubernetes", "resources"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(container_cpu_usage_seconds_total, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          },
+          {
+            "name": "namespace",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(container_cpu_usage_seconds_total{cluster_name=\"$cluster_name\", container!=\"\"}, namespace)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+
+        {
+          "title": "CPU",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "collapsed": false
+        },
+        {
+          "title": "CPU Usage vs Requests vs Limits",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(container_cpu_usage_seconds_total{cluster_name=\"$cluster_name\", namespace=\"$namespace\", container!=\"\"}[5m]))",
+              "legendFormat": "usage"
+            },
+            {
+              "expr": "sum(kube_pod_container_resource_requests{cluster_name=\"$cluster_name\", namespace=\"$namespace\", resource=\"cpu\"})",
+              "legendFormat": "requests"
+            },
+            {
+              "expr": "sum(kube_pod_container_resource_limits{cluster_name=\"$cluster_name\", namespace=\"$namespace\", resource=\"cpu\"})",
+              "legendFormat": "limits"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "CPU Usage by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "topk(20, sum by (pod) (rate(container_cpu_usage_seconds_total{cluster_name=\"$cluster_name\", namespace=\"$namespace\", container!=\"\"}[5m])))",
+              "legendFormat": "{{ pod }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "CPU Throttling by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 9 },
+          "datasource": { "uid": "thanos" },
+          "description": "Only containers WITH a CPU limit emit throttling metrics; namespaces without limits show nothing. Zero = healthy (no throttling)",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "custom": { "fillOpacity": 10 }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.25 }, { "color": "red", "value": 0.50 }] } } },
+          "targets": [
+            {
+              "expr": "topk(20, sum by (pod) (rate(container_cpu_cfs_throttled_periods_total{cluster_name=\"$cluster_name\", namespace=\"$namespace\", container!=\"\"}[5m])) / sum by (pod) (rate(container_cpu_cfs_periods_total{cluster_name=\"$cluster_name\", namespace=\"$namespace\", container!=\"\"}[5m])))",
+              "legendFormat": "{{ pod }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+
+        {
+          "title": "Memory",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+          "collapsed": false
+        },
+        {
+          "title": "Memory Usage (WSS) vs Requests vs Limits",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum(container_memory_working_set_bytes{cluster_name=\"$cluster_name\", namespace=\"$namespace\", container!=\"\"})",
+              "legendFormat": "working set"
+            },
+            {
+              "expr": "sum(container_memory_rss{cluster_name=\"$cluster_name\", namespace=\"$namespace\", container!=\"\"})",
+              "legendFormat": "RSS"
+            },
+            {
+              "expr": "sum(kube_pod_container_resource_requests{cluster_name=\"$cluster_name\", namespace=\"$namespace\", resource=\"memory\"})",
+              "legendFormat": "requests"
+            },
+            {
+              "expr": "sum(kube_pod_container_resource_limits{cluster_name=\"$cluster_name\", namespace=\"$namespace\", resource=\"memory\"})",
+              "legendFormat": "limits"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "Memory Usage (WSS) by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "topk(20, sum by (pod) (container_memory_working_set_bytes{cluster_name=\"$cluster_name\", namespace=\"$namespace\", container!=\"\"}))",
+              "legendFormat": "{{ pod }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+
+        {
+          "title": "Network",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+          "collapsed": false
+        },
+        {
+          "title": "Network Receive by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 27 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "topk(20, sum by (pod) (rate(container_network_receive_bytes_total{cluster_name=\"$cluster_name\", namespace=\"$namespace\"}[5m])))",
+              "legendFormat": "{{ pod }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        },
+        {
+          "title": "Network Transmit by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 27 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "topk(20, sum by (pod) (rate(container_network_transmit_bytes_total{cluster_name=\"$cluster_name\", namespace=\"$namespace\"}[5m])))",
+              "legendFormat": "{{ pod }}"
+            }
+          ],
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } }
+        }
+      ],
+      "schemaVersion": 39
+    }

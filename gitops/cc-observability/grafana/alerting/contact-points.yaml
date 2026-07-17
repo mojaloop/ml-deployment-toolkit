@@ -1,0 +1,32 @@
+# Contact points live in a Secret (not a ConfigMap) because they carry the
+# Telegram bot token. The Grafana alerts sidecar watches both kinds
+# (sidecar.alerts.resource: both).
+#
+# One contact point ("ops") with two integrations — every alert goes to both
+# email and Telegram. With the dummy defaults from .env.sample both provision
+# fine but delivery fails visibly in Grafana (Alerting > Contact points) until
+# real values are set. Use the "Test" button there to verify delivery.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-alerting-contact-points
+  namespace: observability
+  labels:
+    grafana_alert: "1"
+stringData:
+  contact-points.yaml: |
+    apiVersion: 1
+    contactPoints:
+      - orgId: 1
+        name: ops
+        receivers:
+          - uid: ops-email
+            type: email
+            settings:
+              addresses: "${alert_email_to}"
+              singleEmail: true
+          - uid: ops-telegram
+            type: telegram
+            settings:
+              bottoken: "${telegram_bot_token}"
+              chatid: "${telegram_chat_id}"

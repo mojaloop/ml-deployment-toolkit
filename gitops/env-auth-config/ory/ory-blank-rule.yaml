@@ -1,0 +1,23 @@
+# Placeholder Rule CRD — required by oathkeeper-maester to initialize
+# the rules ConfigMap. Without at least one Rule, maester creates an
+# empty rules file and oathkeeper fails to start.
+apiVersion: oathkeeper.ory.sh/v1alpha1
+kind: Rule
+metadata:
+  name: blank-rule
+  namespace: ory
+spec:
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+  match:
+    methods:
+      - GET
+    url: <http|https>://foo.bar
+  mutators:
+    - config: {}
+      handler: header
+  upstream:
+    preserveHost: false
+    url: http://abc.ef

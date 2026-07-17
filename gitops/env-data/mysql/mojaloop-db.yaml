@@ -1,0 +1,191 @@
+apiVersion: pxc.percona.com/v1
+kind: PerconaXtraDBCluster
+metadata:
+  name: mojaloop-db
+  namespace: data
+spec:
+  crVersion: "1.19.0"
+  secretsName: mojaloop-db-secrets
+  backup:
+    image: percona/percona-xtrabackup:8.0.35-34.1
+    storages:
+      s3-backup:
+        type: s3
+        s3:
+          bucket: ${backup_s3_bucket}/${cluster_name}/mysql
+          region: ${backup_s3_region}
+          endpointUrl: ${backup_s3_endpoint}
+          credentialsSecret: backup-s3-credentials
+    schedule:
+      - name: daily
+        schedule: "0 1 * * *"
+        keep: 7
+        storageName: s3-backup
+    pitr:
+      enabled: true
+      storageName: s3-backup
+      resources:
+        requests:
+          memory: 128Mi
+          cpu: 50m
+        limits:
+          memory: 2Gi
+          cpu: 200m
+  users:
+    - name: central_ledger
+      dbs: [central_ledger]
+      hosts: ["%"]
+      grants: [ALL PRIVILEGES]
+      passwordSecretRef:
+        name: mysqldb
+        key: mysql-password
+    - name: account_lookup
+      dbs: [account_lookup]
+      hosts: ["%"]
+      grants: [ALL PRIVILEGES]
+      passwordSecretRef:
+        name: mysqldb
+        key: mysql-als-password
+    - name: oracle_msisdn
+      dbs: [oracle_msisdn]
+      hosts: ["%"]
+      grants: [ALL PRIVILEGES]
+      passwordSecretRef:
+        name: mysqldb
+        key: mysql-oracle-password
+    - name: kratos
+      dbs: [kratos]
+      hosts: ["%"]
+      grants: [ALL PRIVILEGES]
+      passwordSecretRef:
+        name: auth-db-app-secrets
+        key: kratos-password
+    - name: keto
+      dbs: [keto]
+      hosts: ["%"]
+      grants: [ALL PRIVILEGES]
+      passwordSecretRef:
+        name: auth-db-app-secrets
+        key: keto-password
+    - name: hydra
+      dbs: [hydra]
+      hosts: ["%"]
+      grants: [ALL PRIVILEGES]
+      passwordSecretRef:
+        name: auth-db-app-secrets
+        key: hydra-password
+    - name: mcm
+      dbs: [mcm]
+      hosts: ["%"]
+      grants: [ALL PRIVILEGES]
+      passwordSecretRef:
+        name: auth-db-app-secrets
+        key: mcm-password
+  pxc:
+    size: 3
+    image: percona/percona-xtradb-cluster:8.0.44-35.1
+    tolerations:
+      - key: "node-role"
+        operator: "Equal"
+        value: "db"
+        effect: "NoSchedule"
+    affinity:
+      advanced:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: node-role
+                    operator: In
+                    values: ["db"]
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/component: pxc
+                topologyKey: kubernetes.io/hostname
+    resources:
+      requests:
+        memory: 1Gi
+        cpu: 500m
+      limits:
+        memory: 2Gi
+        cpu: "1"
+    volumeSpec:
+      persistentVolumeClaim:
+        resources:
+          requests:
+            storage: ${mysql_storage}
+    sidecars:
+      - name: mysqld-exporter
+        image: prom/mysqld-exporter:v0.16.0
+        args:
+          - --mysqld.address=localhost:3306
+          - --mysqld.username=monitor
+        env:
+          - name: MYSQLD_EXPORTER_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: mojaloop-db-secrets
+                key: monitor
+        ports:
+          - containerPort: 9104
+            name: metrics
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 64Mi
+    sidecarVolumes: []
+    sidecarPVCs: []
+    configuration: |
+      [mysqld]
+      pxc_strict_mode=PERMISSIVE
+      default_authentication_plugin=mysql_native_password
+      wsrep_auto_increment_control=OFF
+      auto_increment_increment=1
+      auto_increment_offset=1
+      innodb_buffer_pool_size=${mysql_innodb_buffer_pool_size}
+      max_connections=${mysql_max_connections}
+      character_set_server=utf8
+    autoRecovery: true
+  haproxy:
+    enabled: true
+    size: 3
+    image: percona/haproxy:2.8.17
+    tolerations:
+      - key: "node-role"
+        operator: "Equal"
+        value: "db"
+        effect: "NoSchedule"
+    affinity:
+      advanced:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: node-role
+                    operator: In
+                    values: ["db"]
+    readinessProbes:
+      initialDelaySeconds: 30
+      timeoutSeconds: 10
+      periodSeconds: 10
+      failureThreshold: 30
+    livenessProbes:
+      initialDelaySeconds: 60
+      timeoutSeconds: 10
+      periodSeconds: 10
+      failureThreshold: 30
+    resources:
+      requests:
+        memory: 64Mi
+        cpu: 50m
+      limits:
+        memory: 128Mi
+        cpu: 200m

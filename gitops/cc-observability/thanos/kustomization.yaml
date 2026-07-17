@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - externalsecret.yaml
+  - thanos-receive-serviceAccount.yaml
+  - thanos-receive-service.yaml
+  - thanos-receive-statefulSet.yaml
+  - thanos-query-serviceAccount.yaml
+  - thanos-query-service.yaml
+  - thanos-query-deployment.yaml
+  - thanos-store-serviceAccount.yaml
+  - thanos-store-service.yaml
+  - thanos-store-statefulSet.yaml
+  - thanos-compact-serviceAccount.yaml
+  - thanos-compact-service.yaml
+  - thanos-compact-statefulSet.yaml

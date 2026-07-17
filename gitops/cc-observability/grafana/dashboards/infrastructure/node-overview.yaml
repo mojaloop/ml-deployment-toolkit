@@ -1,0 +1,303 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-node-overview
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Infrastructure"
+data:
+  node-overview.json: |
+    {
+      "uid": "infra-node-overview",
+      "title": "Node Overview",
+      "description": "USE method: CPU, memory, disk, network per node with PSI pressure metrics",
+      "tags": ["infrastructure", "node"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(node_uname_info, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          },
+          {
+            "name": "node",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(node_cpu_seconds_total{cluster_name=\"$cluster_name\"}, node)",
+            "refresh": 2,
+            "includeAll": true,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "CPU Utilization",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "custom": { "fillOpacity": 20, "stacking": { "mode": "none" } }
+            }
+          },
+          "targets": [
+            {
+              "expr": "1 - avg by (node) (rate(node_cpu_seconds_total{cluster_name=\"$cluster_name\", node=~\"$node\", mode=\"idle\"}[$__rate_interval]))",
+              "legendFormat": "{{node}}"
+            }
+          ]
+        },
+        {
+          "title": "CPU Saturation (Load / Cores)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 10, "thresholdsStyle": { "mode": "line" } },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "node_load1{cluster_name=\"$cluster_name\", node=~\"$node\"} / count without (cpu) (count without (mode) (node_cpu_seconds_total{cluster_name=\"$cluster_name\", node=~\"$node\", mode=\"idle\"}))",
+              "legendFormat": "{{node}} load1/cores"
+            },
+            {
+              "expr": "node_load15{cluster_name=\"$cluster_name\", node=~\"$node\"} / count without (cpu) (count without (mode) (node_cpu_seconds_total{cluster_name=\"$cluster_name\", node=~\"$node\", mode=\"idle\"}))",
+              "legendFormat": "{{node}} load15/cores"
+            }
+          ]
+        },
+        {
+          "title": "Memory Utilization",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "custom": { "fillOpacity": 20, "thresholdsStyle": { "mode": "line" } },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.75 },
+                  { "color": "red", "value": 0.85 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "1 - (node_memory_MemAvailable_bytes{cluster_name=\"$cluster_name\", node=~\"$node\"} / node_memory_MemTotal_bytes{cluster_name=\"$cluster_name\", node=~\"$node\"})",
+              "legendFormat": "{{node}}"
+            }
+          ]
+        },
+        {
+          "title": "Memory Breakdown",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": { "fillOpacity": 30, "stacking": { "mode": "normal" } }
+            }
+          },
+          "targets": [
+            {
+              "expr": "node_memory_MemTotal_bytes{cluster_name=\"$cluster_name\", node=~\"$node\"} - node_memory_MemFree_bytes{cluster_name=\"$cluster_name\", node=~\"$node\"} - node_memory_Buffers_bytes{cluster_name=\"$cluster_name\", node=~\"$node\"} - node_memory_Cached_bytes{cluster_name=\"$cluster_name\", node=~\"$node\"} - node_memory_Slab_bytes{cluster_name=\"$cluster_name\", node=~\"$node\"}",
+              "legendFormat": "{{node}} used"
+            },
+            {
+              "expr": "node_memory_Buffers_bytes{cluster_name=\"$cluster_name\", node=~\"$node\"}",
+              "legendFormat": "{{node}} buffers"
+            },
+            {
+              "expr": "node_memory_Cached_bytes{cluster_name=\"$cluster_name\", node=~\"$node\"}",
+              "legendFormat": "{{node}} cached"
+            }
+          ]
+        },
+        {
+          "title": "Disk Utilization (Rootfs)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "custom": { "fillOpacity": 20 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red", "value": 0.85 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "1 - (node_filesystem_avail_bytes{cluster_name=\"$cluster_name\", node=~\"$node\", fstype!~\"tmpfs|overlay\", mountpoint=~\"/|/var\"} / node_filesystem_size_bytes{cluster_name=\"$cluster_name\", node=~\"$node\", fstype!~\"tmpfs|overlay\", mountpoint=~\"/|/var\"})",
+              "legendFormat": "{{node}} {{mountpoint}}"
+            }
+          ]
+        },
+        {
+          "title": "Disk I/O Throughput",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "Bps",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "rate(node_disk_read_bytes_total{cluster_name=\"$cluster_name\", node=~\"$node\"}[$__rate_interval])",
+              "legendFormat": "{{node}} {{device}} read"
+            },
+            {
+              "expr": "-rate(node_disk_written_bytes_total{cluster_name=\"$cluster_name\", node=~\"$node\"}[$__rate_interval])",
+              "legendFormat": "{{node}} {{device}} write"
+            }
+          ]
+        },
+        {
+          "title": "Network Throughput",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bps",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "rate(node_network_receive_bytes_total{cluster_name=\"$cluster_name\", node=~\"$node\", device!~\"lo|veth.*|lxc.*|cali.*|cilium.*\"}[$__rate_interval]) * 8",
+              "legendFormat": "{{node}} {{device}} rx"
+            },
+            {
+              "expr": "-rate(node_network_transmit_bytes_total{cluster_name=\"$cluster_name\", node=~\"$node\", device!~\"lo|veth.*|lxc.*|cali.*|cilium.*\"}[$__rate_interval]) * 8",
+              "legendFormat": "{{node}} {{device}} tx"
+            }
+          ]
+        },
+        {
+          "title": "Network Errors",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "rate(node_network_receive_errs_total{cluster_name=\"$cluster_name\", node=~\"$node\", device!~\"lo|veth.*\"}[$__rate_interval])",
+              "legendFormat": "{{node}} {{device}} rx errors"
+            },
+            {
+              "expr": "rate(node_network_transmit_errs_total{cluster_name=\"$cluster_name\", node=~\"$node\", device!~\"lo|veth.*\"}[$__rate_interval])",
+              "legendFormat": "{{node}} {{device}} tx errors"
+            },
+            {
+              "expr": "rate(node_network_receive_drop_total{cluster_name=\"$cluster_name\", node=~\"$node\", device!~\"lo|veth.*\"}[$__rate_interval])",
+              "legendFormat": "{{node}} {{device}} rx drops"
+            }
+          ]
+        },
+        {
+          "title": "PSI - Pressure Stall Information",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+          "datasource": { "uid": "thanos" },
+          "description": "Percentage of time processes are stalled waiting for CPU, memory, or I/O resources",
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "rate(node_pressure_cpu_waiting_seconds_total{cluster_name=\"$cluster_name\", node=~\"$node\"}[$__rate_interval])",
+              "legendFormat": "{{node}} CPU waiting"
+            },
+            {
+              "expr": "rate(node_pressure_memory_stalled_seconds_total{cluster_name=\"$cluster_name\", node=~\"$node\"}[$__rate_interval])",
+              "legendFormat": "{{node}} memory stalled"
+            },
+            {
+              "expr": "rate(node_pressure_io_waiting_seconds_total{cluster_name=\"$cluster_name\", node=~\"$node\"}[$__rate_interval])",
+              "legendFormat": "{{node}} I/O waiting"
+            }
+          ]
+        },
+        {
+          "title": "Conntrack Utilization",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "custom": { "fillOpacity": 10 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red", "value": 0.9 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "node_nf_conntrack_entries{cluster_name=\"$cluster_name\", node=~\"$node\"} / node_nf_conntrack_entries_limit{cluster_name=\"$cluster_name\", node=~\"$node\"}",
+              "legendFormat": "{{node}}"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

@@ -1,0 +1,17 @@
+# Provider-specific values merged into the shared external-dns HelmRelease
+# (gitops/platform/external-dns/) via valuesFrom.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: external-dns-provider-values
+  namespace: flux-system
+data:
+  values.yaml: |
+    provider:
+      name: cloudflare
+    env:
+      - name: CF_API_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: dns-provider-credentials
+            key: api-token

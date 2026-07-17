@@ -1,0 +1,18 @@
+# LoadBalancer Service for extapi mTLS gateway.
+# Routes to the standalone Envoy Deployment that handles mTLS termination.
+apiVersion: v1
+kind: Service
+metadata:
+  name: cilium-gateway-gw-extapi
+  namespace: mojaloop
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: "extapi.${domain}"
+spec:
+  type: LoadBalancer
+  selector:
+    app: extapi-envoy
+  ports:
+    - name: https
+      port: 443
+      targetPort: 8443
+      protocol: TCP

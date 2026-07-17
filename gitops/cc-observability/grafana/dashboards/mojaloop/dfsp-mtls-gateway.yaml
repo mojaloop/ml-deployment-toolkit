@@ -1,0 +1,424 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-dfsp-mtls-gateway
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Mojaloop"
+data:
+  dfsp-mtls-gateway.json: |
+    {
+      "uid": "mojaloop-dfsp-mtls-gateway",
+      "title": "DFSP mTLS API Gateway",
+      "tags": ["mojaloop", "dfsp", "mtls", "envoy", "api-gateway"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(envoy_http_downstream_rq_completed{envoy_http_conn_manager_prefix=\"extapi_mtls\"}, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "INBOUND — DFSPs → Mojaloop (extapi-envoy)",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "collapsed": false
+        },
+        {
+          "title": "Inbound Request Rate",
+          "description": "Total inbound DFSP requests per second through extapi mTLS gateway",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(envoy_http_downstream_rq_completed{envoy_http_conn_manager_prefix=\"extapi_mtls\", cluster_name=\"$cluster_name\"}[5m]))",
+              "legendFormat": "Total"
+            }
+          ]
+        },
+        {
+          "title": "Inbound Response Codes",
+          "description": "Response code breakdown for inbound DFSP requests",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": { "fillOpacity": 10 }
+            },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "2xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+              { "matcher": { "id": "byName", "options": "4xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+              { "matcher": { "id": "byName", "options": "5xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+            ]
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(envoy_http_downstream_rq_xx{envoy_http_conn_manager_prefix=\"extapi_mtls\", cluster_name=\"$cluster_name\", envoy_response_code_class=\"2\"}[5m]))",
+              "legendFormat": "2xx"
+            },
+            {
+              "expr": "sum(rate(envoy_http_downstream_rq_xx{envoy_http_conn_manager_prefix=\"extapi_mtls\", cluster_name=\"$cluster_name\", envoy_response_code_class=\"4\"}[5m]))",
+              "legendFormat": "4xx"
+            },
+            {
+              "expr": "sum(rate(envoy_http_downstream_rq_xx{envoy_http_conn_manager_prefix=\"extapi_mtls\", cluster_name=\"$cluster_name\", envoy_response_code_class=\"5\"}[5m]))",
+              "legendFormat": "5xx"
+            }
+          ]
+        },
+        {
+          "title": "Inbound P50 / P95 / P99 Latency",
+          "description": "Request duration percentiles for inbound DFSP traffic",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 1 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": { "fillOpacity": 5 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(envoy_http_downstream_rq_time_bucket{envoy_http_conn_manager_prefix=\"extapi_mtls\", cluster_name=\"$cluster_name\"}[5m])) by (le))",
+              "legendFormat": "P50"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(envoy_http_downstream_rq_time_bucket{envoy_http_conn_manager_prefix=\"extapi_mtls\", cluster_name=\"$cluster_name\"}[5m])) by (le))",
+              "legendFormat": "P95"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(envoy_http_downstream_rq_time_bucket{envoy_http_conn_manager_prefix=\"extapi_mtls\", cluster_name=\"$cluster_name\"}[5m])) by (le))",
+              "legendFormat": "P99"
+            }
+          ]
+        },
+        {
+          "title": "Inbound Requests by Backend Service",
+          "description": "Request rate routed to each Mojaloop backend (account-lookup, quoting, ml-api-adapter, tx-requests)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (envoy_cluster_name) (rate(envoy_cluster_upstream_rq_completed{envoy_cluster_name=~\"account-lookup-service|quoting-service|ml-api-adapter-service|transaction-requests-service\", pod=~\"extapi-envoy.*\", cluster_name=\"$cluster_name\"}[5m]))",
+              "legendFormat": "{{ envoy_cluster_name }}"
+            }
+          ]
+        },
+        {
+          "title": "Inbound Active Connections",
+          "description": "Active downstream connections to the mTLS gateway",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 6, "x": 12, "y": 9 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(envoy_http_downstream_cx_active{envoy_http_conn_manager_prefix=\"extapi_mtls\", cluster_name=\"$cluster_name\"})",
+              "legendFormat": "Active connections"
+            }
+          ]
+        },
+        {
+          "title": "Inbound TLS Handshakes / Errors",
+          "description": "TLS handshake success and error rates",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 6, "x": 18, "y": 9 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(envoy_listener_ssl_handshake{envoy_listener_address=~\".*8443\", cluster_name=\"$cluster_name\"}[5m]))",
+              "legendFormat": "Handshakes"
+            },
+            {
+              "expr": "sum(rate(envoy_listener_ssl_connection_error{envoy_listener_address=~\".*8443\", cluster_name=\"$cluster_name\"}[5m]))",
+              "legendFormat": "Errors"
+            }
+          ]
+        },
+        {
+          "title": "OUTBOUND — Mojaloop → DFSPs (CEC dfsp-callback-mtls)",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+          "collapsed": false
+        },
+        {
+          "title": "Outbound Request Rate by DFSP",
+          "description": "Callback request rate to each DFSP via mTLS origination",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 18 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } }
+            }
+          },
+          "targets": [
+            {
+              "expr": "label_replace(sum by (envoy_cluster_name) (rate(envoy_cluster_upstream_rq_completed{envoy_cluster_name=~\"mojaloop/dfsp-callback-mtls/.*\", service=\"cilium-envoy\", cluster_name=\"$cluster_name\"}[5m])), \"dfsp\", \"$1\", \"envoy_cluster_name\", \"mojaloop/dfsp-callback-mtls/(.*)-cluster\")",
+              "legendFormat": "{{ dfsp }}"
+            }
+          ]
+        },
+        {
+          "title": "Outbound Response Codes by DFSP",
+          "description": "Response code breakdown per DFSP for outbound callbacks",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 18 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": { "fillOpacity": 10 }
+            },
+            "overrides": [
+              { "matcher": { "id": "byRegexp", "options": ".*2xx.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+              { "matcher": { "id": "byRegexp", "options": ".*4xx.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+              { "matcher": { "id": "byRegexp", "options": ".*5xx.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+            ]
+          },
+          "targets": [
+            {
+              "expr": "label_replace(sum by (envoy_cluster_name, envoy_response_code_class) (rate(envoy_cluster_upstream_rq_xx{envoy_cluster_name=~\"mojaloop/dfsp-callback-mtls/.*\", service=\"cilium-envoy\", cluster_name=\"$cluster_name\"}[5m])), \"dfsp\", \"$1\", \"envoy_cluster_name\", \"mojaloop/dfsp-callback-mtls/(.*)-cluster\")",
+              "legendFormat": "{{ dfsp }} {{ envoy_response_code_class }}xx"
+            }
+          ]
+        },
+        {
+          "title": "Outbound P50 / P95 / P99 Latency",
+          "description": "Request duration to DFSP backends",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 18 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": { "fillOpacity": 5 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum by (le) (rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name=~\"mojaloop/dfsp-callback-mtls/.*\", service=\"cilium-envoy\", cluster_name=\"$cluster_name\"}[5m])))",
+              "legendFormat": "P50"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name=~\"mojaloop/dfsp-callback-mtls/.*\", service=\"cilium-envoy\", cluster_name=\"$cluster_name\"}[5m])))",
+              "legendFormat": "P95"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum by (le) (rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name=~\"mojaloop/dfsp-callback-mtls/.*\", service=\"cilium-envoy\", cluster_name=\"$cluster_name\"}[5m])))",
+              "legendFormat": "P99"
+            }
+          ]
+        },
+        {
+          "title": "Outbound Connection Failures by DFSP",
+          "description": "Connection failures and timeouts when calling DFSPs",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 26 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "label_replace(sum by (envoy_cluster_name) (rate(envoy_cluster_upstream_cx_connect_fail{envoy_cluster_name=~\"mojaloop/dfsp-callback-mtls/.*\", service=\"cilium-envoy\", cluster_name=\"$cluster_name\"}[5m])), \"dfsp\", \"$1\", \"envoy_cluster_name\", \"mojaloop/dfsp-callback-mtls/(.*)-cluster\")",
+              "legendFormat": "{{ dfsp }} connect fail"
+            },
+            {
+              "expr": "label_replace(sum by (envoy_cluster_name) (rate(envoy_cluster_upstream_rq_timeout{envoy_cluster_name=~\"mojaloop/dfsp-callback-mtls/.*\", service=\"cilium-envoy\", cluster_name=\"$cluster_name\"}[5m])), \"dfsp\", \"$1\", \"envoy_cluster_name\", \"mojaloop/dfsp-callback-mtls/(.*)-cluster\")",
+              "legendFormat": "{{ dfsp }} timeout"
+            }
+          ]
+        },
+        {
+          "title": "Outbound TLS Handshakes by DFSP",
+          "description": "Upstream TLS handshake rate per DFSP cluster",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 26 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "label_replace(sum by (envoy_cluster_name) (rate(envoy_cluster_ssl_handshake{envoy_cluster_name=~\"mojaloop/dfsp-callback-mtls/.*\", service=\"cilium-envoy\", cluster_name=\"$cluster_name\"}[5m])), \"dfsp\", \"$1\", \"envoy_cluster_name\", \"mojaloop/dfsp-callback-mtls/(.*)-cluster\")",
+              "legendFormat": "{{ dfsp }}"
+            }
+          ]
+        },
+        {
+          "title": "Outbound Active Connections by DFSP",
+          "description": "Active upstream connections per DFSP cluster",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 26 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "fillOpacity": 10 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "label_replace(sum by (envoy_cluster_name) (envoy_cluster_upstream_cx_active{envoy_cluster_name=~\"mojaloop/dfsp-callback-mtls/.*\", service=\"cilium-envoy\", cluster_name=\"$cluster_name\"}), \"dfsp\", \"$1\", \"envoy_cluster_name\", \"mojaloop/dfsp-callback-mtls/(.*)-cluster\")",
+              "legendFormat": "{{ dfsp }}"
+            }
+          ]
+        },
+        {
+          "title": "TOTAL — Aggregate Request Rate",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+          "collapsed": false
+        },
+        {
+          "title": "Total Inbound Requests",
+          "description": "Total inbound requests through the mTLS gateway",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 35 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "blue", "value": null }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(envoy_http_downstream_rq_completed{envoy_http_conn_manager_prefix=\"extapi_mtls\", cluster_name=\"$cluster_name\"}[5m]))",
+              "legendFormat": ""
+            }
+          ]
+        },
+        {
+          "title": "Total Outbound Callbacks",
+          "description": "Total outbound DFSP callback requests",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 35 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "blue", "value": null }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(envoy_http_downstream_rq_completed{envoy_http_conn_manager_prefix=\"dfsp_egress\", cluster_name=\"$cluster_name\"}[5m]))",
+              "legendFormat": ""
+            }
+          ]
+        },
+        {
+          "title": "Inbound Error Rate",
+          "description": "Percentage of inbound requests returning 4xx/5xx",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 35 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.01 },
+                  { "color": "red", "value": 0.05 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(envoy_http_downstream_rq_xx{envoy_http_conn_manager_prefix=\"extapi_mtls\", cluster_name=\"$cluster_name\", envoy_response_code_class=~\"4|5\"}[5m])) / sum(rate(envoy_http_downstream_rq_completed{envoy_http_conn_manager_prefix=\"extapi_mtls\", cluster_name=\"$cluster_name\"}[5m]))",
+              "legendFormat": ""
+            }
+          ]
+        },
+        {
+          "title": "Outbound Error Rate",
+          "description": "Percentage of outbound DFSP callbacks returning 4xx/5xx",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 35 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.01 },
+                  { "color": "red", "value": 0.05 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(envoy_cluster_upstream_rq_xx{envoy_cluster_name=~\"mojaloop/dfsp-callback-mtls/.*\", service=\"cilium-envoy\", cluster_name=\"$cluster_name\", envoy_response_code_class=~\"4|5\"}[5m])) / sum(rate(envoy_cluster_upstream_rq_completed{envoy_cluster_name=~\"mojaloop/dfsp-callback-mtls/.*\", service=\"cilium-envoy\", cluster_name=\"$cluster_name\"}[5m]))",
+              "legendFormat": ""
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

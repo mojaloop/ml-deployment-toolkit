@@ -1,0 +1,80 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keto-hub-admin-bootstrap
+  namespace: ory
+  annotations:
+    kustomize.toolkit.fluxcd.io/force: "enabled"
+spec:
+  backoffLimit: 10
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: curlimages/curl:8.7.1
+          command: [sh, -c]
+          args:
+            - |
+              set -e
+              KETO_WRITE="http://keto-write.ory.svc.cluster.local:80"
+              KRATOS_ADMIN="http://kratos-admin.ory.svc.cluster.local"
+
+              echo "Waiting for Keto write API..."
+              until curl -sf "$KETO_WRITE/health/ready" > /dev/null 2>&1; do
+                echo "  not ready, retrying in 5s..."; sleep 5
+              done
+
+              # The hub admin Kratos identity must exist first (created by
+              # kratos-hub-admin-bootstrap). Keto subjects are the identity id,
+              # NOT the email — Oathkeeper's cookie_session subject is identity.id.
+              echo "Resolving hub admin identity id for $HUB_ADMIN_EMAIL..."
+              IDENTITY_ID=""
+              for i in $(seq 1 60); do
+                IDENTITY_ID=$(curl -sf \
+                  "$KRATOS_ADMIN/admin/identities?credentials_identifier=$HUB_ADMIN_EMAIL" \
+                  | grep -o '"id":"[^"]*"' | head -1 | sed 's/"id":"//;s/"//')
+                [ -n "$IDENTITY_ID" ] && break
+                echo "  identity not present yet, retrying in 5s..."; sleep 5
+              done
+              if [ -z "$IDENTITY_ID" ]; then
+                echo "ERROR: could not resolve hub admin identity id"; exit 1
+              fi
+              echo "Hub admin identity id: $IDENTITY_ID"
+
+              put_tuple() {
+                DESC=$1; DATA=$2
+                echo "Seeding $DESC..."
+                HTTP_CODE=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
+                  -X PUT "$KETO_WRITE/admin/relation-tuples" \
+                  -H "Content-Type: application/json" -d "$DATA")
+                echo "  HTTP $HTTP_CODE: $(cat /tmp/resp.json)"
+                case "$HTTP_CODE" in 2*) ;; *) echo "  ERROR $HTTP_CODE"; exit 1 ;; esac
+              }
+
+              # MCM: hub admin is an admin of the Hub object (drives Hub.* and the
+              # Dfsp parent-traversal that lets hub admins see every DFSP).
+              put_tuple "Hub:$HUB_OBJECT#admins@$IDENTITY_ID" \
+                "{\"namespace\":\"Hub\",\"object\":\"$HUB_OBJECT\",\"relation\":\"admins\",\"subject_id\":\"$IDENTITY_ID\"}"
+
+              # Finance Portal: role memberships (roles-as-code). The BOF operator
+              # maps these roles → permissions via MojaloopRole CRDs.
+              seed_role() {
+                put_tuple "role:$1#member@$IDENTITY_ID" \
+                  "{\"namespace\":\"role\",\"object\":\"$1\",\"relation\":\"member\",\"subject_id\":\"$IDENTITY_ID\"}"
+              }
+              seed_role manager
+              seed_role pta
+              seed_role operator
+              seed_role financeManager
+              seed_role audit
+              seed_role mcmadmin
+              seed_role clerk
+
+              echo "Hub admin Keto tuples seeded for identity $IDENTITY_ID."
+          env:
+            - name: HUB_ADMIN_EMAIL
+              value: "${hub_admin_email}"
+            - name: HUB_OBJECT
+              value: "${hub_participant_name}"

@@ -1,0 +1,355 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: finance-portal
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 10m
+  chart:
+    spec:
+      chart: finance-portal
+      version: "5.1.x"
+      sourceRef:
+        kind: HelmRepository
+        name: mojaloop-charts
+      interval: 12h
+  releaseName: fin-portal
+  targetNamespace: mojaloop
+  install:
+    createNamespace: false
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      retries: -1
+      strategy: uninstall
+  values:
+    global:
+      adminApiSvc:
+        host: moja-centralledger-service
+        port: 80
+      settlementSvc:
+        host: moja-centralsettlement-service
+        port: 80
+      keto:
+        readURL: "http://keto-read.ory.svc.cluster.local:80"
+        writeURL: "http://keto-write.ory.svc.cluster.local:80"
+      reportingDB:
+        host: "${mysql_host}"
+        port: 3306
+        user: central_ledger
+        database: central_ledger
+        secret:
+          name: mysqldb
+          key: mysql-password
+      reportingEventsDB:
+        host: "${mongodb_host}"
+        port: ${mongodb_port}
+        user: reporting
+        database: reporting_events
+        secret:
+          name: reporting-events-db-secret
+          key: mongodb-password
+      keycloak:
+        url: "https://keycloak.int.${domain}"
+        user: "role-assign-svc"
+        secret:
+          name: role-assign-svc-secret
+          key: secret
+        realm: "hub-operators"
+      rolePermOperator:
+        apiSvc:
+          host: ory-bof-security-role-perm-operator-svc.ory.svc.cluster.local
+          port: 80
+
+    reporting-hub-bop-api-svc:
+      enabled: true
+      image:
+        tag: v4.3.0
+      containerSecurityContext:
+        enabled: false
+
+    reporting-hub-bop-experience-api-svc:
+      enabled: true
+      image:
+        tag: v2.0.5
+      sidecar:
+        enabled: false
+      configOverride:
+        .EVENT_SDKrc:
+          AUDIT: kafka
+          KAFKA:
+            PRODUCER:
+              EVENT:
+                AUDIT:
+                  config:
+                    options:
+                      messageCharset: utf8
+                      sync: true
+                    rdkafkaConf:
+                      client.id: producer-event-audit
+                      compression.type: lz4
+                      dr_cb: false
+                      event_cb: true
+                      metadata.broker.list: "${kafka_host}:${kafka_port}"
+                      queue.buffering.max.messages: 10000000
+                      socket.keepalive.enable: true
+                    topicConf:
+                      partitioner: murmur2_random
+                      request.required.acks: all
+                LOG:
+                  config:
+                    options:
+                      messageCharset: utf8
+                      sync: true
+                    rdkafkaConf:
+                      client.id: producer-event-log
+                      compression.type: lz4
+                      dr_cb: false
+                      event_cb: true
+                      metadata.broker.list: "${kafka_host}:${kafka_port}"
+                      queue.buffering.max.messages: 10000000
+                      socket.keepalive.enable: true
+                    topicConf:
+                      partitioner: murmur2_random
+                      request.required.acks: all
+                TRACE:
+                  config:
+                    options:
+                      messageCharset: utf8
+                      sync: true
+                    rdkafkaConf:
+                      client.id: producer-event-trace
+                      compression.type: lz4
+                      dr_cb: false
+                      event_cb: true
+                      metadata.broker.list: "${kafka_host}:${kafka_port}"
+                      queue.buffering.max.messages: 10000000
+                      socket.keepalive.enable: true
+                    topicConf:
+                      partitioner: murmur2_random
+                      request.required.acks: all
+          LOG: 'off'
+          TRACE: 'off'
+
+    reporting-hub-bop-shell:
+      enabled: true
+      image:
+        tag: v2.3.5
+      ingress:
+        enabled: false
+      config:
+        env:
+          AUTH_MOCK_API: false
+          REMOTE_API_BASE_URL: ''
+          REMOTE_MOCK_API: false
+          LOGIN_URL: "https://auth.int.${domain}/kratos/self-service/login/browser"
+          LOGOUT_URL: "/kratos/self-service/logout/browser?return_to=https%3A%2F%2Ffinance-portal.int.${domain}"
+          LOGIN_PROVIDER: kratos
+          AUTH_TOKEN_URL: "/kratos/sessions/whoami"
+          AUTH_ENABLED: true
+          REMOTE_1_URL: "https://finance-portal.int.${domain}/uis/iam"
+          REMOTE_2_URL: "https://finance-portal.int.${domain}/uis/transfers"
+          REMOTE_3_URL: "https://finance-portal.int.${domain}/uis/settlements"
+          REMOTE_4_URL: "https://finance-portal.int.${domain}/uis/positions"
+      configFiles:
+        config.json:
+          # Header branding — TITLE uses Flux substitution so each
+          # environment automatically displays its own cluster name.
+          TITLE: "${cluster_name}"
+          SUBTITLE: "Finance Portal"
+          TITLE_IMAGE: "https://mojaloop.io/wp-content/uploads/2020/07/mojaloop-foundation-orange.svg"
+          TITLE_BAR_COLOR: "#0C1C8C"
+          AUTH_API_BASE_URL: ''
+          AUTH_MOCK_API: 'false'
+          REMOTE_API_BASE_URL: ''
+          REMOTE_MOCK_API: 'false'
+          AUTH_ENABLED: 'true'
+          LOGIN_URL: "https://auth.int.${domain}/kratos/self-service/login/browser"
+          LOGIN_PROVIDER: kratos
+          LOGOUT_URL: "/kratos/self-service/logout/browser?return_to=https%3A%2F%2Ffinance-portal.int.${domain}"
+          AUTH_TOKEN_URL: /kratos/sessions/whoami
+        remotes.json:
+          roles:
+            path: /iam
+            label: Roles
+            menuComponent: Menu
+            appComponent: App
+            baseUrl: "https://finance-portal.int.${domain}/uis/iam"
+            url: "https://finance-portal.int.${domain}/uis/iam/app.js"
+            appName: reporting_hub_bop_role_ui
+          transfers:
+            path: /transfers
+            label: Transfers
+            menuComponent: Menu
+            appComponent: App
+            baseUrl: "https://finance-portal.int.${domain}/uis/transfers"
+            url: "https://finance-portal.int.${domain}/uis/transfers/app.js"
+            appName: reporting_hub_bop_trx_ui
+          settlements:
+            path: /settlements
+            label: Settlements
+            menuComponent: Menu
+            appComponent: App
+            baseUrl: "https://finance-portal.int.${domain}/uis/settlements"
+            url: "https://finance-portal.int.${domain}/uis/settlements/app.js"
+            appName: reporting_hub_bop_settlements_ui
+          positions:
+            path: /positions
+            label: Financial Positions
+            menuComponent: Menu
+            appComponent: App
+            baseUrl: "https://finance-portal.int.${domain}/uis/positions"
+            url: "https://finance-portal.int.${domain}/uis/positions/app.js"
+            appName: reporting_hub_bop_positions_ui
+
+    reporting-hub-bop-role-ui:
+      enabled: true
+      image:
+        tag: v1.5.10
+      ingress:
+        enabled: false
+      configFiles:
+        runtime-env.js: |
+          window.roleEnv = {
+            REACT_APP_API_BASE_URL: 'https://finance-portal.int.${domain}/api/iam',
+            REACT_APP_MOCK_API: 'false'
+          };
+
+    reporting-hub-bop-trx-ui:
+      enabled: true
+      image:
+        tag: v2.0.7
+      ingress:
+        enabled: false
+      configFiles:
+        runtime-env.js: |
+          window.transferEnv = {
+            REACT_APP_API_BASE_URL: 'https://finance-portal.int.${domain}/api/transfers',
+            REACT_APP_MOCK_API: 'false'
+          };
+
+    reporting-hub-bop-settlements-ui:
+      enabled: true
+      image:
+        tag: v0.0.30
+      ingress:
+        enabled: false
+      configFiles:
+        runtime-env.js: |
+          window.settlementEnv = {
+            CENTRAL_LEDGER_ENDPOINT: 'https://finance-portal.int.${domain}/api/central-admin',
+            CENTRAL_SETTLEMENTS_ENDPOINT: 'https://finance-portal.int.${domain}/api/central-settlements',
+            REPORTING_API_ENDPOINT: 'https://finance-portal.int.${domain}/api/transfers',
+            REPORTING_TEMPLATE_API_ENDPOINT: 'https://finance-portal.int.${domain}/api/reports/report-bilateral-settlement'
+          };
+
+    reporting-hub-bop-positions-ui:
+      enabled: true
+      image:
+        tag: v0.0.16
+      ingress:
+        enabled: false
+      configFiles:
+        runtime-env.js: |
+          window.positionsEnv = {
+            CENTRAL_LEDGER_ENDPOINT: 'https://finance-portal.int.${domain}/api/central-admin'
+          };
+
+    reporting-events-processor-svc:
+      enabled: true
+      image:
+        tag: v3.5.2
+      kafka:
+        host: "${kafka_host}"
+        port: ${kafka_port}
+        topicEvent: topic-event-audit
+        consumerGroup: reporting_events_processor_consumer_group
+        clientId: reporting_events_processor_consumer
+      configFiles:
+        default.json:
+          KAFKA:
+            TOPIC_EVENT: "topic-event-audit"
+            CONSUMER:
+              EVENT:
+                config:
+                  options:
+                    mode: 2
+                    batchSize: 50
+                    pollFrequency: 10
+                    recursiveTimeout: 100
+                    messageCharset: "utf8"
+                    messageAsJSON: true
+                    sync: true
+                    consumeTimeout: 10
+                  rdkafkaConf:
+                    clientId: "reporting_events_processor_consumer"
+                    groupId: "reporting_events_processor_consumer_group"
+                    metadataBrokerList: "${kafka_host}:${kafka_port}"
+                    socketKeepaliveEnable: true
+                    allowAutoCreateTopics: true
+                    partitionAssignmentStrategy: ""
+                    enableAutoCommit: false
+                  topicConf:
+                    autoOffsetReset: "earliest"
+
+    reporting-legacy-api:
+      enabled: true
+      image:
+        tag: v12.4.2
+      containerSecurityContext:
+        enabled: false
+      install-templates: false
+      auth: false
+      config:
+        env:
+          VALIDATION_RETRY_COUNT: "10"
+          VALIDATION_RETRY_INTERVAL_MS: "5000"
+      reporting-k8s-templates:
+        templates:
+          settlement: true
+          dfspSettlement: true
+          dfspSettlementDetail: true
+          reconciliationAmount: true
+          settlementWindow: true
+          settlementInitiation: true
+          transactionReconciliation: true
+          dfspSettlementStatement: true
+          settlementAudit: true
+
+    role-assignment-service:
+      enabled: false
+      ingress:
+        enabled: false
+      configFiles:
+        default.json: {
+            "ROLES_LIST": [
+              "manager",
+              "operator",
+              "clerk",
+              "financeManager",
+              "dfspReconciliationReports",
+              "audit",
+              "mcmadmin"
+            ],
+            "AUTO_GRANT_PORTAL_ADMIN_ROLES": [
+              "manager",
+              "pta"
+            ]
+          }
+
+    reporting-aggregator-svc:
+      # EXPERIMENT (perf campaign): its transfer/quote aggregation query
+      # averages 28s/execution on grown data (1884 DB-seconds total, see
+      # perf/RESULTS.md digest analysis) and starves PXC for the transaction
+      # path. Disabled pending an index/query fix; Transfers UI stops
+      # updating while disabled.
+      enabled: false
+      image:
+        tag: v0.0.9
+
+    reporting-nifi-processor-svc:
+      resources:
+        limits:
+          cpu: 1
