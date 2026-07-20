@@ -90,6 +90,7 @@ resource "proxmox_virtual_environment_vm" "instance" {
 
   # Cloud-init configuration for Talos VMs
   initialization {
+    datastore_id      = each.value.storage_config[0].storage_pool
     user_data_file_id = local.talos_config_file_ids[each.key]
     meta_data_file_id = local.talos_meta_file_ids[each.key]
   }
