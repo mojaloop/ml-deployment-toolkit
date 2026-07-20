@@ -81,6 +81,7 @@ SCENARIO=ramp RAMP_STEPS=1,5,10,20 STEP=3m TESTID=... \
 | `DFSPS` | `201,202,203` | participating DFSPs |
 | `DFSP_DOMAIN` | `dfsp.pj1.moja-do.delma.me` | DFSP host suffix |
 | `REQUEST_TIMEOUT` | `5s` | per-transfer timeout (timeouts count as failures) |
+| `CURRENCY` | `XTS` | transfer currency (must match the hub and each DFSP) |
 
 ## Thresholds (transfers.js)
 
