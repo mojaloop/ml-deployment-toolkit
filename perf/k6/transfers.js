@@ -21,6 +21,7 @@ const STEP = __ENV.STEP || '2m';
 const SCENARIO = __ENV.SCENARIO || 'soak';
 const RAMP_STEPS = (__ENV.RAMP_STEPS || '1,2,4,6,8,10,12,15').split(',').map(Number);
 const REQUEST_TIMEOUT = __ENV.REQUEST_TIMEOUT || '5s';
+const CURRENCY = __ENV.CURRENCY || 'XTS';
 
 // Ramp to each step's rate in 30s, then hold it for STEP.
 const rampStages = RAMP_STEPS.flatMap((rate) => [
@@ -89,7 +90,7 @@ export function transfer() {
       from: { idType: 'MSISDN', idValue: msisdn(sender, Math.floor(Math.random() * N) + 1) },
       to: { idType: 'MSISDN', idValue: msisdn(receiver, Math.floor(Math.random() * N) + 1) },
       amountType: 'SEND',
-      currency: 'XXX',
+      currency: CURRENCY,
       amount: String(Math.floor(Math.random() * 100) + 1),
       transactionType: 'TRANSFER',
     }),

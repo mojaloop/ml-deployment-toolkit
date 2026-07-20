@@ -1,0 +1,24 @@
+{
+  "inputValues": {
+    "HUB_NAME": "Hub",
+    "HOST_CENTRAL_LEDGER": "http://moja-centralledger-service",
+    "HOST_ACCOUNT_LOOKUP_ADMIN": "http://moja-account-lookup-service-admin",
+
+    "hubEmail": "hub@example.com",
+
+    "currency": "XTS",
+
+    "settlementModelName": "DEFERREDNETXTS",
+    "settlementGranularity": "NET",
+    "settlementInterchange": "MULTILATERAL",
+    "settlementDelay": "DEFERRED",
+    "ledgerAccountType": "POSITION",
+    "settlementAccountType": "SETTLEMENT",
+    "requireLiquidityCheck": "false",
+    "autoPositionReset": "true",
+
+    "oracleIdType": "MSISDN",
+    "HOST_ORACLE": "http://moja-als-msisdn-oracle",
+    "oracleIsDefault": "true"
+  }
+}
