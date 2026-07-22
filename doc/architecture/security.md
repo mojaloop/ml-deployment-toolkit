@@ -1,0 +1,117 @@
+# Security
+
+[doc](../index.md) / [architecture](index.md) / Security
+
+**Audiences:** architect, platform developer, adopter (operate)
+
+The trust model: who holds secrets, who proves identity, and what is encrypted where.
+
+- [Secret isolation](#secret-isolation)
+- [Identity and access](#identity-and-access)
+- [Authorization model](#authorization-model)
+- [Certificate authorities](#certificate-authorities)
+- [Encryption in transit](#encryption-in-transit)
+- [Cluster hardening](#cluster-hardening)
+
+## Secret isolation
+
+**Every cluster runs its own Vault.** A Hub's Vault has no dependency on the Tooling Cluster's, and compromising one yields nothing about the other. There is no root Vault and no cross-cluster unseal path.
+
+| Cluster | Vault topology | Holds |
+|---------|---------------|-------|
+| Tooling Cluster | Single instance | Registry credentials, object storage keys, platform secrets |
+| Hub | 3-node Raft cluster | Runtime secrets, the scheme PKI, participant certificate material |
+
+Secrets reach workloads by two paths, and the distinction matters when debugging:
+
+- **Terraform-injected** — values from `config.yaml` and `.env` become a `cluster-config` ConfigMap and a `cluster-secrets` Secret, consumed by Flux `postBuild` substitution. These are set at apply time and change only when you re-apply.
+- **Vault-sourced** — External Secrets Operator and Vault Agent pull live values from Vault. These change without a Terraform run.
+
+A secret that looks stale is almost always the first kind being read where the second was expected.
+
+**The KV engine is version 1, deliberately.** MCM's Vault client writes to `secret/mcm/...` without the `data/` path segment that KV v2 requires. Running v2 produces a 403 on participant creation. This is load-bearing — do not "upgrade" the mount.
+
+## Identity and access
+
+Authentication and authorization are **Ory end to end**. Keycloak is not deployed.
+
+| Component | Responsibility |
+|-----------|---------------|
+| **Kratos** | Human identity — accounts, sessions, password recovery |
+| **Hydra** | Machine identity — OAuth2 `client_credentials`, issues JWTs |
+| **Keto** | Authorization — relationship tuples, permissions as code |
+| **Oathkeeper** | Enforcement — the identity-aware proxy every protected API passes through |
+
+Every protected request traverses Oathkeeper, which accepts either a Kratos session cookie (humans) or a Hydra JWT (machines), consults Keto for the authorization decision, and forwards the request with identity headers attached: `X-User`, `X-Email`, `X-DFSP-ID`, `X-Roles`.
+
+Two details are non-obvious and both are deliberate:
+
+**Sessions resolve to the Kratos identity UUID, not the email address.** Email is mutable; the identity ID is not. Authorization tuples are written against the UUID, so changing a user's email does not silently revoke their access.
+
+**The JWT authenticator does not check an audience claim.** The Mojaloop MCM client omits the `audience` parameter when requesting tokens, so requiring it would reject every machine call. Trust is established by issuer and signature instead.
+
+## Authorization model
+
+Permissions are relationship tuples in Keto, defined as code rather than configured per deployment. Roles are shipped as `MojaloopRole` resources: `operator`, `manager`, `clerk`, `financemanager`, `dfspreconciliationreports`, `audit`, `mta`.
+
+The Hub itself is an object in the permission graph, named by `hub_participant_name` (default `Hub`). That single value is simultaneously the scheme ID, the Keto Hub object, and the onboarding participant name — they must agree.
+
+The initial Hub administrator is seeded at bootstrap: a Job resolves the Kratos identity ID for `HUB_ADMIN_EMAIL` and writes the admin tuple against it.
+
+### The traversal rule that matters
+
+Hub administrators inherit most participant permissions, but not all:
+
+| Permission | Hub admin inherits? |
+|------------|:---:|
+| `Dfsp.view` | Yes |
+| `Dfsp.manage` | Yes |
+| `Dfsp.credentialsAccess` | **No** |
+| `Dfsp.memberAccess` | **No** |
+
+This is a control, not an oversight. A Hub operator can create a participant, sign its certificates, and manage its endpoints — but **cannot generate or read that participant's OAuth2 client secret.** The participant generates its own credentials after activating its account, and the Hub never holds them.
+
+The consequence for onboarding is that credential issuance is necessarily a participant-side step. See [Participant integration](participant-integration.md#the-choreography).
+
+## Certificate authorities
+
+Two separate PKIs operate side by side, and confusing them is the most common source of TLS surprises.
+
+| PKI | Issues | Trusted by |
+|-----|--------|-----------|
+| **Let's Encrypt** | Web UI and API certificates on `*.int` and `*.ext` | Public trust store — browsers work without configuration |
+| **Vault — `Mojaloop Hub CA`** | Participant client certificates and the FSPIOP endpoint certificate | Scheme members only |
+
+The scheme root is RSA 4096 with a 10-year lifetime, generated inside Vault and never exported. Two issuing roles sit under it: one constrained to the Hub's own domain for server certificates, one unconstrained for participant client certificates. Both issue RSA 4096 with a five-year ceiling.
+
+**The FSPIOP endpoint is the trap.** `extapi.${domain}` presents a certificate signed by the scheme CA, not by Let's Encrypt — so it fails validation against the public trust store by design. It also rotates on a 30-day cycle, renewed at 15 days, while participant certificates are long-lived.
+
+See [Participant mTLS](participant-mtls.md) for the full certificate lifecycle.
+
+## Encryption in transit
+
+| Path | Protection |
+|------|-----------|
+| Participant → Hub FSPIOP | Mutual TLS, client certificate required on every connection |
+| Hub → Participant callbacks | Mutual TLS, originated by an in-cluster Envoy listener |
+| Public web endpoints | TLS 1.2+, Let's Encrypt, terminated at the Gateway |
+| **Pod to pod, inside the cluster** | **WireGuard, enabled** |
+
+Cilium transparent WireGuard encryption is **on by default on all clusters** ([ADR-013](decisions/013-cilium-wireguard-internal-encryption.md)). Node-to-node traffic is encrypted without application awareness.
+
+Traffic inside the cluster past the mTLS boundary is plain HTTP at the application layer — Envoy terminates participant mTLS and forwards cleartext to Mojaloop services. WireGuard is what protects that hop on the wire.
+
+## Cluster hardening
+
+**Pod Security Admission.** Most namespaces run under default restrictions. Four are explicitly `privileged` because their workloads require it: `platform-system`, `cc-system`, `vault`, and `openebs-system`.
+
+**Network policy is narrow, not comprehensive.** Only two policies ship:
+
+- A Flux policy in `platform-config`
+- `dfsp-callback-egress`, generated per participant, which redirects outbound callback traffic through the mTLS listener
+
+There is **no default-deny posture and no per-namespace segmentation.** Traffic between namespaces is unrestricted. If your threat model requires east-west segmentation, that is additional work, not a configuration toggle.
+
+The callback policy is deliberately scoped to the four services that make outbound calls rather than applying namespace-wide. An unscoped version would capture all TCP 80/443 egress and force it through a plain-HTTP listener, breaking unrelated outbound TLS — database backups to object storage, for instance.
+
+**Gateway exposure.** `*.int` hosts are intended for in-house operations and `*.ext` for external parties, but that separation is a naming convention enforced at your network edge. No NetworkPolicy, load-balancer source range, or annotation in the manifests restricts `gw-int` — both Gateways use the same class and certificate issuer. Verify your edge enforces the boundary you expect.
