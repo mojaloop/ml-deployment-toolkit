@@ -1,0 +1,135 @@
+# Data Layer
+
+[doc](../index.md) / [architecture](index.md) / Data layer
+
+**Audiences:** architect, platform developer, adopter (operate), adopter (recover)
+
+The four data stores, how they are backed up, and what is recoverable.
+
+- [The four stores](#the-four-stores)
+- [Where they live](#where-they-live)
+- [MySQL](#mysql)
+- [Kafka](#kafka)
+- [MongoDB](#mongodb)
+- [Redis](#redis)
+- [Backup coverage](#backup-coverage)
+- [What is not recoverable](#what-is-not-recoverable)
+
+## The four stores
+
+| Store | Implementation | Holds |
+|-------|---------------|-------|
+| MySQL | Percona XtraDB Cluster | Ledger, participants, quotes, oracle, auth, MCM |
+| Kafka | Strimzi | Event streaming between Mojaloop services |
+| MongoDB | Percona Server for MongoDB | Bulk transfer state |
+| Redis | Redis operator | Testing Toolkit cache |
+
+All four run only on a Hub. A Tooling Cluster has none of them.
+
+## Where they live
+
+**Every data store is in the `data` namespace — not `mojaloop`.** This is the single most common source of "my cluster looks empty" confusion. Commands aimed at `mojaloop` return nothing and look like a healthy result.
+
+Services reach them by fully-qualified in-cluster DNS:
+
+| Store | Address |
+|-------|---------|
+| MySQL | `mojaloop-db-haproxy.data.svc.cluster.local:3306` |
+| Kafka | `mojaloop-kafka-kafka-bootstrap.data.svc.cluster.local:9092` |
+| MongoDB | `bulk-mongodb-rs0.data.svc.cluster.local:27017` |
+| Redis | `ttk-redis.data.svc.cluster.local:6379` |
+
+These addresses are injected by Terraform at plan time and substituted into manifests by Flux, which is why the same artifact works across environments without being rebuilt.
+
+The data layer is currently **in-cluster only**. Pointing a Hub at externally managed databases is not configurable today — see `discrepancies.md` item 2.
+
+The database **operators** live elsewhere again, in `env-system`. Three namespaces are therefore involved in a data-layer problem: `env-system` for the operator, `data` for the cluster, and `mojaloop` for the client.
+
+## MySQL
+
+Percona XtraDB Cluster, three nodes, fronted by three HAProxy replicas. Applications connect to HAProxy, never to a node directly.
+
+Seven databases, each with its own user and credentials:
+
+| Database | Owner |
+|----------|-------|
+| `central_ledger` | Mojaloop core |
+| `account_lookup` | Account lookup service |
+| `oracle_msisdn` | MSISDN oracle |
+| `kratos` | Ory Kratos |
+| `keto` | Ory Keto |
+| `hydra` | Ory Hydra |
+| `mcm` | Connection Manager |
+
+There is no `keycloak` database. Any reference to one is stale ([ADR-010](decisions/010-dual-realm-keycloak.md), superseded).
+
+A single cluster hosts all seven rather than one cluster per service ([ADR-009](decisions/009-single-mysql-cluster.md)).
+
+**Users are created asynchronously by the operator**, taking roughly 7–10 minutes after the cluster is created. Services whose migrations start before their user exists fail with access-denied errors. This is why the reconciliation chain gates `env-auth` behind `env-data` — see [System overview](system-overview.md#reconciliation-order).
+
+## Kafka
+
+Strimzi-managed, three brokers in KRaft mode with `min.insync.replicas: 2`. Mojaloop services communicate through it for transfer and settlement events.
+
+It also carries the trace stream: services emit spans to `topic-event-trace`, which a bridge converts to OTLP and forwards to Tempo. See [Observability](observability.md#tracing).
+
+## MongoDB
+
+Percona Server for MongoDB, replica set `rs0`, holding bulk transfer state. Three application users: `mlos`, `ttk`, and `reporting`, all read-write.
+
+## Redis
+
+A cache for the Testing Toolkit. It holds no durable state — losing it costs nothing but a cold cache.
+
+## Backup coverage
+
+MySQL and MongoDB each run **two mechanisms together**, and the distinction matters when you are deciding how much data an incident can cost you.
+
+**Scheduled full backups** — a complete copy taken on a timer. Restores land you exactly on a backup boundary.
+
+**Continuous streaming (PITR)** — transaction logs shipped to object storage between full backups. This is what lets you restore to an arbitrary moment rather than to last night at 01:00, and it is enabled on both stores.
+
+| Store | Full backup | Streaming (PITR) | Retention |
+|-------|-------------|:---:|-----------|
+| MySQL | xtrabackup → S3, daily 01:00 | **Enabled** — binlogs streamed continuously | 7 backups |
+| MongoDB | Percona Backup → S3, daily 01:00 | **Enabled** — oplog streamed continuously | 7 backups |
+| Vault | Raft snapshot → S3, **every 15 min** | Not applicable | **Last 7 snapshots** |
+| Kafka | **None** | — | — |
+| Redis | **None** | — | — |
+
+Practically: with PITR you can recover the ledger to the second before a bad write, not merely to the previous night. Without it, worst-case exposure would be a full day of transfers.
+
+Both mechanisms write to the same S3-compatible storage — MinIO on the Tooling Cluster, or a cloud object store. **A full backup alone is not restorable to a point in time, and streamed logs alone are not restorable at all** — recovery needs both, so both must survive.
+
+**Read the Vault row carefully.** Snapshots run every fifteen minutes and only the last seven are kept, so the retained history is about **one hour and forty-five minutes** — not seven days. Vault holds the scheme PKI. If a compromise or corruption is discovered after two hours, there is no snapshot from before it.
+
+**Kafka has no backup by design.** It is a transport, not a system of record; committed state lands in MySQL and MongoDB. A total Kafka loss costs in-flight events, not settled positions. Whether that is acceptable is a scheme-level decision worth making explicitly rather than inheriting.
+
+**Redis has no backup and needs none** — it is a cache.
+
+Restore procedures: [Adopter → Recover](../adopter/index.md).
+
+## What is not recoverable
+
+Three things sit outside the backup story entirely, and each has bitten someone:
+
+**Terraform state.** Stored locally under `artifacts/<env>/terraform/`, with no remote backend, no locking, and no versioning. `make clean` deletes it. Losing it means losing Terraform's knowledge of your infrastructure — the cluster keeps running, but you can no longer plan or apply against it. Back up `artifacts/` yourself.
+
+**Vault unseal keys.** Less alarming than it sounds — the operator handles unsealing automatically. Vault is configured with `unsealConfig.kubernetes`, so the operator generates the unseal keys and root token at initialization and **stores them as a Secret in the `vault` namespace**. A pod restart unseals without human involvement.
+
+What is *not* handled is losing the cluster. That Secret lives only in etcd, so it is covered by neither the Vault raft snapshots nor the database backups. Rebuild the cluster without it and the snapshots are unopenable — you hold encrypted data and no key.
+
+Back it up out-of-band, on both the Hub and the Tooling Cluster:
+
+```bash
+kubectl -n vault get secrets
+kubectl -n vault get secret <unseal-secret> -o yaml > vault-unseal-<cluster>.yaml
+```
+
+The operator names the Secret after the Vault resource; list the namespace to confirm it on your cluster rather than assuming the name.
+
+Treat that file with the same care as the root token — anyone holding it can unseal your Vault and read the scheme's private keys.
+
+**In-flight Kafka events.** As above.
+
+The first two are operational obligations that the tooling does not currently discharge on your behalf. Treat them as manual steps with the same seriousness as the automated backups.

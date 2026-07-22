@@ -1,0 +1,127 @@
+# GitOps Structure
+
+[doc](../index.md) / [architecture](index.md) / GitOps structure
+
+**Audiences:** architect, platform developer, system integrator
+
+How the OCI artifact is laid out, how Flux consumes it, and how one artifact serves every environment.
+
+- [One artifact, not a Git repository](#one-artifact-not-a-git-repository)
+- [Artifact layout](#artifact-layout)
+- [How Flux consumes it](#how-flux-consumes-it)
+- [Substitution](#substitution)
+- [Versioning](#versioning)
+- [Why the chain is ordered](#why-the-chain-is-ordered)
+
+## One artifact, not a Git repository
+
+Flux reconciles from an **OCI artifact**, not from a Git branch ([ADR-001](decisions/001-oci-over-git.md)). The artifact is a tarball of `gitops/` pushed to a registry and pulled by the cluster.
+
+This matters for three reasons:
+
+- **Adopters need no Git access.** A registry pull is the only dependency, which suits air-gapped and restricted networks.
+- **Versions are immutable and content-addressed.** A tag resolves to a digest; you can prove what is deployed.
+- **Integrators republish rather than fork-and-diverge.** A customized artifact is consumed exactly like the upstream one.
+
+All layers ship as **one artifact**, not one per component ([ADR-007](decisions/007-single-oci-artifact.md)) — the layers are interdependent, and mixing versions across them breaks in ways that are hard to diagnose.
+
+## Artifact layout
+
+```
+gitops/
+  platform/                  # Every cluster: cert-manager, ESO, external-dns,
+                             # metrics-server, VPA, Goldilocks, reloader
+  dns/
+    route53/ cloudflare/ digitalocean/
+  platform-config/           # Gateways, cluster-wide config
+  talos/                     # Self-managed only: Cilium, Gateway API CRDs,
+                             # LB-IPAM, OpenEBS
+
+  cc/                        # Tooling Cluster: namespaces, Vault operator
+  cc-config/                 #   Vault, Harbor, MinIO
+  cc-routes/                 #   HTTPRoutes
+  cc-observability/          #   Thanos, Loki, Tempo, Grafana, dashboards, alerts
+  cc-observability-routes/   #   HTTPRoutes
+
+  env/                       # Hub: namespaces, database operators
+  env-data/                  #   MySQL, Kafka, MongoDB, Redis
+  env-auth/                  #   Vault, Ory (Kratos, Hydra, Keto, Oathkeeper)
+  env-auth-config/           #   Bootstrap jobs, access rules
+  env-app/                   #   Mojaloop, MCM, Finance Portal, extapi Envoy
+  env-observability-agent/   #   Alloy, kube-state-metrics, node-exporter
+```
+
+Each top-level directory is a Kustomization root. Which roots are applied depends on `cluster.role` — see [System overview](system-overview.md#reconciliation-order).
+
+`gitops/talos/` is the only vendor directory, matching the supported deployment infrastructure. A new provider that needs cluster-level resources adds one alongside it — see [Provider model](provider-model.md#where-provider-differences-live).
+
+## How Flux consumes it
+
+```mermaid
+flowchart LR
+    tf["Terraform"] -->|"installs Flux"| f["Flux"]
+    tf -->|"creates OCIRepository<br/>+ Kustomizations"| f
+    f -->|"pulls artifact"| reg["OCI registry"]
+    f -->|"applies manifests"| k8s["Cluster"]
+```
+
+Terraform's job ends once Flux and the Kustomization objects exist. From there Flux owns convergence: it polls the registry every 10 minutes and applies what it finds.
+
+This is the split worth internalising — **Terraform provisions, Flux reconciles.** A drifted workload is a Flux question, not a Terraform one, and re-running `make apply` will not fix it.
+
+## Substitution
+
+The artifact contains no environment-specific values. Manifests carry placeholders that Flux fills at apply time:
+
+```yaml
+hostnames:
+  - "grafana.int.${domain}"
+```
+
+Values come from two objects Terraform creates in `flux-system`:
+
+| Object | Contains |
+|--------|----------|
+| `cluster-config` ConfigMap | Non-secret values — domain, cluster name, endpoints, IP ranges |
+| `cluster-secrets` Secret | Credentials — database passwords, tokens, OIDC secrets |
+
+Every Kustomization declares both under `postBuild.substituteFrom`.
+
+Two consequences follow, and both explain otherwise-confusing behaviour:
+
+**The same artifact deploys anywhere.** Nothing is rebuilt per environment. An integrator's customized artifact stays environment-neutral too.
+
+**Changing a value requires Terraform, not a Flux reconcile.** The substitution inputs are written by `make apply`. Editing a manifest in the cluster is overwritten on the next reconcile; editing `config.yaml` without applying changes nothing.
+
+## Versioning
+
+The `OCIRepository` points at a tag:
+
+```yaml
+oci:
+  repo:
+    url: "oci://ghcr.io/<org>/ml-deployment-toolkit"
+    version: "latest"     # or a pinned tag
+```
+
+`latest` follows the newest published artifact — changes arrive within the poll interval, without action. A pinned tag holds until you change it.
+
+**Pin production.** Following `latest` means an upstream publish reaches your cluster unannounced.
+
+Publishing and promotion: [Platform → Building artifacts](../platform/index.md). Maintaining a customized artifact: [Integrator](../integrator/index.md).
+
+## Why the chain is ordered
+
+Kustomizations declare `dependsOn` and health gates rather than applying in parallel. The ordering encodes real constraints:
+
+| Gate | Reason |
+|------|--------|
+| `platform` before everything | cert-manager and ESO webhooks must be live or dependent resources are rejected |
+| `dns` before `platform-config` | Gateways need a working issuer to obtain certificates |
+| vendor before role layers | CNI and storage must exist before workloads schedule |
+| `env-data` before `env-auth` | Ory migrations need their databases and users to exist |
+| `env-auth-config` before `env-app` | Applications expect access rules and bootstrapped identities |
+
+The database gate is the one that surprises people. The MySQL operator creates users asynchronously — roughly 7–10 minutes — and a service whose migration starts first fails with access denied. Gating on cluster health rather than object existence is what makes the deployment reliable, and it is why a Hub takes time to converge.
+
+A stalled Kustomization blocks everything behind it. When diagnosing, find the **earliest** failing one — later failures are usually consequences, not causes.
