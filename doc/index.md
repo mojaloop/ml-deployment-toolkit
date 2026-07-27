@@ -33,7 +33,7 @@ flowchart LR
 
 ## What you deploy
 
-Two cluster kinds, each driven from its own environment config under `config/environments/<env>/`.
+Two cluster kinds, each driven from its own environment config under `config/environments/<env>/`. One picture of the whole thing: [the deployed system](architecture/system-overview.md#the-deployed-system).
 
 **Tooling Cluster** — the management plane. Harbor (OCI registry and pull-through cache), Vault, object storage, FluxCD, and the observability backend. Optional: a single Hub can pull artifacts directly from a public OCI registry. Recommended for multi-environment and air-gapped operation.
 
