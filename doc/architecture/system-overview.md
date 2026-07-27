@@ -7,6 +7,7 @@
 How the distribution is assembled, what a cluster is made of, and how configuration reaches a running system. Every other guide references this page rather than restating it.
 
 - [What this is](#what-this-is)
+- [The deployed system](#the-deployed-system)
 - [Delivery chain](#delivery-chain)
 - [Cluster roles](#cluster-roles)
 - [What a Tooling Cluster runs](#what-a-tooling-cluster-runs)
@@ -20,6 +21,14 @@ How the distribution is assembled, what a cluster is made of, and how configurat
 ML Deployment Toolkit packages [Mojaloop](https://mojaloop.io/) into an infrastructure-agnostic distribution. It bundles Terraform modules and FluxCD GitOps manifests into OCI artifacts, consumed directly by adopters or customized and republished by system integrators.
 
 The distribution owns everything below the application layer: Kubernetes provisioning, networking, secrets, TLS, observability, data services, and the Mojaloop deployment itself.
+
+## The deployed system
+
+Everything `make plan-apply` leaves running, in one picture:
+
+![ML Deployment Toolkit — deployed system view](../diagrams/deployed-system.svg)
+
+The Hub carries the switch; the Tooling Cluster is the management plane serving every Hub — and is optional, as covered in [Cluster roles](#cluster-roles). The three entry points on the left of the Hub are separate load balancers by design ([Networking](networking.md#three-entry-points)); the arrows into the Tooling Cluster are the three standing relationships between the clusters — artifact pulls, backups, and telemetry.
 
 ## Delivery chain
 

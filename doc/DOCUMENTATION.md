@@ -201,10 +201,10 @@ The second version reads as though node-exporter pushes to Alloy. It doesn't —
 
 Where auto-layout fails — topologies with meaningful spatial arrangement:
 
-- Author in [draw.io](https://app.diagrams.net/) or Excalidraw
-- Export `.drawio.svg` / `.excalidraw.svg`; commit the editable source alongside
+- SVG is text — the committed file is the editable source; use any tool that writes clean SVG
 - Store in `doc/diagrams/`, reference as `![title](../diagrams/name.svg)`
-- Must handle light and dark backgrounds, and must not use a fixed pixel width
+- Give the diagram its own background rect, so it reads identically on light and dark pages
+- Size with `viewBox` only — no fixed `width`/`height`, so the diagram scales to its container
 
 Prefer Mermaid unless you have tried it and the result is unreadable.
 
@@ -229,5 +229,5 @@ That last one is not hypothetical. The auth stack was replaced without the docum
 - [ ] Links point to sections, not just pages
 - [ ] No planned or aspirational content
 - [ ] Audience declared, breadcrumb present
-- [ ] Diagrams use `<br/>`, no hardcoded fills, render in dark mode
+- [ ] Mermaid diagrams use `<br/>` and no hardcoded fills; SVGs carry their own background
 - [ ] Nothing added to `doc/` is orphaned
