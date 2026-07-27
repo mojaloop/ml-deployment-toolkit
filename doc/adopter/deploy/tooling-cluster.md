@@ -4,11 +4,11 @@
 
 **Audiences:** adopter (deploy)
 
-The Tooling Cluster (`role: cc`) is the management plane — OCI registry, secrets, object storage, and the observability backend that Hubs report into. Deploy it first if you are using one.
+The Tooling Cluster (`role: cc`) is the management plane — OCI registry, secrets, object storage, and the observability backend that Hubs report into. Deploy it first if using one.
 
 For the shared workflow and commands, see [Deployment](deployment.md). This page is the `cc`-specific configuration and checks.
 
-- [When you need one](#when-you-need-one)
+- [When to deploy one](#when-to-deploy-one)
 - [Inputs](#inputs)
 - [Configuration](#configuration)
 - [Deploy](#deploy)
@@ -17,20 +17,20 @@ For the shared workflow and commands, see [Deployment](deployment.md). This page
 - [Hand-off to the Hub](#hand-off-to-the-hub)
 - [After deploying](#after-deploying)
 
-## When you need one
+## When to deploy one
 
 A Tooling Cluster is optional. A single Hub can pull artifacts from a public registry and run standalone.
 
-It earns its place when you have more than one environment, or need to operate air-gapped. It provides:
+It earns its place when the adopter runs more than one environment, or needs to operate air-gapped. It provides:
 
-- **Harbor** — a pull-through cache, so Hubs pull images once through you rather than repeatedly from the internet
+- **Harbor** — a pull-through cache, so Hubs pull images once through the Tooling Cluster rather than repeatedly from the internet
 - **MinIO** — shared object storage for backups, metrics, and logs
 - **Observability backend** — Thanos, Loki, Tempo, and Grafana, aggregating every Hub
 - **Vault** — its own secrets and PKI, independent of any Hub's
 
 ## Inputs
 
-Decide these before you start — they are what `config.yaml` and the pre-checks reference.
+Decide these before starting — they are what `config.yaml` and the pre-checks reference.
 
 | Input | Example | Notes |
 |-------|---------|-------|
@@ -69,10 +69,10 @@ Full schema and secrets: [Configuration](configuration.md). The alerting-deliver
 
 ## Deploy
 
-Confirm the DNS zone is delegated first — see [Deployment → Before you deploy](deployment.md#before-you-deploy):
+Confirm the DNS zone is delegated first — see [Deployment → Pre-deploy checks](deployment.md#pre-deploy-checks):
 
 ```bash
-dig +short NS cc1.example.com     # must return your provider's nameservers
+dig +short NS cc1.example.com     # must return the DNS provider's nameservers
 ```
 
 Then deploy:
@@ -105,7 +105,7 @@ kubectl get pods -n minio
 kubectl get pods -n observability
 ```
 
-Expect **two** gateways with addresses, `gw-int` and `gw-ext`. If a certificate is not Ready, it is almost always DNS — the ACME challenge needs your zone reachable, which is why the delegation pre-check matters. See [Troubleshooting](../operate/troubleshooting.md).
+Expect **two** gateways with addresses, `gw-int` and `gw-ext`. If a certificate is not Ready, it is almost always DNS — the ACME challenge needs the zone reachable, which is why the delegation pre-check matters. See [Troubleshooting](../operate/troubleshooting.md).
 
 ## Accessing services
 
@@ -118,7 +118,7 @@ Services are published at `https://<service>.int.<domain>`, where `<domain>` is 
 | MinIO console | `https://minio.int.<domain>` |
 | Grafana | `https://grafana.int.<domain>` |
 
-Admin credentials are the values you set in `.env` — `HARBOR_ADMIN_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`, `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`.
+Admin credentials are the values the adopter set in `.env` — `HARBOR_ADMIN_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`, `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`.
 
 Read the admin passwords straight from the environment file:
 
@@ -130,7 +130,7 @@ Vault is auto-unsealed by its operator, which stores the unseal keys as a Secret
 
 ## Hand-off to the Hub
 
-**All three service URLs must load before you deploy a Hub against this cluster** — the Hub's config points at Harbor, S3, and the observability endpoints here. If any is not reachable, the Hub will fail partway through reconciliation.
+**All three service URLs must load before deploying a Hub against this cluster** — the Hub's config points at Harbor, S3, and the observability endpoints here. If any is not reachable, the Hub will fail partway through reconciliation.
 
 These are the values a Hub's `config.yaml` consumes:
 
@@ -146,16 +146,16 @@ Carry them into [Deploy a Hub → Configuration](hub.md#configuration).
 
 ## After deploying
 
-**Back up the Vault unseal keys before you do anything else.** They live only in cluster state and are covered by no automatic backup. Without them, a rebuilt cluster cannot open its own Vault.
+**Back up the Vault unseal keys before anything else.** They live only in cluster state and are covered by no automatic backup. Without them, a rebuilt cluster cannot open its own Vault.
 
 ```bash
 kubectl -n vault get secrets
 kubectl -n vault get secret <unseal-secret> -o yaml > vault-unseal-<cc-env>.yaml
 ```
 
-Store that file offline. Full rationale and the disaster-recovery procedure: [Recover → Disaster recovery](../recover/disaster-recovery.md#what-you-must-keep).
+Store that file offline. Full rationale and the disaster-recovery procedure: [Recover → Disaster recovery](../recover/disaster-recovery.md#what-the-adopter-must-keep).
 
 Then:
 
 - Deploy a Hub that uses this Tooling Cluster: [Deploy a Hub](hub.md)
-- Confirm alerting delivery works — send a test through your contact points ([Monitoring](../operate/monitoring.md#alerting))
+- Confirm alerting delivery works — send a test through the contact points ([Monitoring](../operate/monitoring.md#alerting))

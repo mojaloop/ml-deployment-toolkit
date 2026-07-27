@@ -51,7 +51,7 @@ kubectl get helmrelease mojaloop -n flux-system --watch
 make plan-apply ENV=<env>
 ```
 
-**Prevention** — always use `make plan-apply` unless you specifically need to review the plan first.
+**Prevention** — always use `make plan-apply` unless the plan needs review first.
 
 ## OCIRepository not Ready
 

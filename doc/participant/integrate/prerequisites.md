@@ -4,65 +4,65 @@
 
 **Audiences:** participant (operator)
 
-What you need before connecting — from the Hub operator, and on your own side.
+What the participant needs before connecting — from the Hub operator, and on its own side.
 
 - [From the Hub operator](#from-the-hub-operator)
-- [What you generate yourself](#what-you-generate-yourself)
-- [Your infrastructure](#your-infrastructure)
-- [Your FQDN](#your-fqdn)
+- [What the participant generates](#what-the-participant-generates)
+- [Participant infrastructure](#participant-infrastructure)
+- [The participant's FQDN](#the-participants-fqdn)
 
 ## From the Hub operator
 
-The Hub operator creates your participant in their system and hands you these out of band. They are the same for every participant of that Hub.
+The Hub operator creates the participant in the Hub and hands over these values out of band. They are the same for every participant of that Hub.
 
 | Value | Example | What it is |
 |-------|---------|-----------|
-| `MCM_SERVER_ENDPOINT` | `https://mcm.ext.<hub-domain>/pm4mlapi` | The Connection Manager API you enrol against |
+| `MCM_SERVER_ENDPOINT` | `https://mcm.ext.<hub-domain>/pm4mlapi` | The Connection Manager API the participant enrols against |
 | `HUB_IAM_PROVIDER_URL` | `https://hydra.ext.<hub-domain>` | The OAuth2 token endpoint |
-| `HUB_EXTAPI_FQDN` | `extapi.<hub-domain>` | Where you send FSPIOP traffic — mTLS, always port 443 |
-| Your participant ID | `dfsp-201` | Your identifier in the scheme; also your OAuth2 `client_id` |
+| `HUB_EXTAPI_FQDN` | `extapi.<hub-domain>` | Where the participant sends FSPIOP traffic — mTLS, always port 443 |
+| The participant ID | `dfsp-201` | The participant's identifier in the scheme; also the OAuth2 `client_id` |
 | Currency | ISO 4217 code | Must match a currency the Hub supports |
 
-If you do not have these, contact the Hub operator before going further.
+Without these values, contact the Hub operator before going further.
 
-## What you generate yourself
+## What the participant generates
 
-Your **OAuth2 client secret is not handed to you** — you create it. After the Hub operator creates your participant, you receive an activation email, activate your account, log in, and generate your own credentials. The Hub never sees the secret.
+The **OAuth2 client secret is never handed over** — the participant creates it. After the Hub operator creates the participant, an activation email arrives; activate the account, log in, and generate the client credentials. The Hub never sees the secret.
 
 That step, and the account it activates, are reached through the Hub's external endpoints — the same `mcm.ext` / `hydra.ext` hosts above. Keep the secret safe once generated; it is shown once.
 
 The full sequence is in [the choreography](../../architecture/participant-integration.md#the-choreography).
 
-## Your infrastructure
+## Participant infrastructure
 
-You run the [Integration Toolkit](https://github.com/mojaloop/integration-toolkit) as a Docker Compose stack. You need:
+The participant runs the [Integration Toolkit](https://github.com/mojaloop/integration-toolkit) as a Docker Compose stack — its [Architecture](https://github.com/mojaloop/integration-toolkit/blob/main/doc/architecture.md) page explains what the stack contains and why. The participant needs:
 
 | Requirement | Notes |
 |-------------|-------|
 | A host with Docker Engine + Compose v2 | Linux VM or equivalent |
-| A **static IP** | The Hub dials your FQDN directly; a changing address breaks inbound mTLS |
+| A **stable public address** | The FQDN must keep resolving to an address where inbound `:443` is reachable; a static IP is the simplest way to guarantee that |
 | Inbound `:443` reachable from the Hub | The SDK terminates mTLS in-process on 443 |
 | Outbound `:443` to the Hub | To `mcm.ext`, `hydra.ext`, and `extapi` |
 | `git`, `openssl` | Cloning ITK and generating bootstrap certificates |
 
-Verify you can reach the Hub before starting:
+Verify the Hub is reachable before starting:
 
 ```bash
 curl -sI https://mcm.ext.<hub-domain>/pm4mlapi
 ```
 
-## Your FQDN
+## The participant's FQDN
 
-You choose a fully-qualified domain name for your participant and publish it in **your own** DNS zone. The Hub uses it as your callback address; it never manages DNS on your behalf.
+The participant chooses a fully-qualified domain name and publishes it in the participant's **own** DNS zone. The Hub uses it as the participant's callback address; it never manages DNS on the participant's behalf.
 
-- It must resolve **publicly**, before you enrol — the Hub pins it by name and enrolment fails if it does not resolve.
-- It must point at your static IP.
-- In production this is your own domain (`dfsp.yourbank.com`); the Hub never touches it.
+- It must resolve **publicly**, before enrolment — the Hub pins it by name and enrolment fails if it does not resolve.
+- It must point at the address where the participant's inbound `:443` is reachable, and keep resolving there.
+- In production this is the participant's own domain (`dfsp.examplebank.com`); the Hub never touches it.
 
 Confirm resolution before continuing:
 
 ```bash
-dig +short <your-fqdn>
+dig +short <participant-fqdn>
 ```
 
 Next: [Connect](connect.md).

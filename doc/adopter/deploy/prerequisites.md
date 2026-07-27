@@ -4,7 +4,7 @@
 
 **Audiences:** adopter (deploy)
 
-Everything you need in place before your first `make plan-apply`. For what gets deployed and why, see [System overview](../../architecture/system-overview.md).
+Everything the adopter needs in place before the first `make plan-apply`. For what gets deployed and why, see [System overview](../../architecture/system-overview.md).
 
 - [Tools](#tools)
 - [Proxmox](#proxmox)
@@ -14,7 +14,7 @@ Everything you need in place before your first `make plan-apply`. For what gets 
 
 ## Tools
 
-Install these on the machine you deploy from.
+Install these on the machine the adopter deploys from.
 
 | Tool | Version | Used for |
 |------|---------|----------|
@@ -24,11 +24,11 @@ Install these on the machine you deploy from.
 | talosctl | latest | Talos node access and health (self-managed clusters) |
 | make | any | Runs the workflow; pre-installed on macOS and Linux |
 
-For working on the distribution itself — building artifacts, rendering manifests — you also need `helm`, `jsonnet`, and `jb`. Those belong to the [Platform](../../platform/index.md) guide, not to deploying.
+Working on the distribution itself — building artifacts, rendering manifests — also takes `helm`, `jsonnet`, and `jb`. Those belong to the [Platform](../../platform/index.md) guide, not to deploying.
 
 ## Proxmox
 
-Proxmox with Talos Linux is the supported infrastructure. You need:
+Proxmox with Talos Linux is the supported infrastructure. The adopter needs:
 
 - **API access** — an API token (preferred) or user/password
 - **SSH access** to the Proxmox nodes
@@ -39,7 +39,7 @@ Full walkthrough: [Provider setup](provider-setup.md).
 
 ## DNS
 
-Your DNS provider is independent of your infrastructure — any of the three works with Proxmox.
+The DNS provider is independent of the infrastructure — any of the three works with Proxmox.
 
 | Provider | Credential | Env variable |
 |----------|-----------|--------------|
@@ -47,33 +47,33 @@ Your DNS provider is independent of your infrastructure — any of the three wor
 | Cloudflare | Token scoped to `Zone:DNS:Edit` | `CLOUDFLARE_API_TOKEN` |
 | DigitalOcean | Token with DNS write scope | `DIGITALOCEAN_TOKEN` |
 
-You need a delegated DNS zone the toolkit can manage — `external-dns` creates and updates records in it automatically. See [Provider setup](provider-setup.md#dns-zone).
+The adopter needs a delegated DNS zone the toolkit can manage — `external-dns` creates and updates records in it automatically. See [Provider setup](provider-setup.md#dns-zone).
 
 ## OCI registry
 
-Flux reconciles from an OCI artifact. What you need depends on where it lives.
+Flux reconciles from an OCI artifact. The required credentials depend on where it lives.
 
 **Pulling a public artifact** — no credentials. Public GitHub Container Registry artifacts pull anonymously.
 
-**Private registry, or publishing your own** — set `OCI_REPO_USERNAME` and `OCI_REPO_PASSWORD`. For GitHub Container Registry, the password is a Personal Access Token:
+**Private registry, or publishing a custom artifact** — set `OCI_REPO_USERNAME` and `OCI_REPO_PASSWORD`. For GitHub Container Registry, the password is a Personal Access Token:
 
 ```bash
 gh auth refresh -s read:packages,write:packages
 gh auth token
 ```
 
-Use your GitHub username and the token output.
+Use the GitHub username and the token output.
 
-**Harbor pull-through cache** — only if you run a Tooling Cluster with the proxy enabled (`oci.proxy.active: true`). Set `OCI_PROXY_USERNAME` and `OCI_PROXY_PASSWORD`.
+**Harbor pull-through cache** — only when a Tooling Cluster runs with the proxy enabled (`oci.proxy.active: true`). Set `OCI_PROXY_USERNAME` and `OCI_PROXY_PASSWORD`.
 
 ## Credentials checklist
 
-Credentials live in your environment's `.env`. The set depends on the cluster role — the full reference is in [Configuration](configuration.md#secrets), but check these before you start, because a missing one fails late and quietly rather than at plan time.
+Credentials live in the environment's `.env`. The set depends on the cluster role — the full reference is in [Configuration](configuration.md#secrets), but check these before starting, because a missing one fails late and quietly rather than at plan time.
 
 **Every cluster:**
 
 - Proxmox — `PROXMOX_VE_ENDPOINT`, `PROXMOX_VE_API_TOKEN`, `PROXMOX_VE_SSH_USERNAME`, `PROXMOX_VE_SSH_PASSWORD`
-- DNS — the variable for your provider, above
+- DNS — the variable for the chosen provider, above
 - OCI — `OCI_REPO_USERNAME`, `OCI_REPO_PASSWORD` if not pulling anonymously
 
 **Tooling Cluster (`cc`):**

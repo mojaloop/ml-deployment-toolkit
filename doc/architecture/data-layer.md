@@ -83,11 +83,11 @@ A cache for the Testing Toolkit. It holds no durable state — losing it costs n
 
 ## Backup coverage
 
-MySQL and MongoDB each run **two mechanisms together**, and the distinction matters when you are deciding how much data an incident can cost you.
+MySQL and MongoDB each run **two mechanisms together**, and the distinction matters when the adopter weighs how much data an incident can cost.
 
-**Scheduled full backups** — a complete copy taken on a timer. Restores land you exactly on a backup boundary.
+**Scheduled full backups** — a complete copy taken on a timer. Restores land exactly on a backup boundary.
 
-**Continuous streaming (PITR)** — transaction logs shipped to object storage between full backups. This is what lets you restore to an arbitrary moment rather than to last night at 01:00, and it is enabled on both stores.
+**Continuous streaming (PITR)** — transaction logs shipped to object storage between full backups. This is what allows a restore to an arbitrary moment rather than to last night at 01:00, and it is enabled on both stores.
 
 | Store | Full backup | Streaming (PITR) | Retention |
 |-------|-------------|:---:|-----------|
@@ -97,7 +97,7 @@ MySQL and MongoDB each run **two mechanisms together**, and the distinction matt
 | Kafka | **None** | — | — |
 | Redis | **None** | — | — |
 
-Practically: with PITR you can recover the ledger to the second before a bad write, not merely to the previous night. Without it, worst-case exposure would be a full day of transfers.
+Practically: PITR recovers the ledger to the second before a bad write, not merely to the previous night. Without it, worst-case exposure would be a full day of transfers.
 
 Both mechanisms write to the same S3-compatible storage — MinIO on the Tooling Cluster, or a cloud object store. **A full backup alone is not restorable to a point in time, and streamed logs alone are not restorable at all** — recovery needs both, so both must survive.
 
@@ -113,11 +113,11 @@ Restore procedures: [Adopter → Recover](../adopter/index.md).
 
 Three things sit outside the backup story entirely, and each has bitten someone:
 
-**Terraform state.** Stored locally under `artifacts/<env>/terraform/`, with no remote backend, no locking, and no versioning. `make clean` deletes it. Losing it means losing Terraform's knowledge of your infrastructure — the cluster keeps running, but you can no longer plan or apply against it. Back up `artifacts/` yourself.
+**Terraform state.** Stored locally under `artifacts/<env>/terraform/`, with no remote backend, no locking, and no versioning. `make clean` deletes it. Losing it means losing Terraform's knowledge of the infrastructure — the cluster keeps running, but Terraform can no longer plan or apply against it. Backing up `artifacts/` falls to the adopter.
 
 **Vault unseal keys.** Less alarming than it sounds — the operator handles unsealing automatically. Vault is configured with `unsealConfig.kubernetes`, so the operator generates the unseal keys and root token at initialization and **stores them as a Secret in the `vault` namespace**. A pod restart unseals without human involvement.
 
-What is *not* handled is losing the cluster. That Secret lives only in etcd, so it is covered by neither the Vault raft snapshots nor the database backups. Rebuild the cluster without it and the snapshots are unopenable — you hold encrypted data and no key.
+What is *not* handled is losing the cluster. That Secret lives only in etcd, so it is covered by neither the Vault raft snapshots nor the database backups. Rebuild the cluster without it and the snapshots are unopenable — what remains is encrypted data and no key.
 
 Back it up out-of-band, on both the Hub and the Tooling Cluster:
 
@@ -126,10 +126,10 @@ kubectl -n vault get secrets
 kubectl -n vault get secret <unseal-secret> -o yaml > vault-unseal-<cluster>.yaml
 ```
 
-The operator names the Secret after the Vault resource; list the namespace to confirm it on your cluster rather than assuming the name.
+The operator names the Secret after the Vault resource; list the namespace to confirm it on the cluster at hand rather than assuming the name.
 
-Treat that file with the same care as the root token — anyone holding it can unseal your Vault and read the scheme's private keys.
+Treat that file with the same care as the root token — anyone holding it can unseal Vault and read the scheme's private keys.
 
 **In-flight Kafka events.** As above.
 
-The first two are operational obligations that the tooling does not currently discharge on your behalf. Treat them as manual steps with the same seriousness as the automated backups.
+The first two are operational obligations that the tooling does not currently discharge on the adopter's behalf. Treat them as manual steps with the same seriousness as the automated backups.

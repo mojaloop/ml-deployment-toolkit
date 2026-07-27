@@ -142,7 +142,7 @@ The `config-loader` Terraform module merges them: it reads the environment confi
 
 Adopters touch tier 1 only. Tiers 2 and 3 arrive in the artifact.
 
-Values that must reach a running workload are injected two ways — a `cluster-config` ConfigMap for non-secret values and a `cluster-secrets` Secret for credentials, both consumed by Flux `postBuild` substitution. That is how a manifest in the artifact ends up carrying your domain name without the artifact being rebuilt per environment.
+Values that must reach a running workload are injected two ways — a `cluster-config` ConfigMap for non-secret values and a `cluster-secrets` Secret for credentials, both consumed by Flux `postBuild` substitution. That is how a manifest in the artifact ends up carrying the environment's domain name without the artifact being rebuilt per environment.
 
 See [Configuration](../adopter/deploy/configuration.md) for the schema, and [GitOps structure](gitops-structure.md) for how substitution works.
 

@@ -72,12 +72,12 @@ make list-artifacts ENV=<env>
 
 ## Verifying
 
-Before promoting, confirm the artifact contains what you expect:
+Before promoting, confirm the artifact contains what it should:
 
 ```bash
 flux pull artifact oci://<repo>:<tag> --output /tmp/artifact
 ```
 
-This pulls and unpacks the artifact so you can inspect the `gitops/` tree that clusters will actually reconcile. Doing this against a release candidate before tagging it `stable` catches a mis-publish before it reaches a consumer following that tag.
+This pulls and unpacks the artifact, exposing the `gitops/` tree that clusters will actually reconcile. Doing this against a release candidate before tagging it `stable` catches a mis-publish before it reaches a consumer following that tag.
 
-Which tag a cluster follows is the adopter's choice, in `oci.repo.version` — see [Upgrading](../adopter/deploy/upgrading.md). Your responsibility ends at publishing a correct, correctly-tagged artifact.
+Which tag a cluster follows is the adopter's choice, in `oci.repo.version` — see [Upgrading](../adopter/deploy/upgrading.md). The platform developer's responsibility ends at publishing a correct, correctly-tagged artifact.

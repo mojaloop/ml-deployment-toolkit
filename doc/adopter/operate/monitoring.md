@@ -16,13 +16,13 @@ Where to look, in what order, and what "healthy" looks like. For how the observa
 
 ## Where monitoring lives
 
-Grafana runs on the **Tooling Cluster**, at `https://grafana.int.<tooling-domain>`, with the admin password you set in `GRAFANA_ADMIN_PASSWORD`.
+Grafana runs on the **Tooling Cluster**, at `https://grafana.int.<tooling-domain>`, with the admin password from `GRAFANA_ADMIN_PASSWORD`.
 
-A Hub ships metrics, logs, and traces to the Tooling Cluster — it runs no Grafana of its own. If you deployed without a Tooling Cluster, there is no aggregated dashboard; a Hub keeps running but you have no central place to watch it.
+A Hub ships metrics, logs, and traces to the Tooling Cluster — it runs no Grafana of its own. A deployment without a Tooling Cluster has no aggregated dashboard; a Hub keeps running, but there is no central place to watch it.
 
 ## Start here: Switch Overview
 
-Open the **Switch Overview** dashboard first. It is the intended landing page — a single view of the whole Hub, with drill-downs into everything else. When someone reports a problem, this is where you begin, not in a service-specific dashboard.
+Open the **Switch Overview** dashboard first. It is the intended landing page — a single view of the whole Hub, with drill-downs into everything else. When someone reports a problem, begin here, not in a service-specific dashboard.
 
 ## Dashboards
 
@@ -88,14 +88,14 @@ The dashboard is a live per-node view of CPU, memory, network, and services. Rea
 
 **22 alert rules ship and run** — across infrastructure, platform, data layer, and Mojaloop. They evaluate whether or not anyone is listening.
 
-**Delivery is separate, and silent if unconfigured.** Alerts go nowhere without the SMTP and Telegram secrets set on the Tooling Cluster. If you have never received an alert, the first thing to check is whether delivery is configured — not whether the rules exist.
+**Delivery is separate, and silent if unconfigured.** Alerts go nowhere without the SMTP and Telegram secrets set on the Tooling Cluster. If no alert has ever arrived, the first thing to check is whether delivery is configured — not whether the rules exist.
 
 ```
 SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, ALERT_EMAIL_FROM, ALERT_EMAIL_TO
 TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 ```
 
-Everything routes to one policy, grouped by alert name and cluster, repeating every 4 hours. Confirm delivery by triggering a test through your contact point in Grafana rather than waiting for a real alert to find out it was never wired. See [Observability → Alerting](../../architecture/observability.md#alerting).
+Everything routes to one policy, grouped by alert name and cluster, repeating every 4 hours. Confirm delivery by triggering a test through the contact point in Grafana rather than waiting for a real alert to find out it was never wired. See [Observability → Alerting](../../architecture/observability.md#alerting).
 
 ## Retention
 

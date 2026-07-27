@@ -4,11 +4,11 @@ An infrastructure-agnostic distribution of [Mojaloop](https://mojaloop.io/), the
 
 The toolkit packages Terraform modules and FluxCD GitOps manifests into OCI artifacts, so a full Mojaloop deployment becomes a single `make plan-apply`.
 
-## Find your guide
+## Find the right guide
 
 ```mermaid
 flowchart LR
-    q["What do you<br/>need to do?"]
+    q["What is<br/>the task?"]
 
     q --> a["Understand the design<br/>or its trade-offs"]
     q --> b["Contribute to<br/>this codebase"]
@@ -31,7 +31,7 @@ flowchart LR
 | [Adopter](adopter/index.md) | How do I run a Hub? | [Prerequisites](adopter/deploy/prerequisites.md) |
 | [Participant](participant/index.md) | How do I connect to a Hub? | [Prerequisites](participant/integrate/prerequisites.md) |
 
-## What you deploy
+## What gets deployed
 
 Two cluster kinds, each driven from its own environment config under `config/environments/<env>/`. One picture of the whole thing: [the deployed system](architecture/system-overview.md#the-deployed-system).
 
@@ -80,4 +80,4 @@ Full command reference: [Deployment commands](adopter/deploy/deployment.md#comma
 
 Structure, vocabulary, and the rules they are held to: [DOCUMENTATION.md](DOCUMENTATION.md)
 
-The most important one: **if you cannot execute it today, it is not in here.**
+The most important one: **if a reader cannot execute it today, it is not in here.**

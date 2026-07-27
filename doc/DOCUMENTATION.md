@@ -93,7 +93,7 @@ Every fact lives in exactly one place. Other documents **link**. This is enforce
 
 - **Architecture owns all design facts.** Platform, integrator, adopter, and participant docs reference architecture; they never restate it.
 - **Platform owns the internals reference** — module pipeline, adding providers and services, building artifacts. Integrator references it.
-- **Integrator owns only what is unique to maintaining a derivative** — what to fork, publishing your own artifact, version pinning, rebasing on upstream. It is thin by design.
+- **Integrator owns only what is unique to maintaining a derivative** — what to fork, publishing the derivative artifact, version pinning, rebasing on upstream. It is thin by design.
 
 ```markdown
 <!-- Good -->
@@ -103,7 +103,7 @@ see [Participant mTLS](architecture/participant-mtls.md#inbound-participant-to-h
 <!-- Bad: restating the architecture in a guide -->
 ```
 
-If you find yourself explaining *why* inside a procedure, the explanation belongs in `architecture/` and the procedure should link to it.
+An explanation of *why* inside a procedure belongs in `architecture/`; the procedure links to it.
 
 ### The one permitted duplication
 
@@ -113,8 +113,8 @@ The participant onboarding choreography is a two-party sequence. Its diagram may
 
 Each side of the choreography declares its interface explicitly:
 
-- **What you need from the other party** (inbound)
-- **What you must hand back** (outbound)
+- **What the actor needs from the other party** (inbound)
+- **What the actor must hand back** (outbound)
 
 These two tables are what make the guides independently readable, and what will allow the participant half to move to the Integration Toolkit repository later as a clean cut rather than a rewrite.
 
@@ -166,9 +166,11 @@ Any document is reachable within two clicks of `index.md`. An orphaned file — 
 
 ## Voice
 
-Second person, present tense, active voice. Procedures address the reader directly: *"Create the secret before installing"*, not *"The secret should be created"*.
+Third person, present tense, active voice. Prose names the acting role from the [audience table](#audiences) — *the participant*, *the adopter*, *the Hub operator*, *the integrator*, *the platform developer* — never "you" or "your". In any page describing an exchange between parties, "you" has no fixed referent; the named actor always does.
 
-Architecture and decision records may use impersonal register — they describe a system, not a task. Everything else speaks to a person doing something.
+Procedure steps use the bare imperative: *"Create the secret before installing"*, not *"The secret should be created"*. The imperative names no actor and inherits the document's declared audience. Possessives follow the same rule: *"the participant's FQDN"* or simply *"the FQDN"*, never *"your FQDN"*.
+
+Architecture and decision records use impersonal register — they describe a system, not a task.
 
 State what a step does before the command. Name the expected result. When something commonly looks stuck but is not, say so and give the duration.
 
@@ -178,10 +180,10 @@ State what a step does before the command. Name the expected result. When someth
 
 Mermaid renders natively in GitHub, needs no build step, and diffs readably.
 
-**Arrows show who acts, not where data ends up.** An arrow starts at the component performing the action and is labelled with the action. This is the difference between a diagram you can act on and one you have to decode.
+**Arrows show who acts, not where data ends up.** An arrow starts at the component performing the action and is labelled with the action. This is the difference between a diagram a reader can act on and one they have to decode.
 
 ```
-Good — Alloy is the actor; you can see what to debug:
+Good — Alloy is the actor; the reader sees what to debug:
     alloy -->|"scrapes"| node-exporter
     alloy -->|"writes metrics"| thanos
 
@@ -189,7 +191,7 @@ Bad — data flow hides who initiates:
     node-exporter --> alloy --> thanos
 ```
 
-The second version reads as though node-exporter pushes to Alloy. It doesn't — Alloy pulls. When something breaks, the actor is what you go and look at, so the actor is what the diagram must name.
+The second version reads as though node-exporter pushes to Alloy. It doesn't — Alloy pulls. When something breaks, the actor is what the operator goes and looks at, so the actor is what the diagram must name.
 
 - **Line breaks in node labels use `<br/>`, never `\n`.** Mermaid does not interpret `\n` inside quoted strings — it prints the characters literally.
 - **No hardcoded colours.** `style x fill:#f0f4ff` is invisible in dark mode. Use `classDef` with theme-neutral values, or no styling.
@@ -206,7 +208,7 @@ Where auto-layout fails — topologies with meaningful spatial arrangement:
 - Give the diagram its own background rect, so it reads identically on light and dark pages
 - Size with `viewBox` only — no fixed `width`/`height`, so the diagram scales to its container
 
-Prefer Mermaid unless you have tried it and the result is unreadable.
+Prefer Mermaid unless it has been tried and the result is unreadable.
 
 ## Maintenance
 

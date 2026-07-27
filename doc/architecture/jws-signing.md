@@ -42,7 +42,7 @@ The Hub signs callbacks with `fspiop-source` set to its participant name. Three 
 
 All three derive from a **single** Terraform variable, `hub_participant_name` (default `Hub`). That single source is deliberate: when these three drifted apart, participants received a public key filed under one name and callbacks signed with another, and validation failed with no obvious cause.
 
-**Do not set these independently.** If you change the Hub's name, change the one variable.
+**Do not set these independently.** Renaming the Hub means changing that one variable.
 
 The Hub also signs with **one shared key across all services**. Upstream Mojaloop charts generate a separate keypair per service when none is supplied — which would mean a participant needing a different public key per service, with no way to know which was which. A single `switch-jws` Secret is mounted by every signing service instead.
 
@@ -108,7 +108,7 @@ Rotation is automatic and requires no coordination with participants.
 3. The publisher posts the new public key to MCM
 4. Each participant's agent picks it up on its next poll, within about a minute
 
-**The brief window matters.** Between a signing service restarting with the new key and a participant's agent fetching it, Hub-signed callbacks can fail validation. The window is bounded by the poll interval and is normally under a minute, but it is a real gap — if you see JWS failures immediately after a certificate renewal, check the timing before investigating further.
+**The brief window matters.** Between a signing service restarting with the new key and a participant's agent fetching it, Hub-signed callbacks can fail validation. The window is bounded by the poll interval and is normally under a minute, but it is a real gap — JWS failures immediately after a certificate renewal point to this window, so the timing is worth checking before investigating further.
 
 ## When validation fails
 

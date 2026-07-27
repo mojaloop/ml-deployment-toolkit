@@ -24,7 +24,7 @@ The trust model: who holds secrets, who proves identity, and what is encrypted w
 
 Secrets reach workloads by two paths, and the distinction matters when debugging:
 
-- **Terraform-injected** — values from `config.yaml` and `.env` become a `cluster-config` ConfigMap and a `cluster-secrets` Secret, consumed by Flux `postBuild` substitution. These are set at apply time and change only when you re-apply.
+- **Terraform-injected** — values from `config.yaml` and `.env` become a `cluster-config` ConfigMap and a `cluster-secrets` Secret, consumed by Flux `postBuild` substitution. These are set at apply time and change only on the next Terraform apply.
 - **Vault-sourced** — External Secrets Operator and Vault Agent pull live values from Vault. These change without a Terraform run.
 
 A secret that looks stale is almost always the first kind being read where the second was expected.
@@ -110,8 +110,8 @@ Traffic inside the cluster past the mTLS boundary is plain HTTP at the applicati
 - A Flux policy in `platform-config`
 - `dfsp-callback-egress`, generated per participant, which redirects outbound callback traffic through the mTLS listener
 
-There is **no default-deny posture and no per-namespace segmentation.** Traffic between namespaces is unrestricted. If your threat model requires east-west segmentation, that is additional work, not a configuration toggle.
+There is **no default-deny posture and no per-namespace segmentation.** Traffic between namespaces is unrestricted. If the adopter's threat model requires east-west segmentation, that is additional work, not a configuration toggle.
 
 The callback policy is deliberately scoped to the four services that make outbound calls rather than applying namespace-wide. An unscoped version would capture all TCP 80/443 egress and force it through a plain-HTTP listener, breaking unrelated outbound TLS — database backups to object storage, for instance.
 
-**Gateway exposure.** `*.int` hosts are intended for in-house operations and `*.ext` for external parties, but that separation is a naming convention enforced at your network edge. No NetworkPolicy, load-balancer source range, or annotation in the manifests restricts `gw-int` — both Gateways use the same class and certificate issuer. Verify your edge enforces the boundary you expect.
+**Gateway exposure.** `*.int` hosts are intended for in-house operations and `*.ext` for external parties, but that separation is a naming convention enforced at the adopter's network edge. No NetworkPolicy, load-balancer source range, or annotation in the manifests restricts `gw-int` — both Gateways use the same class and certificate issuer. The boundary holds only where the network edge enforces it.

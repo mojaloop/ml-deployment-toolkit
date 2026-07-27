@@ -47,7 +47,7 @@ flowchart LR
 
 Read the arrows as actions: **Alloy** scrapes the exporters and writes outward; **trace-bridge** writes traces; **Grafana** queries all three backends. Nothing on the Tooling Cluster reaches into a Hub.
 
-A Hub runs **no Grafana, no Prometheus, no Loki, and no Tempo.** It runs agents that ship data outward. If the Tooling Cluster is unreachable, a Hub keeps serving traffic but you lose visibility into it — there is no local fallback UI.
+A Hub runs **no Grafana, no Prometheus, no Loki, and no Tempo.** It runs agents that ship data outward. If the Tooling Cluster is unreachable, a Hub keeps serving traffic but the operator loses visibility into it — there is no local fallback UI.
 
 Several Hubs report into one Tooling Cluster. Series are tagged by cluster, which is why alerts group on cluster name as well as alert name.
 
@@ -123,7 +123,7 @@ Grafana unified alerting is configured and active — **22 rules** across four g
 
 Two contact points are wired: **email** and **Telegram**. A single notification policy routes everything to both, grouping by alert name and cluster, waiting 30 seconds to group, and repeating every 4 hours.
 
-**Alerting is silent unless you configure delivery.** The rules evaluate regardless, but nothing is sent without `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `ALERT_EMAIL_FROM`, `ALERT_EMAIL_TO`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_CHAT_ID`. There is no warning when they are missing — alerts simply fire into nothing.
+**Alerting is silent unless the adopter configures delivery.** The rules evaluate regardless, but nothing is sent without `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `ALERT_EMAIL_FROM`, `ALERT_EMAIL_TO`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_CHAT_ID`. There is no warning when they are missing — alerts simply fire into nothing.
 
 This is the most common way a deployment ends up believing it has no alerting when it has 22 rules running.
 

@@ -7,7 +7,7 @@
 The workflow that turns configuration into a running cluster. It is the same for a Tooling Cluster and a Hub — only `config.yaml` differs. Role-specific inputs and checks are in [Tooling Cluster](tooling-cluster.md) and [Hub](hub.md).
 
 - [The four phases](#the-four-phases)
-- [Before you deploy](#before-you-deploy)
+- [Pre-deploy checks](#pre-deploy-checks)
 - [Deploy](#deploy)
 - [Verify, up the stack](#verify-up-the-stack)
 - [Commands](#commands)
@@ -22,21 +22,21 @@ flowchart LR
     flux --> v["Verify"]
 ```
 
-**You** run the pre-checks and `make`. **Terraform** provisions VMs, boots Talos, forms the cluster, and installs Flux — then exits. **Flux** keeps working after Terraform returns, pulling the artifact and reconciling everything else.
+**The adopter** runs the pre-checks and `make`. **Terraform** provisions VMs, boots Talos, forms the cluster, and installs Flux — then exits. **Flux** keeps working after Terraform returns, pulling the artifact and reconciling everything else.
 
 That last point is the one to internalise: **the cluster is not finished when `make` returns.** Terraform hands off to Flux, and Flux takes several more minutes. A workload that never appears is a Flux question, not a Terraform one — re-running `make apply` will not summon it. See [GitOps structure](../../architecture/gitops-structure.md#how-flux-consumes-it).
 
-## Before you deploy
+## Pre-deploy checks
 
 Two checks here save the two most common slow failures.
 
-**Confirm the DNS zone is delegated.** cert-manager proves domain ownership through DNS-01 challenges. If the zone is not delegated to your provider, certificate issuance fails slowly and with a confusing error rather than a clear one.
+**Confirm the DNS zone is delegated.** cert-manager proves domain ownership through DNS-01 challenges. If the zone is not delegated to the DNS provider, certificate issuance fails slowly and with a confusing error rather than a clear one.
 
 ```bash
-dig +short NS <your-domain>
+dig +short NS <domain>
 ```
 
-This must return your DNS provider's nameservers before you deploy. If it returns nothing, the delegation is not in place — fix that first.
+This must return the DNS provider's nameservers before deploying. If it returns nothing, the delegation is not in place — fix that first.
 
 **Confirm the config and credentials are in place.** The environment needs both files:
 
@@ -44,7 +44,7 @@ This must return your DNS provider's nameservers before you deploy. If it return
 ls config/environments/<env>/config.yaml config/environments/<env>/.env
 ```
 
-The credentials your role needs are listed in [Prerequisites](prerequisites.md#credentials-checklist). A missing one typically fails deep into reconciliation, not at plan time, so it is worth checking now.
+The credentials each role needs are listed in [Prerequisites](prerequisites.md#credentials-checklist). A missing one typically fails deep into reconciliation, not at plan time, so it is worth checking now.
 
 ## Deploy
 
@@ -58,7 +58,7 @@ make apply ENV=<env>     # apply the saved plan
 
 **Do not skip `init`.** It downloads the provider plugins and configures the state backend for this environment. `plan` and `apply` assume it has run; on a fresh environment, or after switching `ENV`, running them without `init` first fails or acts against the wrong backend.
 
-`plan` then `apply` lets you read the plan before it executes — worth doing on a first deploy and on any infrastructure change. If state drifts between the two, `apply` reports a stale plan; the fix is `make plan-apply ENV=<env>`, which does both in one step and is the safer default once you trust the config.
+Running `plan` then `apply` separately leaves room to read the plan before it executes — worth doing on a first deploy and on any infrastructure change. If state drifts between the two, `apply` reports a stale plan; the fix is `make plan-apply ENV=<env>`, which does both in one step and is the safer default once the config is known good.
 
 Then wait. Terraform provisions and hands off to Flux:
 
@@ -71,7 +71,7 @@ A Hub takes longer because its chain waits for databases to come up before runni
 
 ## Verify, up the stack
 
-Check from the bottom up — infrastructure, then OS, then Kubernetes. A failure is easiest to place when you know which layer it is in.
+Check from the bottom up — infrastructure, then OS, then Kubernetes. A failure is easiest to place once its layer is known.
 
 **Proxmox — are the VMs running?** From any Proxmox node:
 
@@ -149,4 +149,4 @@ These load the environment's `.env`, so they need `ENV=` like everything else.
 
 Across clusters, **destroy Hubs before the Tooling Cluster** they depend on — otherwise the Hubs lose their registry and secrets mid-teardown and the destroy can stall.
 
-**`make clean` deletes Terraform state.** After a clean, Terraform has no record of any infrastructure; anything still running is orphaned and must be removed by hand. Never `clean` a live environment. Back up `artifacts/` first — see [Recover → What you must keep](../recover/disaster-recovery.md#what-you-must-keep).
+**`make clean` deletes Terraform state.** After a clean, Terraform has no record of any infrastructure; anything still running is orphaned and must be removed by hand. Never `clean` a live environment. Back up `artifacts/` first — see [Recover → What the adopter must keep](../recover/disaster-recovery.md#what-the-adopter-must-keep).

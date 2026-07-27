@@ -4,7 +4,7 @@
 
 **Audiences:** adopter (deploy)
 
-Two files describe an environment: `config.yaml` for infrastructure and `.env` for secrets. Everything specific to your deployment lives in these; you never edit the distribution.
+Two files describe an environment: `config.yaml` for infrastructure and `.env` for secrets. Everything specific to a deployment lives in these; the adopter never edits the distribution.
 
 - [Vocabulary](#vocabulary)
 - [Environment layout](#environment-layout)
@@ -16,13 +16,13 @@ Two files describe an environment: `config.yaml` for infrastructure and `.env` f
 
 The documentation uses reader-facing names; the configuration uses code values. They map one to one:
 
-| You configure | The docs call it |
-|---------------|------------------|
+| Configuration value | The docs call it |
+|---------------------|------------------|
 | `role: cc` | Tooling Cluster |
 | `role: env` | Hub |
 | `dfsp`, `DFSP_ID` | Participant |
 
-When a page says "deploy a Hub," you set `role: env`. This is the only translation you need.
+When a page says "deploy a Hub," set `role: env`. This is the only translation needed.
 
 ## Environment layout
 
@@ -36,7 +36,7 @@ config/environments/
     values/            # optional Helm overrides (git-ignored)
 ```
 
-Environments are fully independent — their own config, secrets, and Terraform state. One repository clone manages as many as you like. A Tooling Cluster and its Hubs are separate environments, each deployed with its own `make plan-apply ENV=<name>`.
+Environments are fully independent — their own config, secrets, and Terraform state. One repository clone manages any number of them. A Tooling Cluster and its Hubs are separate environments, each deployed with its own `make plan-apply ENV=<name>`.
 
 State and generated artifacts land under `artifacts/<env>/` — see [System overview](../../architecture/system-overview.md#configuration-tiers).
 
@@ -121,12 +121,12 @@ The required set depends on the role. It is listed in full in [Prerequisites →
 
 Two things worth repeating because they fail quietly:
 
-- **Alerting delivery secrets are not optional if you want alerts.** Rules run regardless, but nothing is sent without them.
+- **Alerting needs its delivery secrets.** Rules run regardless, but nothing is sent without them.
 - **Proxmox variables are read natively** by the provider — `PROXMOX_VE_*` are used as-is, not mapped through `TF_VAR_`.
 
 ## Helm value overrides
 
-You can override the platform's Helm values for the Mojaloop and MCM charts without forking anything. Drop a file in `values/`:
+The adopter can override the platform's Helm values for the Mojaloop and MCM charts without forking anything. Drop a file in `values/`:
 
 ```
 config/environments/<env>/values/
@@ -134,12 +134,12 @@ config/environments/<env>/values/
   mcm.yaml
 ```
 
-Each is layered over the platform defaults through the HelmRelease's `valuesFrom` as an optional ConfigMap — a missing file changes nothing. Merge order is chart defaults, then platform values, then your file.
+Each is layered over the platform defaults through the HelmRelease's `valuesFrom` as an optional ConfigMap — a missing file changes nothing. Merge order is chart defaults, then platform values, then the environment's file.
 
 Two constraints:
 
 - **Only `mojaloop` and `mcm` are wired for overrides.** Other charts cannot be overridden this way.
-- **Flux substitution variables are not expanded** inside these files — `${...}` is taken literally. Hardcode the values you need.
+- **Flux substitution variables are not expanded** inside these files — `${...}` is taken literally. Hardcode the required values.
 
 Apply changes with `make plan-apply ENV=<env>`; Flux picks them up on the next reconcile. This is configuration, not customization — changing the distribution itself is the [Integrator](../../integrator/index.md) guide.
 
