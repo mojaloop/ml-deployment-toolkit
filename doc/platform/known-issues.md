@@ -4,7 +4,7 @@
 
 **Audiences:** platform developer
 
-Build, render, and Flux issues at the platform level, plus the emergency operations you reach for when reconciliation goes wrong.
+Build, render, and Flux issues at the platform level, plus the emergency operations to reach for when reconciliation goes wrong.
 
 ## Cilium render must keep Hubble disabled
 
@@ -14,7 +14,7 @@ Build, render, and Flux issues at the platform level, plus the emergency operati
 
 ## Rendered manifests need re-rendering on version bumps
 
-Thanos and the Cilium bootstrap manifest are rendered from upstream sources and committed, not reconciled live. Bumping either version in isolation does nothing until you re-render:
+Thanos and the Cilium bootstrap manifest are rendered from upstream sources and committed, not reconciled live. Bumping either version does nothing on its own; re-render afterwards:
 
 ```bash
 make render-thanos      # after a Thanos change

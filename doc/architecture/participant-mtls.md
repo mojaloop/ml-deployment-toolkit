@@ -156,7 +156,7 @@ Think of it as two independent layers:
 | **Scheme membership** | Whether the participant can transact | Disable in the Finance Portal — immediate |
 | **Transport** | Whether the TLS connection is accepted | Certificate lifecycle |
 
-Blocking is a membership action, not a certificate action. You do not need to touch PKI to stop a participant.
+Blocking is a membership action, not a certificate action. Stopping a participant never touches PKI.
 
 ### Certificate cleanup at offboarding
 

@@ -4,9 +4,9 @@
 
 **Audiences:** adopter (deploy, recover, operate)
 
-You run a Hub. This guide takes you from an empty Proxmox cluster to a running Mojaloop switch, keeps it recoverable, and keeps it healthy.
+The adopter runs a Hub. This guide takes an adopter from an empty Proxmox cluster to a running Mojaloop switch, keeps it recoverable, and keeps it healthy.
 
-You configure two files per environment and run Terraform through Make. You never fork the distribution or edit the bundle — everything specific to your deployment lives in your own configuration. If you need to change the distribution itself, that is the [Integrator](../integrator/index.md) guide.
+The adopter configures two files per environment and runs Terraform through Make — never forking the distribution or editing the bundle. Everything specific to a deployment lives in the adopter's own configuration. Changing the distribution itself is the [Integrator](../integrator/index.md) guide.
 
 ## Three journeys
 
@@ -17,7 +17,7 @@ flowchart LR
     r -.-> o
 ```
 
-| Journey | You are here when | Start |
+| Journey | When it applies | Start |
 |---------|-------------------|-------|
 | **[Deploy](deploy/prerequisites.md)** | Standing up a Tooling Cluster or a Hub | [Prerequisites](deploy/prerequisites.md) |
 | **[Operate](operate/monitoring.md)** | Running it day to day — watching, diagnosing | [Monitoring](operate/monitoring.md) |
@@ -29,8 +29,8 @@ Getting from nothing to a running switch.
 
 | Page | Covers |
 |------|--------|
-| [Prerequisites](deploy/prerequisites.md) | Tools, accounts, and credentials you need first |
-| [Provider setup](deploy/provider-setup.md) | Preparing Proxmox and your DNS zone |
+| [Prerequisites](deploy/prerequisites.md) | Tools, accounts, and credentials needed first |
+| [Provider setup](deploy/provider-setup.md) | Preparing Proxmox and the DNS zone |
 | [Configuration](deploy/configuration.md) | `config.yaml`, `.env`, and the vocabulary mapping |
 | [Deployment](deploy/deployment.md) | The deploy workflow, commands, and verification |
 | [Deploy a Tooling Cluster](deploy/tooling-cluster.md) | Role `cc` — registry, secrets, observability backend |
@@ -38,7 +38,7 @@ Getting from nothing to a running switch.
 | [Upgrading](deploy/upgrading.md) | Moving to a new artifact or infrastructure change |
 | [Known issues](deploy/known-issues.md) | Deployment-time issues and workarounds |
 
-Deploy the Tooling Cluster first if you are using one, then Hubs. A single Hub can run without a Tooling Cluster by pulling from a public registry.
+Deploy the Tooling Cluster first if using one, then Hubs. A single Hub can run without a Tooling Cluster by pulling from a public registry.
 
 ## Operate
 
@@ -53,17 +53,17 @@ Keeping a running Hub healthy.
 
 ## Recover
 
-Restoring data and rebuilding after loss. Read this **before** you need it — the first recovery should not be your first read.
+Restoring data and rebuilding after loss. Read this **before** it is needed — the first recovery should not be the first read.
 
 | Page | Covers |
 |------|--------|
-| [Backups](recover/backup.md) | What is backed up, what is not, and what you must back up yourself |
+| [Backups](recover/backup.md) | What is backed up, what is not, and what the adopter must back up |
 | [Restore](recover/restore.md) | Restoring MySQL, MongoDB, and Vault |
-| [Disaster recovery](recover/disaster-recovery.md) | Rebuilding a cluster, and the material you cannot rebuild without |
+| [Disaster recovery](recover/disaster-recovery.md) | Rebuilding a cluster, and the material no rebuild can do without |
 
-## Before you start
+## Before starting
 
-Two things about this toolkit will save you time if you know them going in:
+Knowing two things about this toolkit going in saves time:
 
 **Namespaces do not match intuition.** The data layer is in `data`, not `mojaloop`. The auth stack is in `ory`. A `kubectl` command against the wrong namespace returns an empty list that looks like success. See [System overview](../architecture/system-overview.md#what-a-hub-runs).
 

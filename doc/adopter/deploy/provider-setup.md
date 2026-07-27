@@ -16,7 +16,7 @@ What to prepare in Proxmox and DNS before deploying. The same setup serves a Too
 
 ## Proxmox state
 
-Before deploying you need:
+Before deploying, the adopter needs:
 
 - A Proxmox VE cluster — a single node is fine — reachable over HTTPS on its API port (default `8006`)
 - A storage pool for VM disks (`local-lvm`, ZFS, or Ceph RBD)
@@ -44,7 +44,7 @@ PROXMOX_VE_API_TOKEN="root@pam!ml-deployment-toolkit=<uuid>"
 
 A scoped non-root user works too — grant `VM.Allocate`, `VM.Config.*`, `VM.PowerMgmt`, `VM.Console`, `Datastore.AllocateSpace`, `Datastore.Audit`, `SDN.Use`, `Sys.Audit`. Administrator is simplest.
 
-> **TLS verification is always off.** The Proxmox provider is configured with `insecure = true` and it is not overridable — `PROXMOX_VE_INSECURE` in `.env` has no effect. If your Proxmox uses a CA-signed certificate, verification is skipped anyway. Tracked in `discrepancies.md` item D2.
+> **TLS verification is always off.** The Proxmox provider is configured with `insecure = true` and it is not overridable — `PROXMOX_VE_INSECURE` in `.env` has no effect. If the Proxmox host uses a CA-signed certificate, verification is skipped anyway. Tracked in `discrepancies.md` item D2.
 
 ## SSH access
 
@@ -78,7 +78,7 @@ Confirm each pool exists with the right content type in **Datacenter → Storage
 pvesm set local --content iso,vztmpl,backup,snippets
 ```
 
-The content list is **absolute, not additive** — include the existing types or you drop them. Check the current value first:
+The content list is **absolute, not additive** — include the existing types, or the command drops them. Check the current value first:
 
 ```bash
 pvesm status --storage local
@@ -94,7 +94,7 @@ Plan addresses before deploying:
 | Node IPs | 1 per VM | Assigned by Talos; the sizing profile sets the count |
 | LB-IPAM range | 2 or 3 | `app.lb_ipam.range` |
 
-**The LB range differs by role.** A Tooling Cluster needs 2 addresses (`gw-int`, `gw-ext`). A Hub needs 3 — it adds the FSPIOP endpoint. The range must sit outside your DHCP scope; overlap causes intermittent failures as addresses are handed out twice.
+**The LB range differs by role.** A Tooling Cluster needs 2 addresses (`gw-int`, `gw-ext`). A Hub needs 3 — it adds the FSPIOP endpoint. The range must sit outside the DHCP scope; overlap causes intermittent failures as addresses are handed out twice.
 
 All addresses must be on the bridge in `infra.proxmox.network_bridge`.
 
@@ -115,9 +115,9 @@ How many groups a profile uses is in `config/providers/proxmox/profiles/{cc,env}
 
 ## DNS zone
 
-You need a delegated zone the toolkit can manage. `external-dns` creates and updates records automatically — **do not pre-create records for cluster services**, as hand-created records cause ownership conflicts.
+The adopter needs a delegated zone the toolkit can manage. `external-dns` creates and updates records automatically — **do not pre-create records for cluster services**, as hand-created records cause ownership conflicts.
 
-Set the credential for your provider in `.env`:
+Set the credential for the chosen provider in `.env`:
 
 | Provider | Variable(s) |
 |----------|-------------|
@@ -133,6 +133,6 @@ dns:
   domain: "cc1.example.com"
 ```
 
-The zone must be delegated to the provider before deploying — the toolkit manages records within it, but does not create the zone or its delegation. Confirm delegation resolves before you deploy; certificate issuance depends on it.
+The zone must be delegated to the provider before deploying — the toolkit manages records within it, but does not create the zone or its delegation. Confirm delegation resolves before deploying; certificate issuance depends on it.
 
 Next: [Configuration](configuration.md), then [Deployment](deployment.md).

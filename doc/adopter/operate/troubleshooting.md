@@ -55,7 +55,7 @@ flux reconcile source oci ml-gitops
 
 ## Networking
 
-**A Gateway or the FSPIOP service has no address.** On self-managed clusters, LB-IPAM assigns from your pool:
+**A Gateway or the FSPIOP service has no address.** On self-managed clusters, LB-IPAM assigns from the configured pool:
 
 ```bash
 kubectl get ciliumloadbalancerippool
@@ -85,7 +85,7 @@ kubectl get challenges -A
 kubectl get clusterissuer
 ```
 
-Most failures are DNS-01: the zone is not delegated, credentials are wrong, or propagation is still in flight (allow a few minutes). This is why the [deploy pre-check](../deploy/deployment.md#before-you-deploy) confirms delegation first. A Let's Encrypt rate limit — too many certificates for one domain too quickly — is the other common cause.
+Most failures are DNS-01: the zone is not delegated, credentials are wrong, or propagation is still in flight (allow a few minutes). This is why the [deploy pre-check](../deploy/deployment.md#pre-deploy-checks) confirms delegation first. A Let's Encrypt rate limit — too many certificates for one domain too quickly — is the other common cause.
 
 The FSPIOP endpoint certificate is the exception: it comes from Vault, not Let's Encrypt, so a problem there is a Vault issue, not an ACME one. See [Participant mTLS](../../architecture/participant-mtls.md).
 
@@ -122,7 +122,7 @@ kubectl get pods -n vault
 kubectl logs -n <cc-system|env-system> deploy/vault-operator
 ```
 
-If it stays sealed, the operator is the place to look, not Vault itself. The unseal keys live in a Secret in the `vault` namespace; auto-unseal reads them on restart. See [Data layer → What you must keep](../recover/disaster-recovery.md#what-you-must-keep) for why that Secret is also your responsibility to back up.
+If it stays sealed, the operator is the place to look, not Vault itself. The unseal keys live in a Secret in the `vault` namespace; auto-unseal reads them on restart. See [Data layer → What the adopter must keep](../recover/disaster-recovery.md#what-the-adopter-must-keep) for why that Secret is also the adopter's responsibility to back up.
 
 ## The namespace trap
 
@@ -138,4 +138,4 @@ More time is lost to this than to any real fault. Kubernetes returns an empty li
 | Mojaloop / MCM HelmReleases | `flux-system` |
 | Gateways | `platform-system` |
 
-When a `get` returns nothing and you expected something, confirm the namespace before concluding the resource is missing.
+When a `get` unexpectedly returns nothing, confirm the namespace before concluding the resource is missing.

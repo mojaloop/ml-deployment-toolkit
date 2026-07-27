@@ -4,10 +4,10 @@
 
 **Audiences:** adopter (operate)
 
-The Hub-side procedure for bringing a participant online. This is one half of a two-party exchange — the participant does the other half on their own infrastructure. For the full sequence and the reasoning, see [Participant integration](../../architecture/participant-integration.md#the-choreography); this page is what **you**, as HubOps, do.
+The Hub-side procedure for bringing a participant online. This is one half of a two-party exchange — the participant does the other half on their own infrastructure. For the full sequence and the reasoning, see [Participant integration](../../architecture/participant-integration.md#the-choreography); this page is what **the adopter**, acting as HubOps, does.
 
-- [What you do and what they do](#what-you-do-and-what-they-do)
-- [Before you start](#before-you-start)
+- [Who does what](#who-does-what)
+- [Before starting](#before-starting)
 - [1. Create the participant](#1-create-the-participant)
 - [2. Hand over the endpoints](#2-hand-over-the-endpoints)
 - [3. Sign the certificate](#3-sign-the-certificate)
@@ -15,29 +15,29 @@ The Hub-side procedure for bringing a participant online. This is one half of a 
 - [5. Confirm](#5-confirm)
 - [Blocking a participant](#blocking-a-participant)
 
-## What you do and what they do
+## Who does what
 
-Onboarding interleaves the two sides. Your actions are the ones marked HubOps:
+Onboarding interleaves the two sides. The adopter's actions are the ones marked **Adopter**:
 
 | # | Who | Action |
 |---|-----|--------|
-| 1 | **HubOps** | Create the participant in MCM |
+| 1 | **Adopter** | Create the participant in MCM |
 | 2 | Participant | Activates their account, generates their own credentials |
-| 3 | **HubOps** | Hand over the Hub endpoints (out of band) |
+| 3 | **Adopter** | Hand over the Hub endpoints (out of band) |
 | 4 | Participant | Configures and starts their agent; it submits a CSR |
-| 5 | **HubOps** | Sign the CSR |
-| 6 | **HubOps** | Trigger onboarding — creates the participant in the ledger |
+| 5 | **Adopter** | Sign the CSR |
+| 6 | **Adopter** | Trigger onboarding — creates the participant in the ledger |
 | 7 | Participant | Agent retrieves the certificate; the connection goes live |
 
-You cannot generate the participant's credentials for them — the authorization model prevents it by design, so step 2 is necessarily theirs. See [Security → Authorization model](../../architecture/security.md#authorization-model).
+The adopter cannot generate the participant's credentials for them — the authorization model prevents it by design, so step 2 is necessarily the participant's. See [Security → Authorization model](../../architecture/security.md#authorization-model).
 
-## Before you start
+## Before starting
 
 - The Hub is deployed and [configured](../deploy/hub.md#configure-the-hub) — currency, ledger accounts, settlement model, and oracle exist. A participant cannot transact on a Hub with no settlement model.
 - **SMTP is working.** MCM sends the participant an activation email; without SMTP, they never receive it and cannot proceed. Confirm it before creating anyone.
 - Each participant needs a **distinct email address** — MCM keys account activation on it.
 
-You work in MCM at `https://mcm.int.<domain>`, using your HubOps login (`HUB_ADMIN_EMAIL` / `HUB_ADMIN_PASSWORD`).
+The adopter works in MCM at `https://mcm.int.<domain>`, using the HubOps login (`HUB_ADMIN_EMAIL` / `HUB_ADMIN_PASSWORD`).
 
 ## 1. Create the participant
 
@@ -46,15 +46,15 @@ In MCM:
 1. **Participants → New DFSP**
 2. Fill in:
    - **Name / ID** — the participant identifier, e.g. `dfsp-201`. This becomes their OAuth2 `client_id`.
-   - **Currency** — must match a currency you configured on the Hub
+   - **Currency** — must match a currency configured on the Hub
    - **Email** — the participant operator's address
 3. **Create**
 
-MCM sends an activation email to that address. The participant activates, logs in, and generates their own OAuth2 client credentials — you never see their secret.
+MCM sends an activation email to that address. The participant activates, logs in, and generates their own OAuth2 client credentials — the adopter never sees the secret.
 
 ## 2. Hand over the endpoints
 
-Give the participant the Hub endpoints. These are the same for every participant and are the ones you collected in [Deploy a Hub → Collect integration details](../deploy/hub.md#collect-integration-details):
+Give the participant the Hub endpoints. These are the same for every participant and are the ones the adopter collected in [Deploy a Hub → Collect integration details](../deploy/hub.md#collect-integration-details):
 
 ```
 MCM_SERVER_ENDPOINT=https://mcm.ext.<domain>/pm4mlapi
@@ -67,11 +67,11 @@ These are not secret, but they are not discoverable either — the hand-off is a
 
 ## 3. Sign the certificate
 
-Once the participant starts their agent, it submits a certificate signing request and then waits. On your side, a pending CSR appears in MCM.
+Once the participant starts their agent, it submits a certificate signing request and then waits. On the Hub side, a pending CSR appears in MCM.
 
 In MCM, find the participant, locate its pending CSR, and sign it. This issues their client certificate against the scheme CA.
 
-The participant's agent is idle until you do this — an agent that "stopped" after submitting its CSR is waiting for you, not broken.
+The participant's agent is idle until the adopter signs — an agent that "stopped" after submitting its CSR is waiting for the Hub, not broken.
 
 ## 4. Trigger onboarding
 
@@ -97,4 +97,4 @@ The participant confirms the live connection from their side — their agent rep
 
 To stop a participant transacting — suspension, default, or a suspected compromise — **disable it in the Finance Portal.** This takes effect immediately: the central ledger rejects everything from a disabled participant, regardless of its certificate.
 
-You do not touch PKI to block someone. Blocking is a scheme-membership action; the certificate lifecycle is a separate concern. See [Participant mTLS → Blocking and offboarding](../../architecture/participant-mtls.md#blocking-and-offboarding).
+The adopter does not touch PKI to block someone. Blocking is a scheme-membership action; the certificate lifecycle is a separate concern. See [Participant mTLS → Blocking and offboarding](../../architecture/participant-mtls.md#blocking-and-offboarding).

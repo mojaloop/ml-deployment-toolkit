@@ -4,9 +4,9 @@
 
 **Audiences:** platform developer
 
-You contribute to this codebase — the Terraform modules in `src/`, the GitOps manifests in `gitops/`, and the OCI artifacts adopters consume. This guide is how the distribution is built and extended.
+The platform developer contributes to this codebase — the Terraform modules in `src/`, the GitOps manifests in `gitops/`, and the OCI artifacts adopters consume. This guide is how the distribution is built and extended.
 
-If instead you are maintaining a *derivative* of the distribution for a client — forking, customizing, publishing your own artifact — that is the [Integrator guide](../integrator/index.md). The line: a platform developer changes this repository; an integrator maintains their own.
+Maintaining a *derivative* of the distribution for a client — forking, customizing, publishing a separate artifact — is instead the [Integrator guide](../integrator/index.md). The line: a platform developer changes this repository; an integrator maintains their own.
 
 For the design rationale behind everything here, see [Architecture](../architecture/index.md). This guide references it rather than restating it.
 
@@ -22,7 +22,7 @@ For the design rationale behind everything here, see [Architecture](../architect
 
 ## The two halves
 
-The distribution has two layers you work in, and they meet at exactly one place.
+The distribution has two layers the platform developer works in, and they meet at exactly one place.
 
 ```mermaid
 flowchart LR

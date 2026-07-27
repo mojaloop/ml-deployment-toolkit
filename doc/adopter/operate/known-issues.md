@@ -77,7 +77,7 @@ This is the same class of race as the [Mojaloop migration issue](../deploy/known
 kubectl rollout restart deploy/mcm -n mcm
 ```
 
-**Prevention** — MCM restarts on artifact updates, so normal deployment cycles cover the TTL. If you go more than ~30 days between updates, watch MCM's pod age and restart it periodically.
+**Prevention** — MCM restarts on artifact updates, so normal deployment cycles cover the TTL. If more than ~30 days pass between updates, watch MCM's pod age and restart it periodically.
 
 ## Metrics gap after a Thanos Receive restart
 

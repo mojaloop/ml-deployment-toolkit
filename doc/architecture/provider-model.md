@@ -62,7 +62,7 @@ Three are supported, each a self-contained directory of cert-manager and externa
 | **Cloudflare** | API token scoped to `Zone:DNS:Edit` |
 | **DigitalOcean** | API token with write access |
 
-Your DNS provider is an independent choice — Route53 with Proxmox is a normal combination, and the DNS provider has no bearing on where compute runs.
+The DNS provider is an independent choice — Route53 with Proxmox is a normal combination, and the DNS provider has no bearing on where compute runs.
 
 ## Certificate issuance
 

@@ -4,7 +4,7 @@
 
 **Audiences:** adopter (deploy)
 
-A Hub (`role: env`) runs the Mojaloop switch — central ledger, account lookup, quoting, settlements, MCM, the Ory auth stack, and the data layer. If you use a Tooling Cluster, deploy it first.
+A Hub (`role: env`) runs the Mojaloop switch — central ledger, account lookup, quoting, settlements, MCM, the Ory auth stack, and the data layer. If a Tooling Cluster is in use, deploy it first.
 
 For the shared workflow and commands, see [Deployment](deployment.md). This page is the `env`-specific configuration and checks.
 
@@ -54,7 +54,7 @@ app:
 
 A Hub carries far more secrets than a Tooling Cluster — the databases and the Ory stack each need their own. The full set is in [Prerequisites](prerequisites.md#credentials-checklist); missing database credentials are the most common cause of a Hub that provisions but never becomes healthy. One in particular:
 
-- **`HUB_ADMIN_EMAIL` / `HUB_ADMIN_PASSWORD`** are the HubOps login for both MCM and the Finance Portal. You use them minutes after deploy, in [Configure the Hub](#configure-the-hub).
+- **`HUB_ADMIN_EMAIL` / `HUB_ADMIN_PASSWORD`** are the HubOps login for both MCM and the Finance Portal. The adopter uses them minutes after deploy, in [Configure the Hub](#configure-the-hub).
 
 ### Pointing at a Tooling Cluster
 
@@ -77,7 +77,7 @@ The Harbor proxy is a Talos-level registry mirror, transparent to the workloads.
 
 ## Deploy
 
-Confirm the DNS zone is delegated ([Before you deploy](deployment.md#before-you-deploy)):
+Confirm the DNS zone is delegated ([Pre-deploy checks](deployment.md#pre-deploy-checks)):
 
 ```bash
 dig +short NS sw1.example.com
@@ -134,7 +134,7 @@ grep -E '^HUB_ADMIN_(EMAIL|PASSWORD)=' config/environments/<hub-env>/.env
 
 ## Configure the Hub
 
-**A freshly reconciled Hub is empty** — no currency, no ledger accounts, no settlement model, no oracle. It cannot process a transaction until you provision these, and skipping this step produces misleading failures much later (a party lookup that fails with an unrelated-looking error is almost always a missing oracle).
+**A freshly reconciled Hub is empty** — no currency, no ledger accounts, no settlement model, no oracle. It cannot process a transaction until the adopter provisions these, and skipping this step produces misleading failures much later (a party lookup that fails with an unrelated-looking error is almost always a missing oracle).
 
 Flux must have fully converged first, or the Testing Toolkit will not be reachable:
 
@@ -174,10 +174,8 @@ These are the values every participant needs, identical for all of them. This is
 MCM_SERVER_ENDPOINT=https://mcm.ext.<domain>/pm4mlapi
 HUB_IAM_PROVIDER_URL=https://hydra.ext.<domain>
 HUB_EXTAPI_FQDN=extapi.<domain>
-DFSP_CURRENCIES=<your currency>
+DFSP_CURRENCIES=<currency>
 ```
-
-If a Tooling Cluster is deployed, also share the observability endpoints so participants can ship telemetry to it.
 
 > A participant's ID and OAuth2 client credentials are **not** part of this hand-off. They exist only once HubOps creates the participant in MCM, and the participant generates its own secret — the Hub never holds it. See [Onboarding participants](../operate/onboarding-participants.md) and the [choreography](../../architecture/participant-integration.md#the-choreography).
 
@@ -202,7 +200,7 @@ kubectl -n vault get secrets
 kubectl -n vault get secret <unseal-secret> -o yaml > vault-unseal-<hub-env>.yaml
 ```
 
-Store it offline. See [Recover → Disaster recovery](../recover/disaster-recovery.md#what-you-must-keep).
+Store it offline. See [Recover → Disaster recovery](../recover/disaster-recovery.md#what-the-adopter-must-keep).
 
 Then:
 

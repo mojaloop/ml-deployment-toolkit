@@ -20,7 +20,7 @@ Flux reconciles from an **OCI artifact**, not from a Git branch ([ADR-001](decis
 This matters for three reasons:
 
 - **Adopters need no Git access.** A registry pull is the only dependency, which suits air-gapped and restricted networks.
-- **Versions are immutable and content-addressed.** A tag resolves to a digest; you can prove what is deployed.
+- **Versions are immutable and content-addressed.** A tag resolves to a digest; the digest proves exactly what is deployed.
 - **Integrators republish rather than fork-and-diverge.** A customized artifact is consumed exactly like the upstream one.
 
 All layers ship as **one artifact**, not one per component ([ADR-007](decisions/007-single-oci-artifact.md)) — the layers are interdependent, and mixing versions across them breaks in ways that are hard to diagnose.
@@ -104,9 +104,9 @@ oci:
     version: "latest"     # or a pinned tag
 ```
 
-`latest` follows the newest published artifact — changes arrive within the poll interval, without action. A pinned tag holds until you change it.
+`latest` follows the newest published artifact — changes arrive within the poll interval, without action. A pinned tag holds until the adopter changes it.
 
-**Pin production.** Following `latest` means an upstream publish reaches your cluster unannounced.
+**Pin production.** Following `latest` means an upstream publish reaches the cluster unannounced.
 
 Publishing and promotion: [Platform → Building artifacts](../platform/index.md). Maintaining a customized artifact: [Integrator](../integrator/index.md).
 

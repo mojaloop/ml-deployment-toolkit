@@ -82,7 +82,7 @@ Envoy requires a client certificate on every connection and routes by path prefi
 
 ## Load balancer addresses
 
-On self-hosted infrastructure, Cilium LB-IPAM assigns addresses from a pool you define, announced on the local network via L2.
+On self-hosted infrastructure, Cilium LB-IPAM assigns addresses from a pool the adopter defines, announced on the local network via L2.
 
 ```yaml
 app:
@@ -92,11 +92,11 @@ app:
 
 **A Hub needs three addresses** — `gw-int`, `gw-ext`, and `extapi`. **A Tooling Cluster needs two** — it has no FSPIOP endpoint.
 
-The range must sit outside your DHCP scope. Overlap produces intermittent, hard-to-diagnose failures as addresses are handed out twice.
+The range must sit outside the local DHCP scope. Overlap produces intermittent, hard-to-diagnose failures as addresses are handed out twice.
 
 ## DNS
 
-`external-dns` watches Gateways and Services and reconciles records automatically. You do not pre-create records for Hub services — creating them by hand causes ownership conflicts.
+`external-dns` watches Gateways and Services and reconciles records automatically. The operator never pre-creates records for Hub services — hand-created records cause ownership conflicts.
 
 Two record shapes are produced:
 
@@ -107,7 +107,7 @@ Note that `extapi.${domain}` sits at the apex level, not under `.int` or `.ext`.
 
 Participant FQDNs are the participant's own responsibility, in their own zone. The Hub never creates records for them, and each participant needs an individual record — there is no wildcard on that side.
 
-Supported DNS providers: Route53, Cloudflare, DigitalOcean. The choice is independent of your infrastructure provider.
+Supported DNS providers: Route53, Cloudflare, DigitalOcean. The choice is independent of the infrastructure provider.
 
 ## Certificates
 

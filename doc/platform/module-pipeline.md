@@ -40,7 +40,7 @@ The modules, in `src/`:
 
 The first module. It reads the environment's `config.yaml`, resolves the sizing profile from the provider's profile directory, applies Talos patches, and emits one merged configuration object that every downstream module reads.
 
-This is where the three configuration tiers collapse into one — see [Configuration tiers](../architecture/system-overview.md#configuration-tiers). Downstream modules never read `config.yaml` directly; they read config-loader's output. When you add a configuration field, it flows through here.
+This is where the three configuration tiers collapse into one — see [Configuration tiers](../architecture/system-overview.md#configuration-tiers). Downstream modules never read `config.yaml` directly; they read config-loader's output. When the platform developer adds a configuration field, it flows through here.
 
 ## Provider modules
 
@@ -70,4 +70,4 @@ The pipeline ends where Flux begins. After `flux-config` creates the Kustomizati
 
 The two communicate through exactly two objects — the `cluster-config` ConfigMap and `cluster-secrets` Secret. A value that must reach a workload gets added to one of them here, and referenced with `${...}` substitution in the manifest that needs it. That is the entire interface between the two halves of the system, and keeping it narrow is what keeps them decoupled.
 
-When you add a value a workload needs, the path is always: config field → config-loader → flux-config writes it into `cluster-config`/`cluster-secrets` → the manifest substitutes it. If you find yourself wanting Terraform to template a manifest directly, that is the boundary being crossed — put the value in the substitution inputs instead.
+When adding a value a workload needs, the path is always: config field → config-loader → flux-config writes it into `cluster-config`/`cluster-secrets` → the manifest substitutes it. The urge to have Terraform template a manifest directly is the boundary being crossed — put the value in the substitution inputs instead.

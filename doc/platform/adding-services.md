@@ -38,11 +38,11 @@ Keep it provider-agnostic. If the service needs a value that varies by environme
 
 ## Wiring substitution values
 
-If your service needs an environment-specific value — a domain, an endpoint, a credential — it flows through the same path as everything else:
+If the service needs an environment-specific value — a domain, an endpoint, a credential — it flows through the same path as everything else:
 
 1. Add the field to the configuration if it is adopter-set
 2. Carry it through `config-loader` and into `flux-config`, which writes it to `cluster-config` (non-secret) or `cluster-secrets` (secret)
-3. Reference it in your manifest with `${...}`
+3. Reference it in the manifest with `${...}`
 
 See [Module pipeline → the boundary](module-pipeline.md#the-terraformflux-boundary). Do not have Terraform template the manifest directly; the substitution inputs are the interface.
 
@@ -61,6 +61,6 @@ The `dns` Kustomization deploys `gitops/dns/${dns_provider}/`, so the directory 
 
 ## Health gating
 
-If downstream Kustomizations depend on your service being genuinely ready — not just applied — add a health check in `flux-config` so the chain waits for it.
+If downstream Kustomizations depend on the new service being genuinely ready — not just applied — add a health check in `flux-config` so the chain waits for it.
 
-This matters most for services others build on: a database, an operator, an identity component. The existing gates wait on operator readiness and on custom-resource status, not merely on a Deployment existing. A service that reports "applied" before it is usable will let the next stage start too early and fail — which is exactly the class of race the [reconciliation order](../architecture/system-overview.md#reconciliation-order) exists to prevent. If your service is a dependency, gate on what "ready" actually means for it.
+This matters most for services others build on: a database, an operator, an identity component. The existing gates wait on operator readiness and on custom-resource status, not merely on a Deployment existing. A service that reports "applied" before it is usable will let the next stage start too early and fail — which is exactly the class of race the [reconciliation order](../architecture/system-overview.md#reconciliation-order) exists to prevent. If the service is a dependency, gate on what "ready" actually means for it.

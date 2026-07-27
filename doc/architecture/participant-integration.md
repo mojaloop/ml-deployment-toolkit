@@ -159,8 +159,6 @@ The Hub presents the participant's own client certificate — the one issued at 
 
 **Participant side** — the [Integration Toolkit](https://github.com/mojaloop/integration-toolkit). A Docker Compose stack providing the enrolment agent, a per-participant Vault, the SDK scheme adapter, a Redis cache, and a simulator backend to stand in for a core banking system.
 
-The Hub is engineered against the Integration Toolkit's conventions — the `/pm4mlapi` API prefix and its observability profile are both accommodated directly. A participant may use a different stack, but must satisfy the same interface contract.
-
-> The Integration Toolkit currently tracks the `feat/mcm-agent` branch. Pin to it until it merges.
+The Hub is engineered against the Integration Toolkit's conventions — the `/pm4mlapi` API prefix is accommodated directly at the gateway. A participant may use a different stack, but must satisfy the same interface contract.
 
 Participant-side deployment is documented in [Participant → Integrate](../participant/index.md). Hub-side onboarding is documented in [Adopter → Operate](../adopter/index.md).
