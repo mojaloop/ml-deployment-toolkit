@@ -65,25 +65,44 @@ flux resume helmrelease kratos -n flux-system
 
 This is the same class of race as the [Mojaloop migration issue](../deploy/known-issues.md#mojaloop-migration-fails-with-backofflimitexceeded-on-a-fresh-deploy).
 
-## Lost or placeholder kubeconfig
+## Lost or expired cluster access (kubeconfig and talosconfig)
 
-**Symptoms** — `kubectl` fails with connection refused dialing `127.0.0.1:1`, or `artifacts/<env>/kubernetes/kubeconfig` is missing entirely.
+**Symptoms** — one of three shapes, all the same underlying story:
 
-**Root cause** — the kubeconfig lives under `artifacts/`, which is gitignored, so a fresh clone or a cleanup loses it. And if any `make` target ran before it was restored, the Makefile seeds a placeholder pointing at `https://127.0.0.1:1` (so Terraform can plan) — the placeholder is valid YAML, so `kubectl` accepts it and dials a dead endpoint.
+- `kubectl` fails with connection refused dialing `127.0.0.1:1` — the kubeconfig is the Makefile-seeded placeholder.
+- `artifacts/<env>/kubernetes/kubeconfig` or `artifacts/<env>/talos-config/talosconfig` is missing entirely.
+- `talosctl` or `kubectl` fails with `x509: certificate has expired`.
 
-**Fix** — on Talos-based environments, regenerate it from the Talos config without touching the cluster:
+**Root cause** — two independent facts. First, both files live under `artifacts/`, which is gitignored, so a fresh clone or a cleanup loses them; and if any `make` target runs before the kubeconfig is restored, the Makefile seeds a placeholder pointing at `https://127.0.0.1:1` (so Terraform can plan) — valid YAML, so `kubectl` accepts it and dials a dead endpoint. Second, both client certificates are issued for **one year**, while the Talos CA is valid for ten; Talos auto-rotates everything cluster-internal, so only these two client credentials ever age. Check remaining validity anytime with `talosctl config info`.
 
-```bash
-talosctl kubeconfig \
-  --talosconfig artifacts/<env>/talos-config/talosconfig \
-  -n <vip> -e <vip> \
-  --merge=false -f \
-  artifacts/<env>/kubernetes/kubeconfig
-```
+**Fix** — restore access from the bottom up. Each step is only needed if the layer below it is broken.
 
-On managed providers (AWS, DigitalOcean) — or if the talosconfig is gone too — run `make apply ENV=<env>`; the provider module rewrites both from Terraform state.
+*Terraform path (all providers):* `make apply ENV=<env>` regenerates everything — the Talos provider re-issues expired client certificates on refresh and rewrites both files under `artifacts/`. On managed providers (AWS, DigitalOcean) this is the only path.
 
-**Prevention** — none needed: everything under `artifacts/` is regenerable, which is exactly why it is not committed. Just know the regeneration path.
+*Manual path (Talos environments)* — needs only the `talosctl` binary and reachability to the cluster, no working Terraform:
+
+1. **If the talosconfig is lost or expired**, mint a fresh one from the machine secrets bundle (written by every deploy to `artifacts/<env>/talos-secrets/secrets.yaml`). This step is offline — it does not touch the cluster:
+
+   ```bash
+   talosctl gen config <cluster-name> https://<vip>:6443 \
+     --with-secrets artifacts/<env>/talos-secrets/secrets.yaml \
+     --output-types talosconfig \
+     -o artifacts/<env>/talos-config/talosconfig --force
+   ```
+
+2. **Regenerate the kubeconfig** using the (now valid) talosconfig:
+
+   ```bash
+   talosctl kubeconfig \
+     --talosconfig artifacts/<env>/talos-config/talosconfig \
+     -n <vip> -e <vip> \
+     --merge=false -f \
+     artifacts/<env>/kubernetes/kubeconfig
+   ```
+
+**The hard boundary** — every recovery above roots in the machine secrets, held in `secrets.yaml` and the Terraform state. If both are gone, there is no door: the Talos API is mTLS-only with no password or console fallback, and the only way forward is a rebuild per [Disaster recovery](../recover/disaster-recovery.md). This is why the state backup there is not optional.
+
+**Prevention** — the files themselves need no backup beyond the Terraform state (see [What the adopter must keep](../recover/disaster-recovery.md#what-the-adopter-must-keep)); they are regenerable, which is why `artifacts/` is not committed. The certificates do need a calendar: any `make apply` within the year re-issues them, but a cluster left untouched longer than that crosses the expiry — run `talosctl config info` when in doubt, and refresh before the date it prints.
 
 ## MCM returns HTTP 500 on Vault-backed operations
 
