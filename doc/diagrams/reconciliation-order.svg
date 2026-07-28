@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 590" font-family="Helvetica Neue, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1180" height="590" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="40" y="44" font-size="21" font-weight="700" fill="#0f172a">Reconciliation order</text>
+  <text x="40" y="68" font-size="12.5" fill="#64748b">Flux applies Kustomizations as a dependency graph — each stage waits for the previous one to report healthy</text>
+
+  <!-- ================= Foundation ================= -->
+  <rect x="40" y="210" width="446" height="132" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="58" y="238" font-size="15" font-weight="700" fill="#334155">Foundation — shared stages</text>
+  <text x="58" y="256" font-size="11" fill="#64748b">the four-stage prefix every role shares</text>
+
+  <rect x="58" y="278" width="82" height="44" rx="6" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="99" y="304" font-size="11.5" font-weight="700" fill="#334155" text-anchor="middle">platform</text>
+
+  <rect x="172" y="278" width="56" height="44" rx="6" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="200" y="304" font-size="11.5" font-weight="700" fill="#334155" text-anchor="middle">dns</text>
+
+  <rect x="260" y="278" width="116" height="44" rx="6" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="318" y="304" font-size="11.5" font-weight="700" fill="#334155" text-anchor="middle">platform-config</text>
+
+  <rect x="408" y="278" width="60" height="44" rx="6" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="438" y="297" font-size="11.5" font-weight="700" fill="#334155" text-anchor="middle">talos</text>
+  <text x="438" y="313" font-size="9.5" fill="#64748b" text-anchor="middle">vendor</text>
+
+  <!-- Foundation chain arrows -->
+  <line x1="140" y1="300" x2="168" y2="300" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="228" y1="300" x2="256" y2="300" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="376" y1="300" x2="404" y2="300" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- ================= Tooling Cluster lane ================= -->
+  <rect x="530" y="110" width="606" height="200" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="548" y="138" font-size="15" font-weight="700" fill="#334155">Tooling Cluster</text>
+  <text x="548" y="156" font-size="11" fill="#64748b">role: cc · adds five stages</text>
+
+  <rect x="548" y="170" width="48" height="44" rx="6" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="572" y="196" font-size="11.5" font-weight="700" fill="#334155" text-anchor="middle">cc</text>
+
+  <rect x="630" y="170" width="84" height="44" rx="6" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="672" y="196" font-size="11.5" font-weight="700" fill="#334155" text-anchor="middle">cc-config</text>
+
+  <rect x="748" y="170" width="84" height="44" rx="6" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="790" y="196" font-size="11.5" font-weight="700" fill="#334155" text-anchor="middle">cc-routes</text>
+
+  <rect x="630" y="254" width="118" height="44" rx="6" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="689" y="280" font-size="11.5" font-weight="700" fill="#334155" text-anchor="middle">cc-observability</text>
+
+  <rect x="782" y="254" width="170" height="44" rx="6" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="867" y="280" font-size="11.5" font-weight="700" fill="#334155" text-anchor="middle">cc-observability-routes</text>
+
+  <!-- Tooling Cluster arrows -->
+  <line x1="596" y1="192" x2="626" y2="192" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="714" y1="192" x2="744" y2="192" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="672" y1="214" x2="672" y2="250" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="748" y1="276" x2="778" y2="276" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- ================= Hub lane ================= -->
+  <rect x="530" y="350" width="606" height="200" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="548" y="378" font-size="15" font-weight="700" fill="#3730a3">Hub</text>
+  <text x="548" y="396" font-size="11" fill="#4f46e5">role: env · adds six stages</text>
+
+  <rect x="548" y="410" width="56" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
+  <text x="576" y="436" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">env</text>
+
+  <rect x="638" y="410" width="84" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
+  <text x="680" y="436" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">env-data</text>
+
+  <rect x="756" y="410" width="84" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
+  <text x="798" y="436" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">env-auth</text>
+
+  <rect x="874" y="410" width="116" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
+  <text x="932" y="436" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">env-auth-config</text>
+
+  <rect x="1024" y="410" width="76" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
+  <text x="1062" y="436" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">env-app</text>
+
+  <rect x="548" y="494" width="170" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
+  <text x="633" y="520" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">env-observability-agent</text>
+
+  <!-- Hub arrows -->
+  <line x1="604" y1="432" x2="634" y2="432" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="722" y1="432" x2="752" y2="432" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="840" y1="432" x2="870" y2="432" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="990" y1="432" x2="1020" y2="432" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- talos fork into the two lanes -->
+  <path d="M468 300 H506 V192 H540" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M506 300 V432 H540" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- platform-config feeds env-observability-agent -->
+  <path d="M318 322 V516 H544" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Footnote -->
+  <text x="40" y="578" font-size="10.5" fill="#64748b">arrows follow apply order — each stage points at the stage that depends on it</text>
+</svg>

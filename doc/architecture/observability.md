@@ -19,31 +19,7 @@ Where metrics, logs, and traces go, and what is already built to read them.
 
 Hubs collect. The Tooling Cluster stores and displays.
 
-```mermaid
-flowchart LR
-    subgraph hub["Hub"]
-        ksm["kube-state-metrics"]
-        ne["node-exporter"]
-        a["Alloy"]
-        tb["trace-bridge"]
-    end
-
-    subgraph tc["Tooling Cluster"]
-        th["Thanos"]
-        lo["Loki"]
-        te["Tempo"]
-        gr["Grafana"]
-    end
-
-    a -->|"scrapes"| ksm
-    a -->|"scrapes"| ne
-    a -->|"writes metrics"| th
-    a -->|"writes logs"| lo
-    tb -->|"writes traces"| te
-    gr -->|"queries"| th
-    gr -->|"queries"| lo
-    gr -->|"queries"| te
-```
+![Telemetry flow](../diagrams/telemetry-flow.svg)
 
 Read the arrows as actions: **Alloy** scrapes the exporters and writes outward; **trace-bridge** writes traces; **Grafana** queries all three backends. Nothing on the Tooling Cluster reaches into a Hub.
 

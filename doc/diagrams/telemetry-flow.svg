@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 500" font-family="Helvetica Neue, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+    <marker id="arrowIndigo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/>
+    </marker>
+    <marker id="arrowEmerald" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#10b981"/>
+    </marker>
+    <marker id="arrowAmber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1120" height="500" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="40" y="44" font-size="21" font-weight="700" fill="#0f172a">Observability — Telemetry Flow</text>
+  <text x="40" y="68" font-size="12.5" fill="#64748b">Hubs collect · the Tooling Cluster stores and displays</text>
+
+  <!-- ================= Hub ================= -->
+  <rect x="40" y="110" width="460" height="310" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="56" y="138" font-size="15" font-weight="700" fill="#334155">Hub</text>
+  <text x="56" y="156" font-size="11" fill="#64748b">role: env · agents ship data outward</text>
+
+  <!-- Exporters -->
+  <rect x="60" y="180" width="160" height="52" rx="6" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="140" y="203" font-size="10.5" font-weight="700" fill="#334155" text-anchor="middle">kube-state-metrics</text>
+  <text x="140" y="219" font-size="9" fill="#64748b" text-anchor="middle">exporter</text>
+
+  <rect x="60" y="260" width="160" height="52" rx="6" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="140" y="283" font-size="10.5" font-weight="700" fill="#334155" text-anchor="middle">node-exporter</text>
+  <text x="140" y="299" font-size="9" fill="#64748b" text-anchor="middle">exporter</text>
+
+  <!-- Alloy -->
+  <rect x="300" y="170" width="170" height="140" rx="8" fill="#f0fdfa" stroke="#14b8a6" stroke-width="1.5"/>
+  <text x="385" y="228" font-size="13" font-weight="700" fill="#115e59" text-anchor="middle">Alloy</text>
+  <text x="385" y="248" font-size="9.5" fill="#64748b" text-anchor="middle">scrapes exporters ·</text>
+  <text x="385" y="261" font-size="9.5" fill="#64748b" text-anchor="middle">tails container logs</text>
+
+  <!-- trace-bridge -->
+  <rect x="300" y="330" width="170" height="52" rx="8" fill="#f0fdfa" stroke="#14b8a6" stroke-width="1.5"/>
+  <text x="385" y="352" font-size="12" font-weight="700" fill="#115e59" text-anchor="middle">trace-bridge</text>
+  <text x="385" y="368" font-size="9.5" fill="#64748b" text-anchor="middle">Kafka spans → OTLP</text>
+
+  <!-- scrapes arrows (inside Hub) -->
+  <line x1="300" y1="206" x2="226" y2="206" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="262" y="197" font-size="9" fill="#475569" text-anchor="middle">scrapes</text>
+  <line x1="300" y1="286" x2="226" y2="286" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="262" y="277" font-size="9" fill="#475569" text-anchor="middle">scrapes</text>
+
+  <!-- ================= Tooling Cluster ================= -->
+  <rect x="620" y="110" width="460" height="310" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="636" y="138" font-size="15" font-weight="700" fill="#334155">Tooling Cluster</text>
+  <text x="636" y="156" font-size="11" fill="#64748b">role: cc · stores and displays</text>
+
+  <rect x="640" y="170" width="180" height="52" rx="8" fill="#f0fdfa" stroke="#14b8a6" stroke-width="1.5"/>
+  <text x="730" y="192" font-size="12" font-weight="700" fill="#115e59" text-anchor="middle">Thanos</text>
+  <text x="730" y="208" font-size="9.5" fill="#64748b" text-anchor="middle">metrics</text>
+
+  <rect x="640" y="250" width="180" height="52" rx="8" fill="#f0fdfa" stroke="#14b8a6" stroke-width="1.5"/>
+  <text x="730" y="272" font-size="12" font-weight="700" fill="#115e59" text-anchor="middle">Loki</text>
+  <text x="730" y="288" font-size="9.5" fill="#64748b" text-anchor="middle">logs</text>
+
+  <rect x="640" y="330" width="180" height="52" rx="8" fill="#f0fdfa" stroke="#14b8a6" stroke-width="1.5"/>
+  <text x="730" y="352" font-size="12" font-weight="700" fill="#115e59" text-anchor="middle">Tempo</text>
+  <text x="730" y="368" font-size="9.5" fill="#64748b" text-anchor="middle">traces</text>
+
+  <rect x="900" y="240" width="150" height="72" rx="8" fill="#f0fdfa" stroke="#14b8a6" stroke-width="1.5"/>
+  <text x="975" y="271" font-size="12" font-weight="700" fill="#115e59" text-anchor="middle">Grafana</text>
+  <text x="975" y="289" font-size="9.5" fill="#64748b" text-anchor="middle">dashboards &amp; alerting</text>
+
+  <!-- Grafana queries arrows -->
+  <line x1="900" y1="255" x2="825" y2="205" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="868" y="222" font-size="9" fill="#475569" text-anchor="middle">queries</text>
+  <line x1="900" y1="276" x2="825" y2="276" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="868" y="268" font-size="9" fill="#475569" text-anchor="middle">queries</text>
+  <line x1="900" y1="297" x2="825" y2="347" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="868" y="334" font-size="9" fill="#475569" text-anchor="middle">queries</text>
+
+  <!-- ================= Cross-cluster pushes ================= -->
+  <line x1="470" y1="196" x2="636" y2="196" stroke="#6366f1" stroke-width="2.5" marker-end="url(#arrowIndigo)"/>
+  <text x="553" y="187" font-size="9.5" font-weight="600" fill="#6366f1" text-anchor="middle">writes metrics</text>
+
+  <line x1="470" y1="276" x2="636" y2="276" stroke="#10b981" stroke-width="2.5" marker-end="url(#arrowEmerald)"/>
+  <text x="553" y="267" font-size="9.5" font-weight="600" fill="#10b981" text-anchor="middle">writes logs</text>
+
+  <line x1="470" y1="356" x2="636" y2="356" stroke="#f59e0b" stroke-width="2.5" marker-end="url(#arrowAmber)"/>
+  <text x="553" y="347" font-size="9.5" font-weight="600" fill="#f59e0b" text-anchor="middle">writes traces</text>
+
+  <!-- Legend -->
+  <line x1="40" y1="464" x2="72" y2="464" stroke="#6366f1" stroke-width="2.5"/>
+  <text x="80" y="468" font-size="10.5" fill="#64748b">metrics</text>
+  <line x1="160" y1="464" x2="192" y2="464" stroke="#10b981" stroke-width="2.5"/>
+  <text x="200" y="468" font-size="10.5" fill="#64748b">logs</text>
+  <line x1="260" y1="464" x2="292" y2="464" stroke="#f59e0b" stroke-width="2.5"/>
+  <text x="300" y="468" font-size="10.5" fill="#64748b">traces</text>
+  <text x="400" y="468" font-size="10.5" fill="#64748b">arrows start at the acting component</text>
+</svg>
