@@ -96,37 +96,15 @@ Note the namespace split: **the data layer lives in `data`, not `mojaloop`**, an
 
 Flux applies Kustomizations as a dependency graph, not a flat list. Each stage waits for the previous one to report healthy.
 
-Every role shares the same four-stage prefix:
+![Reconciliation order](../diagrams/reconciliation-order.svg)
 
-```mermaid
-flowchart LR
-    p["platform"] --> d["dns"] --> pc["platform-config"] --> v["talos<br/>(vendor)"]
-```
+Every role shares the same four-stage prefix — `platform` → `dns` → `platform-config` → `talos`. `platform` gates on the cert-manager and external-secrets webhooks being live. The vendor stage is named for the infrastructure provider — `talos` on Proxmox — and is skipped on providers that need no vendor layer.
 
-`platform` gates on the cert-manager and external-secrets webhooks being live. The vendor stage is named for the infrastructure provider — `talos` on Proxmox — and is skipped on providers that need no vendor layer.
+The **Tooling Cluster** adds five stages. `cc-config` gates on Harbor and MinIO. `cc-observability` gates on Thanos receive and query, plus Loki, Tempo, and Grafana.
 
-**Tooling Cluster** adds five stages:
+The **Hub** adds six, gated at every step: `env` waits for the PXC, PSMDB, and Strimzi operators; `env-data` waits for the MySQL cluster to report `ready` and for Kafka and MongoDB to be healthy; `env-auth` waits for Vault, Kratos, Keto, and Hydra; `env-app` waits for Mojaloop, MCM, and Finance Portal.
 
-```mermaid
-flowchart LR
-    v["talos"] --> cc["cc"] --> ccc["cc-config"]
-    ccc --> ccr["cc-routes"]
-    ccc --> cco["cc-observability"] --> ccor["cc-observability-routes"]
-```
-
-`cc-config` gates on Harbor and MinIO. `cc-observability` gates on Thanos receive and query, plus Loki, Tempo, and Grafana.
-
-**Hub** adds six:
-
-```mermaid
-flowchart LR
-    v["talos"] --> e["env"] --> ed["env-data"] --> ea["env-auth"] --> eac["env-auth-config"] --> ep["env-app"]
-    pc["platform-config"] --> eoa["env-observability-agent"]
-```
-
-The chain is gated at every step: `env` waits for the PXC, PSMDB, and Strimzi operators; `env-data` waits for the MySQL cluster to report `ready` and for Kafka and MongoDB to be healthy; `env-auth` waits for Vault, Kratos, Keto, and Hydra; `env-app` waits for Mojaloop, MCM, and Finance Portal.
-
-This is why a Hub takes time to converge and why an early failure blocks everything downstream — the ordering is deliberate, because migrations run against databases that must already exist. `env-observability-agent` is a parallel branch and does not block the application chain.
+This is why a Hub takes time to converge and why an early failure blocks everything downstream — the ordering is deliberate, because migrations run against databases that must already exist. `env-observability-agent` is a parallel branch off `platform-config` and does not block the application chain.
 
 ## Configuration tiers
 

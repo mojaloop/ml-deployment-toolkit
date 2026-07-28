@@ -6,22 +6,7 @@ The toolkit packages Terraform modules and FluxCD GitOps manifests into OCI arti
 
 ## Find the right guide
 
-```mermaid
-flowchart LR
-    q["What is<br/>the task?"]
-
-    q --> a["Understand the design<br/>or its trade-offs"]
-    q --> b["Contribute to<br/>this codebase"]
-    q --> c["Tailor the distribution<br/>for a client"]
-    q --> d["Run a Hub"]
-    q --> e["Connect to a Hub"]
-
-    a --> arch["Architecture"]
-    b --> plat["Platform"]
-    c --> si["Integrator"]
-    d --> ad["Adopter"]
-    e --> pa["Participant"]
-```
+![Find the right guide](diagrams/audience-routing.svg)
 
 | Guide | Core question | Start here |
 |-------|--------------|------------|
