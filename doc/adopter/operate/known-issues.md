@@ -65,6 +65,26 @@ flux resume helmrelease kratos -n flux-system
 
 This is the same class of race as the [Mojaloop migration issue](../deploy/known-issues.md#mojaloop-migration-fails-with-backofflimitexceeded-on-a-fresh-deploy).
 
+## Lost or placeholder kubeconfig
+
+**Symptoms** — `kubectl` fails with connection refused dialing `127.0.0.1:1`, or `artifacts/<env>/kubernetes/kubeconfig` is missing entirely.
+
+**Root cause** — the kubeconfig lives under `artifacts/`, which is gitignored, so a fresh clone or a cleanup loses it. And if any `make` target ran before it was restored, the Makefile seeds a placeholder pointing at `https://127.0.0.1:1` (so Terraform can plan) — the placeholder is valid YAML, so `kubectl` accepts it and dials a dead endpoint.
+
+**Fix** — on Talos-based environments, regenerate it from the Talos config without touching the cluster:
+
+```bash
+talosctl kubeconfig \
+  --talosconfig artifacts/<env>/talos-config/talosconfig \
+  -n <vip> -e <vip> \
+  --merge=false -f \
+  artifacts/<env>/kubernetes/kubeconfig
+```
+
+On managed providers (AWS, DigitalOcean) — or if the talosconfig is gone too — run `make apply ENV=<env>`; the provider module rewrites both from Terraform state.
+
+**Prevention** — none needed: everything under `artifacts/` is regenerable, which is exactly why it is not committed. Just know the regeneration path.
+
 ## MCM returns HTTP 500 on Vault-backed operations
 
 **Symptoms** — MCM returns 500 for anything touching Vault (participant enrolment, certificate management). Vault's audit log shows an expired token.

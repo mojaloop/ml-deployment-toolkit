@@ -23,6 +23,8 @@ export KUBECONFIG=$(pwd)/artifacts/<env>/kubernetes/kubeconfig
 kubectl get kustomizations -n flux-system
 ```
 
+If the kubeconfig is missing — or `kubectl` dials `127.0.0.1:1`, meaning it is the seeded placeholder — regenerate it first: see [Known issues → Lost or placeholder kubeconfig](known-issues.md#lost-or-placeholder-kubeconfig).
+
 If a Kustomization is not Ready, that is almost always the root — fix it before chasing application symptoms, and start from the **earliest** failing one in the chain, since later failures are usually consequences.
 
 ## Flux and reconciliation
