@@ -1,0 +1,179 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1370 740" font-family="Helvetica Neue, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+    <marker id="arrowIndigo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1370" height="740" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="40" y="44" font-size="21" font-weight="700" fill="#0f172a">Participant onboarding — phase overview</text>
+  <text x="40" y="68" font-size="12.5" fill="#64748b">The 16-step onboarding choreography grouped into five phases · a two-party exchange — neither side can complete it alone</text>
+
+  <!-- ============ Lane backgrounds ============ -->
+  <rect x="40" y="240" width="1290" height="110" fill="#eef2ff"/>
+
+  <!-- Phase tint overlay (alternating columns) -->
+  <rect x="190" y="92" width="130" height="540" fill="#334155" fill-opacity="0.035"/>
+  <rect x="560" y="92" width="300" height="540" fill="#334155" fill-opacity="0.035"/>
+  <rect x="1140" y="92" width="190" height="540" fill="#334155" fill-opacity="0.035"/>
+
+  <!-- Grid lines -->
+  <rect x="190" y="92" width="1140" height="540" fill="none" stroke="#cbd5e1"/>
+  <line x1="320" y1="92" x2="320" y2="632" stroke="#e2e8f0"/>
+  <line x1="560" y1="92" x2="560" y2="632" stroke="#e2e8f0"/>
+  <line x1="860" y1="92" x2="860" y2="632" stroke="#e2e8f0"/>
+  <line x1="1140" y1="92" x2="1140" y2="632" stroke="#e2e8f0"/>
+  <line x1="190" y1="132" x2="1330" y2="132" stroke="#cbd5e1"/>
+  <line x1="40" y1="240" x2="1330" y2="240" stroke="#cbd5e1"/>
+  <line x1="40" y1="350" x2="1330" y2="350" stroke="#cbd5e1"/>
+
+  <!-- Phase headers -->
+  <text x="255" y="112" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">Create</text>
+  <text x="255" y="126" font-size="9" fill="#64748b" text-anchor="middle">step 1</text>
+  <text x="440" y="112" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">Activate</text>
+  <text x="440" y="126" font-size="9" fill="#64748b" text-anchor="middle">steps 2–5</text>
+  <text x="710" y="112" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">Enrol</text>
+  <text x="710" y="126" font-size="9" fill="#64748b" text-anchor="middle">steps 6–10</text>
+  <text x="1000" y="112" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">Sign &amp; onboard</text>
+  <text x="1000" y="126" font-size="9" fill="#64748b" text-anchor="middle">steps 11–15</text>
+  <text x="1235" y="112" font-size="12" font-weight="700" fill="#334155" text-anchor="middle">Live</text>
+  <text x="1235" y="126" font-size="9" fill="#64748b" text-anchor="middle">step 16</text>
+  <text x="320" y="113" font-size="13" fill="#94a3b8" text-anchor="middle">›</text>
+  <text x="560" y="113" font-size="13" fill="#94a3b8" text-anchor="middle">›</text>
+  <text x="860" y="113" font-size="13" fill="#94a3b8" text-anchor="middle">›</text>
+  <text x="1140" y="113" font-size="13" fill="#94a3b8" text-anchor="middle">›</text>
+
+  <!-- Lane headers -->
+  <text x="48" y="190" font-size="13" font-weight="700" fill="#334155">Hub operator</text>
+  <text x="48" y="286" font-size="13" font-weight="700" fill="#334155">Hub systems</text>
+  <text x="48" y="303" font-size="9.5" fill="#64748b">MCM · Vault PKI ·</text>
+  <text x="48" y="316" font-size="9.5" fill="#64748b">Central ledger</text>
+  <text x="48" y="480" font-size="13" font-weight="700" fill="#334155">Participant</text>
+  <text x="48" y="497" font-size="9.5" fill="#64748b">operator + agent</text>
+
+  <!-- ============ Hub operator lane ============ -->
+  <!-- B1 Create participant -->
+  <rect x="196" y="158" width="118" height="52" rx="6" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="255" y="177" font-size="10" font-weight="700" fill="#334155" text-anchor="middle">Create participant</text>
+  <text x="255" y="190" font-size="8.5" fill="#64748b" text-anchor="middle">name · currency · email</text>
+  <text x="255" y="203" font-size="9" fill="#64748b" text-anchor="middle">1</text>
+
+  <!-- B5 Share Hub endpoints -->
+  <rect x="383" y="158" width="130" height="52" rx="6" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="448" y="177" font-size="10" font-weight="700" fill="#334155" text-anchor="middle">Share Hub endpoints</text>
+  <text x="448" y="190" font-size="8.5" fill="#64748b" text-anchor="middle">out of band</text>
+  <text x="448" y="203" font-size="9" fill="#64748b" text-anchor="middle">5</text>
+
+  <!-- B10 Sign the CSR -->
+  <rect x="872" y="158" width="122" height="52" rx="6" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="933" y="177" font-size="10" font-weight="700" fill="#334155" text-anchor="middle">Sign the CSR</text>
+  <text x="933" y="190" font-size="8.5" fill="#64748b" text-anchor="middle">in MCM</text>
+  <text x="933" y="203" font-size="9" fill="#64748b" text-anchor="middle">11</text>
+
+  <!-- B12 Trigger onboarding -->
+  <rect x="1008" y="158" width="124" height="52" rx="6" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="1070" y="177" font-size="10" font-weight="700" fill="#334155" text-anchor="middle">Trigger onboarding</text>
+  <text x="1070" y="190" font-size="8.5" fill="#64748b" text-anchor="middle">creates it in the scheme</text>
+  <text x="1070" y="203" font-size="9" fill="#64748b" text-anchor="middle">14</text>
+
+  <!-- ============ Hub systems lane ============ -->
+  <!-- B2 Activation email -->
+  <rect x="383" y="268" width="130" height="52" rx="6" fill="#e0e7ff" stroke="#6366f1"/>
+  <text x="448" y="287" font-size="10" font-weight="700" fill="#3730a3" text-anchor="middle">Activation email</text>
+  <text x="448" y="300" font-size="8.5" fill="#4f46e5" text-anchor="middle">sent by MCM</text>
+  <text x="448" y="313" font-size="9" fill="#64748b" text-anchor="middle">2</text>
+
+  <!-- B11 Vault signs -->
+  <rect x="872" y="264" width="122" height="56" rx="6" fill="#e0e7ff" stroke="#6366f1"/>
+  <text x="933" y="283" font-size="10" font-weight="700" fill="#3730a3" text-anchor="middle">Vault signs the CSR</text>
+  <text x="933" y="296" font-size="8.5" fill="#4f46e5" text-anchor="middle">client-cert-role</text>
+  <text x="933" y="310" font-size="9" fill="#64748b" text-anchor="middle">12–13</text>
+
+  <!-- B13 Central-ledger setup -->
+  <rect x="1008" y="264" width="124" height="56" rx="6" fill="#e0e7ff" stroke="#6366f1"/>
+  <text x="1070" y="283" font-size="10" font-weight="700" fill="#3730a3" text-anchor="middle">Central-ledger setup</text>
+  <text x="1070" y="296" font-size="8.5" fill="#4f46e5" text-anchor="middle">limits · funds · endpoints</text>
+  <text x="1070" y="310" font-size="9" fill="#64748b" text-anchor="middle">15</text>
+
+  <!-- ============ Participant lane ============ -->
+  <!-- B3 wait: activation email -->
+  <rect x="372" y="366" width="152" height="60" rx="6" fill="#ffffff" stroke="#64748b" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <circle cx="448" cy="381" r="6" fill="#ffffff" stroke="#64748b" stroke-width="1.2"/>
+  <path d="M448,381 L448,377 M448,381 L451,381" stroke="#64748b" stroke-width="1.2" stroke-linecap="round"/>
+  <text x="448" y="400" font-size="9.5" font-weight="700" fill="#334155" text-anchor="middle">Awaits activation email</text>
+  <text x="448" y="415" font-size="9" fill="#64748b" text-anchor="middle">waits — normal</text>
+
+  <!-- B4 Activate, set password, generate credentials -->
+  <rect x="372" y="452" width="152" height="52" rx="6" fill="#ffffff" stroke="#64748b"/>
+  <text x="448" y="470" font-size="10" font-weight="700" fill="#334155" text-anchor="middle">Activate, set password,</text>
+  <text x="448" y="483" font-size="10" font-weight="700" fill="#334155" text-anchor="middle">generate credentials</text>
+  <text x="448" y="496" font-size="9" fill="#64748b" text-anchor="middle">(operator) · 3–4</text>
+
+  <!-- B6 Publish FQDN A record -->
+  <rect x="572" y="366" width="130" height="48" rx="6" fill="#ffffff" stroke="#64748b"/>
+  <text x="637" y="386" font-size="10" font-weight="700" fill="#334155" text-anchor="middle">Publish FQDN A record</text>
+  <text x="637" y="402" font-size="9" fill="#64748b" text-anchor="middle">(operator) · 6</text>
+
+  <!-- B7 Configure, start agent -->
+  <rect x="710" y="366" width="126" height="48" rx="6" fill="#ffffff" stroke="#64748b"/>
+  <text x="773" y="386" font-size="9.5" font-weight="700" fill="#334155" text-anchor="middle">Configure, start agent</text>
+  <text x="773" y="402" font-size="9" fill="#64748b" text-anchor="middle">(operator) · 7</text>
+
+  <!-- B8 Token, CSR -->
+  <rect x="585" y="430" width="150" height="48" rx="6" fill="#ffffff" stroke="#64748b"/>
+  <text x="660" y="449" font-size="9.5" font-weight="700" fill="#334155" text-anchor="middle">Token, then CSR + own CA</text>
+  <text x="660" y="466" font-size="9" fill="#64748b" text-anchor="middle">(agent) · 8–9</text>
+
+  <!-- B9 wait: certificate pending signature -->
+  <rect x="585" y="494" width="150" height="64" rx="6" fill="#ffffff" stroke="#64748b" stroke-width="1.2" stroke-dasharray="6 4"/>
+  <circle cx="660" cy="507" r="6" fill="#ffffff" stroke="#64748b" stroke-width="1.2"/>
+  <path d="M660,507 L660,503 M660,507 L663,507" stroke="#64748b" stroke-width="1.2" stroke-linecap="round"/>
+  <text x="660" y="525" font-size="9.5" font-weight="700" fill="#334155" text-anchor="middle">Certificate pending</text>
+  <text x="660" y="537" font-size="9.5" font-weight="700" fill="#334155" text-anchor="middle">signature</text>
+  <text x="660" y="551" font-size="9" fill="#64748b" text-anchor="middle">(agent) · 10 · waits — normal</text>
+
+  <!-- B14 Retrieve certificate -->
+  <rect x="1150" y="430" width="130" height="52" rx="6" fill="#ffffff" stroke="#64748b"/>
+  <text x="1215" y="449" font-size="9.5" font-weight="700" fill="#334155" text-anchor="middle">Retrieve cert + Hub CA</text>
+  <text x="1215" y="466" font-size="9" fill="#64748b" text-anchor="middle">(agent) · 16</text>
+
+  <!-- ============ Arrows (start at the acting party) ============ -->
+  <!-- 1: HubOps creates in MCM -> MCM sends email -->
+  <path d="M255,210 V294 H379" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- 2: activation email Hub -> Participant -->
+  <line x1="448" y1="322" x2="448" y2="362" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- 5: endpoints handed to the participant -->
+  <path d="M513,198 H773 V362" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- 9: CSR submitted, HubOps signs -->
+  <path d="M735,454 H851 V184 H868" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="843" y="320" font-size="9" fill="#475569" text-anchor="end">submitted CSR</text>
+  <!-- 11 -> 12: HubOps sign action goes to Vault via MCM -->
+  <line x1="933" y1="212" x2="933" y2="260" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- 14 -> 15: trigger goes to the central ledger -->
+  <line x1="1070" y1="212" x2="1070" y2="260" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- signed cert Hub -> Participant -->
+  <path d="M933,322 V456 H1146" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="1040" y="448" font-size="9" fill="#475569" text-anchor="middle">signed cert + Hub CA</text>
+
+  <!-- mTLS live, both directions -->
+  <line x1="1305" y1="252" x2="1305" y2="566" stroke="#6366f1" stroke-width="3" marker-start="url(#arrowIndigo)" marker-end="url(#arrowIndigo)"/>
+  <text x="1225" y="588" font-size="9.5" font-weight="600" fill="#4f46e5" text-anchor="middle">mTLS link live in both directions</text>
+
+  <!-- Legend -->
+  <rect x="190" y="662" width="14" height="14" rx="3" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="212" y="673" font-size="10.5" fill="#64748b">Hub operator activity</text>
+  <rect x="500" y="662" width="14" height="14" rx="3" fill="#e0e7ff" stroke="#6366f1"/>
+  <text x="522" y="673" font-size="10.5" fill="#64748b">Hub systems activity — MCM · Vault PKI · Central ledger</text>
+  <rect x="810" y="662" width="14" height="14" rx="3" fill="#ffffff" stroke="#64748b"/>
+  <text x="832" y="673" font-size="10.5" fill="#64748b">participant activity — (operator) / (agent)</text>
+  <rect x="190" y="690" width="14" height="14" rx="3" fill="#ffffff" stroke="#64748b" stroke-dasharray="4 3"/>
+  <text x="212" y="701" font-size="10.5" fill="#64748b">dashed — waiting (normal), resumes on its own</text>
+  <line x1="500" y1="697" x2="540" y2="697" stroke="#6366f1" stroke-width="3"/>
+  <text x="550" y="701" font-size="10.5" fill="#64748b">live mTLS traffic in both directions</text>
+  <text x="810" y="701" font-size="10.5" fill="#64748b">arrows start at the acting party</text>
+</svg>
