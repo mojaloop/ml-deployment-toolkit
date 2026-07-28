@@ -31,6 +31,10 @@ The Hub operator never touches the participant's cluster; the participant never 
 
 ## The choreography
 
+![Participant onboarding — phase overview](../diagrams/participant-onboarding.svg)
+
+The overview above groups the exchange into its five phases; the sequence below gives the step-by-step detail.
+
 ```mermaid
 sequenceDiagram
     actor HO as HubOps
