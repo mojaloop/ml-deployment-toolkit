@@ -19,7 +19,7 @@ A cluster can be rebuilt from the artifact and the configuration — but only if
 | Keep | Why | Without it |
 |------|-----|-----------|
 | **Vault unseal keys / root token** | The Secret in the `vault` namespace, which dies with the cluster | The raft snapshots are encrypted and unopenable — the PKI is lost |
-| **Terraform state** (`artifacts/<env>/`) | Terraform's record of the infrastructure | Terraform cannot manage or cleanly rebuild what it no longer knows exists |
+| **Terraform state** (`artifacts/<env>/`) | Terraform's record of the infrastructure — and, on Talos environments, the machine secrets (the Talos CA key, also written to `artifacts/<env>/talos-secrets/secrets.yaml`) | Terraform cannot manage or cleanly rebuild what it no longer knows exists; on Talos, expired client certs become a [permanent lockout](../operate/known-issues.md#lost-or-expired-cluster-access-kubeconfig-and-talosconfig) — the API is mTLS-only with no fallback |
 | **`config.yaml` and `.env`** | The environment's identity and secrets | No way to reproduce the same cluster |
 
 Back the first two up explicitly — see [Backups → What the adopter must back up](backup.md#what-the-adopter-must-back-up). The third is the adopter's to keep safe from the moment it is created; `.env` is git-ignored and exists nowhere but the adopter's disk.
