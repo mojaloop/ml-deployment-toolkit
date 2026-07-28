@@ -1,0 +1,128 @@
+# ------------------------------------------------------------------
+# INFRASTRUCTURE & CLUSTER CONFIGURATION (sample — env/switch cluster)
+# ------------------------------------------------------------------
+# Copy this file to config.yaml and edit for your environment.
+# Secrets live in .env (sourced via Makefile) — never put credentials here.
+# Proxmox credentials: native PROXMOX_VE_* env vars.
+# Flux-config secrets: TF_VAR_* env vars (digitalocean_token, oci_repo_*, oci_proxy_*).
+# ------------------------------------------------------------------
+
+# ------------------------------------------------------------------
+# 1. INFRASTRUCTURE PROVIDER
+# ------------------------------------------------------------------
+infra:
+  provider: "proxmox"  # proxmox | aws | digitalocean
+
+  # --- Proxmox ---
+  proxmox:
+    # Maps deployment template placement groups → Proxmox physical nodes
+    placement:
+      placement-group-1: "pve-node-1"
+      placement-group-2: "pve-node-2"
+      placement-group-3: "pve-node-3"
+    network_bridge: "vmbr0"
+    storage:
+      disks: "local-lvm"
+      images: "local"
+      snippets: "local"
+
+  # Talos node OS overrides (optional — any on-prem provider)
+  talos:
+    nameservers:
+      - "8.8.8.8"
+      - "1.1.1.1"
+    ntp_servers:
+      - "time.cloudflare.com"
+
+  # # --- AWS ---
+  # aws:
+  #   region: "us-east-1"
+  #   vpc_cidr: "10.0.0.0/16"
+  #   availability_zones:
+  #     - "us-east-1a"
+  #     - "us-east-1b"
+  #     - "us-east-1c"
+
+  # # --- DigitalOcean ---
+  # digitalocean:
+  #   region: "nyc1"
+  #   vpc_cidr: "10.10.0.0/16"
+
+# ------------------------------------------------------------------
+# 2. SIZING PROFILE
+# ------------------------------------------------------------------
+profile: "tps-10"  # TPS-based profile (see config/providers/proxmox/profiles/env/)
+
+# ------------------------------------------------------------------
+# 3. CLUSTER PARAMETERS
+# ------------------------------------------------------------------
+cluster:
+  name: "my-switch"
+  role: "env"                        # cc | env — determines which gitops paths are deployed
+
+  # Kubernetes API endpoint
+  vip: "192.168.0.214"              # Proxmox: floating IP
+
+  # Flux configuration
+  flux:
+    version: "2.7.2"
+
+# ------------------------------------------------------------------
+# 4. DNS
+# ------------------------------------------------------------------
+dns:
+  provider: "route53"
+  domain: "sw1.lab1.example.com"
+
+  # Supported providers: digitalocean | cloudflare | route53
+  # Credentials come from .env: DIGITALOCEAN_TOKEN, CLOUDFLARE_API_TOKEN,
+  # or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_REGION for route53.
+
+# ------------------------------------------------------------------
+# 5. APPLICATION PARAMETERS
+# ------------------------------------------------------------------
+app:
+  lb_ipam:
+    range: "192.168.0.215-192.168.0.217"
+  alert_email: "ops@example.com"
+  # Mojaloop API dialect for ALS, quoting-service, and ml-api-adapter.
+  #   fspiop    — FSPIOP 1.x JSON message bodies (default)
+  #   iso20022  — ISO 20022 message bodies (FSPIOP 2.0 envelope)
+  # Switching modes mid-flight breaks in-progress transfers (Kafka topics carry
+  # bodies in the previous dialect). Set this once at deploy time. DFSPs and
+  # simulators connecting to the switch must use the same dialect.
+  api_type: "fspiop"
+
+# ------------------------------------------------------------------
+# 6. BACKUP
+# ------------------------------------------------------------------
+backup:
+  s3:
+    endpoint: "https://s3.int.cc1.lab1.example.com"
+    bucket: "backups"
+    region: "us-east-1"
+  # Credentials (BACKUP_S3_ACCESS_KEY, BACKUP_S3_SECRET_KEY) live in .env
+
+# ------------------------------------------------------------------
+# 6.5. OBSERVABILITY
+# ------------------------------------------------------------------
+observability:
+  loki_url: "https://loki.int.cc1.lab1.example.com/loki/api/v1/push"
+  mimir_url: "https://thanos.int.cc1.lab1.example.com/api/v1/receive"
+  tempo_url: "https://tempo.int.cc1.lab1.example.com/v1/traces"       # OTLP/HTTP via gw-int route
+
+# ------------------------------------------------------------------
+# 7. OCI CONFIGURATION
+# ------------------------------------------------------------------
+oci:
+  # OCI-REPO: Platform team's OCI registry where the Flux gitops artifact lives
+  repo:
+    active: true                    # Enable Flux OCI reconciliation
+    url: "oci://ghcr.io/your-org/ml-deployment-toolkit"
+    version: "latest"               # OCI tag — use "latest" or pin to a specific version
+
+  # OCI-PROXY: Harbor as transparent pull-through cache for container images
+  # Configured at Talos level (machine.registries.mirrors) so containerd routes pulls through Harbor
+  proxy:
+    active: true                   # Enable container image proxy through Harbor
+    url: "harbor.int.cc1.lab1.example.com"   # Harbor proxy cache URL (no oci:// prefix — used in Talos mirrors)

@@ -41,4 +41,15 @@ _*
 
 .env
 
+# --- Environment configs: everything ignored by default. ---
+# Only the exact example files whitelisted below are ever tracked.
+# Rule order matters (last match wins) — do not reorder or "simplify" this block.
 config/environments/*
+!config/environments/mlf-lab1-cc1/
+!config/environments/mlf-lab1-sw1/
+config/environments/mlf-lab1-cc1/*
+config/environments/mlf-lab1-sw1/*
+!config/environments/mlf-lab1-cc1/config.yaml.sample
+!config/environments/mlf-lab1-cc1/.env.sample
+!config/environments/mlf-lab1-sw1/config.yaml.sample
+!config/environments/mlf-lab1-sw1/.env.sample
