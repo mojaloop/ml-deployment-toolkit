@@ -184,7 +184,11 @@
       "additionalProperties": false,
       "properties": {
         "provider": {
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "acme"
+          ],
+          "description": "Certificate issuance method. Only ACME is implemented; a private CA (Vault PKI) is not available yet."
         },
         "email": {
           "type": "string"

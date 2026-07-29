@@ -87,7 +87,7 @@ make plan ENV=<env>
 
 **The infra plan must show no changes.** If it plans to replace anything, stop — that is a mis-run migration, not an upgrade. The config plan is different: Kustomizations show as replacements because they moved from individual resources into a `for_each` map, which is safe, since Flux keeps reconciling from identical manifests.
 
-**Keep the existing passwords.** Any generated secret whose UPPER_CASE name is present and non-empty in `.env` is used as-is instead of being generated, so an environment carrying its passwords forward keeps them — see [Configuration → Secrets](configuration.md#secrets). Read the current values with `make secrets ENV=<env>` before migrating, so they can be written into `.env` if they are not already there.
+**Keep the existing passwords.** Any generated secret whose UPPER_CASE name is present and non-empty in `.env` is used as-is instead of being generated, so an environment that writes its current values into `.env` keeps them — see [Configuration → Secrets](configuration.md#secrets). While the old cluster is still running, the values can be read from the `cluster-secrets` Secret in `flux-system`.
 
 ## Rolling back
 

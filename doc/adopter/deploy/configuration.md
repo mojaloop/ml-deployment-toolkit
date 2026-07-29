@@ -353,7 +353,7 @@ The SMTP host, port, sender, alert recipient, and Telegram chat ID are **not** s
 $EDITOR environments/<env>/.env
 ```
 
-Three things worth knowing:
+Four things worth knowing:
 
 - **Any generated secret can be pinned** by setting its UPPER_CASE name in `.env` — `MYSQL_ROOT_PASSWORD`, `HARBOR_ADMIN_PASSWORD`, and so on. A non-empty value there is used verbatim and nothing is generated for that name; generation only kicks in for names that are absent or empty. This is how an `external-unmanaged` data store receives its credentials, and it is the migration path for an existing environment whose passwords must not rotate — see [Upgrading → Migrating an existing environment](upgrading.md#migrating-an-existing-environment).
 - **The Ory signing secrets are pinnable too.** `KRATOS_SECRETS_CIPHER`, `KRATOS_SECRETS_COOKIE`, `KRATOS_SECRETS_CSRF_COOKIE`, `KRATOS_SECRETS_DEFAULT`, `HYDRA_SECRETS_SYSTEM`, and `HYDRA_SECRETS_COOKIE` behave like the passwords. They matter more than most: rotating `KRATOS_SECRETS_CIPHER` makes stored credential and recovery material undecryptable, and rotating `HYDRA_SECRETS_SYSTEM` invalidates every issued token and consent grant.
@@ -412,7 +412,7 @@ This checks, in order: `config.yaml` against the JSON Schema, the selected templ
 Two properties of the schema checker are worth knowing:
 
 - **The validator refuses to ignore a constraint.** `tools/validate.py` implements a deliberate subset of JSON Schema, and any keyword outside that subset is reported as a schema error rather than skipped. A constraint added to a schema therefore either takes effect or fails loudly — it can never be silently ignored.
-- **The schemas have their own self-check.** `tools/test-validation.sh` runs 18 cases against the tracked samples — 2 that must be accepted and 16 that must be rejected — and is the place to add a case when a rule changes.
+- **The schemas have their own self-check.** `tools/test-validation.sh` runs 19 cases against the tracked samples — 2 that must be accepted and 17 that must be rejected — and is the place to add a case when a rule changes.
 
 ### Rules that fail at plan time
 

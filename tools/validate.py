@@ -3,7 +3,8 @@
 
 Implements exactly the keyword subset used by config/schemas/*.json:
 type, properties, required, additionalProperties, enum, pattern, items,
-minimum, maximum. Anything else in a schema is ignored.
+minimum, maximum. A schema using any other keyword is rejected as a schema
+error, so a constraint added later can never be silently ignored.
 
 Usage: yq -o json e '.' file.yaml | python3 tools/validate.py <schema.json>
 Exits non-zero with one line per violation.
