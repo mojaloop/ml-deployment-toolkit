@@ -84,6 +84,14 @@ define CHECK_ENV
 	@if [ ! -f "$(ENV_DIR)/config.yaml" ]; then echo "ERROR: $(ENV_DIR)/config.yaml not found"; exit 1; fi
 endef
 
+# Both stack directories are shared by every environment, and terraform silently
+# reuses whichever backend was last initialized there. Any target that runs
+# terraform MUST rebind the backend to $(ENV) first — otherwise `make destroy
+# ENV=a` happily operates on environment b's state, reporting success.
+# -reconfigure (not -upgrade) keeps this cheap enough to do every time.
+BIND_INFRA  = terraform init -reconfigure -input=false -backend-config="$(INFRA_BACKEND)" >/dev/null
+BIND_CONFIG = terraform init -reconfigure -input=false -backend-config="$(CONFIG_BACKEND)" >/dev/null
+
 .DEFAULT_GOAL := help
 
 # GitOps artifact settings (override via env or command line)
@@ -173,44 +181,44 @@ init: init-infra init-config
 plan-infra: init-infra
 	$(CHECK_ENV)
 	@echo "Planning infra stack (ENV=$(ENV))..."
-	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform plan -out=../../$(INFRA_PLAN)
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && $(BIND_INFRA) && terraform plan -out=../../$(INFRA_PLAN)
 
 plan-config: init-config
 	$(CHECK_ENV)
 	@echo "Planning config stack (ENV=$(ENV))..."
-	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform plan -out=../../$(CONFIG_PLAN)
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform plan -out=../../$(CONFIG_PLAN)
 
 plan: plan-infra plan-config
 
 apply-infra:
 	$(CHECK_ENV)
 	@if [ ! -f "$(INFRA_PLAN)" ]; then echo "No infra plan — run 'make plan-infra ENV=$(ENV)'"; exit 1; fi
-	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform apply ../../$(INFRA_PLAN)
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && $(BIND_INFRA) && terraform apply ../../$(INFRA_PLAN)
 
 # Fast path: config changes converge without touching infrastructure.
 apply-config: init-config
 	$(CHECK_ENV)
 	@echo "Applying config stack only (ENV=$(ENV))..."
-	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform plan -out=../../$(CONFIG_PLAN)
-	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform apply ../../$(CONFIG_PLAN)
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform plan -out=../../$(CONFIG_PLAN)
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform apply ../../$(CONFIG_PLAN)
 
 apply:
 	$(CHECK_ENV)
 	@if [ ! -f "$(INFRA_PLAN)" ]; then echo "No infra plan — run 'make plan ENV=$(ENV)'"; exit 1; fi
-	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform apply ../../$(INFRA_PLAN)
-	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform plan -out=../../$(CONFIG_PLAN)
-	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform apply ../../$(CONFIG_PLAN)
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && $(BIND_INFRA) && terraform apply ../../$(INFRA_PLAN)
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform plan -out=../../$(CONFIG_PLAN)
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform apply ../../$(CONFIG_PLAN)
 
 # Plan and apply both stacks in order (config planned AFTER infra applies, so
 # it sees the real cluster).
 plan-apply: init
 	$(CHECK_ENV)
 	@echo "Deploying infra stack (ENV=$(ENV))..."
-	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform plan -out=../../$(INFRA_PLAN)
-	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform apply ../../$(INFRA_PLAN)
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && $(BIND_INFRA) && terraform plan -out=../../$(INFRA_PLAN)
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && $(BIND_INFRA) && terraform apply ../../$(INFRA_PLAN)
 	@echo "Deploying config stack (ENV=$(ENV))..."
-	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform plan -out=../../$(CONFIG_PLAN)
-	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform apply ../../$(CONFIG_PLAN)
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform plan -out=../../$(CONFIG_PLAN)
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform apply ../../$(CONFIG_PLAN)
 
 # --------------------------------------------------------------------------
 # Generated secrets
@@ -218,7 +226,7 @@ plan-apply: init
 
 secrets:
 	$(CHECK_ENV)
-	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform output -json generated_secrets | jq .
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform output -json generated_secrets | jq .
 
 # --------------------------------------------------------------------------
 # Destroy
@@ -231,9 +239,9 @@ destroy:
 	@sleep 5
 	@$(ENSURE_KUBECONFIG)
 	@echo "Destroying config stack (best effort)..."
-	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform destroy -auto-approve -refresh=false || true
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform destroy -auto-approve -refresh=false || true
 	@echo "Destroying infra stack..."
-	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform destroy -auto-approve
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && $(BIND_INFRA) && terraform destroy -auto-approve
 
 destroy-fast:
 	$(CHECK_ENV)
@@ -241,8 +249,8 @@ destroy-fast:
 	@echo "Press Ctrl+C to cancel, or wait 3 seconds to continue..."
 	@sleep 3
 	@$(ENSURE_KUBECONFIG)
-	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform destroy -auto-approve -refresh=false || true
-	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform destroy -auto-approve -refresh=false
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform destroy -auto-approve -refresh=false || true
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && $(BIND_INFRA) && terraform destroy -auto-approve -refresh=false
 
 # Removes generated artifacts for ONE environment, never the Terraform state —
 # deleting state orphans running VMs and managed clusters.
@@ -256,13 +264,13 @@ clean:
 list:
 	$(CHECK_ENV)
 	@echo "--- infra stack ---"
-	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform state list
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && $(BIND_INFRA) && terraform state list
 	@echo "--- config stack ---"
-	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform state list
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform state list
 
 show:
 	$(CHECK_ENV)
-	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform show
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && $(BIND_INFRA) && terraform show
 
 # --------------------------------------------------------------------------
 # Manifest Rendering (Jsonnet -> YAML)
