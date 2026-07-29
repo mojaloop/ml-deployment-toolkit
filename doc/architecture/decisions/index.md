@@ -23,9 +23,10 @@ Records are **append-only**. A decision the system has moved past is marked supe
 | [009](009-single-mysql-cluster.md) | One MySQL cluster for all services | accepted |
 | [010](010-dual-realm-keycloak.md) | Dual-realm Keycloak with Kratos OIDC | **superseded by 014** |
 | [011](011-dns01-over-http01.md) | DNS-01 over HTTP-01 ACME challenges | accepted |
-| [012](012-tps-sizing-profiles.md) | TPS-based sizing profiles | accepted |
+| [012](012-tps-sizing-profiles.md) | TPS-based sizing profiles | **superseded by 015** |
 | [013](013-cilium-wireguard-internal-encryption.md) | WireGuard encryption for pod-to-pod traffic | accepted |
 | [014](014-ory-identity-stack.md) | Ory as the complete identity and access stack | accepted |
+| [015](015-two-stack-capability-config.md) | Two Terraform stacks and a capability-bound config model | accepted |
 
 ## Writing a new record
 
