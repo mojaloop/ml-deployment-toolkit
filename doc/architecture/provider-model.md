@@ -70,7 +70,7 @@ All three DNS providers use **DNS-01** ACME challenges ([ADR-011](decisions/011-
 
 The ACME account contact is `cert.email` in the environment config — a real field with a real effect, unlike the `app.alert_email` it replaced, which despite its name only ever reached Let's Encrypt.
 
-**Let's Encrypt production is still the only directory URL in use.** The issuer template takes the directory URL as a substitution variable, but the environment schema accepts no field to change it, so every deployment gets the Let's Encrypt production endpoint. Other ACME-compatible certificate authorities and staging endpoints are not selectable today.
+**The ACME directory URL is configurable.** `cert.server` selects it and defaults to Let's Encrypt production, so any ACME-compatible certificate authority — or the Let's Encrypt staging endpoint, while working through rate-limited testing — can be used without touching the manifests. A private CA (Vault PKI) is not an option today: `cert.provider` accepts only `acme`.
 
 The scheme's own CA is separate and unrelated — see [Security](security.md#certificate-authorities).
 
