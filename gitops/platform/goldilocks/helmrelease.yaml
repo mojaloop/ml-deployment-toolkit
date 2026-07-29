@@ -24,25 +24,11 @@ spec:
     remediation:
       retries: 3
   valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: goldilocks-values
+      valuesKey: values.yaml
     - kind: ConfigMap
       name: goldilocks-values-override
       valuesKey: values.yaml
       optional: true
-  values:
-    dashboard:
-      replicaCount: 1
-      resources:
-        requests:
-          cpu: 25m
-          memory: 32Mi
-        limits:
-          memory: 128Mi
-    controller:
-      flags:
-        on-by-default: "true"
-      resources:
-        requests:
-          cpu: 25m
-          memory: 32Mi
-        limits:
-          memory: 128Mi

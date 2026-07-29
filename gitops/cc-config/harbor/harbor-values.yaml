@@ -1,0 +1,37 @@
+# Distribution values for the harbor HelmRelease.
+# Adopter overrides go in environments/<env>/values/harbor.yaml,
+# which is merged after this file and therefore wins.
+expose:
+  type: clusterIP
+  tls:
+    enabled: false
+externalURL: https://harbor.${domain}
+persistence:
+  enabled: true
+  persistentVolumeClaim:
+    registry:
+      size: ${harbor_registry_storage}
+    database:
+      size: ${harbor_db_storage}
+    redis:
+      size: ${harbor_redis_storage}
+    trivy:
+      size: ${harbor_trivy_storage}
+# Use MinIO for S3-compatible storage backend
+imageChartStorage:
+  type: s3
+  s3:
+    region: us-east-1
+    bucket: harbor
+    regionendpoint: http://minio.minio:9000
+    encrypt: false
+    secure: false
+
+# Reduce Trivy scanner memory (scans on-demand, not continuous)
+trivy:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      memory: 512Mi

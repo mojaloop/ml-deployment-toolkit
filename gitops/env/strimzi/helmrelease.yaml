@@ -32,15 +32,11 @@ spec:
     remediation:
       retries: 3
   valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: strimzi-kafka-operator-values
+      valuesKey: values.yaml
     - kind: ConfigMap
       name: strimzi-kafka-operator-values-override
       valuesKey: values.yaml
       optional: true
-  values:
-    watchNamespaces:
-      - data
-    # Pod annotations for Alloy metrics scraping
-    annotations:
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "8080"
-      prometheus.io/path: "/metrics"

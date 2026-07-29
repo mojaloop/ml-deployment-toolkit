@@ -34,37 +34,19 @@ spec:
   dependsOn:
     - name: vault-operator
   valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: minio-values
+      valuesKey: values.yaml
     - kind: Secret
       name: minio-credentials
-      targetPath: rootUser
       valuesKey: rootUser
+      targetPath: rootUser
     - kind: Secret
       name: minio-credentials
-      targetPath: rootPassword
       valuesKey: rootPassword
+      targetPath: rootPassword
     - kind: ConfigMap
       name: minio-values-override
       valuesKey: values.yaml
       optional: true
-  values:
-    mode: standalone
-    replicas: ${minio_replicas}
-    persistence:
-      enabled: true
-      size: ${minio_storage}
-    resources:
-      requests:
-        memory: 256Mi
-    buckets:
-      - name: harbor
-        policy: none
-      - name: backups
-        policy: none
-      - name: thanos
-        policy: none
-      - name: loki
-        policy: none
-      - name: tempo
-        policy: none
-    consoleIngress:
-      enabled: false

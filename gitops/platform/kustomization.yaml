@@ -11,3 +11,38 @@ resources:
   - vpa/helmrelease.yaml
   - goldilocks/helmrelease.yaml
   - reloader/helmrelease.yaml
+
+# Distribution values for each HelmRelease in this kustomization.
+# Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;
+# the adopter's <release>-values-override is merged after them and wins.
+configMapGenerator:
+  - name: cert-manager-values
+    namespace: flux-system
+    files:
+      - values.yaml=cert-manager/cert-manager-values.yaml
+  - name: external-dns-values
+    namespace: flux-system
+    files:
+      - values.yaml=external-dns/external-dns-values.yaml
+  - name: external-secrets-values
+    namespace: flux-system
+    files:
+      - values.yaml=external-secrets/external-secrets-values.yaml
+  - name: goldilocks-values
+    namespace: flux-system
+    files:
+      - values.yaml=goldilocks/goldilocks-values.yaml
+  - name: metrics-server-values
+    namespace: flux-system
+    files:
+      - values.yaml=metrics-server/metrics-server-values.yaml
+  - name: reloader-values
+    namespace: flux-system
+    files:
+      - values.yaml=reloader/reloader-values.yaml
+  - name: vpa-values
+    namespace: flux-system
+    files:
+      - values.yaml=vpa/vpa-values.yaml
+generatorOptions:
+  disableNameSuffixHash: true

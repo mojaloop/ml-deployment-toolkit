@@ -1,0 +1,64 @@
+# Distribution values for the tempo HelmRelease.
+# Adopter overrides go in environments/<env>/values/tempo.yaml,
+# which is merged after this file and therefore wins.
+tempo:
+  multitenancyEnabled: false
+
+  # Receivers for different trace formats
+  receivers:
+    otlp:
+      protocols:
+        http:
+          endpoint: 0.0.0.0:4318
+        grpc:
+          endpoint: 0.0.0.0:4317
+    jaeger:
+      protocols:
+        thrift_http:
+          endpoint: 0.0.0.0:14268
+        grpc:
+          endpoint: 0.0.0.0:14250
+    zipkin:
+      endpoint: 0.0.0.0:9411
+
+  # S3 storage configuration
+  storage:
+    trace:
+      backend: s3
+      s3:
+        bucket: tempo
+        endpoint: minio.minio:9000
+        insecure: true
+        forcepathstyle: true
+        # Credentials injected via valuesFrom above
+
+  # Retention (7 days)
+  retention: 168h
+
+  # Memory ballast for stability
+  memBallastSizeMbs: 128
+
+  # Global overrides
+  global_overrides:
+    max_bytes_per_trace: 5000000
+
+# Resources
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+# Persistence
+persistence:
+  enabled: true
+  size: 2Gi
+
+# Service configuration
+service:
+  type: ClusterIP
+
+# Monitoring
+serviceMonitor:
+  enabled: false

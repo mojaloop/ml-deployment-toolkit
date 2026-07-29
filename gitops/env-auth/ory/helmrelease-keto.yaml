@@ -24,80 +24,11 @@ spec:
       retries: -1
       strategy: uninstall
   valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: keto-values
+      valuesKey: values.yaml
     - kind: ConfigMap
       name: keto-values-override
       valuesKey: values.yaml
       optional: true
-  values:
-    replicaCount: ${keto_replicas}
-    fullnameOverride: "keto"
-
-    secret:
-      enabled: false
-      nameOverride: keto-secret
-
-    deployment:
-      extraInitContainers: |
-        - name: wait-for-db
-          image: percona/percona-xtradb-cluster:8.0.44-35.1
-          command: [sh, -c]
-          args:
-            - |
-              # Extract host, port, user, password from DSN
-              # DSN format: mysql://user:pass@tcp(host:port)/db?params
-              DB_USER=$(echo "$DSN" | sed 's|mysql://\([^:]*\):.*|\1|')
-              DB_PASS=$(echo "$DSN" | sed 's|mysql://[^:]*:\([^@]*\)@.*|\1|')
-              HOST=$(echo "$DSN" | sed 's|.*tcp(\([^:]*\):.*|\1|')
-              PORT=$(echo "$DSN" | sed 's|.*tcp([^:]*:\([^)]*\)).*|\1|')
-              DB=$(echo "$DSN" | sed 's|.*/\([^?]*\).*|\1|')
-              echo "Waiting for MySQL connectivity to $DB..."
-              until mysql -h "$HOST" -P "$PORT" -u "$DB_USER" -p"$DB_PASS" -e "SELECT 1" "$DB" 2>/dev/null; do
-                echo "Waiting for $DB database..."
-                sleep 5
-              done
-              echo "MySQL reachable. Verifying DDL readiness..."
-              STABLE=0
-              while [ $STABLE -lt 3 ]; do
-                if mysql -h "$HOST" -P "$PORT" -u "$DB_USER" -p"$DB_PASS" "$DB" \
-                  -e "CREATE TABLE IF NOT EXISTS __init_check (id INT PRIMARY KEY) ENGINE=InnoDB; DROP TABLE IF EXISTS __init_check;" 2>/dev/null; then
-                  STABLE=$((STABLE + 1))
-                  echo "DDL check passed ($STABLE/3)"
-                else
-                  STABLE=0
-                  echo "DDL not ready, retrying..."
-                fi
-                sleep 2
-              done
-              echo "Database ready!"
-          env:
-            - name: DSN
-              valueFrom:
-                secretKeyRef:
-                  name: keto-secret
-                  key: dsn
-      extraVolumes:
-        - name: keto-opl
-          configMap:
-            name: keto-opl
-      extraVolumeMounts:
-        - name: keto-opl
-          mountPath: /etc/keto-namespaces
-          readOnly: true
-
-    keto:
-      automigration:
-        enabled: true
-        type: initContainer
-      config:
-        dsn: "mysql://keto:${keto_db_password}@tcp(${mysql_host}:${mysql_port})/keto?max_conns=20&max_idle_conns=4"
-        serve:
-          read:
-            port: 4466
-          write:
-            port: 4467
-          metrics:
-            port: 4468
-        # Unified OPL model (MCM Hub/Dfsp/User + FP role/permission/participant).
-        # See keto-opl.yaml. Replaces the legacy flat namespace array.
-        namespaces:
-          location: file:///etc/keto-namespaces/mcm.keto.ts
