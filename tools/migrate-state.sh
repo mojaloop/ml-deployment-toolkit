@@ -62,21 +62,23 @@ echo "  ->  infra : $INFRA_STATE"
 echo "  -> config : $CONFIG_STATE"
 echo
 
-# Resources currently in state
-mapfile -t RESOURCES < <(terraform state list -state="$OLD_STATE" 2>/dev/null || true)
-if [[ ${#RESOURCES[@]} -eq 0 ]]; then
-  echo "ERROR: no resources found in $OLD_STATE" >&2
-  exit 1
-fi
-
+# Resources currently in state (read without mapfile — absent in bash 3.2/macOS)
 CONFIG_RESOURCES=()
 INFRA_RESOURCES=()
-for r in "${RESOURCES[@]}"; do
+COUNT=0
+while IFS= read -r r; do
+  [[ -z "$r" ]] && continue
+  COUNT=$((COUNT + 1))
   case "$r" in
     module.flux_config*) CONFIG_RESOURCES+=("$r") ;;
     *)                   INFRA_RESOURCES+=("$r") ;;
   esac
-done
+done < <(terraform state list -state="$OLD_STATE" 2>/dev/null || true)
+
+if [[ $COUNT -eq 0 ]]; then
+  echo "ERROR: no resources found in $OLD_STATE" >&2
+  exit 1
+fi
 
 echo "Infra stack keeps ${#INFRA_RESOURCES[@]} resource(s); config stack takes ${#CONFIG_RESOURCES[@]}."
 echo
