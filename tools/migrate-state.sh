@@ -101,8 +101,21 @@ if [[ "$MODE" == "--apply" ]]; then
 else
   echo "Dry run complete — re-run with --apply to perform it. Then:"
 fi
+OLD_CLUSTER_NAME="$(yq -r '.cluster.name // ""' "$REPO_ROOT/environments/$ENV_NAME/config.yaml" 2>/dev/null || true)"
+if [[ -n "$OLD_CLUSTER_NAME" && "$OLD_CLUSTER_NAME" != "$ENV_NAME" ]]; then
+  cat <<WARN
+
+  !! This environment's cluster.name ('$OLD_CLUSTER_NAME') differs from its
+     directory name ('$ENV_NAME'). Keep cluster.name EXACTLY as it is in the
+     rewritten config. It is the external-dns TXT owner id, the Vault backup
+     prefix, and the VM name prefix — renaming it orphans every DNS record the
+     cluster published and forces VM replacement.
+WARN
+fi
+
 cat <<EOF
   1. Rewrite environments/$ENV_NAME/config.yaml to the new schema.
+     Carry cluster.name over verbatim (see warning above, if any).
   2. Move secrets: keep only external credentials in .env; existing internal
      passwords stay honored if their UPPER_CASE names remain in .env
      (generation only kicks in for names that are absent or empty).
