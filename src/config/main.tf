@@ -8,11 +8,28 @@
 locals {
   env_config_path = "../../environments/${var.env_name}/config.yaml"
 
+  # Non-secret variables an override file may reference as ${var}.
+  # Flux cannot substitute inside a ConfigMap it does not render, so overrides
+  # are templated here instead — same ${...} syntax as the gitops manifests.
+  # Secrets are deliberately absent: override files are for values, not credentials.
+  override_vars = merge(
+    {
+      cluster_name = module.config.cluster.name
+      domain       = module.config.dns.domain
+      loki_url     = module.config.observability.loki_url
+      mimir_url    = module.config.observability.mimir_url
+      tempo_url    = module.config.observability.tempo_url
+    },
+    { for k, v in module.config.template_app : k => tostring(v) },
+    { for k, v in module.config.template_data : k => tostring(v) },
+    { for k, v in module.config.template_cc : k => tostring(v) },
+  )
+
   # Deployer Helm value overrides — environments/<env>/values/<chart>.yaml
   values_dir = "../../environments/${var.env_name}/values"
   helm_value_overrides = {
     for f in try(fileset(local.values_dir, "*.yaml"), []) :
-    trimsuffix(f, ".yaml") => file("${local.values_dir}/${f}")
+    trimsuffix(f, ".yaml") => templatefile("${local.values_dir}/${f}", local.override_vars)
   }
 }
 
