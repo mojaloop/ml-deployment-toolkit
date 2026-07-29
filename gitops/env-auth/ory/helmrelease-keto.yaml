@@ -23,6 +23,11 @@ spec:
     remediation:
       retries: -1
       strategy: uninstall
+  valuesFrom:
+    - kind: ConfigMap
+      name: keto-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     replicaCount: ${keto_replicas}
     fullnameOverride: "keto"

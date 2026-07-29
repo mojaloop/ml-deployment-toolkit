@@ -25,6 +25,11 @@ spec:
     timeout: 5m
     remediation:
       retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: node-exporter-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     # Run on all nodes including control-plane (Talos mixed-plane)
     tolerations:

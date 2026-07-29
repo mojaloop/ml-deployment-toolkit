@@ -40,6 +40,10 @@ spec:
       name: harbor-credentials
       targetPath: harborAdminPassword
       valuesKey: adminPassword
+    - kind: ConfigMap
+      name: harbor-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     expose:
       type: clusterIP

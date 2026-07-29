@@ -24,6 +24,11 @@ spec:
     remediation:
       retries: -1
       strategy: uninstall
+  valuesFrom:
+    - kind: ConfigMap
+      name: finance-portal-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     global:
       adminApiSvc:
@@ -37,7 +42,7 @@ spec:
         writeURL: "http://keto-write.ory.svc.cluster.local:80"
       reportingDB:
         host: "${mysql_host}"
-        port: 3306
+        port: ${mysql_port}
         user: central_ledger
         database: central_ledger
         secret:

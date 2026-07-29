@@ -1,80 +1,58 @@
-# Makefile for Terraform Infrastructure as Code
-# Run terraform commands with environment variables from .env file
+# Makefile — Mojaloop deployment toolkit
+#
+# Two Terraform stacks per environment:
+#   src/infra   — cluster VMs/managed k8s + Flux bootstrap (slow, infra blast radius)
+#   src/config  — cluster-config/secrets, Kustomizations, values overrides
+#                 (seconds, cannot touch VMs; Flux converges on next cycle)
 #
 # Usage:
-#   make plan ENV=cc          # Plan for the cc environment (default)
-#   make apply ENV=env-prod   # Apply for the env-prod environment
-#   export ENV=cc && make plan  # Set ENV for a session
+#   make plan-apply ENV=<env>     # Full deployment (infra then config)
+#   make apply-config ENV=<env>   # Push config changes only (fast path)
+#   make validate ENV=<env>       # Schema + terraform validation
+#   make secrets ENV=<env>        # Show generated internal passwords
 
-# Variables
 SHELL := /bin/bash
-ENV ?= cc
-ENV_DIR := config/environments/$(ENV)
+ENV ?=
+ENV_DIR := environments/$(ENV)
 ENV_FILE := $(ENV_DIR)/.env
 ARTIFACTS_DIR := artifacts/$(ENV)/terraform
-PLAN_FILE := $(ARTIFACTS_DIR)/tfplan
-TF_DIR := src
-BACKEND_CONFIG := path=../artifacts/$(ENV)/terraform/terraform.tfstate
+INFRA_DIR := src/infra
+CONFIG_DIR := src/config
+INFRA_PLAN := $(ARTIFACTS_DIR)/tfplan-infra
+CONFIG_PLAN := $(ARTIFACTS_DIR)/tfplan-config
+INFRA_BACKEND := path=../../artifacts/$(ENV)/terraform/infra.tfstate
+CONFIG_BACKEND := path=../../artifacts/$(ENV)/terraform/config.tfstate
 
-# Load .env and map clean variable names to Terraform's TF_VAR_ convention
-# DNS credentials are collected into a single map variable (dns_credentials)
-# so any combination of DNS provider variables works without Terraform changes.
-LOAD_ENV = set -a && source ../$(ENV_FILE) && set +a && \
-	export TF_VAR_env_name=$(ENV) \
-	       TF_VAR_dns_credentials='{"digitalocean_token":"'$${DIGITALOCEAN_TOKEN:-}'",'`\
-	       `'"cloudflare_api_token":"'$${CLOUDFLARE_API_TOKEN:-}'",'`\
-	       `'"aws_access_key_id":"'$${AWS_ACCESS_KEY_ID:-}'",'`\
-	       `'"aws_secret_access_key":"'$${AWS_SECRET_ACCESS_KEY:-}'",'`\
-	       `'"aws_region":"'$${AWS_REGION:-}'",'`\
-	       `'"powerdns_api_url":"'$${POWERDNS_API_URL:-}'",'`\
-	       `'"powerdns_api_key":"'$${POWERDNS_API_KEY:-}'",'`\
-	       `'"dns_provider_credentials":"'$${DIGITALOCEAN_TOKEN:-}$${CLOUDFLARE_API_TOKEN:-}$${AWS_ACCESS_KEY_ID:-}$${POWERDNS_API_KEY:-}'"}' \
-	       TF_VAR_oci_repo_username=$${OCI_REPO_USERNAME:-} \
-	       TF_VAR_oci_repo_password=$${OCI_REPO_PASSWORD:-} \
-	       TF_VAR_oci_proxy_username=$${OCI_PROXY_USERNAME:-} \
-	       TF_VAR_oci_proxy_password=$${OCI_PROXY_PASSWORD:-} \
-	       TF_VAR_minio_root_user=$${MINIO_ROOT_USER:-} \
-	       TF_VAR_minio_root_password=$${MINIO_ROOT_PASSWORD:-} \
-	       TF_VAR_harbor_admin_password=$${HARBOR_ADMIN_PASSWORD:-} \
-	       TF_VAR_grafana_admin_password=$${GRAFANA_ADMIN_PASSWORD:-} \
-	       TF_VAR_mysql_root_password=$${MYSQL_ROOT_PASSWORD:-} \
-	       TF_VAR_mysql_central_ledger_password=$${MYSQL_CENTRAL_LEDGER_PASSWORD:-} \
-	       TF_VAR_mysql_account_lookup_password=$${MYSQL_ACCOUNT_LOOKUP_PASSWORD:-} \
-	       TF_VAR_mysql_oracle_msisdn_password=$${MYSQL_ORACLE_MSISDN_PASSWORD:-} \
-	       TF_VAR_mongodb_root_password=$${MONGODB_ROOT_PASSWORD:-} \
-	       TF_VAR_mongodb_app_password=$${MONGODB_APP_PASSWORD:-} \
-	       TF_VAR_keycloak_db_password=$${KEYCLOAK_DB_PASSWORD:-} \
-	       TF_VAR_kratos_db_password=$${KRATOS_DB_PASSWORD:-} \
-	       TF_VAR_keto_db_password=$${KETO_DB_PASSWORD:-} \
-	       TF_VAR_mcm_db_password=$${MCM_DB_PASSWORD:-} \
-	       TF_VAR_hydra_db_password=$${HYDRA_DB_PASSWORD:-} \
-	       TF_VAR_hub_admin_password=$${HUB_ADMIN_PASSWORD:-} \
-	       TF_VAR_hub_admin_email=$${HUB_ADMIN_EMAIL:-} \
-	       TF_VAR_hubop_oidc_secret=$${HUBOP_OIDC_SECRET:-} \
-	       TF_VAR_mcm_oidc_client_secret=$${MCM_OIDC_CLIENT_SECRET:-} \
-	       TF_VAR_role_assign_svc_secret=$${ROLE_ASSIGN_SVC_SECRET:-} \
-	       TF_VAR_dfsp_oidc_client_secret=$${DFSP_OIDC_CLIENT_SECRET:-} \
-	       TF_VAR_hub_participant_name=$${HUB_PARTICIPANT_NAME:-} \
-	       TF_VAR_onboarding_funds_in=$${ONBOARDING_FUNDS_IN:-} \
-	       TF_VAR_onboarding_net_debit_cap=$${ONBOARDING_NET_DEBIT_CAP:-} \
-	       TF_VAR_backup_s3_access_key=$${BACKUP_S3_ACCESS_KEY:-} \
-	       TF_VAR_backup_s3_secret_key=$${BACKUP_S3_SECRET_KEY:-} \
-	       TF_VAR_smtp_host=$${SMTP_HOST:-} \
-	       TF_VAR_smtp_port=$${SMTP_PORT:-587} \
-	       TF_VAR_smtp_user=$${SMTP_USER:-} \
-	       TF_VAR_smtp_password=$${SMTP_PASSWORD:-} \
-	       TF_VAR_alert_email_from=$${ALERT_EMAIL_FROM:-grafana@example.invalid} \
-	       TF_VAR_alert_email_to=$${ALERT_EMAIL_TO:-ops@example.invalid} \
-	       TF_VAR_telegram_bot_token=$${TELEGRAM_BOT_TOKEN:-unset} \
-	       TF_VAR_telegram_chat_id=$${TELEGRAM_CHAT_ID:-0} && \
+# External credential names read from .env into the TF_VAR_secrets map.
+# UPPER_CASE password names double as generation overrides (migrating envs /
+# external-unmanaged data stores).
+SECRET_KEYS := \
+	DIGITALOCEAN_TOKEN CLOUDFLARE_API_TOKEN \
+	AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION \
+	POWERDNS_API_URL POWERDNS_API_KEY \
+	OCI_REPO_USERNAME OCI_REPO_PASSWORD \
+	OCI_PROXY_USERNAME OCI_PROXY_PASSWORD \
+	SMTP_USER SMTP_PASSWORD TELEGRAM_BOT_TOKEN \
+	BACKUP_S3_ACCESS_KEY BACKUP_S3_SECRET_KEY \
+	MINIO_ROOT_USER MINIO_ROOT_PASSWORD HARBOR_ADMIN_PASSWORD GRAFANA_ADMIN_PASSWORD \
+	MYSQL_ROOT_PASSWORD MYSQL_CENTRAL_LEDGER_PASSWORD MYSQL_ACCOUNT_LOOKUP_PASSWORD \
+	MYSQL_ORACLE_MSISDN_PASSWORD MONGODB_ROOT_PASSWORD MONGODB_APP_PASSWORD \
+	KRATOS_DB_PASSWORD KETO_DB_PASSWORD HYDRA_DB_PASSWORD MCM_DB_PASSWORD \
+	HUB_ADMIN_PASSWORD MCM_OIDC_CLIENT_SECRET ROLE_ASSIGN_SVC_SECRET
+
+# Load .env, then build TF_VAR_secrets with jq (reads the process environment
+# directly — no shell interpolation of secret values, quote-safe by design).
+LOAD_ENV = set -a && source ../../$(ENV_FILE) && set +a && \
+	export TF_VAR_env_name=$(ENV) && \
+	export TF_SECRET_KEYS="$(strip $(SECRET_KEYS))" && \
+	export TF_VAR_secrets=$$(jq -cn 'env.TF_SECRET_KEYS | split(" ") | map({key: ., value: (env[.] // "")}) | from_entries') && \
 	export AWS_ACCESS_KEY_ID=$${AWS_ACCESS_KEY_ID:-unused} \
 	       AWS_SECRET_ACCESS_KEY=$${AWS_SECRET_ACCESS_KEY:-unused}
 
 # Placeholder kubeconfig — the alekc/kubectl provider validates (stats + loads)
 # its config_path at plan time, before the real kubeconfig exists on fresh
-# deploys. The placeholder content is never dialed: terraform rewrites the file
-# during apply before any kubernetes/helm/kubectl provider is configured
-# (see src/providers.tf).
+# deploys. The placeholder content is never dialed: the infra stack rewrites
+# the file during apply before any kubernetes/kubectl provider is configured.
 KUBECONFIG_FILE := artifacts/$(ENV)/kubernetes/kubeconfig
 define ENSURE_KUBECONFIG
 	mkdir -p artifacts/$(ENV)/kubernetes; \
@@ -95,161 +73,200 @@ define ENSURE_KUBECONFIG
 			'- name: pending' \
 			'  user: {token: pending}' \
 			> "$(KUBECONFIG_FILE)"; \
-		echo "Seeded placeholder kubeconfig at $(KUBECONFIG_FILE) (replaced during apply)"; \
+		echo "Seeded placeholder kubeconfig at $(KUBECONFIG_FILE)"; \
 	fi
 endef
 
-# Default target
+define CHECK_ENV
+	@if [ -z "$(ENV)" ]; then echo "ERROR: ENV is required, e.g. make $@ ENV=my-env"; exit 1; fi
+	@if [ ! -f "$(ENV_DIR)/config.yaml" ]; then echo "ERROR: $(ENV_DIR)/config.yaml not found"; exit 1; fi
+endef
+
 .DEFAULT_GOAL := help
 
 # GitOps artifact settings (override via env or command line)
 GITOPS_DIR := gitops
-OCI_REPO := $(shell grep -A4 'repo:' $(ENV_DIR)/config.yaml | grep 'url:' | head -1 | sed 's/.*url: *"*oci:\/\///' | sed 's/"*$$//')
+OCI_REPO = $(shell yq -r '.artifact.url' $(ENV_DIR)/config.yaml 2>/dev/null | sed 's|^oci://||')
 GITOPS_VERSION ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "latest")
 
-# Phony targets (not files)
-.PHONY: help init plan apply plan-apply apply-direct apply-force destroy destroy-fast clean validate fmt show list render render-thanos render-cilium push-gitops tag-gitops list-artifacts release
+.PHONY: help init init-infra init-config validate fmt plan plan-infra plan-config \
+	apply apply-infra apply-config plan-apply destroy destroy-fast clean secrets \
+	list show render render-thanos render-cilium push-gitops tag-gitops list-artifacts release
 
-# Help target - displays available commands
 help:
-	@echo "Available targets:"
+	@echo "Available targets (all need ENV=<name>, reading environments/<name>/):"
 	@echo ""
-	@echo "  ENV=<name>  Select environment (default: cc)"
-	@echo "              Reads config from config/environments/<name>/"
-	@echo "              Stores state in artifacts/<name>/"
+	@echo "Main commands:"
+	@echo "  make validate      - Schema-validate config.yaml + template, terraform validate"
+	@echo "  make plan-apply    - Full deployment: infra stack, then config stack"
+	@echo "  make apply-config  - Fast path: apply ONLY config changes (no infra plan)"
+	@echo "  make secrets       - Show generated internal service passwords"
 	@echo ""
-	@echo "Main Commands:"
-	@echo "  make plan         - Create Terraform execution plan (saved to artifacts)"
-	@echo "  make apply        - Apply Terraform changes using saved plan"
-	@echo "  make plan-apply   - Create plan and apply immediately (prevents stale plan)"
+	@echo "Stack-level commands:"
+	@echo "  make init | plan | apply           - Both stacks in order"
+	@echo "  make plan-infra | apply-infra      - Infra stack only"
+	@echo "  make plan-config                   - Config stack only"
 	@echo ""
-	@echo "Alternative Apply Commands:"
-	@echo "  make apply-direct - Apply changes directly without plan (auto-approve)"
-	@echo "  make apply-force  - Force recreate plan and apply (alias for plan-apply)"
+	@echo "Destroy:"
+	@echo "  make destroy       - Destroy config then infra stack"
+	@echo "  make destroy-fast  - Destroy without refresh (resources already gone)"
 	@echo ""
-	@echo "Destroy Commands:"
-	@echo "  make destroy      - Destroy all Terraform-managed infrastructure"
-	@echo "  make destroy-fast - Fast destroy without refresh (when resources already gone)"
+	@echo "GitOps artifact:"
+	@echo "  make push-gitops [GITOPS_VERSION=v1.0.0]  - Push gitops/ as OCI artifact"
+	@echo "  make tag-gitops TAG=latest                - Tag an existing artifact"
+	@echo "  make release TAG=v0.3.0                   - Git tag + OCI artifact push"
+	@echo "  make list-artifacts                       - List published versions"
 	@echo ""
-	@echo "Rendering Commands:"
-	@echo "  make render               - Render all pre-rendered manifests (Jsonnet → YAML)"
-	@echo "  make render-thanos        - Render Thanos manifests only"
-	@echo "  make render-cilium        - Render Cilium bootstrap manifest (CILIUM_VERSION=$(CILIUM_VERSION))"
-	@echo ""
-	@echo "GitOps Commands:"
-	@echo "  make push-gitops          - Push gitops/ as OCI artifact (version=git SHA)"
-	@echo "  make push-gitops GITOPS_VERSION=v1.0.0 - Push with explicit version"
-	@echo "  make tag-gitops TAG=latest - Tag an existing artifact"
-	@echo "  make release TAG=v0.3.0   - Git tag + push + OCI artifact push"
-	@echo "  make list-artifacts       - List published artifact versions"
-	@echo ""
-	@echo "Utility Commands:"
-	@echo "  make validate     - Validate Terraform configuration"
-	@echo "  make fmt          - Format Terraform files"
-	@echo "  make show         - Display current Terraform state"
-	@echo "  make list         - List all Terraform resources"
-	@echo "  make clean        - Remove artifacts and temporary files"
-	@echo ""
-	@echo "Examples:"
-	@echo "  make plan ENV=cc              # Plan Control Center"
-	@echo "  make plan-apply ENV=env-prod  # Plan + apply App Environment"
-	@echo "  export ENV=cc && make plan    # Set ENV for a session"
+	@echo "Rendering: make render | render-thanos | render-cilium"
+	@echo "Utilities: make fmt | clean | list | show"
 
-# Initialize Terraform
-init:
-	@echo "Initializing Terraform (ENV=$(ENV))..."
+# --------------------------------------------------------------------------
+# Validation
+# --------------------------------------------------------------------------
+
+validate:
+	$(CHECK_ENV)
+	@echo "Validating $(ENV_DIR)/config.yaml against schema..."
+	@yq -o json e '.' $(ENV_DIR)/config.yaml | python3 tools/validate.py config/schemas/environment.schema.json
+	@role=$$(yq -r '.cluster.role' $(ENV_DIR)/config.yaml); \
+	 tmpl=$$(yq -r '.template' $(ENV_DIR)/config.yaml); \
+	 tfile="config/templates/$$role/$$tmpl.yaml"; \
+	 if [ ! -f "$$tfile" ]; then echo "ERROR: template $$tfile not found"; exit 1; fi; \
+	 echo "Validating $$tfile against schema..."; \
+	 yq -o json e '.' "$$tfile" | python3 tools/validate.py config/schemas/template.schema.json
+	@provider=$$(yq -r '.infra.provider' $(ENV_DIR)/config.yaml); \
+	 mfile="config/templates/mappings/$$provider.yaml"; \
+	 if [ ! -f "$$mfile" ]; then echo "ERROR: provider mapping $$mfile not found"; exit 1; fi; \
+	 yq -o json e '.' "$$mfile" | python3 tools/validate.py config/schemas/mapping.schema.json
+	@if [ -d "$(INFRA_DIR)/.terraform" ]; then \
+		cd $(INFRA_DIR) && $(LOAD_ENV) && terraform validate && cd ../../$(CONFIG_DIR) && $(LOAD_ENV) && terraform validate; \
+	else \
+		echo "(terraform validate skipped — run 'make init ENV=$(ENV)' first for full validation)"; \
+	fi
+	@echo "Validation OK"
+
+fmt:
+	@cd src && terraform fmt -recursive
+
+# --------------------------------------------------------------------------
+# Init / Plan / Apply
+# --------------------------------------------------------------------------
+
+init-infra:
+	$(CHECK_ENV)
 	@mkdir -p $(ARTIFACTS_DIR)
 	@$(ENSURE_KUBECONFIG)
-	@cd $(TF_DIR) && $(LOAD_ENV) && terraform init -upgrade -reconfigure \
-		-backend-config="$(BACKEND_CONFIG)"
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform init -upgrade -reconfigure \
+		-backend-config="$(INFRA_BACKEND)"
 
-# Validate Terraform configuration
-validate:
-	@echo "Validating Terraform configuration..."
-	@cd $(TF_DIR) && $(LOAD_ENV) && terraform validate
-
-# Format Terraform files
-fmt:
-	@echo "Formatting Terraform files..."
-	@cd $(TF_DIR) && terraform fmt -recursive
-
-# Create Terraform plan and save to artifacts
-plan: init
-	@echo "Creating Terraform plan (ENV=$(ENV))..."
+init-config:
+	$(CHECK_ENV)
 	@mkdir -p $(ARTIFACTS_DIR)
-	@cd $(TF_DIR) && $(LOAD_ENV) && terraform plan -out=../$(PLAN_FILE)
-	@echo "Plan saved to $(PLAN_FILE)"
+	@$(ENSURE_KUBECONFIG)
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform init -upgrade -reconfigure \
+		-backend-config="$(CONFIG_BACKEND)"
 
-# Apply Terraform changes using saved plan
+init: init-infra init-config
+
+plan-infra: init-infra
+	$(CHECK_ENV)
+	@echo "Planning infra stack (ENV=$(ENV))..."
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform plan -out=../../$(INFRA_PLAN)
+
+plan-config: init-config
+	$(CHECK_ENV)
+	@echo "Planning config stack (ENV=$(ENV))..."
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform plan -out=../../$(CONFIG_PLAN)
+
+plan: plan-infra plan-config
+
+apply-infra:
+	$(CHECK_ENV)
+	@if [ ! -f "$(INFRA_PLAN)" ]; then echo "No infra plan — run 'make plan-infra ENV=$(ENV)'"; exit 1; fi
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform apply ../../$(INFRA_PLAN)
+
+# Fast path: config changes converge without touching infrastructure.
+apply-config: init-config
+	$(CHECK_ENV)
+	@echo "Applying config stack only (ENV=$(ENV))..."
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform plan -out=../../$(CONFIG_PLAN)
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform apply ../../$(CONFIG_PLAN)
+
 apply:
-	@if [ ! -f "$(PLAN_FILE)" ]; then \
-		echo "Error: Plan file not found. Run 'make plan ENV=$(ENV)' first."; \
-		exit 1; \
-	fi
-	@echo "Applying Terraform changes from saved plan (ENV=$(ENV))..."
-	@echo "Note: If you get 'stale plan' error, run 'make plan-apply ENV=$(ENV)' instead."
-	@cd $(TF_DIR) && $(LOAD_ENV) && terraform apply ../$(PLAN_FILE)
+	$(CHECK_ENV)
+	@if [ ! -f "$(INFRA_PLAN)" ]; then echo "No infra plan — run 'make plan ENV=$(ENV)'"; exit 1; fi
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform apply ../../$(INFRA_PLAN)
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform plan -out=../../$(CONFIG_PLAN)
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform apply ../../$(CONFIG_PLAN)
 
-# Plan and apply in one step (prevents stale plan issues)
+# Plan and apply both stacks in order (config planned AFTER infra applies, so
+# it sees the real cluster).
 plan-apply: init
-	@echo "Creating and applying Terraform plan (ENV=$(ENV))..."
-	@mkdir -p $(ARTIFACTS_DIR)
-	@cd $(TF_DIR) && $(LOAD_ENV) && terraform plan -out=../$(PLAN_FILE)
-	@echo "Plan created. Applying changes..."
-	@cd $(TF_DIR) && $(LOAD_ENV) && terraform apply ../$(PLAN_FILE)
+	$(CHECK_ENV)
+	@echo "Deploying infra stack (ENV=$(ENV))..."
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform plan -out=../../$(INFRA_PLAN)
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform apply ../../$(INFRA_PLAN)
+	@echo "Deploying config stack (ENV=$(ENV))..."
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform plan -out=../../$(CONFIG_PLAN)
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform apply ../../$(CONFIG_PLAN)
 
-# Apply without plan (direct apply with auto-approve)
-apply-direct: init
-	@echo "WARNING: Applying changes directly without saved plan..."
-	@cd $(TF_DIR) && $(LOAD_ENV) && terraform apply -auto-approve
+# --------------------------------------------------------------------------
+# Generated secrets
+# --------------------------------------------------------------------------
 
-# Force apply - recreate plan and apply immediately
-apply-force: plan-apply
-	@echo "Force apply completed."
+secrets:
+	$(CHECK_ENV)
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform output -json generated_secrets | jq .
 
-# Destroy infrastructure
+# --------------------------------------------------------------------------
+# Destroy
+# --------------------------------------------------------------------------
+
 destroy:
-	@echo "WARNING: This will destroy all Terraform-managed infrastructure (ENV=$(ENV))!"
+	$(CHECK_ENV)
+	@echo "WARNING: destroying ALL infrastructure for ENV=$(ENV)!"
 	@echo "Press Ctrl+C to cancel, or wait 5 seconds to continue..."
 	@sleep 5
 	@$(ENSURE_KUBECONFIG)
-	@cd $(TF_DIR) && $(LOAD_ENV) && terraform destroy -auto-approve
+	@echo "Destroying config stack (best effort)..."
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform destroy -auto-approve -refresh=false || true
+	@echo "Destroying infra stack..."
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform destroy -auto-approve
 
-# Fast destroy without refresh (use when resources are already gone)
 destroy-fast:
-	@echo "WARNING: Fast destroy without refresh - use when resources are already deleted!"
+	$(CHECK_ENV)
+	@echo "WARNING: fast destroy without refresh (ENV=$(ENV))!"
 	@echo "Press Ctrl+C to cancel, or wait 3 seconds to continue..."
 	@sleep 3
 	@$(ENSURE_KUBECONFIG)
-	@cd $(TF_DIR) && $(LOAD_ENV) && terraform destroy -auto-approve -refresh=false
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform destroy -auto-approve -refresh=false || true
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform destroy -auto-approve -refresh=false
 
-# Clean up artifacts
 clean:
 	@echo "Cleaning up artifacts..."
 	@rm -rf artifacts/
 	@echo "Artifacts removed."
 
-# Show current Terraform state
-show:
-	@cd $(TF_DIR) && $(LOAD_ENV) && terraform show
-
-# List Terraform resources
 list:
-	@cd $(TF_DIR) && $(LOAD_ENV) && terraform state list
+	$(CHECK_ENV)
+	@echo "--- infra stack ---"
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform state list
+	@echo "--- config stack ---"
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform state list
+
+show:
+	$(CHECK_ENV)
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform show
 
 # --------------------------------------------------------------------------
-# Manifest Rendering (Jsonnet → YAML)
+# Manifest Rendering (Jsonnet -> YAML)
 # --------------------------------------------------------------------------
 
-# Cilium chart version for the Talos bootstrap manifest
-# (override: make render-cilium CILIUM_VERSION=1.19.4)
 CILIUM_VERSION ?= 1.19.4
 CILIUM_MANIFEST := config/manifests/cilium-$(CILIUM_VERSION).yaml
 
-# Render all components that need pre-rendering
 render: render-thanos render-cilium
 
-# Render Thanos manifests from kube-thanos Jsonnet
 render-thanos:
 	@echo "Rendering Thanos manifests..."
 	@cd rendering/thanos && jb install && \
@@ -258,10 +275,6 @@ render-thanos:
 	for f in thanos-*; do [ -f "$$f" ] && [ "$${f##*.}" != "yaml" ] && yq -p json -o yaml "$$f" > "$$f.yaml" && rm "$$f"; done || true
 	@echo "Thanos manifests rendered to gitops/cc-observability/thanos/"
 
-# Render the Cilium bootstrap manifest fetched by Talos extraManifests.
-# Minimal values only — Flux reconciles the full config (gitops/talos/cilium/)
-# after the cluster is up. Hubble stays disabled so no TLS Secrets are
-# rendered into the committed file; the guard below enforces that.
 render-cilium:
 	@echo "Rendering Cilium $(CILIUM_VERSION) bootstrap manifest..."
 	@mkdir -p config/manifests
@@ -274,19 +287,17 @@ render-cilium:
 		>> $(CILIUM_MANIFEST)
 	@if grep -q "^kind: Secret" $(CILIUM_MANIFEST); then \
 		rm $(CILIUM_MANIFEST); \
-		echo "ERROR: rendered manifest contains Secrets (private keys) — not writing it. Check hubble is disabled in rendering/cilium/values.yaml"; \
+		echo "ERROR: rendered manifest contains Secrets — check hubble is disabled"; \
 		exit 1; \
 	fi
 	@echo "Rendered to $(CILIUM_MANIFEST)"
-	@echo "Reference in config/patches/talos/patch-cilium-install.yaml:"
-	@echo "  https://raw.githubusercontent.com/kiswend/ml-deployment-toolkit/main/$(CILIUM_MANIFEST)"
 
 # --------------------------------------------------------------------------
 # GitOps OCI Artifact Management
 # --------------------------------------------------------------------------
 
-# Push gitops/ directory as OCI artifact
 push-gitops:
+	$(CHECK_ENV)
 	@echo "Pushing gitops artifact to oci://$(OCI_REPO):$(GITOPS_VERSION)..."
 	@set -a && source $(ENV_FILE) && set +a && \
 	flux push artifact oci://$(OCI_REPO):$(GITOPS_VERSION) \
@@ -294,40 +305,33 @@ push-gitops:
 		--source="$(shell git config --get remote.origin.url)" \
 		--revision="$(shell git rev-parse --short HEAD)" \
 		--creds="$$OCI_REPO_USERNAME:$$OCI_REPO_PASSWORD"
-	@echo "Tagging as latest..."
-	@set -a && source $(ENV_FILE) && set +a && \
-	flux tag artifact oci://$(OCI_REPO):$(GITOPS_VERSION) --tag=latest \
-		--creds="$$OCI_REPO_USERNAME:$$OCI_REPO_PASSWORD"
-	@echo "Pushed oci://$(OCI_REPO):$(GITOPS_VERSION) (also tagged latest)"
+	@echo "Pushed oci://$(OCI_REPO):$(GITOPS_VERSION)"
 
-# Tag an existing artifact with an additional tag
 tag-gitops:
+	$(CHECK_ENV)
 	@if [ -z "$(TAG)" ]; then echo "Usage: make tag-gitops TAG=v1.0.0"; exit 1; fi
 	@set -a && source $(ENV_FILE) && set +a && \
 	flux tag artifact oci://$(OCI_REPO):$(GITOPS_VERSION) --tag=$(TAG) \
 		--creds="$$OCI_REPO_USERNAME:$$OCI_REPO_PASSWORD"
 	@echo "Tagged oci://$(OCI_REPO):$(GITOPS_VERSION) as $(TAG)"
 
-# Tag git and push OCI artifact
 release:
-	@if [ -z "$(TAG)" ]; then echo "Usage: make release TAG=v0.3.0 [MSG=\"Release description\"]"; exit 1; fi
+	$(CHECK_ENV)
+	@if [ -z "$(TAG)" ]; then echo "Usage: make release TAG=v0.3.0 [MSG=\"...\"]"; exit 1; fi
 	git tag -a $(TAG) -m "$(or $(MSG),Release $(TAG))"
 	git push origin $(TAG)
-	@echo "Pushing gitops artifact to oci://$(OCI_REPO):$(TAG)..."
 	@set -a && source $(ENV_FILE) && set +a && \
 	flux push artifact oci://$(OCI_REPO):$(TAG) \
 		--path=./$(GITOPS_DIR) \
 		--source="$(shell git config --get remote.origin.url)" \
 		--revision="$(TAG)@sha1:$(shell git rev-parse HEAD)" \
-		--creds="$$OCI_REPO_USERNAME:$$OCI_REPO_PASSWORD"
-	@set -a && source $(ENV_FILE) && set +a && \
+		--creds="$$OCI_REPO_USERNAME:$$OCI_REPO_PASSWORD" && \
 	flux tag artifact oci://$(OCI_REPO):$(TAG) --tag=latest \
 		--creds="$$OCI_REPO_USERNAME:$$OCI_REPO_PASSWORD"
-	@echo "Released $(TAG) — git tag pushed, OCI artifact pushed and tagged latest"
+	@echo "Released $(TAG)"
 
-# List published artifact versions
 list-artifacts:
-	@echo "Artifacts in oci://$(OCI_REPO):"
+	$(CHECK_ENV)
 	@set -a && source $(ENV_FILE) && set +a && \
 	flux list artifacts oci://$(OCI_REPO) \
 		--creds="$$OCI_REPO_USERNAME:$$OCI_REPO_PASSWORD"

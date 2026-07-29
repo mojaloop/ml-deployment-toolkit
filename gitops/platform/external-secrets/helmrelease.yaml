@@ -32,6 +32,11 @@ spec:
     crds: CreateReplace
     remediation:
       retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: external-secrets-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     webhook:
       resources:

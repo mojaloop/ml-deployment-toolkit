@@ -30,6 +30,11 @@ spec:
   upgrade:
     remediation:
       retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: vpa-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     recommender:
       enabled: true

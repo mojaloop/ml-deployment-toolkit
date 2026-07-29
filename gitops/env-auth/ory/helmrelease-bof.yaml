@@ -31,6 +31,11 @@ spec:
     remediation:
       retries: -1
       strategy: uninstall
+  valuesFrom:
+    - kind: ConfigMap
+      name: bof-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     global:
       keto:

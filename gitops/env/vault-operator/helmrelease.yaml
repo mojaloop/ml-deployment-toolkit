@@ -32,6 +32,11 @@ spec:
     crds: CreateReplace
     remediation:
       retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: vault-operator-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     bankVaults:
       watchNamespace: vault

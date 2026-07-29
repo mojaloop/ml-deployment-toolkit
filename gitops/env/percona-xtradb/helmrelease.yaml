@@ -31,5 +31,10 @@ spec:
     crds: CreateReplace
     remediation:
       retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: pxc-operator-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     watchNamespace: "data"

@@ -27,6 +27,11 @@ spec:
   dependsOn:
     - name: loki
     - name: tempo
+  valuesFrom:
+    - kind: ConfigMap
+      name: grafana-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     # Admin credentials
     adminUser: admin

@@ -1,7 +1,7 @@
 # Outputs from Config Loader Module
 
 output "config" {
-  description = "Complete deployer configuration (config.yaml)"
+  description = "Complete environment configuration (config.yaml)"
   value       = local.config
 }
 
@@ -10,19 +10,51 @@ output "provider_name" {
   value       = local.provider_name
 }
 
+output "cluster" {
+  description = "Cluster configuration (name, role, vip, lb_ipam, flux)"
+  value       = local.cluster
+}
+
+output "cluster_role" {
+  description = "Cluster role: cc | env | base"
+  value       = local.cluster_role
+}
+
+output "dns" {
+  description = "DNS configuration"
+  value       = local.config.dns
+}
+
+output "flux_version" {
+  description = "Flux distribution version"
+  value       = local.flux_version
+}
+
+# --- Topology -------------------------------------------------------------
+
 output "instances" {
-  description = "List of all instances with resolved placement"
+  description = "Expanded per-node instances with resolved placement (on-prem)"
   value       = local.instances
 }
 
 output "control_plane_instances" {
-  description = "List of control plane instances (includes mixed-plane)"
+  description = "Control-plane instances (includes mixed-plane)"
   value       = local.control_plane_instances
 }
 
 output "worker_instances" {
-  description = "List of worker instances"
+  description = "Worker instances"
   value       = local.worker_instances
+}
+
+output "aws_node_groups" {
+  description = "EKS node groups derived from template node groups"
+  value       = local.aws_node_groups
+}
+
+output "do_node_pools" {
+  description = "DOKS node pools derived from template node groups"
+  value       = local.do_node_pools
 }
 
 output "workload_classes" {
@@ -41,7 +73,7 @@ output "kubernetes_version" {
 }
 
 output "talos_image" {
-  description = "Talos image URL and file name (constructed from workload-classes.yaml)"
+  description = "Talos image URL and file name"
   value = {
     url       = local.talos_image_url
     file_name = local.talos_image_file_name
@@ -53,44 +85,104 @@ output "label_taint_patches" {
   value       = local.label_taint_patches
 }
 
-output "deployment_template" {
-  description = "Infrastructure topology from profile (provider-specific structure)"
-  value       = local.deployment_template
+# --- Template tuning sections ---------------------------------------------
+
+output "template_app" {
+  description = "Application scaling variables from the template"
+  value       = try(local.template.app, {})
 }
 
-output "profile_app" {
-  description = "Application scaling variables from profile"
-  value       = try(local.profile.app, {})
+output "template_data" {
+  description = "Data layer tuning variables from the template"
+  value       = try(local.template.data, {})
 }
 
-output "profile_data" {
-  description = "Data layer tuning variables from profile"
-  value       = try(local.profile.data, {})
+output "template_cc" {
+  description = "CC services scaling variables from the template"
+  value       = try(local.template.cc, {})
 }
 
-output "profile_cc" {
-  description = "CC services scaling variables from profile"
-  value       = try(local.profile.cc, {})
+# --- Resolved capabilities ------------------------------------------------
+
+output "registry" {
+  description = "Image pull-through cache (resolved)"
+  value = {
+    active = local.registry_active
+    url    = local.registry_url
+  }
 }
 
-output "cluster" {
-  description = "Cluster configuration"
-  value       = local.config.cluster
+output "object_storage" {
+  description = "Backup S3 target (resolved)"
+  value = {
+    endpoint = local.backup_s3_endpoint
+    bucket   = local.backup_s3_bucket
+    region   = local.backup_s3_region
+  }
 }
 
-output "dns" {
-  description = "DNS configuration"
-  value       = local.config.dns
+output "observability" {
+  description = "Telemetry push sink URLs (resolved)"
+  value = {
+    loki_url  = local.loki_url
+    mimir_url = local.mimir_url
+    tempo_url = local.tempo_url
+  }
+}
+
+output "cert" {
+  description = "ACME parameters (resolved)"
+  value = {
+    acme_email  = local.acme_email
+    acme_server = local.acme_server
+  }
+}
+
+output "email" {
+  description = "Transactional SMTP parameters (non-secret)"
+  value = {
+    host = local.smtp_host
+    port = local.smtp_port
+    from = local.email_from
+  }
+}
+
+output "alerting" {
+  description = "Alert delivery parameters (non-secret)"
+  value = {
+    email_to         = local.alert_email_to
+    telegram_chat_id = local.telegram_chat_id
+  }
+}
+
+output "data_stores" {
+  description = "Per-store data layer resolution: mode, in_cluster, host, port"
+  value       = local.data_stores
+}
+
+output "artifact" {
+  description = "Distribution gitops artifact (resolved)"
+  value = {
+    active  = local.artifact_active
+    url     = local.artifact_url
+    version = local.artifact_version
+  }
 }
 
 output "app" {
-  description = "Application configuration"
-  value       = local.config.app
+  description = "Application / hub parameters"
+  value = {
+    api_type                 = local.api_type
+    hub_participant_name     = local.hub_participant_name
+    hub_admin_email          = local.hub_admin_email
+    onboarding_funds_in      = local.onboarding_funds_in
+    onboarding_net_debit_cap = local.onboarding_net_debit_cap
+  }
 }
 
 output "paths" {
-  description = "Standard paths for shared resources"
+  description = "Standard paths for shared resources (relative to a stack root)"
   value = {
-    patches = "../config/patches/talos"
+    patches = "../../config/patches/talos"
   }
 }

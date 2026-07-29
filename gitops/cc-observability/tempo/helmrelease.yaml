@@ -35,6 +35,10 @@ spec:
       name: tempo-s3-credentials
       targetPath: tempo.storage.trace.s3.secret_key
       valuesKey: secretKey
+    - kind: ConfigMap
+      name: tempo-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     tempo:
       multitenancyEnabled: false

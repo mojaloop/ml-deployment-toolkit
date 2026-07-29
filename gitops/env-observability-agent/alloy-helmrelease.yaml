@@ -25,6 +25,11 @@ spec:
     timeout: 10m
     remediation:
       retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: alloy-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     # Deploy as DaemonSet (one pod per node for log collection)
     controller:

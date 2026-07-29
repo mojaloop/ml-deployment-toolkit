@@ -34,6 +34,11 @@ spec:
   upgrade:
     remediation:
       retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: reloader-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     reloader:
       watchGlobally: true

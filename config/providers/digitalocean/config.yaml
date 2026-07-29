@@ -1,6 +1,0 @@
-# DigitalOcean Infrastructure Configuration
-# Provider-specific settings for DOKS managed Kubernetes
-
-# VPC defaults
-vpc:
-  ip_range: "10.10.0.0/16"

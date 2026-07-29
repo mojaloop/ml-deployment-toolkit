@@ -1,31 +1,35 @@
+# yaml-language-server: $schema=../../config/schemas/environment.schema.json
 # ------------------------------------------------------------------
-# INFRASTRUCTURE & CLUSTER CONFIGURATION (sample — env/switch cluster)
-# ------------------------------------------------------------------
+# Environment config (sample — env/switch cluster, backed by a CC)
 # Copy this file to config.yaml and edit for your environment.
-# Secrets live in .env (sourced via Makefile) — never put credentials here.
-# Proxmox credentials: native PROXMOX_VE_* env vars.
-# Flux-config secrets: TF_VAR_* env vars (digitalocean_token, oci_repo_*, oci_proxy_*).
+# Secrets live in .env next to this file (sourced via Makefile) —
+# never put credentials here.
 # ------------------------------------------------------------------
+version: 1
 
-# ------------------------------------------------------------------
-# 1. INFRASTRUCTURE PROVIDER
-# ------------------------------------------------------------------
+cluster:
+  name: "my-switch"
+  role: "env"                         # cc | env | base
+  vip: "192.168.0.214"                # Kubernetes API floating IP (on-prem only)
+  lb_ipam:
+    range: "192.168.0.215-192.168.0.217"
+
+# Deployment template — config/templates/{role}/{template}.yaml
+template: "tps-10"
+
 infra:
-  provider: "proxmox"  # proxmox | aws | digitalocean
-
-  # --- Proxmox ---
+  provider: "proxmox"                 # proxmox | aws | digitalocean
   proxmox:
-    # Maps deployment template placement groups → Proxmox physical nodes
+    # Maps template placement groups -> Proxmox physical nodes
     placement:
-      placement-group-1: "pve-node-1"
-      placement-group-2: "pve-node-2"
-      placement-group-3: "pve-node-3"
+      pg-1: "pve-node-1"
+      pg-2: "pve-node-2"
+      pg-3: "pve-node-3"
     network_bridge: "vmbr0"
     storage:
       disks: "local-lvm"
       images: "local"
       snippets: "local"
-
   # Talos node OS overrides (optional — any on-prem provider)
   talos:
     nameservers:
@@ -34,95 +38,79 @@ infra:
     ntp_servers:
       - "time.cloudflare.com"
 
-  # # --- AWS ---
-  # aws:
-  #   region: "us-east-1"
-  #   vpc_cidr: "10.0.0.0/16"
-  #   availability_zones:
-  #     - "us-east-1a"
-  #     - "us-east-1b"
-  #     - "us-east-1c"
-
-  # # --- DigitalOcean ---
-  # digitalocean:
-  #   region: "nyc1"
-  #   vpc_cidr: "10.10.0.0/16"
-
-# ------------------------------------------------------------------
-# 2. SIZING PROFILE
-# ------------------------------------------------------------------
-profile: "tps-10"  # TPS-based profile (see config/providers/proxmox/profiles/env/)
-
-# ------------------------------------------------------------------
-# 3. CLUSTER PARAMETERS
-# ------------------------------------------------------------------
-cluster:
-  name: "my-switch"
-  role: "env"                        # cc | env — determines which gitops paths are deployed
-
-  # Kubernetes API endpoint
-  vip: "192.168.0.214"              # Proxmox: floating IP
-
-  # Flux configuration
-  flux:
-    version: "2.7.2"
-
-# ------------------------------------------------------------------
-# 4. DNS
-# ------------------------------------------------------------------
+# Credentials in .env: DIGITALOCEAN_TOKEN, CLOUDFLARE_API_TOKEN,
+# or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_REGION for route53.
 dns:
-  provider: "route53"
+  provider: "route53"                 # digitalocean | cloudflare | route53
   domain: "sw1.lab1.example.com"
 
-  # Supported providers: digitalocean | cloudflare | route53
-  # Credentials come from .env: DIGITALOCEAN_TOKEN, CLOUDFLARE_API_TOKEN,
-  # or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_REGION for route53.
+# Certificates (ACME). email is the ACME account contact.
+cert:
+  provider: "acme"
+  email: "ops@example.com"
 
-# ------------------------------------------------------------------
-# 5. APPLICATION PARAMETERS
-# ------------------------------------------------------------------
-app:
-  lb_ipam:
-    range: "192.168.0.215-192.168.0.217"
-  alert_email: "ops@example.com"
-  # Mojaloop API dialect for ALS, quoting-service, and ml-api-adapter.
-  #   fspiop    — FSPIOP 1.x JSON message bodies (default)
-  #   iso20022  — ISO 20022 message bodies (FSPIOP 2.0 envelope)
-  # Switching modes mid-flight breaks in-progress transfers (Kafka topics carry
-  # bodies in the previous dialect). Set this once at deploy time. DFSPs and
-  # simulators connecting to the switch must use the same dialect.
-  api_type: "fspiop"
+# Distribution gitops artifact consumed by Flux (credentials OCI_REPO_* in .env)
+artifact:
+  url: "oci://ghcr.io/your-org/ml-deployment-toolkit"
+  version: "latest"                   # OCI tag — "latest" or pin to a version
 
-# ------------------------------------------------------------------
-# 6. BACKUP
-# ------------------------------------------------------------------
-backup:
-  s3:
-    endpoint: "https://s3.int.cc1.lab1.example.com"
-    bucket: "backups"
-    region: "us-east-1"
-  # Credentials (BACKUP_S3_ACCESS_KEY, BACKUP_S3_SECRET_KEY) live in .env
+# One value drives every toolkit-cc preset below: the Tooling Cluster's domain.
+toolkit_cc:
+  domain: "cc1.lab1.example.com"
 
-# ------------------------------------------------------------------
-# 6.5. OBSERVABILITY
-# ------------------------------------------------------------------
+# Image pull-through cache via the CC's Harbor (credentials OCI_PROXY_* in .env)
+registry:
+  provider: "toolkit-cc"              # derives harbor.int.<toolkit_cc.domain>
+
+# Backup target (credentials BACKUP_S3_ACCESS_KEY/SECRET_KEY in .env)
+object_storage:
+  provider: "toolkit-cc"              # derives https://s3.int.<toolkit_cc.domain>
+  bucket: "backups"
+
+# Telemetry push sink
 observability:
-  loki_url: "https://loki.int.cc1.lab1.example.com/loki/api/v1/push"
-  mimir_url: "https://thanos.int.cc1.lab1.example.com/api/v1/receive"
-  tempo_url: "https://tempo.int.cc1.lab1.example.com/v1/traces"       # OTLP/HTTP via gw-int route
+  provider: "toolkit-cc"              # derives loki/thanos/tempo push URLs
 
-# ------------------------------------------------------------------
-# 7. OCI CONFIGURATION
-# ------------------------------------------------------------------
-oci:
-  # OCI-REPO: Platform team's OCI registry where the Flux gitops artifact lives
-  repo:
-    active: true                    # Enable Flux OCI reconciliation
-    url: "oci://ghcr.io/your-org/ml-deployment-toolkit"
-    version: "latest"               # OCI tag — use "latest" or pin to a specific version
+# Data layer — per-store mode: in-cluster-managed | external-unmanaged
+# (external-managed is schema-reserved, not yet implemented)
+data:
+  mysql:
+    mode: "in-cluster-managed"
+  # External MySQL instead (credentials in .env):
+  # mysql:
+  #   mode: "external-unmanaged"
+  #   host: "mysql.lab1.example.com"
+  #   port: "3306"
+  kafka:
+    mode: "in-cluster-managed"
+  mongodb:
+    mode: "in-cluster-managed"
+  redis:
+    mode: "in-cluster-managed"
 
-  # OCI-PROXY: Harbor as transparent pull-through cache for container images
-  # Configured at Talos level (machine.registries.mirrors) so containerd routes pulls through Harbor
-  proxy:
-    active: true                   # Enable container image proxy through Harbor
-    url: "harbor.int.cc1.lab1.example.com"   # Harbor proxy cache URL (no oci:// prefix — used in Talos mirrors)
+# Transactional email (SMTP — Kratos courier). Credentials in .env.
+email:
+  host: "smtp.example.com"
+  port: "587"
+  from: "grafana@example.com"
+
+# Alert delivery channels (Grafana contact points)
+alerting:
+  email:
+    to: "ops@example.com"
+  telegram:                           # token in .env (TELEGRAM_BOT_TOKEN)
+    chat_id: "0"
+
+app:
+  # fspiop | iso20022 — set once at deploy time; switching mid-flight breaks
+  # in-progress transfers. DFSPs and simulators connecting to the switch must
+  # use the same dialect.
+  api_type: "fspiop"
+  hub:
+    participant_name: "Hub"
+    admin_email: "hub-admin@example.com"
+    onboarding:
+      # Initial deposit into DFSP settlement accounts (available liquidity)
+      funds_in: "1000000"
+      # Maximum net debit position — transfers blocked beyond this limit
+      net_debit_cap: "500000"
