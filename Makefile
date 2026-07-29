@@ -38,7 +38,9 @@ SECRET_KEYS := \
 	MYSQL_ROOT_PASSWORD MYSQL_CENTRAL_LEDGER_PASSWORD MYSQL_ACCOUNT_LOOKUP_PASSWORD \
 	MYSQL_ORACLE_MSISDN_PASSWORD MONGODB_ROOT_PASSWORD MONGODB_APP_PASSWORD \
 	KRATOS_DB_PASSWORD KETO_DB_PASSWORD HYDRA_DB_PASSWORD MCM_DB_PASSWORD \
-	HUB_ADMIN_PASSWORD MCM_OIDC_CLIENT_SECRET ROLE_ASSIGN_SVC_SECRET
+	HUB_ADMIN_PASSWORD MCM_OIDC_CLIENT_SECRET ROLE_ASSIGN_SVC_SECRET \
+	KRATOS_SECRETS_CIPHER KRATOS_SECRETS_COOKIE KRATOS_SECRETS_CSRF_COOKIE \
+	KRATOS_SECRETS_DEFAULT HYDRA_SECRETS_SYSTEM HYDRA_SECRETS_COOKIE
 
 # Load .env, then build TF_VAR_secrets with jq (reads the process environment
 # directly — no shell interpolation of secret values, quote-safe by design).
@@ -242,10 +244,14 @@ destroy-fast:
 	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform destroy -auto-approve -refresh=false || true
 	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform destroy -auto-approve -refresh=false
 
+# Removes generated artifacts for ONE environment, never the Terraform state —
+# deleting state orphans running VMs and managed clusters.
 clean:
-	@echo "Cleaning up artifacts..."
-	@rm -rf artifacts/
-	@echo "Artifacts removed."
+	$(CHECK_ENV)
+	@echo "Removing generated artifacts for $(ENV) (state is preserved)..."
+	@rm -rf artifacts/$(ENV)/kubernetes artifacts/$(ENV)/talos artifacts/$(ENV)/talos-config \
+		artifacts/$(ENV)/talos-secrets $(INFRA_PLAN) $(CONFIG_PLAN)
+	@echo "Done. Terraform state under artifacts/$(ENV)/terraform/ was kept."
 
 list:
 	$(CHECK_ENV)

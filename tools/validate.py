@@ -29,6 +29,29 @@ def check_type(value, expected):
     return isinstance(value, TYPES[expected])
 
 
+# Keywords this validator understands. Anything else in a schema would be
+# silently ignored — which would quietly weaken a constraint someone believed
+# they had added — so it is reported as a schema error instead.
+SUPPORTED = {
+    "$schema", "title", "description", "type", "properties", "required",
+    "additionalProperties", "enum", "pattern", "items", "minimum", "maximum",
+}
+
+
+def check_schema_keywords(schema, path, errors):
+    if not isinstance(schema, dict):
+        return
+    for key in schema:
+        if key not in SUPPORTED:
+            errors.append(f"schema{path}: unsupported keyword '{key}' (validator would ignore it)")
+    for key, sub in schema.get("properties", {}).items():
+        check_schema_keywords(sub, f"{path}.{key}", errors)
+    if isinstance(schema.get("items"), dict):
+        check_schema_keywords(schema["items"], f"{path}[]", errors)
+    if isinstance(schema.get("additionalProperties"), dict):
+        check_schema_keywords(schema["additionalProperties"], f"{path}.*", errors)
+
+
 def validate(value, schema, path, errors):
     expected = schema.get("type")
     if expected is not None:
@@ -79,6 +102,7 @@ def main():
         sys.exit(f"invalid JSON on stdin: {exc}")
 
     errors = []
+    check_schema_keywords(schema, "", errors)
     validate(document, schema, "$", errors)
     if errors:
         print("\n".join(errors), file=sys.stderr)
