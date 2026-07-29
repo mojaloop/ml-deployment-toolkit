@@ -36,11 +36,7 @@ The integrator can override the platform's Helm values for **any** chart the dis
 
 This covers a large amount of application-level tailoring — resource sizing, feature flags, chart-exposed settings — with zero maintenance burden, because the override lives in the client's environment. Applying one is `make apply-config ENV=<env>`: seconds, and it cannot touch infrastructure.
 
-One limit, worth knowing before relying on it:
-
-- **Flux substitution variables are not expanded** in these files — `${...}` is literal, so hardcode values.
-
-See [Configuration → Helm value overrides](../adopter/deploy/configuration.md#helm-value-overrides).
+The files are templated: `${domain}`, `${cluster_name}`, the resolved telemetry URLs, and the template's tuning keys expand at apply time, so a client's override does not re-hardcode values the cluster already knows. Secrets are deliberately not exposed, and an unknown `${name}` fails the apply rather than passing through. See [Configuration → Helm value overrides](../adopter/deploy/configuration.md#helm-value-overrides).
 
 ## Forking: carried forever
 

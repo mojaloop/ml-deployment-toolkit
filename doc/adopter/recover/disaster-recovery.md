@@ -24,6 +24,8 @@ A cluster can be rebuilt from the artifact and the configuration — but only if
 
 Back the first two up explicitly — see [Backups → What the adopter must back up](backup.md#what-the-adopter-must-back-up). The third is the adopter's to keep safe from the moment it is created; `.env` is git-ignored and exists nowhere but the adopter's disk.
 
+While a cluster is still running, its generated passwords can be read back two ways — `make secrets ENV=<env>` from the config state, or the `cluster-secrets` Secret in `flux-system`. Neither survives losing both the state and the cluster, which is why the state backup covers `artifacts/<env>/terraform/` in full.
+
 A rebuild with all three is a procedure. A rebuild missing any of them is a partial reconstruction with permanent loss — know which situation applies before starting.
 
 ## The recovery order

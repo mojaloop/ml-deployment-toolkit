@@ -1,9 +1,15 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Environment configuration",
-  "description": "Schema for environments/<name>/config.yaml — flat capability sections. Secrets never live here; they belong in the sibling .env file.",
+  "description": "Schema for environments/<name>/config.yaml \u2014 flat capability sections. Secrets never live here; they belong in the sibling .env file.",
   "type": "object",
-  "required": ["version", "cluster", "template", "infra", "dns"],
+  "required": [
+    "version",
+    "cluster",
+    "template",
+    "infra",
+    "dns"
+  ],
   "additionalProperties": false,
   "properties": {
     "version": {
@@ -14,7 +20,10 @@
     "cluster": {
       "description": "Cluster identity and networking",
       "type": "object",
-      "required": ["name", "role"],
+      "required": [
+        "name",
+        "role"
+      ],
       "additionalProperties": false,
       "properties": {
         "name": {
@@ -24,7 +33,11 @@
         },
         "role": {
           "description": "Determines which gitops paths are deployed and which template directory is used",
-          "enum": ["cc", "env", "base"]
+          "enum": [
+            "cc",
+            "env",
+            "base"
+          ]
         },
         "vip": {
           "description": "Kubernetes API floating IP (on-prem only)",
@@ -40,21 +53,42 @@
               "type": "string"
             }
           }
+        },
+        "flux": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "type": "string",
+              "description": "Flux distribution version"
+            }
+          },
+          "description": "Flux configuration"
+        },
+        "gateway_class_name": {
+          "type": "string",
+          "description": "GatewayClass name for the Gateways (default: cilium)"
         }
       }
     },
     "template": {
-      "description": "Deployment template name — config/templates/{role}/{template}.yaml",
+      "description": "Deployment template name \u2014 config/templates/{role}/{template}.yaml",
       "type": "string"
     },
     "infra": {
       "description": "Infrastructure provider settings",
       "type": "object",
-      "required": ["provider"],
+      "required": [
+        "provider"
+      ],
       "additionalProperties": false,
       "properties": {
         "provider": {
-          "enum": ["proxmox", "aws", "digitalocean"]
+          "enum": [
+            "proxmox",
+            "aws",
+            "digitalocean"
+          ]
         },
         "proxmox": {
           "type": "object",
@@ -89,17 +123,21 @@
           }
         },
         "talos": {
-          "description": "Talos node OS overrides (optional — any on-prem provider)",
+          "description": "Talos node OS overrides (optional \u2014 any on-prem provider)",
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "nameservers": {
               "type": "array",
-              "items": { "type": "string" }
+              "items": {
+                "type": "string"
+              }
             },
             "ntp_servers": {
               "type": "array",
-              "items": { "type": "string" }
+              "items": {
+                "type": "string"
+              }
             }
           }
         },
@@ -118,11 +156,18 @@
     "dns": {
       "description": "DNS zone management. Credentials in .env (DIGITALOCEAN_TOKEN, CLOUDFLARE_API_TOKEN, or AWS_* for route53).",
       "type": "object",
-      "required": ["provider", "domain"],
+      "required": [
+        "provider",
+        "domain"
+      ],
       "additionalProperties": false,
       "properties": {
         "provider": {
-          "enum": ["digitalocean", "cloudflare", "route53"]
+          "enum": [
+            "digitalocean",
+            "cloudflare",
+            "route53"
+          ]
         },
         "domain": {
           "description": "Base domain for this cluster",
@@ -140,6 +185,10 @@
         },
         "email": {
           "type": "string"
+        },
+        "server": {
+          "type": "string",
+          "description": "ACME directory URL (default: Let's Encrypt production)"
         }
       }
     },
@@ -153,13 +202,17 @@
           "type": "string"
         },
         "version": {
-          "description": "OCI tag — 'latest' or a pinned version",
+          "description": "OCI tag \u2014 'latest' or a pinned version",
           "type": "string"
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Enable Flux OCI reconciliation (default: true when url is set)"
         }
       }
     },
     "toolkit_cc": {
-      "description": "Backing Tooling Cluster — one value drives every toolkit-cc preset",
+      "description": "Backing Tooling Cluster \u2014 one value drives every toolkit-cc preset",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -175,7 +228,11 @@
       "properties": {
         "provider": {
           "description": "toolkit-cc derives harbor.int.<toolkit_cc.domain>; harbor uses an explicit url",
-          "enum": ["toolkit-cc", "harbor", "none"]
+          "enum": [
+            "toolkit-cc",
+            "harbor",
+            "none"
+          ]
         },
         "url": {
           "description": "Registry URL (harbor provider only; no oci:// prefix)",
@@ -190,7 +247,11 @@
       "properties": {
         "provider": {
           "description": "toolkit-cc derives https://s3.int.<toolkit_cc.domain>; s3 uses an explicit endpoint",
-          "enum": ["toolkit-cc", "s3", "none"]
+          "enum": [
+            "toolkit-cc",
+            "s3",
+            "none"
+          ]
         },
         "endpoint": {
           "description": "S3 endpoint URL (s3 provider only)",
@@ -211,7 +272,11 @@
       "properties": {
         "provider": {
           "description": "toolkit-cc derives loki/thanos/tempo push URLs; urls uses the explicit *_url fields",
-          "enum": ["toolkit-cc", "urls", "none"]
+          "enum": [
+            "toolkit-cc",
+            "urls",
+            "none"
+          ]
         },
         "loki_url": {
           "type": "string"
@@ -225,7 +290,7 @@
       }
     },
     "data": {
-      "description": "Data layer — per-store deployment mode",
+      "description": "Data layer \u2014 per-store deployment mode",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -234,7 +299,11 @@
           "additionalProperties": false,
           "properties": {
             "mode": {
-              "enum": ["in-cluster-managed", "external-unmanaged", "external-managed"]
+              "enum": [
+                "in-cluster-managed",
+                "external-unmanaged",
+                "external-managed"
+              ]
             },
             "host": {
               "description": "External endpoint (external modes only)",
@@ -251,7 +320,11 @@
           "additionalProperties": false,
           "properties": {
             "mode": {
-              "enum": ["in-cluster-managed", "external-unmanaged", "external-managed"]
+              "enum": [
+                "in-cluster-managed",
+                "external-unmanaged",
+                "external-managed"
+              ]
             },
             "host": {
               "type": "string"
@@ -267,7 +340,11 @@
           "additionalProperties": false,
           "properties": {
             "mode": {
-              "enum": ["in-cluster-managed", "external-unmanaged", "external-managed"]
+              "enum": [
+                "in-cluster-managed",
+                "external-unmanaged",
+                "external-managed"
+              ]
             },
             "host": {
               "type": "string"
@@ -283,7 +360,11 @@
           "additionalProperties": false,
           "properties": {
             "mode": {
-              "enum": ["in-cluster-managed", "external-unmanaged", "external-managed"]
+              "enum": [
+                "in-cluster-managed",
+                "external-unmanaged",
+                "external-managed"
+              ]
             },
             "host": {
               "type": "string"
@@ -344,8 +425,11 @@
       "additionalProperties": false,
       "properties": {
         "api_type": {
-          "description": "Mojaloop API dialect — set once at deploy time",
-          "enum": ["fspiop", "iso20022"]
+          "description": "Mojaloop API dialect \u2014 set once at deploy time",
+          "enum": [
+            "fspiop",
+            "iso20022"
+          ]
         },
         "hub": {
           "type": "object",

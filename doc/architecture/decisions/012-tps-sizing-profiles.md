@@ -37,7 +37,7 @@ Profile files are organized by cluster role:
 
 The deployer's `config.yaml` changes from `template: "h2c1w3"` to `profile: "tps-1"`. The config-loader module resolves the profile path from `provider + role + profile` and outputs infrastructure topology (to provider modules) plus app/data/cc variables (to flux-config, which merges them into the `cluster-config` ConfigMap for Flux postBuild substitution).
 
-Available profiles: [Provider model](../provider-model.md#sizing-profiles)
+Available tiers, in their current form: [Provider model](../provider-model.md#deployment-templates)
 
 ## Consequences
 

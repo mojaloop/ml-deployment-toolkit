@@ -39,9 +39,17 @@ Services reach them by fully-qualified in-cluster DNS:
 | MongoDB | `bulk-mongodb-rs0.data.svc.cluster.local:27017` |
 | Redis | `ttk-redis.data.svc.cluster.local:6379` |
 
-These addresses are injected by Terraform at plan time and substituted into manifests by Flux, which is why the same artifact works across environments without being rebuilt.
+Those are the defaults for a store running **in-cluster**. Both host and port are substitution variables, so an external endpoint on a non-standard port works the same way. The addresses are resolved by Terraform at plan time and substituted into manifests by Flux, which is why the same artifact works across environments without being rebuilt.
 
-The data layer is currently **in-cluster only**. Pointing a Hub at externally managed databases is not configurable today — see `discrepancies.md` item 2.
+Each store is bound independently, in `data.<store>.mode`:
+
+| Mode | Effect on this page |
+|------|---------------------|
+| `in-cluster-managed` (default) | Everything below applies — operator, custom resource, and the toolkit's backup path |
+| `external-unmanaged` | The adopter supplies the endpoint and credentials. No operator, no custom resource, no `env-data-<store>` Kustomization, and **no toolkit backup** — provisioning, tuning, and recovery are the adopter's |
+| `external-managed` | Reserved in the schema, rejected at plan time. Not available |
+
+Mixing modes is supported — external MySQL alongside in-cluster Kafka is a valid Hub. See [Configuration → Data modes](../adopter/deploy/configuration.md#data-modes).
 
 The database **operators** live elsewhere again, in `env-system`. Three namespaces are therefore involved in a data-layer problem: `env-system` for the operator, `data` for the cluster, and `mojaloop` for the client.
 
@@ -99,7 +107,7 @@ MySQL and MongoDB each run **two mechanisms together**, and the distinction matt
 
 Practically: PITR recovers the ledger to the second before a bad write, not merely to the previous night. Without it, worst-case exposure would be a full day of transfers.
 
-Both mechanisms write to the same S3-compatible storage — MinIO on the Tooling Cluster, or a cloud object store. **A full backup alone is not restorable to a point in time, and streamed logs alone are not restorable at all** — recovery needs both, so both must survive.
+Both mechanisms write to whatever the `object_storage` capability is bound to — MinIO on the Tooling Cluster via the `toolkit-cc` preset, or any S3-compatible endpoint. A store bound to `external-unmanaged` is outside this table entirely: the toolkit schedules nothing for it. **A full backup alone is not restorable to a point in time, and streamed logs alone are not restorable at all** — recovery needs both, so both must survive.
 
 **Read the Vault row carefully.** Snapshots run every fifteen minutes and only the last seven are kept, so the retained history is about **one hour and forty-five minutes** — not seven days. Vault holds the scheme PKI. If a compromise or corruption is discovered after two hours, there is no snapshot from before it.
 
@@ -113,7 +121,7 @@ Restore procedures: [Adopter → Recover](../adopter/index.md).
 
 Three things sit outside the backup story entirely, and each has bitten someone:
 
-**Terraform state.** Stored locally under `artifacts/<env>/terraform/`, with no remote backend, no locking, and no versioning. `make clean` deletes it. Losing it means losing Terraform's knowledge of the infrastructure — the cluster keeps running, but Terraform can no longer plan or apply against it. Backing up `artifacts/` falls to the adopter.
+**Terraform state.** Two files, stored locally under `artifacts/<env>/terraform/` — `infra.tfstate` and `config.tfstate` — with no remote backend, no locking, and no versioning. `make clean` deletes both, for every environment. Losing the infra state means losing Terraform's knowledge of the infrastructure — the cluster keeps running, but Terraform can no longer plan or apply against it. Losing the config state means losing the generated internal service passwords unless the cluster is still up to read them from. Backing up `artifacts/` falls to the adopter.
 
 **Vault unseal keys.** Less alarming than it sounds — the operator handles unsealing automatically. Vault is configured with `unsealConfig.kubernetes`, so the operator generates the unseal keys and root token at initialization and **stores them as a Secret in the `vault` namespace**. A pod restart unseals without human involvement.
 
