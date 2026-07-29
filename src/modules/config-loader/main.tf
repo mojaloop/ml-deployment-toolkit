@@ -12,8 +12,13 @@ locals {
   config           = yamldecode(file(var.config_path))
   workload_classes = yamldecode(file(var.workload_classes_path))
 
-  cluster       = local.config.cluster
-  cluster_name  = local.cluster.name
+  cluster = local.config.cluster
+  # cluster.name is optional and defaults to the environment directory name.
+  # It is the cluster's durable identity: it becomes the external-dns TXT owner
+  # id, the Vault backup prefix, and the VM name prefix. Renaming an existing
+  # cluster orphans records owned under the old name, so migrated environments
+  # should set it explicitly to whatever they already use.
+  cluster_name  = try(local.cluster.name, var.env_name)
   cluster_role  = local.cluster.role
   provider_name = local.config.infra.provider
 
@@ -225,8 +230,8 @@ resource "terraform_data" "validation" {
       error_message = "cluster.role must be one of: cc, env, base."
     }
     precondition {
-      condition     = local.cluster_name == var.env_name || var.env_name == ""
-      error_message = "cluster.name ('${local.cluster_name}') must equal the environment directory name ('${var.env_name}')."
+      condition     = local.cluster_name != ""
+      error_message = "cluster.name resolved to an empty string — set it, or name the environment directory."
     }
     precondition {
       condition = alltrue([
