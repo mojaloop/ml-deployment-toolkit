@@ -362,7 +362,7 @@ Four things worth knowing:
 
 ## Helm value overrides
 
-The adopter can supply Helm values to any chart the distribution ships, without forking anything. Drop a file named for the HelmRelease in `values/`:
+The adopter can override the platform's Helm values for **any** chart the distribution ships, without forking anything. Drop a file named for the HelmRelease in `values/`:
 
 ```
 environments/<env>/values/
@@ -373,9 +373,7 @@ environments/<env>/values/
 
 Each file becomes a `<name>-values-override` ConfigMap, referenced by the HelmRelease's `valuesFrom` as an optional entry — a missing file changes nothing. The name must match the HelmRelease, not the chart's upstream name: `psmdb-operator.yaml`, not `percona-mongodb.yaml`.
 
-> **This supplies values; it does not override them.** Flux merges a HelmRelease's inline `spec.values` *after* everything in `spec.valuesFrom`, so the distribution's inline values win any key they set. The effective order is chart defaults → your file → the distribution's inline values. A file setting a key the distribution also sets is read, substituted, mounted — and has no effect, with no error, because the reference is optional.
->
-> In practice this works for keys the distribution leaves unset, and does nothing for the ones it sets inline — replica counts, storage sizes, root URLs, resource limits. To change one of those today you must fork `gitops/` and republish the artifact. Check the chart's HelmRelease in `gitops/` before relying on an override file.
+**Your file is merged last, so it wins.** No HelmRelease uses inline `spec.values`; the distribution's own values ship as a `<name>-values` ConfigMap listed *first* in `valuesFrom`, and yours is listed last. Flux merges `valuesFrom` entries in order, later overwriting earlier, so the effective precedence is chart defaults → distribution values → your file. Setting a key the distribution also sets is the normal case, and it takes effect.
 
 **Override files are templated**, with the same `${...}` syntax the artifact's manifests use — the config stack expands them before writing the ConfigMap, because Flux does not substitute inside a ConfigMap it did not render:
 
