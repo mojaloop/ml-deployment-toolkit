@@ -35,6 +35,11 @@ spec:
     timeout: 5m
     remediation:
       retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: kube-state-metrics-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     # Ensure cluster-wide access (not restricted to release namespace)
     releaseNamespace: false

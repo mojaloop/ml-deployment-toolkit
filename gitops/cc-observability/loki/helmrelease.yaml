@@ -44,6 +44,10 @@ spec:
       name: loki-s3-credentials
       targetPath: loki.structuredConfig.storage_config.aws.secret_access_key
       valuesKey: secretKey
+    - kind: ConfigMap
+      name: loki-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     # Deployment mode: single binary (simpler for small scale)
     deploymentMode: SingleBinary

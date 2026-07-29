@@ -35,7 +35,7 @@ spec:
       passwordSecret: mcm-db-secret
       passwordSecretKey: mysql-password
       host: "${mysql_host}"
-      port: 3306
+      port: ${mysql_port}
       schema: mcm
 
     api:

@@ -24,6 +24,11 @@ spec:
       strategy: uninstall
   dependsOn:
     - name: kratos
+  valuesFrom:
+    - kind: ConfigMap
+      name: kratos-selfservice-ui-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     fullnameOverride: "kratos-ui"
 

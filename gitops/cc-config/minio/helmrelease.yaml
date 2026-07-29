@@ -42,6 +42,10 @@ spec:
       name: minio-credentials
       targetPath: rootPassword
       valuesKey: rootPassword
+    - kind: ConfigMap
+      name: minio-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     mode: standalone
     replicas: ${minio_replicas}

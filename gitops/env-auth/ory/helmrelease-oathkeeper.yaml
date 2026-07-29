@@ -22,6 +22,11 @@ spec:
     remediation:
       retries: -1
       strategy: uninstall
+  valuesFrom:
+    - kind: ConfigMap
+      name: oathkeeper-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     replicaCount: ${oathkeeper_replicas}
     global:

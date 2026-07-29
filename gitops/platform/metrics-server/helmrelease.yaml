@@ -29,6 +29,11 @@ spec:
   upgrade:
     remediation:
       retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: metrics-server-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     args:
       - --kubelet-insecure-tls

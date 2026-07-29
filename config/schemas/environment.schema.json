@@ -1,0 +1,379 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Environment configuration",
+  "description": "Schema for environments/<name>/config.yaml — flat capability sections. Secrets never live here; they belong in the sibling .env file.",
+  "type": "object",
+  "required": ["version", "cluster", "template", "infra", "dns"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "description": "Config format version",
+      "type": "integer",
+      "minimum": 1
+    },
+    "cluster": {
+      "description": "Cluster identity and networking",
+      "type": "object",
+      "required": ["name", "role"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "Cluster name; prefixes all rendered node names",
+          "type": "string",
+          "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+        },
+        "role": {
+          "description": "Determines which gitops paths are deployed and which template directory is used",
+          "enum": ["cc", "env", "base"]
+        },
+        "vip": {
+          "description": "Kubernetes API floating IP (on-prem only)",
+          "type": "string"
+        },
+        "lb_ipam": {
+          "description": "Cilium LB IPAM pool",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "range": {
+              "description": "IP range, e.g. 192.168.0.211-192.168.0.213",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "template": {
+      "description": "Deployment template name — config/templates/{role}/{template}.yaml",
+      "type": "string"
+    },
+    "infra": {
+      "description": "Infrastructure provider settings",
+      "type": "object",
+      "required": ["provider"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "enum": ["proxmox", "aws", "digitalocean"]
+        },
+        "proxmox": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "placement": {
+              "description": "Maps template placement groups (pg-N) to Proxmox physical nodes",
+              "type": "object",
+              "additionalProperties": true
+            },
+            "network_bridge": {
+              "type": "string"
+            },
+            "storage": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "disks": {
+                  "description": "Datastore for VM disks",
+                  "type": "string"
+                },
+                "images": {
+                  "description": "Datastore for Talos images",
+                  "type": "string"
+                },
+                "snippets": {
+                  "description": "Datastore for cloud-init snippets",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "talos": {
+          "description": "Talos node OS overrides (optional — any on-prem provider)",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "nameservers": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "ntp_servers": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "aws": {
+          "description": "AWS provider settings (region, vpc overrides, ...)",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "digitalocean": {
+          "description": "DigitalOcean provider settings (region, vpc overrides, ...)",
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "dns": {
+      "description": "DNS zone management. Credentials in .env (DIGITALOCEAN_TOKEN, CLOUDFLARE_API_TOKEN, or AWS_* for route53).",
+      "type": "object",
+      "required": ["provider", "domain"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "enum": ["digitalocean", "cloudflare", "route53"]
+        },
+        "domain": {
+          "description": "Base domain for this cluster",
+          "type": "string"
+        }
+      }
+    },
+    "cert": {
+      "description": "Certificates (ACME). email is the ACME account contact.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        }
+      }
+    },
+    "artifact": {
+      "description": "Distribution gitops artifact consumed by Flux. Credentials OCI_REPO_* in .env.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "description": "OCI repository URL, e.g. oci://ghcr.io/org/repo",
+          "type": "string"
+        },
+        "version": {
+          "description": "OCI tag — 'latest' or a pinned version",
+          "type": "string"
+        }
+      }
+    },
+    "toolkit_cc": {
+      "description": "Backing Tooling Cluster — one value drives every toolkit-cc preset",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "domain": {
+          "type": "string"
+        }
+      }
+    },
+    "registry": {
+      "description": "Container image pull-through cache. Credentials OCI_PROXY_* in .env.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "description": "toolkit-cc derives harbor.int.<toolkit_cc.domain>; harbor uses an explicit url",
+          "enum": ["toolkit-cc", "harbor", "none"]
+        },
+        "url": {
+          "description": "Registry URL (harbor provider only; no oci:// prefix)",
+          "type": "string"
+        }
+      }
+    },
+    "object_storage": {
+      "description": "Backup target. Credentials BACKUP_S3_ACCESS_KEY/SECRET_KEY in .env.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "description": "toolkit-cc derives https://s3.int.<toolkit_cc.domain>; s3 uses an explicit endpoint",
+          "enum": ["toolkit-cc", "s3", "none"]
+        },
+        "endpoint": {
+          "description": "S3 endpoint URL (s3 provider only)",
+          "type": "string"
+        },
+        "bucket": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        }
+      }
+    },
+    "observability": {
+      "description": "Telemetry push sink",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "description": "toolkit-cc derives loki/thanos/tempo push URLs; urls uses the explicit *_url fields",
+          "enum": ["toolkit-cc", "urls", "none"]
+        },
+        "loki_url": {
+          "type": "string"
+        },
+        "mimir_url": {
+          "type": "string"
+        },
+        "tempo_url": {
+          "type": "string"
+        }
+      }
+    },
+    "data": {
+      "description": "Data layer — per-store deployment mode",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mysql": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "enum": ["in-cluster-managed", "external-unmanaged", "external-managed"]
+            },
+            "host": {
+              "description": "External endpoint (external modes only)",
+              "type": "string"
+            },
+            "port": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          }
+        },
+        "kafka": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "enum": ["in-cluster-managed", "external-unmanaged", "external-managed"]
+            },
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          }
+        },
+        "mongodb": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "enum": ["in-cluster-managed", "external-unmanaged", "external-managed"]
+            },
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          }
+        },
+        "redis": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "enum": ["in-cluster-managed", "external-unmanaged", "external-managed"]
+            },
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          }
+        }
+      }
+    },
+    "email": {
+      "description": "Transactional email (SMTP). Credentials SMTP_USER/SMTP_PASSWORD in .env.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "from": {
+          "type": "string"
+        }
+      }
+    },
+    "alerting": {
+      "description": "Alert delivery channels (Grafana contact points). Telegram token in .env.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "to": {
+              "type": "string"
+            }
+          }
+        },
+        "telegram": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "chat_id": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "app": {
+      "description": "Mojaloop application parameters (env clusters)",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "api_type": {
+          "description": "Mojaloop API dialect — set once at deploy time",
+          "enum": ["fspiop", "iso20022"]
+        },
+        "hub": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "participant_name": {
+              "type": "string"
+            },
+            "admin_email": {
+              "type": "string"
+            },
+            "onboarding": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "funds_in": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                },
+                "net_debit_cap": {
+                  "type": "string",
+                  "pattern": "^[0-9]+$"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

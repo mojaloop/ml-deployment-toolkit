@@ -23,6 +23,11 @@ spec:
   upgrade:
     remediation:
       retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: goldilocks-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     dashboard:
       replicaCount: 1

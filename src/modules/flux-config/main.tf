@@ -1,81 +1,105 @@
-# Flux Config Module
-# Creates Kubernetes resources for Flux OCI-based GitOps
-# Deploys: 1 OCIRepository + Kustomizations (platform → dns/{provider} → platform-config → [vendor] → role-specific → ...)
+# Flux Config Module (config stack)
+# Creates the in-cluster configuration Flux consumes:
+#   cluster-config ConfigMap + cluster-secrets Secret (postBuild substitution),
+#   per-chart values-override ConfigMaps, OCIRepository, and all Kustomizations.
 #
-# Two independent provider dimensions:
-#   - infra_provider (proxmox, aws, gcp, openstack, digitalocean) → selects vendor kustomization
-#   - dns_provider (digitalocean, cloudflare, route53) → selects dns kustomization (gitops/dns/{provider})
+# Kustomization graph (Flux dependsOn, role-gated):
+#   platform -> dns/<provider> -> platform-config -> <vendor> -> <role>
+#   cc:  cc -> cc-config -> {cc-routes, cc-observability -> cc-observability-routes}
+#   env: env -> env-data-common -> env-data-<store>... -> env-auth -> env-auth-config -> env-app
+#        env-observability-agent (parallel, after platform-config)
 
 locals {
-  has_oci_credentials = var.oci_repo_username != "" && var.oci_repo_password != ""
+  s = var.secrets
+
+  has_oci_credentials = lookup(local.s, "OCI_REPO_USERNAME", "") != "" && lookup(local.s, "OCI_REPO_PASSWORD", "") != ""
   is_talos            = contains(["proxmox", "openstack"], var.infra_provider)
   has_vendor          = contains(["proxmox", "openstack", "aws", "gcp"], var.infra_provider)
   is_env              = var.cluster_role == "env"
+  is_cc               = var.cluster_role == "cc"
+  vendor_name         = local.is_talos ? "talos" : var.infra_provider
 
-  # Extract registry host from artifact URL (e.g. "oci://ghcr.io/kiswend/ml-deployment-toolkit" → "ghcr.io")
+  # Extract registry host from artifact URL ("oci://ghcr.io/x/y" -> "ghcr.io")
   oci_registry = local.has_oci_credentials ? split("/", replace(var.artifact_url, "oci://", ""))[0] : ""
 
-  # Docker config JSON for Flux source-controller authentication
   dockerconfigjson = local.has_oci_credentials ? jsonencode({
     auths = {
       (local.oci_registry) = {
-        username = var.oci_repo_username
-        password = var.oci_repo_password
-        auth     = base64encode("${var.oci_repo_username}:${var.oci_repo_password}")
+        username = local.s["OCI_REPO_USERNAME"]
+        password = local.s["OCI_REPO_PASSWORD"]
+        auth     = base64encode("${local.s["OCI_REPO_USERNAME"]}:${local.s["OCI_REPO_PASSWORD"]}")
       }
     }
   }) : ""
 
-  # Data layer endpoints — self-hosted uses in-cluster FQDNs (data ns), managed uses cloud service endpoints
-  mysql_host   = local.is_talos ? "mojaloop-db-haproxy.data.svc.cluster.local" : var.mysql_host
-  mysql_port   = local.is_talos ? "3306" : var.mysql_port
-  kafka_host   = local.is_talos ? "mojaloop-kafka-kafka-bootstrap.data.svc.cluster.local" : var.kafka_host
-  kafka_port   = local.is_talos ? "9092" : var.kafka_port
-  mongodb_host = local.is_talos ? "bulk-mongodb-rs0.data.svc.cluster.local" : var.mongodb_host
-  mongodb_port = local.is_talos ? "27017" : var.mongodb_port
-  redis_host   = local.is_talos ? "ttk-redis.data.svc.cluster.local" : var.redis_host
-  redis_port   = local.is_talos ? "6379" : var.redis_port
+  # DNS provider credentials for gitops/dns/<provider> substitution
+  dns_credentials = {
+    digitalocean_token       = lookup(local.s, "DIGITALOCEAN_TOKEN", "")
+    cloudflare_api_token     = lookup(local.s, "CLOUDFLARE_API_TOKEN", "")
+    aws_access_key_id        = lookup(local.s, "AWS_ACCESS_KEY_ID", "")
+    aws_secret_access_key    = lookup(local.s, "AWS_SECRET_ACCESS_KEY", "")
+    aws_region               = lookup(local.s, "AWS_REGION", "")
+    powerdns_api_url         = lookup(local.s, "POWERDNS_API_URL", "")
+    powerdns_api_key         = lookup(local.s, "POWERDNS_API_KEY", "")
+    dns_provider_credentials = "${lookup(local.s, "DIGITALOCEAN_TOKEN", "")}${lookup(local.s, "CLOUDFLARE_API_TOKEN", "")}${lookup(local.s, "AWS_ACCESS_KEY_ID", "")}${lookup(local.s, "POWERDNS_API_KEY", "")}"
+  }
+
+  # ---------------------------------------------------------------------------
+  # Generated internal service passwords.
+  # A matching non-empty UPPER_CASE key in var.secrets overrides generation
+  # (used by external-unmanaged data stores and for migrating existing envs).
+  # ---------------------------------------------------------------------------
+  generated_secret_names = setunion(
+    local.is_cc ? [
+      "minio_root_password",
+      "harbor_admin_password",
+      "grafana_admin_password",
+    ] : [],
+    local.is_env ? [
+      "mysql_root_password",
+      "mysql_central_ledger_password",
+      "mysql_account_lookup_password",
+      "mysql_oracle_msisdn_password",
+      "mongodb_root_password",
+      "mongodb_app_password",
+      "kratos_db_password",
+      "keto_db_password",
+      "hydra_db_password",
+      "mcm_db_password",
+      "hub_admin_password",
+      "mcm_oidc_client_secret",
+      "role_assign_svc_secret",
+      "kratos_secrets_cipher",
+      "kratos_secrets_cookie",
+      "kratos_secrets_csrf_cookie",
+      "kratos_secrets_default",
+      "hydra_secrets_system",
+      "hydra_secrets_cookie",
+    ] : [],
+  )
+
+  generated_secrets = {
+    for name in local.generated_secret_names :
+    name => (
+      lookup(local.s, upper(name), "") != ""
+      ? local.s[upper(name)]
+      : random_password.generated[name].result
+    )
+  }
 }
 
-# Kratos secrets — generated once, stored in Terraform state, seeded into Vault via cluster-secrets → Flux substitution
-resource "random_password" "kratos_secrets_cipher" {
-  count   = local.is_env ? 1 : 0
-  length  = 32
+resource "random_password" "generated" {
+  for_each = local.generated_secret_names
+
+  length = 32
+  # Alphanumeric only: these values travel through YAML substitution, DSN
+  # strings, and shell-quoted seeds — special characters break too many layers.
   special = false
 }
 
-resource "random_password" "kratos_secrets_cookie" {
-  count   = local.is_env ? 1 : 0
-  length  = 32
-  special = false
-}
-
-resource "random_password" "kratos_secrets_csrf_cookie" {
-  count   = local.is_env ? 1 : 0
-  length  = 32
-  special = false
-}
-
-resource "random_password" "kratos_secrets_default" {
-  count   = local.is_env ? 1 : 0
-  length  = 32
-  special = false
-}
-
-# Hydra secrets — generated once, stored in Terraform state, seeded into Vault via cluster-secrets → Flux substitution
-resource "random_password" "hydra_secrets_system" {
-  count   = local.is_env ? 1 : 0
-  length  = 32
-  special = false
-}
-
-resource "random_password" "hydra_secrets_cookie" {
-  count   = local.is_env ? 1 : 0
-  length  = 32
-  special = false
-}
-
-# ConfigMap with cluster configuration for postBuild substitution
+# ---------------------------------------------------------------------------
+# cluster-config — non-secret substitution variables
+# ---------------------------------------------------------------------------
 resource "kubernetes_config_map_v1" "cluster_config" {
   metadata {
     name      = "cluster-config"
@@ -85,43 +109,54 @@ resource "kubernetes_config_map_v1" "cluster_config" {
   data = merge(
     {
       cluster_name       = var.cluster_name
-      cluster_vip        = var.cluster_vip
       domain             = var.domain
-      dns_provider       = var.dns_provider
       gateway_class_name = var.gateway_class_name
-      alert_email        = var.alert_email
-      lb_ipam_range      = var.lb_ipam_range
       lb_ipam_start      = split("-", var.lb_ipam_range)[0]
       lb_ipam_stop       = split("-", var.lb_ipam_range)[1]
-      loki_url           = var.loki_url
-      mimir_url          = var.mimir_url
-      tempo_url          = var.tempo_url
+
+      # cert capability (ACME)
+      acme_email  = var.cert.acme_email
+      acme_server = var.cert.acme_server
+
+      # email + alerting capabilities (non-secret halves)
+      smtp_host        = var.email.host
+      smtp_port        = var.email.port
+      alert_email_from = var.email.from
+      alert_email_to   = var.alerting.email_to
+      telegram_chat_id = var.alerting.telegram_chat_id
+
+      # observability sink
+      loki_url  = var.observability.loki_url
+      mimir_url = var.observability.mimir_url
+      tempo_url = var.observability.tempo_url
     },
     local.is_env ? {
-      mysql_host   = local.mysql_host
-      mysql_port   = local.mysql_port
-      kafka_host   = local.kafka_host
-      kafka_port   = local.kafka_port
-      mongodb_host = local.mongodb_host
-      mongodb_port = local.mongodb_port
-      redis_host   = local.redis_host
-      redis_port   = local.redis_port
+      mysql_host   = var.data_stores["mysql"].host
+      mysql_port   = var.data_stores["mysql"].port
+      kafka_host   = var.data_stores["kafka"].host
+      kafka_port   = var.data_stores["kafka"].port
+      mongodb_host = var.data_stores["mongodb"].host
+      mongodb_port = var.data_stores["mongodb"].port
+      redis_host   = var.data_stores["redis"].host
+      redis_port   = var.data_stores["redis"].port
 
-      hub_participant_name     = var.hub_participant_name
-      onboarding_funds_in      = var.onboarding_funds_in
-      onboarding_net_debit_cap = var.onboarding_net_debit_cap
+      hub_participant_name     = var.app.hub_participant_name
+      hub_admin_email          = var.app.hub_admin_email
+      onboarding_funds_in      = var.app.onboarding_funds_in
+      onboarding_net_debit_cap = var.app.onboarding_net_debit_cap
+      api_type                 = var.app.api_type
 
-      api_type = var.api_type
-
-      backup_s3_endpoint = var.backup_s3_endpoint
-      backup_s3_bucket   = var.backup_s3_bucket
-      backup_s3_region   = var.backup_s3_region
+      backup_s3_endpoint = var.object_storage.endpoint
+      backup_s3_bucket   = var.object_storage.bucket
+      backup_s3_region   = var.object_storage.region
     } : {},
     var.profile_vars,
   )
 }
 
-# Secret with sensitive credentials for postBuild substitution
+# ---------------------------------------------------------------------------
+# cluster-secrets — secret substitution variables
+# ---------------------------------------------------------------------------
 resource "kubernetes_secret_v1" "cluster_secrets" {
   metadata {
     name      = "cluster-secrets"
@@ -129,61 +164,51 @@ resource "kubernetes_secret_v1" "cluster_secrets" {
   }
 
   data = merge(
-    var.dns_credentials,
+    local.dns_credentials,
     {
-      oci_repo_username      = var.oci_repo_username
-      oci_repo_password      = var.oci_repo_password
-      oci_proxy_username     = var.oci_proxy_username
-      oci_proxy_password     = var.oci_proxy_password
-      minio_root_user        = var.minio_root_user
-      minio_root_password    = var.minio_root_password
-      harbor_admin_password  = var.harbor_admin_password
-      grafana_admin_password = var.grafana_admin_password
-      # SMTP + alerting delivery: needed on cc (Grafana alerting) and env
-      # (Kratos courier), so they live in the common block
-      smtp_host          = var.smtp_host
-      smtp_port          = var.smtp_port
-      smtp_user          = var.smtp_user
-      smtp_password      = var.smtp_password
-      alert_email_from   = var.alert_email_from
-      alert_email_to     = var.alert_email_to
-      telegram_bot_token = var.telegram_bot_token
-      telegram_chat_id   = var.telegram_chat_id
+      oci_repo_username = lookup(local.s, "OCI_REPO_USERNAME", "")
+      oci_repo_password = lookup(local.s, "OCI_REPO_PASSWORD", "")
+      smtp_user         = lookup(local.s, "SMTP_USER", "")
+      smtp_password     = lookup(local.s, "SMTP_PASSWORD", "")
+      # Grafana Telegram contact point tolerates a dummy token; empty breaks provisioning
+      telegram_bot_token = lookup(local.s, "TELEGRAM_BOT_TOKEN", "") != "" ? local.s["TELEGRAM_BOT_TOKEN"] : "unset"
     },
+    local.is_cc ? {
+      minio_root_user        = lookup(local.s, "MINIO_ROOT_USER", "minioadmin")
+      minio_root_password    = local.generated_secrets["minio_root_password"]
+      harbor_admin_password  = local.generated_secrets["harbor_admin_password"]
+      grafana_admin_password = local.generated_secrets["grafana_admin_password"]
+    } : {},
     local.is_env ? {
-      mysql_root_password           = var.mysql_root_password
-      mysql_central_ledger_password = var.mysql_central_ledger_password
-      mysql_account_lookup_password = var.mysql_account_lookup_password
-      mysql_oracle_msisdn_password  = var.mysql_oracle_msisdn_password
-      mongodb_root_password         = var.mongodb_root_password
-      mongodb_app_password          = var.mongodb_app_password
-      keycloak_db_password          = var.keycloak_db_password
-      kratos_db_password            = var.kratos_db_password
-      keto_db_password              = var.keto_db_password
-      mcm_db_password               = var.mcm_db_password
-      hub_admin_password            = var.hub_admin_password
-      hub_admin_email               = var.hub_admin_email
-      hubop_oidc_secret             = var.hubop_oidc_secret
-      mcm_oidc_client_secret        = var.mcm_oidc_client_secret
-      role_assign_svc_secret        = var.role_assign_svc_secret
-      dfsp_oidc_client_secret       = var.dfsp_oidc_client_secret
-      kratos_secrets_cipher         = random_password.kratos_secrets_cipher[0].result
-      kratos_secrets_cookie         = random_password.kratos_secrets_cookie[0].result
-      kratos_secrets_csrf_cookie    = random_password.kratos_secrets_csrf_cookie[0].result
-      kratos_secrets_default        = random_password.kratos_secrets_default[0].result
-      hydra_db_password             = var.hydra_db_password
-      hydra_secrets_system          = random_password.hydra_secrets_system[0].result
-      hydra_secrets_cookie          = random_password.hydra_secrets_cookie[0].result
-      backup_s3_access_key          = var.backup_s3_access_key
-      backup_s3_secret_key          = var.backup_s3_secret_key
+      mysql_root_password           = local.generated_secrets["mysql_root_password"]
+      mysql_central_ledger_password = local.generated_secrets["mysql_central_ledger_password"]
+      mysql_account_lookup_password = local.generated_secrets["mysql_account_lookup_password"]
+      mysql_oracle_msisdn_password  = local.generated_secrets["mysql_oracle_msisdn_password"]
+      mongodb_root_password         = local.generated_secrets["mongodb_root_password"]
+      mongodb_app_password          = local.generated_secrets["mongodb_app_password"]
+      kratos_db_password            = local.generated_secrets["kratos_db_password"]
+      keto_db_password              = local.generated_secrets["keto_db_password"]
+      hydra_db_password             = local.generated_secrets["hydra_db_password"]
+      mcm_db_password               = local.generated_secrets["mcm_db_password"]
+      hub_admin_password            = local.generated_secrets["hub_admin_password"]
+      mcm_oidc_client_secret        = local.generated_secrets["mcm_oidc_client_secret"]
+      role_assign_svc_secret        = local.generated_secrets["role_assign_svc_secret"]
+      kratos_secrets_cipher         = local.generated_secrets["kratos_secrets_cipher"]
+      kratos_secrets_cookie         = local.generated_secrets["kratos_secrets_cookie"]
+      kratos_secrets_csrf_cookie    = local.generated_secrets["kratos_secrets_csrf_cookie"]
+      kratos_secrets_default        = local.generated_secrets["kratos_secrets_default"]
+      hydra_secrets_system          = local.generated_secrets["hydra_secrets_system"]
+      hydra_secrets_cookie          = local.generated_secrets["hydra_secrets_cookie"]
+      backup_s3_access_key          = lookup(local.s, "BACKUP_S3_ACCESS_KEY", "")
+      backup_s3_secret_key          = lookup(local.s, "BACKUP_S3_SECRET_KEY", "")
     } : {}
   )
 
   type = "Opaque"
 }
 
-# Deployer Helm value overrides — one ConfigMap per chart with a non-empty override
-# Referenced by HelmRelease.valuesFrom (optional: true), merged on top of the platform-team's inline values.
+# Deployer Helm value overrides — one ConfigMap per values/<chart>.yaml file.
+# Referenced by every HelmRelease via valuesFrom (optional: true).
 resource "kubernetes_config_map_v1" "helm_value_overrides" {
   for_each = { for k, v in var.helm_value_overrides : k => v if v != "" }
 
@@ -197,7 +222,7 @@ resource "kubernetes_config_map_v1" "helm_value_overrides" {
   }
 }
 
-# OCI registry credentials secret (for Flux source-controller to pull from private registry)
+# OCI registry credentials (Flux source-controller pull auth)
 resource "kubernetes_secret_v1" "oci_credentials" {
   count = local.has_oci_credentials ? 1 : 0
 
@@ -241,758 +266,285 @@ resource "kubectl_manifest" "oci_repository" {
   depends_on = [kubernetes_secret_v1.oci_credentials]
 }
 
-# Kustomization: platform (shared — always deployed first)
-resource "kubectl_manifest" "kustomization_platform" {
+# ---------------------------------------------------------------------------
+# Kustomization graph.
+# Every entry is normalized to the same object shape (Terraform requires
+# homogeneous types across conditional branches), then filtered on `enabled`.
+# Ordering between Kustomizations is Flux's job (dependsOn), not Terraform's.
+# ---------------------------------------------------------------------------
+locals {
+  # env-data: one Kustomization per in-cluster store + a common slice.
+  in_cluster_stores = local.is_env && local.is_talos ? sort([
+    for store, cfg in var.data_stores : store if cfg.in_cluster
+  ]) : []
+
+  store_health = {
+    mysql = {
+      health_check_exprs = [{
+        apiVersion = "pxc.percona.com/v1"
+        kind       = "PerconaXtraDBCluster"
+        inProgress = "!has(status.state) || status.state == 'initializing'"
+        current    = "has(status.state) && status.state == 'ready'"
+        failed     = "has(status.state) && status.state == 'error'"
+      }]
+      health_checks = []
+    }
+    kafka = {
+      health_check_exprs = []
+      health_checks = [{
+        apiVersion = "kafka.strimzi.io/v1beta2"
+        kind       = "Kafka"
+        name       = "mojaloop-kafka"
+        namespace  = "data"
+      }]
+    }
+    mongodb = {
+      health_check_exprs = []
+      health_checks = [{
+        apiVersion = "psmdb.percona.com/v1"
+        kind       = "PerconaServerMongoDB"
+        name       = "bulk-mongodb"
+        namespace  = "data"
+      }]
+    }
+    redis = {
+      health_check_exprs = []
+      health_checks      = []
+    }
+  }
+
+  # Auth needs MySQL (Ory/MCM databases); apps additionally need every other store.
+  auth_depends = contains(local.in_cluster_stores, "mysql") ? ["env-data-mysql"] : ["env"]
+  app_depends = concat(
+    ["env-auth-config"],
+    [for store in local.in_cluster_stores : "env-data-${store}" if store != "mysql"],
+  )
+
+  # Per-store Kustomizations (always same shape; enabled drives inclusion)
+  data_kustomizations = merge(
+    {
+      "env-data-common" = {
+        enabled            = length(local.in_cluster_stores) > 0
+        path               = "./env-data/common"
+        depends_on         = ["env"]
+        timeout            = "5m"
+        wait               = false
+        health_checks      = []
+        health_check_exprs = []
+      }
+    },
+    {
+      for store, cfg in var.data_stores :
+      "env-data-${store}" => {
+        enabled            = contains(local.in_cluster_stores, store)
+        path               = "./env-data/${store}"
+        depends_on         = ["env-data-common"]
+        timeout            = "20m"
+        wait               = false
+        health_checks      = local.store_health[store].health_checks
+        health_check_exprs = local.store_health[store].health_check_exprs
+      }
+    },
+  )
+
+  all_kustomizations = merge(
+    {
+      "platform" = {
+        enabled    = true
+        path       = "./platform"
+        depends_on = []
+        timeout    = ""
+        wait       = false
+        health_checks = [
+          { apiVersion = "apps/v1", kind = "Deployment", name = "external-secrets-external-secrets-webhook", namespace = "external-secrets" },
+          { apiVersion = "apps/v1", kind = "Deployment", name = "cert-manager-cert-manager-webhook", namespace = "cert-manager" },
+        ]
+        health_check_exprs = []
+      }
+      "dns" = {
+        enabled            = true
+        path               = "./dns/${var.dns_provider}"
+        depends_on         = ["platform"]
+        timeout            = ""
+        wait               = false
+        health_checks      = []
+        health_check_exprs = []
+      }
+      "platform-config" = {
+        enabled            = true
+        path               = "./platform-config"
+        depends_on         = ["dns"]
+        timeout            = ""
+        wait               = false
+        health_checks      = []
+        health_check_exprs = []
+      }
+      # vendor (infra-provider gap fillers) — name varies by provider
+      (local.vendor_name) = {
+        enabled            = local.has_vendor
+        path               = "./${local.vendor_name}"
+        depends_on         = ["platform-config"]
+        timeout            = ""
+        wait               = false
+        health_checks      = []
+        health_check_exprs = []
+      }
+      # role chain entry (cc or env); "base" gets no role kustomization
+      (var.cluster_role) = {
+        enabled    = var.cluster_role != "base"
+        path       = "./${var.cluster_role}"
+        depends_on = [local.has_vendor ? local.vendor_name : "platform-config"]
+        timeout    = local.is_env ? "10m" : "5m"
+        wait       = false
+        health_checks = local.is_env ? [
+          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "psmdb-operator", namespace = var.flux_namespace },
+          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "pxc-operator", namespace = var.flux_namespace },
+          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "strimzi-kafka-operator", namespace = var.flux_namespace },
+        ] : []
+        health_check_exprs = []
+      }
+      # --- cc chain ---
+      "cc-config" = {
+        enabled    = local.is_cc
+        path       = "./cc-config"
+        depends_on = ["cc"]
+        timeout    = "20m"
+        wait       = false
+        health_checks = [
+          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "minio", namespace = var.flux_namespace },
+          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "harbor", namespace = var.flux_namespace },
+        ]
+        health_check_exprs = []
+      }
+      "cc-routes" = {
+        enabled            = local.is_cc
+        path               = "./cc-routes"
+        depends_on         = ["cc-config"]
+        timeout            = ""
+        wait               = false
+        health_checks      = []
+        health_check_exprs = []
+      }
+      "cc-observability" = {
+        enabled    = local.is_cc
+        path       = "./cc-observability"
+        depends_on = ["cc-config"]
+        timeout    = "20m"
+        wait       = false
+        health_checks = [
+          { apiVersion = "apps/v1", kind = "StatefulSet", name = "thanos-receive", namespace = "observability" },
+          { apiVersion = "apps/v1", kind = "Deployment", name = "thanos-query", namespace = "observability" },
+          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "loki", namespace = var.flux_namespace },
+          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "tempo", namespace = var.flux_namespace },
+          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "grafana", namespace = var.flux_namespace },
+        ]
+        health_check_exprs = []
+      }
+      "cc-observability-routes" = {
+        enabled            = local.is_cc
+        path               = "./cc-observability-routes"
+        depends_on         = ["cc-observability"]
+        timeout            = ""
+        wait               = false
+        health_checks      = []
+        health_check_exprs = []
+      }
+      # --- env chain ---
+      "env-auth" = {
+        enabled    = local.is_env
+        path       = "./env-auth"
+        depends_on = local.auth_depends
+        timeout    = "20m"
+        wait       = false
+        health_checks = [
+          { apiVersion = "vault.banzaicloud.com/v1alpha1", kind = "Vault", name = "vault", namespace = "vault" },
+          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "kratos", namespace = var.flux_namespace },
+          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "keto", namespace = var.flux_namespace },
+          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "hydra", namespace = var.flux_namespace },
+        ]
+        health_check_exprs = []
+      }
+      "env-auth-config" = {
+        enabled            = local.is_env
+        path               = "./env-auth-config"
+        depends_on         = ["env-auth"]
+        timeout            = "10m"
+        wait               = false
+        health_checks      = []
+        health_check_exprs = []
+      }
+      "env-app" = {
+        enabled    = local.is_env
+        path       = "./env-app"
+        depends_on = local.app_depends
+        timeout    = "30m"
+        wait       = false
+        health_checks = [
+          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "mojaloop", namespace = var.flux_namespace },
+          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "mcm", namespace = var.flux_namespace },
+          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "finance-portal", namespace = var.flux_namespace },
+        ]
+        health_check_exprs = []
+      }
+      "env-observability-agent" = {
+        enabled            = local.is_env
+        path               = "./env-observability-agent"
+        depends_on         = ["platform-config"]
+        timeout            = "5m"
+        wait               = true
+        health_checks      = []
+        health_check_exprs = []
+      }
+    },
+    local.data_kustomizations,
+  )
+
+  kustomizations = { for k, v in local.all_kustomizations : k => v if v.enabled }
+}
+
+resource "kubectl_manifest" "kustomization" {
+  for_each = local.kustomizations
+
   yaml_body = yamlencode({
     apiVersion = "kustomize.toolkit.fluxcd.io/v1"
     kind       = "Kustomization"
     metadata = {
-      name      = "platform"
+      name      = each.key
       namespace = var.flux_namespace
     }
-    spec = {
-      interval = "10m"
-      path     = "./platform"
-      prune    = true
-      sourceRef = {
-        kind = "OCIRepository"
-        name = "ml-gitops"
-      }
-      healthChecks = [
-        {
-          apiVersion = "apps/v1"
-          kind       = "Deployment"
-          name       = "external-secrets-external-secrets-webhook"
-          namespace  = "external-secrets"
-        },
-        {
-          apiVersion = "apps/v1"
-          kind       = "Deployment"
-          name       = "cert-manager-cert-manager-webhook"
-          namespace  = "cert-manager"
+    spec = merge(
+      {
+        interval = "10m"
+        path     = each.value.path
+        prune    = true
+        sourceRef = {
+          kind = "OCIRepository"
+          name = "ml-gitops"
         }
-      ]
-      postBuild = {
-        substituteFrom = [
-          {
-            kind = "ConfigMap"
-            name = kubernetes_config_map_v1.cluster_config.metadata[0].name
-          },
-          {
-            kind = "Secret"
-            name = kubernetes_secret_v1.cluster_secrets.metadata[0].name
-          }
-        ]
-      }
-    }
+        postBuild = {
+          substituteFrom = [
+            { kind = "ConfigMap", name = kubernetes_config_map_v1.cluster_config.metadata[0].name },
+            { kind = "Secret", name = kubernetes_secret_v1.cluster_secrets.metadata[0].name },
+          ]
+        }
+      },
+      length(each.value.depends_on) > 0 ? {
+        dependsOn = [for d in each.value.depends_on : { name = d }]
+      } : {},
+      each.value.timeout != "" ? { timeout = each.value.timeout } : {},
+      each.value.wait ? { wait = true } : {},
+      length(each.value.health_checks) > 0 ? {
+        healthChecks = each.value.health_checks
+      } : {},
+      length(each.value.health_check_exprs) > 0 ? {
+        healthCheckExprs = each.value.health_check_exprs
+      } : {},
+    )
   })
 
   depends_on = [
     kubectl_manifest.oci_repository,
     kubernetes_config_map_v1.cluster_config,
-    kubernetes_secret_v1.cluster_secrets
-  ]
-}
-
-# Kustomization: dns/{provider} (DNS-provider-specific: ClusterIssuers, DNS Secret, external-dns values patch)
-resource "kubectl_manifest" "kustomization_dns" {
-  yaml_body = yamlencode({
-    apiVersion = "kustomize.toolkit.fluxcd.io/v1"
-    kind       = "Kustomization"
-    metadata = {
-      name      = "dns"
-      namespace = var.flux_namespace
-    }
-    spec = {
-      interval = "10m"
-      path     = "./dns/${var.dns_provider}"
-      prune    = true
-      dependsOn = [
-        { name = "platform" }
-      ]
-      sourceRef = {
-        kind = "OCIRepository"
-        name = "ml-gitops"
-      }
-      postBuild = {
-        substituteFrom = [
-          {
-            kind = "ConfigMap"
-            name = kubernetes_config_map_v1.cluster_config.metadata[0].name
-          },
-          {
-            kind = "Secret"
-            name = kubernetes_secret_v1.cluster_secrets.metadata[0].name
-          }
-        ]
-      }
-    }
-  })
-
-  depends_on = [
-    kubectl_manifest.kustomization_platform
-  ]
-}
-
-# Kustomization: platform-config (Gateway, wildcard TLS — depends on dns for ClusterIssuers)
-resource "kubectl_manifest" "kustomization_platform_config" {
-  yaml_body = yamlencode({
-    apiVersion = "kustomize.toolkit.fluxcd.io/v1"
-    kind       = "Kustomization"
-    metadata = {
-      name      = "platform-config"
-      namespace = var.flux_namespace
-    }
-    spec = {
-      interval = "10m"
-      path     = "./platform-config"
-      prune    = true
-      dependsOn = [
-        { name = "dns" }
-      ]
-      sourceRef = {
-        kind = "OCIRepository"
-        name = "ml-gitops"
-      }
-      postBuild = {
-        substituteFrom = [
-          {
-            kind = "ConfigMap"
-            name = kubernetes_config_map_v1.cluster_config.metadata[0].name
-          },
-          {
-            kind = "Secret"
-            name = kubernetes_secret_v1.cluster_secrets.metadata[0].name
-          }
-        ]
-      }
-    }
-  })
-
-  depends_on = [
-    kubectl_manifest.kustomization_dns
-  ]
-}
-
-# Kustomization: vendor (infra-provider-specific gap fillers — Cilium, LB, storage, registry)
-resource "kubectl_manifest" "kustomization_vendor" {
-  count = local.has_vendor ? 1 : 0
-
-  yaml_body = yamlencode({
-    apiVersion = "kustomize.toolkit.fluxcd.io/v1"
-    kind       = "Kustomization"
-    metadata = {
-      name      = local.is_talos ? "talos" : var.infra_provider
-      namespace = var.flux_namespace
-    }
-    spec = {
-      interval = "10m"
-      path     = "./${local.is_talos ? "talos" : var.infra_provider}"
-      prune    = true
-      dependsOn = [
-        { name = "platform-config" }
-      ]
-      sourceRef = {
-        kind = "OCIRepository"
-        name = "ml-gitops"
-      }
-      postBuild = {
-        substituteFrom = [
-          {
-            kind = "ConfigMap"
-            name = kubernetes_config_map_v1.cluster_config.metadata[0].name
-          },
-          {
-            kind = "Secret"
-            name = kubernetes_secret_v1.cluster_secrets.metadata[0].name
-          }
-        ]
-      }
-    }
-  })
-
-  depends_on = [
-    kubectl_manifest.kustomization_platform_config
-  ]
-}
-
-# Kustomization: role-specific (cc or env — deployed after vendor kustomization)
-# Skipped for "base" role which only needs platform + dns + platform-config + vendor
-resource "kubectl_manifest" "kustomization_role" {
-  count = var.cluster_role != "base" ? 1 : 0
-
-  yaml_body = yamlencode({
-    apiVersion = "kustomize.toolkit.fluxcd.io/v1"
-    kind       = "Kustomization"
-    metadata = {
-      name      = var.cluster_role
-      namespace = var.flux_namespace
-    }
-    # env clusters: wait for operators to install CRDs before env-data can apply CRs
-    spec = {
-      interval = "10m"
-      timeout  = local.is_env ? "10m" : "5m"
-      path     = "./${var.cluster_role}"
-      prune    = true
-      dependsOn = local.has_vendor ? [
-        { name = local.is_talos ? "talos" : var.infra_provider }
-        ] : [
-        { name = "platform-config" }
-      ]
-      sourceRef = {
-        kind = "OCIRepository"
-        name = "ml-gitops"
-      }
-      healthChecks = local.is_env ? [
-        {
-          apiVersion = "helm.toolkit.fluxcd.io/v2"
-          kind       = "HelmRelease"
-          name       = "psmdb-operator"
-          namespace  = var.flux_namespace
-        },
-        {
-          apiVersion = "helm.toolkit.fluxcd.io/v2"
-          kind       = "HelmRelease"
-          name       = "pxc-operator"
-          namespace  = var.flux_namespace
-        },
-        {
-          apiVersion = "helm.toolkit.fluxcd.io/v2"
-          kind       = "HelmRelease"
-          name       = "strimzi-kafka-operator"
-          namespace  = var.flux_namespace
-        }
-      ] : []
-      postBuild = {
-        substituteFrom = [
-          {
-            kind = "ConfigMap"
-            name = kubernetes_config_map_v1.cluster_config.metadata[0].name
-          },
-          {
-            kind = "Secret"
-            name = kubernetes_secret_v1.cluster_secrets.metadata[0].name
-          }
-        ]
-      }
-    }
-  })
-
-  depends_on = [
-    kubectl_manifest.kustomization_platform_config,
-    kubectl_manifest.kustomization_vendor
-  ]
-}
-
-# Kustomization: cc-config (Vault CR, ESO SecretStore, MinIO, Harbor — depends on cc installing vault-operator CRDs)
-resource "kubectl_manifest" "kustomization_cc_config" {
-  count = var.cluster_role == "cc" ? 1 : 0
-
-  yaml_body = yamlencode({
-    apiVersion = "kustomize.toolkit.fluxcd.io/v1"
-    kind       = "Kustomization"
-    metadata = {
-      name      = "cc-config"
-      namespace = var.flux_namespace
-    }
-    spec = {
-      interval = "10m"
-      timeout  = "20m"
-      path     = "./cc-config"
-      prune    = true
-      dependsOn = [
-        { name = "cc" }
-      ]
-      sourceRef = {
-        kind = "OCIRepository"
-        name = "ml-gitops"
-      }
-      healthChecks = [
-        {
-          apiVersion = "helm.toolkit.fluxcd.io/v2"
-          kind       = "HelmRelease"
-          name       = "minio"
-          namespace  = var.flux_namespace
-        },
-        {
-          apiVersion = "helm.toolkit.fluxcd.io/v2"
-          kind       = "HelmRelease"
-          name       = "harbor"
-          namespace  = var.flux_namespace
-        }
-      ]
-      postBuild = {
-        substituteFrom = [
-          {
-            kind = "ConfigMap"
-            name = kubernetes_config_map_v1.cluster_config.metadata[0].name
-          },
-          {
-            kind = "Secret"
-            name = kubernetes_secret_v1.cluster_secrets.metadata[0].name
-          }
-        ]
-      }
-    }
-  })
-
-  depends_on = [
-    kubectl_manifest.kustomization_role
-  ]
-}
-
-# Kustomization: cc-routes (HTTPRoutes for CC services — depends on cc-config so backend services exist)
-resource "kubectl_manifest" "kustomization_cc_routes" {
-  count = var.cluster_role == "cc" ? 1 : 0
-
-  yaml_body = yamlencode({
-    apiVersion = "kustomize.toolkit.fluxcd.io/v1"
-    kind       = "Kustomization"
-    metadata = {
-      name      = "cc-routes"
-      namespace = var.flux_namespace
-    }
-    spec = {
-      interval = "10m"
-      path     = "./cc-routes"
-      prune    = true
-      dependsOn = [
-        { name = "cc-config" }
-      ]
-      sourceRef = {
-        kind = "OCIRepository"
-        name = "ml-gitops"
-      }
-      postBuild = {
-        substituteFrom = [
-          {
-            kind = "ConfigMap"
-            name = kubernetes_config_map_v1.cluster_config.metadata[0].name
-          },
-          {
-            kind = "Secret"
-            name = kubernetes_secret_v1.cluster_secrets.metadata[0].name
-          }
-        ]
-      }
-    }
-  })
-
-  depends_on = [
-    kubectl_manifest.kustomization_cc_config
-  ]
-}
-
-# Kustomization: cc-observability (Observability stack: Thanos, Loki, Tempo, Grafana — depends on cc-config for MinIO buckets)
-resource "kubectl_manifest" "kustomization_cc_observability" {
-  count = var.cluster_role == "cc" ? 1 : 0
-
-  yaml_body = yamlencode({
-    apiVersion = "kustomize.toolkit.fluxcd.io/v1"
-    kind       = "Kustomization"
-    metadata = {
-      name      = "cc-observability"
-      namespace = var.flux_namespace
-    }
-    spec = {
-      interval = "10m"
-      timeout  = "20m"
-      path     = "./cc-observability"
-      prune    = true
-      dependsOn = [
-        { name = "cc-config" }
-      ]
-      sourceRef = {
-        kind = "OCIRepository"
-        name = "ml-gitops"
-      }
-      healthChecks = [
-        {
-          apiVersion = "apps/v1"
-          kind       = "StatefulSet"
-          name       = "thanos-receive"
-          namespace  = "observability"
-        },
-        {
-          apiVersion = "apps/v1"
-          kind       = "Deployment"
-          name       = "thanos-query"
-          namespace  = "observability"
-        },
-        {
-          apiVersion = "helm.toolkit.fluxcd.io/v2"
-          kind       = "HelmRelease"
-          name       = "loki"
-          namespace  = var.flux_namespace
-        },
-        {
-          apiVersion = "helm.toolkit.fluxcd.io/v2"
-          kind       = "HelmRelease"
-          name       = "tempo"
-          namespace  = var.flux_namespace
-        },
-        {
-          apiVersion = "helm.toolkit.fluxcd.io/v2"
-          kind       = "HelmRelease"
-          name       = "grafana"
-          namespace  = var.flux_namespace
-        }
-      ]
-      postBuild = {
-        substituteFrom = [
-          {
-            kind = "ConfigMap"
-            name = kubernetes_config_map_v1.cluster_config.metadata[0].name
-          },
-          {
-            kind = "Secret"
-            name = kubernetes_secret_v1.cluster_secrets.metadata[0].name
-          }
-        ]
-      }
-    }
-  })
-
-  depends_on = [
-    kubectl_manifest.kustomization_cc_config
-  ]
-}
-
-# Kustomization: cc-observability-routes (HTTPRoutes for observability services — depends on cc-observability)
-resource "kubectl_manifest" "kustomization_cc_observability_routes" {
-  count = var.cluster_role == "cc" ? 1 : 0
-
-  yaml_body = yamlencode({
-    apiVersion = "kustomize.toolkit.fluxcd.io/v1"
-    kind       = "Kustomization"
-    metadata = {
-      name      = "cc-observability-routes"
-      namespace = var.flux_namespace
-    }
-    spec = {
-      interval = "10m"
-      path     = "./cc-observability-routes"
-      prune    = true
-      dependsOn = [
-        { name = "cc-observability" }
-      ]
-      sourceRef = {
-        kind = "OCIRepository"
-        name = "ml-gitops"
-      }
-      postBuild = {
-        substituteFrom = [
-          {
-            kind = "ConfigMap"
-            name = kubernetes_config_map_v1.cluster_config.metadata[0].name
-          },
-          {
-            kind = "Secret"
-            name = kubernetes_secret_v1.cluster_secrets.metadata[0].name
-          }
-        ]
-      }
-    }
-  })
-
-  depends_on = [
-    kubectl_manifest.kustomization_cc_observability
-  ]
-}
-
-# Kustomization: env-data (self-hosted data layer — operators deploy CRs for MySQL, Kafka, MongoDB, Redis)
-resource "kubectl_manifest" "kustomization_env_data" {
-  count = local.is_talos && local.is_env ? 1 : 0
-
-  yaml_body = yamlencode({
-    apiVersion = "kustomize.toolkit.fluxcd.io/v1"
-    kind       = "Kustomization"
-    metadata = {
-      name      = "env-data"
-      namespace = var.flux_namespace
-    }
-    spec = {
-      interval = "10m"
-      timeout  = "20m"
-      path     = "./env-data"
-      prune    = true
-      dependsOn = [
-        { name = "env" }
-      ]
-      sourceRef = {
-        kind = "OCIRepository"
-        name = "ml-gitops"
-      }
-      # CEL-based health check: PXC CR .status.state must be 'ready' (all nodes synced + proxies healthy)
-      # Matches ALL PerconaXtraDBCluster CRs — gates downstream kustomizations from starting migrations before DDL is safe
-      healthCheckExprs = [
-        {
-          apiVersion = "pxc.percona.com/v1"
-          kind       = "PerconaXtraDBCluster"
-          inProgress = "!has(status.state) || status.state == 'initializing'"
-          current    = "has(status.state) && status.state == 'ready'"
-          failed     = "has(status.state) && status.state == 'error'"
-        }
-      ]
-      healthChecks = [
-        {
-          apiVersion = "kafka.strimzi.io/v1beta2"
-          kind       = "Kafka"
-          name       = "mojaloop-kafka"
-          namespace  = "data"
-        },
-        {
-          apiVersion = "psmdb.percona.com/v1"
-          kind       = "PerconaServerMongoDB"
-          name       = "bulk-mongodb"
-          namespace  = "data"
-        }
-      ]
-      postBuild = {
-        substituteFrom = [
-          {
-            kind = "ConfigMap"
-            name = kubernetes_config_map_v1.cluster_config.metadata[0].name
-          },
-          {
-            kind = "Secret"
-            name = kubernetes_secret_v1.cluster_secrets.metadata[0].name
-          }
-        ]
-      }
-    }
-  })
-
-  depends_on = [
-    kubectl_manifest.kustomization_role
-  ]
-}
-
-# Kustomization: env-auth (auth layer — Vault, Keycloak, Ory stack, HTTPRoutes)
-resource "kubectl_manifest" "kustomization_env_auth" {
-  count = local.is_env ? 1 : 0
-
-  yaml_body = yamlencode({
-    apiVersion = "kustomize.toolkit.fluxcd.io/v1"
-    kind       = "Kustomization"
-    metadata = {
-      name      = "env-auth"
-      namespace = var.flux_namespace
-    }
-    spec = {
-      interval = "10m"
-      timeout  = "20m"
-      path     = "./env-auth"
-      prune    = true
-      dependsOn = local.is_talos ? [
-        { name = "env-data" }
-        ] : [
-        { name = "env" }
-      ]
-      sourceRef = {
-        kind = "OCIRepository"
-        name = "ml-gitops"
-      }
-      healthChecks = [
-        {
-          apiVersion = "vault.banzaicloud.com/v1alpha1"
-          kind       = "Vault"
-          name       = "vault"
-          namespace  = "vault"
-        },
-        # Ory stack
-        {
-          apiVersion = "helm.toolkit.fluxcd.io/v2"
-          kind       = "HelmRelease"
-          name       = "kratos"
-          namespace  = var.flux_namespace
-        },
-        {
-          apiVersion = "helm.toolkit.fluxcd.io/v2"
-          kind       = "HelmRelease"
-          name       = "keto"
-          namespace  = var.flux_namespace
-        },
-        {
-          apiVersion = "helm.toolkit.fluxcd.io/v2"
-          kind       = "HelmRelease"
-          name       = "hydra"
-          namespace  = var.flux_namespace
-        }
-      ]
-      postBuild = {
-        substituteFrom = [
-          {
-            kind = "ConfigMap"
-            name = kubernetes_config_map_v1.cluster_config.metadata[0].name
-          },
-          {
-            kind = "Secret"
-            name = kubernetes_secret_v1.cluster_secrets.metadata[0].name
-          }
-        ]
-      }
-    }
-  })
-
-  depends_on = [
-    kubectl_manifest.kustomization_role,
-    kubectl_manifest.kustomization_env_data,
-    kubectl_manifest.kustomization_vendor
-  ]
-}
-
-# Kustomization: env-auth-config (bootstrap jobs — depends on env-auth being healthy)
-resource "kubectl_manifest" "kustomization_env_auth_config" {
-  count = local.is_env ? 1 : 0
-
-  yaml_body = yamlencode({
-    apiVersion = "kustomize.toolkit.fluxcd.io/v1"
-    kind       = "Kustomization"
-    metadata = {
-      name      = "env-auth-config"
-      namespace = var.flux_namespace
-    }
-    spec = {
-      interval = "10m"
-      timeout  = "10m"
-      path     = "./env-auth-config"
-      prune    = true
-      dependsOn = [
-        { name = "env-auth" }
-      ]
-      sourceRef = {
-        kind = "OCIRepository"
-        name = "ml-gitops"
-      }
-      postBuild = {
-        substituteFrom = [
-          {
-            kind = "ConfigMap"
-            name = kubernetes_config_map_v1.cluster_config.metadata[0].name
-          },
-          {
-            kind = "Secret"
-            name = kubernetes_secret_v1.cluster_secrets.metadata[0].name
-          }
-        ]
-      }
-    }
-  })
-
-  depends_on = [
-    kubectl_manifest.kustomization_env_auth
-  ]
-}
-
-# Kustomization: env-app (Mojaloop core + MCM + Finance Portal — always deployed for env clusters)
-resource "kubectl_manifest" "kustomization_env_app" {
-  count = local.is_env ? 1 : 0
-
-  yaml_body = yamlencode({
-    apiVersion = "kustomize.toolkit.fluxcd.io/v1"
-    kind       = "Kustomization"
-    metadata = {
-      name      = "env-app"
-      namespace = var.flux_namespace
-    }
-    spec = {
-      interval = "10m"
-      timeout  = "30m"
-      path     = "./env-app"
-      prune    = true
-      dependsOn = [
-        { name = "env-auth-config" }
-      ]
-      sourceRef = {
-        kind = "OCIRepository"
-        name = "ml-gitops"
-      }
-      healthChecks = [
-        {
-          apiVersion = "helm.toolkit.fluxcd.io/v2"
-          kind       = "HelmRelease"
-          name       = "mojaloop"
-          namespace  = var.flux_namespace
-        },
-        {
-          apiVersion = "helm.toolkit.fluxcd.io/v2"
-          kind       = "HelmRelease"
-          name       = "mcm"
-          namespace  = var.flux_namespace
-        },
-        {
-          apiVersion = "helm.toolkit.fluxcd.io/v2"
-          kind       = "HelmRelease"
-          name       = "finance-portal"
-          namespace  = var.flux_namespace
-        }
-      ]
-      postBuild = {
-        substituteFrom = [
-          {
-            kind = "ConfigMap"
-            name = kubernetes_config_map_v1.cluster_config.metadata[0].name
-          },
-          {
-            kind = "Secret"
-            name = kubernetes_secret_v1.cluster_secrets.metadata[0].name
-          }
-        ]
-      }
-    }
-  })
-
-  depends_on = [
-    kubectl_manifest.kustomization_role,
-    kubectl_manifest.kustomization_env_data,
-    kubectl_manifest.kustomization_env_auth,
-    kubectl_manifest.kustomization_env_auth_config,
-    kubectl_manifest.kustomization_vendor
-  ]
-}
-
-# Kustomization: env-observability-agent (Grafana Alloy for log collection — only deployed to env clusters)
-resource "kubectl_manifest" "kustomization_env_observability_agent" {
-  count = local.is_env ? 1 : 0
-
-  yaml_body = yamlencode({
-    apiVersion = "kustomize.toolkit.fluxcd.io/v1"
-    kind       = "Kustomization"
-    metadata = {
-      name      = "env-observability-agent"
-      namespace = var.flux_namespace
-    }
-    spec = {
-      interval = "10m"
-      timeout  = "5m"
-      path     = "./env-observability-agent"
-      prune    = true
-      wait     = true
-      dependsOn = [
-        { name = "platform-config" } # Needs Gateway/DNS for remote write
-      ]
-      sourceRef = {
-        kind = "OCIRepository"
-        name = "ml-gitops"
-      }
-      postBuild = {
-        substituteFrom = [
-          {
-            kind = "ConfigMap"
-            name = kubernetes_config_map_v1.cluster_config.metadata[0].name
-          },
-          {
-            kind = "Secret"
-            name = kubernetes_secret_v1.cluster_secrets.metadata[0].name
-          }
-        ]
-      }
-    }
-  })
-
-  depends_on = [
-    kubectl_manifest.oci_repository,
-    kubectl_manifest.kustomization_platform_config
+    kubernetes_secret_v1.cluster_secrets,
   ]
 }

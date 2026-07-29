@@ -31,6 +31,11 @@ spec:
     crds: CreateReplace
     remediation:
       retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: strimzi-kafka-operator-values-override
+      valuesKey: values.yaml
+      optional: true
   values:
     watchNamespaces:
       - data

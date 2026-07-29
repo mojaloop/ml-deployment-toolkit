@@ -1,14 +1,14 @@
-# Output values from the root configuration
+# Outputs from the infra stack
 
 output "cluster_name" {
   description = "The name of the cluster"
-  value       = local.config.cluster.name
+  value       = module.config.cluster.name
 }
 
 output "cluster_endpoint" {
   description = "The API endpoint of the cluster"
   value = (
-    local.is_talos ? try(local.config.cluster.vip, null)
+    local.is_talos ? try(module.config.cluster.vip, null)
     : local.active_provider != null ? try(local.active_provider.cluster_endpoint, null)
     : null
   )
@@ -34,9 +34,4 @@ output "talosconfig_path" {
 output "flux_installed" {
   description = "Whether FluxCD controllers are installed"
   value       = length(module.flux_bootstrap) > 0 ? module.flux_bootstrap[0].flux_installed : false
-}
-
-output "oci_repo_active" {
-  description = "Whether Flux OCI reconciliation is active"
-  value       = local.oci_active
 }

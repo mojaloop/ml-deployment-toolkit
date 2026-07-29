@@ -1,31 +1,35 @@
+# yaml-language-server: $schema=../../config/schemas/environment.schema.json
 # ------------------------------------------------------------------
-# INFRASTRUCTURE & CLUSTER CONFIGURATION (sample — CC cluster)
-# ------------------------------------------------------------------
+# Environment config (sample — CC / Tooling Cluster)
 # Copy this file to config.yaml and edit for your environment.
-# Secrets live in .env (sourced via Makefile) — never put credentials here.
-# Proxmox credentials: native PROXMOX_VE_* env vars.
-# Flux-config secrets: TF_VAR_* env vars (digitalocean_token, oci_repo_*, oci_proxy_*).
+# Secrets live in .env next to this file (sourced via Makefile) —
+# never put credentials here.
 # ------------------------------------------------------------------
+version: 1
 
-# ------------------------------------------------------------------
-# 1. INFRASTRUCTURE PROVIDER
-# ------------------------------------------------------------------
+cluster:
+  name: "my-cc"
+  role: "cc"                          # cc | env | base
+  vip: "192.168.0.210"                # Kubernetes API floating IP (on-prem only)
+  lb_ipam:
+    range: "192.168.0.211-192.168.0.213"
+
+# Deployment template — config/templates/{role}/{template}.yaml
+template: "medium"
+
 infra:
-  provider: "proxmox"  # proxmox | aws | digitalocean
-
-  # --- Proxmox ---
+  provider: "proxmox"                 # proxmox | aws | digitalocean
   proxmox:
-    # Maps deployment template placement groups → Proxmox physical nodes
+    # Maps template placement groups -> Proxmox physical nodes
     placement:
-      placement-group-1: "pve-node-1"
-      #placement-group-2: "pve-node-2"
-      #placement-group-3: "pve-node-3"
+      pg-1: "pve-node-1"
+      # pg-2: "pve-node-2"
+      # pg-3: "pve-node-3"
     network_bridge: "vmbr0"
     storage:
       disks: "local-lvm"
       images: "local"
       snippets: "local"
-
   # Talos node OS overrides (optional — any on-prem provider)
   talos:
     nameservers:
@@ -34,88 +38,35 @@ infra:
     ntp_servers:
       - "time.cloudflare.com"
 
-  # # --- AWS ---
-  # aws:
-  #   region: "us-east-1"
-  #   vpc_cidr: "10.0.0.0/16"
-  #   availability_zones:
-  #     - "us-east-1a"
-  #     - "us-east-1b"
-  #     - "us-east-1c"
-
-  # # --- DigitalOcean ---
-  # digitalocean:
-  #   region: "nyc1"
-  #   vpc_cidr: "10.10.0.0/16"
-
-# ------------------------------------------------------------------
-# 2. SIZING PROFILE
-# ------------------------------------------------------------------
-profile: "medium"  # CC profile (see config/providers/proxmox/profiles/cc/)
-
-# ------------------------------------------------------------------
-# 3. CLUSTER PARAMETERS
-# ------------------------------------------------------------------
-cluster:
-  name: "my-cc"
-  role: "cc"                        # cc | env — determines which gitops paths are deployed
-
-  # Kubernetes API endpoint
-  vip: "192.168.0.210"              # Proxmox: floating IP
-
-  # Flux configuration
-  flux:
-    version: "2.7.2"
-
-# ------------------------------------------------------------------
-# 4. DNS
-# ------------------------------------------------------------------
+# Credentials in .env: DIGITALOCEAN_TOKEN, CLOUDFLARE_API_TOKEN,
+# or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_REGION for route53.
 dns:
-  provider: "route53"               # digitalocean | cloudflare | route53
+  provider: "route53"                 # digitalocean | cloudflare | route53
   domain: "cc1.lab1.example.com"
 
-  # Credentials come from .env: DIGITALOCEAN_TOKEN, CLOUDFLARE_API_TOKEN,
-  # or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_REGION for route53.
+# Certificates (ACME). email is the ACME account contact.
+cert:
+  provider: "acme"
+  email: "ops@example.com"
 
-  # For Cloudflare:
-  # cloudflare:
-  #   proxied: false
+# Distribution gitops artifact consumed by Flux (credentials OCI_REPO_* in .env)
+artifact:
+  url: "oci://ghcr.io/your-org/ml-deployment-toolkit"
+  version: "latest"                   # OCI tag — "latest" or pin to a version
 
-  # For AWS:
-  # aws:
-  #   region: "us-east-1"
+# Container image pull-through cache (none on the CC itself — Harbor lives here)
+registry:
+  provider: "none"
 
-# ------------------------------------------------------------------
-# 5. APPLICATION PARAMETERS
-# ------------------------------------------------------------------
-app:
-  lb_ipam:
-    range: "192.168.0.211-192.168.0.213"
-  alert_email: "ops@example.com"
+# Transactional email (SMTP). Credentials SMTP_USER/SMTP_PASSWORD in .env.
+email:
+  host: "smtp.example.com"
+  port: "587"
+  from: "grafana@example.com"
 
-# ------------------------------------------------------------------
-# 6. BACKUP (env clusters only)
-# ------------------------------------------------------------------
-# backup:
-#   s3:
-#     endpoint: "https://s3.int.cc1.lab1.example.com"
-#     bucket: "backups"
-#     region: "us-east-1"  # optional — defaults to us-east-1
-#   # Credentials (BACKUP_S3_ACCESS_KEY, BACKUP_S3_SECRET_KEY) live in .env
-
-# ------------------------------------------------------------------
-# 7. OCI CONFIGURATION
-# ------------------------------------------------------------------
-oci:
-  # OCI-REPO: Platform team's OCI registry where the Flux gitops artifact lives
-  repo:
-    active: true                    # Enable Flux OCI reconciliation
-    url: "oci://ghcr.io/your-org/ml-deployment-toolkit"
-    version: "latest"               # OCI tag — use "latest" or pin to a specific version
-
-  # OCI-PROXY: Harbor as transparent pull-through cache for container images
-  # Configured at Talos level (machine.registries.mirrors) so containerd routes pulls through Harbor
-  # Typically active: false on the CC itself (Harbor is hosted here) and true on env clusters.
-  proxy:
-    active: false                   # Enable container image proxy through Harbor
-    url: ""    # Harbor proxy cache URL (no oci:// prefix — used in Talos mirrors)
+# Alert delivery channels (Grafana contact points)
+alerting:
+  email:
+    to: "ops@example.com"
+  telegram:                           # token in .env (TELEGRAM_BOT_TOKEN)
+    chat_id: "0"
