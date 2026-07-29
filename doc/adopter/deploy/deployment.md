@@ -8,6 +8,7 @@ The workflow that turns configuration into a running cluster. It is the same for
 
 - [The four phases](#the-four-phases)
 - [Two stacks](#two-stacks)
+- [State is bound per environment](#state-is-bound-per-environment)
 - [Pre-deploy checks](#pre-deploy-checks)
 - [Deploy](#deploy)
 - [Changing configuration afterwards](#changing-configuration-afterwards)
@@ -38,6 +39,15 @@ Terraform is split into two roots with separate state, and knowing which one a c
 | **config** (`src/config`) | `OCIRepository`, Kustomizations, `cluster-config`, `cluster-secrets`, values overrides | `artifacts/<env>/terraform/config.tfstate` | seconds |
 
 The config stack has no provider that can address a VM, so a config-only change physically cannot disturb the cluster. `make plan-apply` runs both in order — infra first, then config against the real cluster.
+
+## State is bound per environment
+
+The two stack directories, `src/infra` and `src/config`, are shared by every environment. What separates one environment from another is not the directory but the backend: state lives per environment at `artifacts/<env>/terraform/infra.tfstate` and `artifacts/<env>/terraform/config.tfstate`, selected by `terraform init -backend-config`.
+
+Every make target that runs Terraform rebinds the backend to `ENV=` immediately before doing so — `plan`, `apply`, `destroy`, `secrets`, `list`, `show`, all of them. Two consequences worth knowing:
+
+- **Environments cannot cross-contaminate.** A command run with `ENV=a` operates on environment `a`'s state, whatever was initialised in that directory last.
+- **`ENV=` must always be passed.** Every target requires it and errors out immediately when it is missing, so there is no default environment to fall back on.
 
 ## Pre-deploy checks
 
@@ -83,7 +93,7 @@ make plan ENV=<env>      # plan both stacks
 make apply ENV=<env>     # apply the saved infra plan, then config
 ```
 
-**Do not skip `init`.** It downloads the provider plugins and configures the state backend for each stack. `plan` and `apply` assume it has run; on a fresh environment, or after switching `ENV`, running them without `init` first fails or acts against the wrong backend.
+`make init` downloads and upgrades the provider plugins and configures the state backend for each stack. `make plan` runs it for both stacks anyway, so the explicit form is mostly there to make the step readable — and it is the one command that picks up new provider versions. Switching `ENV` needs no special handling: every target rebinds the backend to the environment it was given ([State is bound per environment](#state-is-bound-per-environment)).
 
 Then wait. Terraform provisions and hands off to Flux:
 
@@ -162,7 +172,7 @@ All commands run from the repository root. `ENV=` selects the environment.
 
 | Command | Does |
 |---------|------|
-| `make init ENV=<env>` | Download providers, configure both state backends. **Run first on any new environment.** |
+| `make init ENV=<env>` | Download and **upgrade** providers, configure both state backends. `plan` and `plan-apply` run it for you |
 | `make plan ENV=<env>` | Plan both stacks and save the plans |
 | `make apply ENV=<env>` | Apply the saved infra plan, then plan and apply config |
 | `make plan-apply ENV=<env>` | Plan and apply both stacks in order — avoids stale-plan errors |
@@ -187,7 +197,7 @@ These load the environment's `.env`, so they need `ENV=` like everything else.
 |---------|------|
 | `make destroy ENV=<env>` | Destroy config then infra — 5-second cancel window |
 | `make destroy-fast ENV=<env>` | Destroy without refreshing state — 3-second window |
-| `make clean` | Delete the whole `artifacts/` tree — **including every environment's Terraform state** |
+| `make clean ENV=<env>` | Delete one environment's generated artifacts — kubeconfig, Talos config and secrets, saved plans. **Terraform state is preserved** |
 
 ## Destroying
 
@@ -195,4 +205,6 @@ These load the environment's `.env`, so they need `ENV=` like everything else.
 
 Across clusters, **destroy Hubs before the Tooling Cluster** they depend on — otherwise the Hubs lose their registry and secrets mid-teardown and the destroy can stall.
 
-**`make clean` deletes Terraform state, for every environment.** It takes no `ENV` and removes the whole `artifacts/` tree. After a clean, Terraform has no record of any infrastructure; anything still running is orphaned and must be removed by hand, and every generated password held only in `config.tfstate` is gone. Never `clean` while an environment is live. Back up `artifacts/` first — see [Recover → What the adopter must keep](../recover/disaster-recovery.md#what-the-adopter-must-keep).
+**`make clean ENV=<env>` keeps the state.** It is scoped to one environment and removes only that environment's generated artifacts — `artifacts/<env>/kubernetes`, `talos`, `talos-config`, `talos-secrets`, and the two saved plan files. `artifacts/<env>/terraform/` is left untouched, deliberately: deleting state orphans running VMs and managed clusters, and loses the generated passwords held in `config.tfstate`. `ENV=` is required, as everywhere else.
+
+The removed files are Terraform-managed copies — `kubeconfig`, `talosconfig`, the per-node machine configs, and `talos-secrets/secrets.yaml` are all written from infra state, so the next apply writes them back. The state is the authoritative copy, which is why it is the thing to back up. See [Recover → What the adopter must keep](../recover/disaster-recovery.md#what-the-adopter-must-keep).

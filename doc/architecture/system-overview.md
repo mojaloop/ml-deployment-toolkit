@@ -14,6 +14,7 @@ How the distribution is assembled, what a cluster is made of, and how configurat
 - [What a Hub runs](#what-a-hub-runs)
 - [Reconciliation order](#reconciliation-order)
 - [Configuration tiers](#configuration-tiers)
+- [Configuration layers](#configuration-layers)
 - [Provider independence](#provider-independence)
 
 ## What this is
@@ -125,6 +126,37 @@ Adopters touch tier 1 only. Tiers 2 and 3 arrive in the artifact.
 Terraform itself is two stacks with separate state ([ADR-015](decisions/015-two-stack-capability-config.md)): **infra** (`src/infra`) builds the cluster and installs Flux; **config** (`src/config`) writes everything Flux consumes. Both load the same merged configuration; only the second can be applied on its own, with `make apply-config`.
 
 Values that must reach a running workload are injected two ways — a `cluster-config` ConfigMap for non-secret values and a `cluster-secrets` Secret for credentials, both written by the config stack and consumed by Flux `postBuild` substitution. That is how a manifest in the artifact ends up carrying the environment's domain name without the artifact being rebuilt per environment. The internal service passwords in `cluster-secrets` are generated there rather than authored.
+
+## Configuration layers
+
+The tiers above say who *owns* each input. This says how an input *reaches* a running workload, and which layer wins when more than one speaks to the same setting.
+
+A value takes one of two routes.
+
+**Route 1 — substitution, for anything the distribution templated.** The artifact's manifests carry `${...}` placeholders. Terraform resolves the environment config into `cluster-config` and `cluster-secrets`, and every Flux Kustomization substitutes from that pair, so the placeholder becomes this environment's value at reconcile time:
+
+| Step | Where |
+|------|-------|
+| Capacity template tuning — replica counts, storage sizes, buffer pools | `config/templates/<role>/<name>.yaml`, sections `app:` / `data:` / `cc:` |
+| Environment config — capability bindings, domain, cluster identity | `environments/<env>/config.yaml` |
+| Supplied credentials | `environments/<env>/.env` |
+| Generated credentials — the ~20 internal service passwords | created by the config stack, never authored |
+| ↓ resolved by `config-loader`, written by the config stack | `cluster-config` ConfigMap + `cluster-secrets` Secret |
+| ↓ Flux `postBuild.substituteFrom` | the rendered manifest |
+
+Two things follow. A value only reaches a workload here if the distribution left a placeholder for it — substitution fills blanks, it does not introduce new settings. And because Flux re-reads both objects each reconcile, changing one is `make apply-config` (seconds, no infrastructure touched) rather than a redeploy.
+
+**Route 2 — Helm values, for chart settings.** Each HelmRelease composes its values from several sources, and the merge order decides the winner:
+
+| Order | Source | Owner |
+|:---:|--------|-------|
+| 1 | Upstream chart defaults | Chart author |
+| 2 | `environments/<env>/values/<release>.yaml` → `<release>-values-override` ConfigMap, via `valuesFrom` | Adopter |
+| 3 | The HelmRelease's inline `spec.values` (itself substituted by route 1) | Distribution |
+
+**Later wins, so the distribution's inline values beat the adopter's file.** Flux merges `spec.values` after everything in `spec.valuesFrom`. The adopter layer therefore reaches only settings the distribution leaves unset; a file setting a key the distribution also sets is read, templated, mounted, and ignored — silently, because the reference is `optional: true`. Changing a value the distribution sets inline means forking `gitops/`. See [Configuration → Helm value overrides](../adopter/deploy/configuration.md#helm-value-overrides).
+
+Everything a workload consumes therefore arrives from one of: a chart default, a distribution decision in `gitops/`, a capacity template, the environment's config, a credential, or an adopter values file — in that order of specificity, with the caveat above about which of the last two actually wins.
 
 See [Configuration](../adopter/deploy/configuration.md) for the schema, and [GitOps structure](gitops-structure.md) for how substitution works.
 

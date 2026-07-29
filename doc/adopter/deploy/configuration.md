@@ -57,12 +57,12 @@ State and generated artifacts land under `artifacts/<env>/` — see [System over
 | Section | Required | Choices | Default |
 |---------|:---:|---------|---------|
 | `version` | yes | `1` | — |
-| `cluster` | yes | `name`, `role`, `vip`, `lb_ipam.range` | — |
+| `cluster` | yes | `name`, `role`, `vip`, `lb_ipam.range`, `flux.version`, `gateway_class_name` | Flux `2.7.2`, GatewayClass `cilium` |
 | `template` | yes | a name under `config/templates/<role>/` | — |
 | `infra` | yes | `proxmox`, `aws`, `digitalocean` | — |
 | `dns` | yes | `digitalocean`, `cloudflare`, `route53` | — |
-| `cert` | no | ACME contact email | `admin@<dns.domain>`, Let's Encrypt |
-| `artifact` | no | the gitops OCI artifact Flux reconciles | none — no Kustomizations created |
+| `cert` | no | `email` (ACME contact), `server` (ACME directory URL) | `admin@<dns.domain>`, Let's Encrypt production |
+| `artifact` | no | `url`, `version`, `active` — the gitops OCI artifact Flux reconciles | none — no Kustomizations created; `active` defaults to true once `url` is set |
 | `toolkit_cc` | no | the backing Tooling Cluster's domain | — |
 | `registry` | no | `toolkit-cc`, `harbor`, `none` | `none` (pull direct from upstream) |
 | `object_storage` | no | `toolkit-cc`, `s3`, `none` | `none` |
@@ -145,6 +145,15 @@ alerting:                             # Grafana contact points
 A Tooling Cluster carries no `data`, no `app`, and no `toolkit_cc` — it is the thing other clusters point at.
 
 **`cert.email` is the ACME account contact and nothing else.** It replaces the old `app.alert_email`, which despite its name only ever reached Let's Encrypt. Alert destinations are `alerting:`.
+
+**`cert.server` selects the ACME directory URL** and defaults to Let's Encrypt production. It sets the `server` of the `letsencrypt-prod` ClusterIssuer — the one the Gateways annotate, so it is the URL every platform certificate is actually issued from. Point it at the Let's Encrypt staging endpoint while working through rate-limited testing, or at any other ACME-compatible authority:
+
+```yaml
+cert:
+  provider: "acme"
+  email: "ops@example.com"
+  server: "https://acme-staging-v02.api.letsencrypt.org/directory"
+```
 
 ## A Hub, annotated
 
@@ -240,9 +249,10 @@ node_groups:
     memory: 12288              # MB
     disks: [64, 64]            # GB
     placement: [pg-3, pg-2, pg-1]
+    tags: [lab1]               # optional — extra Proxmox/cloud tags on every node
 ```
 
-`placement` is index-aligned — node `i` lands on `placement[i]`, wrapping when the list is shorter than `count`. The `pg-N` names are abstract; `infra.<provider>.placement` in `config.yaml` maps them to physical Proxmox nodes. Provide a mapping for every group the template references.
+Every node carries the tags `ml` and the cluster name; `tags` on a group adds to that list. `placement` is index-aligned — node `i` lands on `placement[i]`, wrapping when the list is shorter than `count`. The `pg-N` names are abstract; `infra.<provider>.placement` in `config.yaml` maps them to physical Proxmox nodes. Provide a mapping for every group the template references.
 
 The concrete machine behind a workload class comes from `config/templates/mappings/<provider>.yaml` — VM defaults on Proxmox, instance types on AWS and DigitalOcean. That file is distribution-maintained; adopters do not edit it.
 
@@ -345,13 +355,14 @@ $EDITOR environments/<env>/.env
 
 Three things worth knowing:
 
-- **Any generated password can be overridden** by setting its UPPER_CASE name in `.env` — `MYSQL_ROOT_PASSWORD`, `HARBOR_ADMIN_PASSWORD`, and so on. This is how an `external-unmanaged` data store receives its credentials, and how an environment migrated from an older layout keeps the passwords it already has.
+- **Any generated secret can be pinned** by setting its UPPER_CASE name in `.env` — `MYSQL_ROOT_PASSWORD`, `HARBOR_ADMIN_PASSWORD`, and so on. A non-empty value there is used verbatim and nothing is generated for that name; generation only kicks in for names that are absent or empty. This is how an `external-unmanaged` data store receives its credentials, and it is the migration path for an existing environment whose passwords must not rotate — see [Upgrading → Migrating an existing environment](upgrading.md#migrating-an-existing-environment).
+- **The Ory signing secrets are pinnable too.** `KRATOS_SECRETS_CIPHER`, `KRATOS_SECRETS_COOKIE`, `KRATOS_SECRETS_CSRF_COOKIE`, `KRATOS_SECRETS_DEFAULT`, `HYDRA_SECRETS_SYSTEM`, and `HYDRA_SECRETS_COOKIE` behave like the passwords. They matter more than most: rotating `KRATOS_SECRETS_CIPHER` makes stored credential and recovery material undecryptable, and rotating `HYDRA_SECRETS_SYSTEM` invalidates every issued token and consent grant.
 - **Proxmox variables are read natively** by the provider. `PROXMOX_VE_*` are used as-is.
 - **Generated passwords live in the config stack's Terraform state** (`artifacts/<env>/terraform/config.tfstate`) as well as in the cluster. Losing both loses the passwords — see [Disaster recovery](../recover/disaster-recovery.md#what-the-adopter-must-keep).
 
 ## Helm value overrides
 
-The adopter can override the platform's Helm values for **any** chart the distribution ships, without forking anything. Drop a file named for the HelmRelease in `values/`:
+The adopter can supply Helm values to any chart the distribution ships, without forking anything. Drop a file named for the HelmRelease in `values/`:
 
 ```
 environments/<env>/values/
@@ -360,7 +371,11 @@ environments/<env>/values/
   loki.yaml
 ```
 
-Each file becomes a `<name>-values-override` ConfigMap, layered over the platform defaults through the HelmRelease's `valuesFrom` as an optional reference — a missing file changes nothing. Merge order is chart defaults, then platform values, then the environment's file. The name must match the HelmRelease, not the chart's upstream name: `psmdb-operator.yaml`, not `percona-mongodb.yaml`.
+Each file becomes a `<name>-values-override` ConfigMap, referenced by the HelmRelease's `valuesFrom` as an optional entry — a missing file changes nothing. The name must match the HelmRelease, not the chart's upstream name: `psmdb-operator.yaml`, not `percona-mongodb.yaml`.
+
+> **This supplies values; it does not override them.** Flux merges a HelmRelease's inline `spec.values` *after* everything in `spec.valuesFrom`, so the distribution's inline values win any key they set. The effective order is chart defaults → your file → the distribution's inline values. A file setting a key the distribution also sets is read, substituted, mounted — and has no effect, with no error, because the reference is optional.
+>
+> In practice this works for keys the distribution leaves unset, and does nothing for the ones it sets inline — replica counts, storage sizes, root URLs, resource limits. To change one of those today you must fork `gitops/` and republish the artifact. Check the chart's HelmRelease in `gitops/` before relying on an override file.
 
 **Override files are templated**, with the same `${...}` syntax the artifact's manifests use — the config stack expands them before writing the ConfigMap, because Flux does not substitute inside a ConfigMap it did not render:
 
@@ -392,6 +407,33 @@ Seconds, no infrastructure plan, and Flux picks the change up on its next reconc
 make validate ENV=<env>
 ```
 
-This checks, in order: `config.yaml` against the JSON Schema, the selected template against the template schema, the provider mapping against the mapping schema, and then `terraform validate` on both stacks (skipped until `make init` has run). Cross-field rules the schema cannot express — `cluster.name` matching the directory, `toolkit-cc` without a domain, an `external-unmanaged` store without a host — are Terraform preconditions and surface at plan time.
+This checks, in order: `config.yaml` against the JSON Schema, the selected template against the template schema, the provider mapping against the mapping schema, and then `terraform validate` on both stacks (skipped until `make init` has run).
+
+Two properties of the schema checker are worth knowing:
+
+- **The validator refuses to ignore a constraint.** `tools/validate.py` implements a deliberate subset of JSON Schema, and any keyword outside that subset is reported as a schema error rather than skipped. A constraint added to a schema therefore either takes effect or fails loudly — it can never be silently ignored.
+- **The schemas have their own self-check.** `tools/test-validation.sh` runs 18 cases against the tracked samples — 2 that must be accepted and 16 that must be rejected — and is the place to add a case when a rule changes.
+
+### Rules that fail at plan time
+
+Cross-field rules the schema cannot express are Terraform preconditions on the config-loader module. They fail the **plan**, before anything is created, each with a message naming the offending value:
+
+| Condition | What it means |
+|-----------|---------------|
+| `version` is not `1` | `config.yaml` must declare the schema version it is written against |
+| `cluster.role` is not `cc`, `env`, or `base` | The role selects both the template directory and the Kustomization set |
+| `cluster.name` resolves to an empty string | Set it, or let it default by naming the environment directory |
+| A capability uses `provider: toolkit-cc` but `toolkit_cc.domain` is unset | Nothing to derive the endpoints from — see [The toolkit-cc shorthand](#the-toolkit-cc-shorthand) |
+| Any `data.<store>.mode` is `external-managed` | Schema-reserved, not implemented — use `in-cluster-managed` or `external-unmanaged` |
+| An `external-unmanaged` store has no `host` | The endpoint cannot be derived for a store the toolkit does not deploy |
+| On `role: env`, `app.api_type` is not `fspiop` or `iso20022` | The message dialect must be one the platform ships |
+| On `role: env`, a non-Talos provider with any `in-cluster-managed` store | The in-cluster data layer is packaged for Talos providers only; on AWS or DigitalOcean every store must be `external-unmanaged`, or the cluster advertises hostnames that were never deployed |
+| The template references a placement group absent from `infra.<provider>.placement` | Unmapped groups reach the provider as literal node names and fail partway through apply, with VMs already created |
+| The template has duplicate `node_groups[].name` | Group names become VM name suffixes and `for_each` keys |
+| `registry.provider: harbor` without `registry.url` | An explicitly bound capability must carry its parameters |
+| `object_storage.provider: s3` without `object_storage.endpoint` | As above |
+| `observability.provider: urls` with no `loki_url`, `mimir_url`, or `tempo_url` | As above |
+
+The last three exist because an empty value would otherwise reach the cluster intact and fail at runtime instead.
 
 Next: [Deployment](deployment.md).
