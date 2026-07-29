@@ -151,12 +151,12 @@ Two things follow. A value only reaches a workload here if the distribution left
 | Order | Source | Owner |
 |:---:|--------|-------|
 | 1 | Upstream chart defaults | Chart author |
-| 2 | `environments/<env>/values/<release>.yaml` → `<release>-values-override` ConfigMap, via `valuesFrom` | Adopter |
-| 3 | The HelmRelease's inline `spec.values` (itself substituted by route 1) | Distribution |
+| 2 | `<release>-values` ConfigMap, generated from `<release>-values.yaml` beside the HelmRelease (itself substituted by route 1) | Distribution |
+| 3 | `environments/<env>/values/<release>.yaml` → `<release>-values-override` ConfigMap | Adopter |
 
-**Later wins, so the distribution's inline values beat the adopter's file.** Flux merges `spec.values` after everything in `spec.valuesFrom`. The adopter layer therefore reaches only settings the distribution leaves unset; a file setting a key the distribution also sets is read, templated, mounted, and ignored — silently, because the reference is `optional: true`. Changing a value the distribution sets inline means forking `gitops/`. See [Configuration → Helm value overrides](../adopter/deploy/configuration.md#helm-value-overrides).
+**Later wins, so the adopter's file beats the distribution's values.** Flux merges `valuesFrom` entries in the order listed, later overwriting earlier, and no HelmRelease uses inline `spec.values` — which would otherwise be merged after everything and take precedence over both. That constraint is what makes the layering work, so a new chart must follow the same pattern. See [Configuration → Helm value overrides](../adopter/deploy/configuration.md#helm-value-overrides).
 
-Everything a workload consumes therefore arrives from one of: a chart default, a distribution decision in `gitops/`, a capacity template, the environment's config, a credential, or an adopter values file — in that order of specificity, with the caveat above about which of the last two actually wins.
+Everything a workload consumes therefore arrives from one of: a chart default, a distribution decision in `gitops/`, a capacity template, the environment's config, a credential, or an adopter values file — in that order of increasing specificity, with the most specific winning.
 
 See [Configuration](../adopter/deploy/configuration.md) for the schema, and [GitOps structure](gitops-structure.md) for how substitution works.
 

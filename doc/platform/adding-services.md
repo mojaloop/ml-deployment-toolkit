@@ -30,11 +30,48 @@ Match the reconciliation stage to the dependency. A service needing the database
 A service is a HelmRelease (or raw manifests) added to the right Kustomization directory:
 
 1. **Add the manifest** — a `HelmRelease` referencing a `HelmRepository`, or plain YAML, in the chosen Kustomization directory.
-2. **Register it in that directory's `kustomization.yaml`** — a resource not listed there is silently not applied. This is the most common omission.
-3. **Add a namespace** if the service needs its own — either a `Namespace` manifest or `install.createNamespace` on the HelmRelease, consistent with the neighbours.
-4. **Add a route** if it needs external access — an `HTTPRoute` attaching to `gw-int` or `gw-ext`, in the appropriate routes Kustomization. See [Networking](../architecture/networking.md).
+2. **Put the chart's values in `<release>-values.yaml`** beside the HelmRelease — never in `spec.values`. See the rule below.
+3. **Register both in that directory's `kustomization.yaml`** — the manifest under `resources:`, and the values file as a `configMapGenerator` entry. A resource not listed there is silently not applied. This is the most common omission.
+4. **Add a namespace** if the service needs its own — either a `Namespace` manifest or `install.createNamespace` on the HelmRelease, consistent with the neighbours.
+5. **Add a route** if it needs external access — an `HTTPRoute` attaching to `gw-int` or `gw-ext`, in the appropriate routes Kustomization. See [Networking](../architecture/networking.md).
 
 Keep it provider-agnostic. If the service needs a value that varies by environment, that value comes through substitution — never hardcode a domain or an endpoint.
+
+### `spec.values` is never used
+
+Flux merges a HelmRelease's inline `spec.values` *after* everything in `spec.valuesFrom`, so any value set inline cannot be overridden by an adopter. Every chart therefore ships its values in a ConfigMap listed first, with the adopter's override last:
+
+```yaml
+# <release>-values.yaml, beside the HelmRelease — plain chart values, no wrapper
+replicaCount: ${some_template_key}
+```
+
+```yaml
+# in the HelmRelease — no spec.values anywhere
+  valuesFrom:
+    - kind: ConfigMap
+      name: <release>-values            # distribution defaults
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: <release>-values-override   # adopter — merged last, wins
+      valuesKey: values.yaml
+      optional: true
+```
+
+```yaml
+# in the directory's kustomization.yaml
+configMapGenerator:
+  - name: <release>-values
+    namespace: flux-system
+    files:
+      - values.yaml=<release>-values.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+```
+
+Three details matter. The generated ConfigMap must be in `flux-system`, where the HelmReleases live, because `valuesFrom` resolves in the HelmRelease's namespace. `disableNameSuffixHash: true` is required rather than stylistic — Kustomize does not rewrite name references inside a CRD, so a hashed name would leave `valuesFrom` pointing at a ConfigMap that does not exist, and the chart would quietly deploy on bare defaults. And `${...}` substitution works normally inside the values file, because Flux renders it as part of the Kustomization.
+
+A chart that puts values inline still works, so nothing fails to alert you — it just silently removes that chart from the adopter's reach. `grep -rn '^  values:' gitops/` should return nothing.
 
 ## Wiring substitution values
 
