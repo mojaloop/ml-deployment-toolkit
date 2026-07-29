@@ -102,7 +102,9 @@ Every role shares the same four-stage prefix — `platform` → `dns` → `platf
 
 The **Tooling Cluster** adds five stages. `cc-config` gates on Harbor and MinIO. `cc-observability` gates on Thanos receive and query, plus Loki, Tempo, and Grafana.
 
-The **Hub** adds six, gated at every step: `env` waits for the PXC, PSMDB, and Strimzi operators; `env-data` waits for the MySQL cluster to report `ready` and for Kafka and MongoDB to be healthy; `env-auth` waits for Vault, Kratos, Keto, and Hydra; `env-app` waits for Mojaloop, MCM, and Finance Portal.
+The **Hub** adds a gated chain at every step: `env` waits for the PXC, PSMDB, and Strimzi operators; `env-data-common` fans out into one Kustomization per in-cluster store, each with its own health gate — `env-data-mysql` waits for the MySQL cluster to report `ready`, Kafka and MongoDB for their custom resources to be healthy; `env-auth` waits for Vault, Kratos, Keto, and Hydra; `env-app` waits for Mojaloop, MCM, and Finance Portal.
+
+A store bound to `external-unmanaged` gets no Kustomization at all — the fan-out is built from the stores that are actually in-cluster, so `env-auth` and `env-app` gate only on what this deployment runs. See [Configuration → Data modes](../adopter/deploy/configuration.md#data-modes).
 
 This is why a Hub takes time to converge and why an early failure blocks everything downstream — the ordering is deliberate, because migrations run against databases that must already exist. `env-observability-agent` is a parallel branch off `platform-config` and does not block the application chain.
 
@@ -112,15 +114,17 @@ Configuration merges from three tiers at plan time.
 
 | Tier | Owner | Contents | Location |
 |------|-------|----------|----------|
-| Environment | Adopter | Provider, cluster name, domain, sizing, secrets | `config/environments/<env>/config.yaml` + `.env` |
-| Platform definitions | Distribution team | Talos and Kubernetes versions, sizing profiles, patches | `config/definitions/`, `config/patches/`, `config/providers/` |
+| Environment | Adopter | Capability bindings, cluster name, domain, template name, external credentials | `environments/<env>/config.yaml` + `.env` |
+| Platform definitions | Distribution team | Talos and Kubernetes versions, capacity templates, provider mappings, patches, schemas | `config/definitions/`, `config/templates/`, `config/patches/`, `config/schemas/` |
 | Distribution artifact | Distribution team | GitOps manifests and Terraform modules | `gitops/`, `src/` |
 
-The `config-loader` Terraform module merges them: it reads the environment config, resolves the sizing profile from the provider's profile directory, applies Talos patches, and produces one unified configuration for downstream modules.
+The `config-loader` Terraform module merges them: it reads the environment config, loads the capacity template for the cluster's role and the mapping for its infrastructure provider, expands node groups into concrete machines, resolves each capability to concrete endpoints, and produces one unified configuration for downstream modules.
 
 Adopters touch tier 1 only. Tiers 2 and 3 arrive in the artifact.
 
-Values that must reach a running workload are injected two ways — a `cluster-config` ConfigMap for non-secret values and a `cluster-secrets` Secret for credentials, both consumed by Flux `postBuild` substitution. That is how a manifest in the artifact ends up carrying the environment's domain name without the artifact being rebuilt per environment.
+Terraform itself is two stacks with separate state ([ADR-015](decisions/015-two-stack-capability-config.md)): **infra** (`src/infra`) builds the cluster and installs Flux; **config** (`src/config`) writes everything Flux consumes. Both load the same merged configuration; only the second can be applied on its own, with `make apply-config`.
+
+Values that must reach a running workload are injected two ways — a `cluster-config` ConfigMap for non-secret values and a `cluster-secrets` Secret for credentials, both written by the config stack and consumed by Flux `postBuild` substitution. That is how a manifest in the artifact ends up carrying the environment's domain name without the artifact being rebuilt per environment. The internal service passwords in `cluster-secrets` are generated there rather than authored.
 
 See [Configuration](../adopter/deploy/configuration.md) for the schema, and [GitOps structure](gitops-structure.md) for how substitution works.
 

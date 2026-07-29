@@ -12,6 +12,11 @@
 locals {
   s = var.secrets
 
+  # The Makefile emits every known credential key, using "" for unset ones, so
+  # an absent value arrives as an empty string rather than a missing key —
+  # lookup()'s default never fires. Drop the empties first so defaults work.
+  set_secrets = { for k, v in var.secrets : k => v if v != "" }
+
   has_oci_credentials = lookup(local.s, "OCI_REPO_USERNAME", "") != "" && lookup(local.s, "OCI_REPO_PASSWORD", "") != ""
   is_talos            = contains(["proxmox", "openstack"], var.infra_provider)
   has_vendor          = contains(["proxmox", "openstack", "aws", "gcp"], var.infra_provider)
@@ -171,10 +176,10 @@ resource "kubernetes_secret_v1" "cluster_secrets" {
       smtp_user         = lookup(local.s, "SMTP_USER", "")
       smtp_password     = lookup(local.s, "SMTP_PASSWORD", "")
       # Grafana Telegram contact point tolerates a dummy token; empty breaks provisioning
-      telegram_bot_token = lookup(local.s, "TELEGRAM_BOT_TOKEN", "") != "" ? local.s["TELEGRAM_BOT_TOKEN"] : "unset"
+      telegram_bot_token = lookup(local.set_secrets, "TELEGRAM_BOT_TOKEN", "unset")
     },
     local.is_cc ? {
-      minio_root_user        = lookup(local.s, "MINIO_ROOT_USER", "minioadmin")
+      minio_root_user        = lookup(local.set_secrets, "MINIO_ROOT_USER", "minioadmin")
       minio_root_password    = local.generated_secrets["minio_root_password"]
       harbor_admin_password  = local.generated_secrets["harbor_admin_password"]
       grafana_admin_password = local.generated_secrets["grafana_admin_password"]

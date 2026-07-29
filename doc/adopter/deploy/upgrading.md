@@ -66,7 +66,7 @@ Kubernetes and Talos versions are set centrally in the platform definitions, not
 
 | What | How |
 |------|-----|
-| Platform workloads | Set `oci.repo.version` back to the previous tag, `make plan-apply` |
+| Platform workloads | Set `artifact.version` back to the previous tag, `make apply-config` |
 | Infrastructure | Revert the `config.yaml` change, `make plan-apply` |
 | Data | Not a rollback — see [Recover → Restore](../recover/restore.md) |
 

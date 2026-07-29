@@ -14,7 +14,7 @@ Publishing the tailored distribution under the integrator's own identity, so cli
 
 ## The model
 
-The integrator publishes the derivative the same way upstream publishes its artifact — an OCI artifact in a registry — but under the integrator's registry and versioning. The client points their `oci.repo.url` at the integrator's registry and deploys with the standard workflow. Nothing about their experience changes; they just consume the derivative artifact instead of upstream's.
+The integrator publishes the derivative the same way upstream publishes its artifact — an OCI artifact in a registry — but under the integrator's registry and versioning. The client points their `artifact.url` at the integrator's registry and deploys with the standard workflow. Nothing about their experience changes; they just consume the derivative artifact instead of upstream's.
 
 This is what "customize without disconnecting" means in practice: the client uses the same tooling, the same commands, the same upgrade path — the only difference is whose registry the artifact comes from.
 
@@ -61,6 +61,6 @@ This is the one piece of derivative-maintenance infrastructure that already work
 
 ## How the client consumes it
 
-Identically to consuming upstream. The client sets `oci.repo.url` to the integrator's registry, provides pull credentials if it is private, and runs the standard [adopter deploy workflow](../adopter/deploy/deployment.md). Flux reconciles the derivative artifact the same way it would reconcile upstream's.
+Identically to consuming upstream. The client sets `artifact.url` to the integrator's registry, provides pull credentials if it is private, and runs the standard [adopter deploy workflow](../adopter/deploy/deployment.md). Flux reconciles the derivative artifact the same way it would reconcile upstream's.
 
 The client is an adopter — hand them the [Adopter guide](../adopter/index.md) for deploying and operating. The integrator's responsibility is publishing a correct, well-versioned, provenance-stamped artifact; the client's is deploying it. The clean seam between the two is what keeps a derivative maintainable on both sides.

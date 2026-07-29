@@ -38,7 +38,7 @@ Both need `jsonnet`, `jb`, `yq`, and `helm` installed.
 make push-gitops ENV=<env>
 ```
 
-This packages `gitops/` and pushes it to the registry in `oci.repo.url`, tagged with the current git SHA and also `latest`. It stamps the artifact with its git source and revision, so a published artifact is traceable to the exact commit that produced it.
+This packages `gitops/` and pushes it to the registry in the environment's `artifact.url`, tagged with the current git SHA. It stamps the artifact with its git source and revision, so a published artifact is traceable to the exact commit that produced it. Only `make release` additionally moves the `latest` tag.
 
 Publishing needs `OCI_REPO_USERNAME` / `OCI_REPO_PASSWORD` with push access — see [Prerequisites → OCI registry](../adopter/deploy/prerequisites.md#oci-registry).
 
@@ -80,4 +80,4 @@ flux pull artifact oci://<repo>:<tag> --output /tmp/artifact
 
 This pulls and unpacks the artifact, exposing the `gitops/` tree that clusters will actually reconcile. Doing this against a release candidate before tagging it `stable` catches a mis-publish before it reaches a consumer following that tag.
 
-Which tag a cluster follows is the adopter's choice, in `oci.repo.version` — see [Upgrading](../adopter/deploy/upgrading.md). The platform developer's responsibility ends at publishing a correct, correctly-tagged artifact.
+Which tag a cluster follows is the adopter's choice, in `artifact.version` — see [Upgrading](../adopter/deploy/upgrading.md). The platform developer's responsibility ends at publishing a correct, correctly-tagged artifact.
