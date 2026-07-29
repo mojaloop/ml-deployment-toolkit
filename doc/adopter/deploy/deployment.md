@@ -7,8 +7,10 @@
 The workflow that turns configuration into a running cluster. It is the same for a Tooling Cluster and a Hub — only `config.yaml` differs. Role-specific inputs and checks are in [Tooling Cluster](tooling-cluster.md) and [Hub](hub.md).
 
 - [The four phases](#the-four-phases)
+- [Two stacks](#two-stacks)
 - [Pre-deploy checks](#pre-deploy-checks)
 - [Deploy](#deploy)
+- [Changing configuration afterwards](#changing-configuration-afterwards)
 - [Verify, up the stack](#verify-up-the-stack)
 - [Commands](#commands)
 - [Destroying](#destroying)
@@ -22,9 +24,20 @@ flowchart LR
     flux --> v["Verify"]
 ```
 
-**The adopter** runs the pre-checks and `make`. **Terraform** provisions VMs, boots Talos, forms the cluster, and installs Flux — then exits. **Flux** keeps working after Terraform returns, pulling the artifact and reconciling everything else.
+**The adopter** runs the pre-checks and `make`. **Terraform** provisions VMs, boots Talos, forms the cluster, installs Flux, and writes the configuration Flux consumes — then exits. **Flux** keeps working after Terraform returns, pulling the artifact and reconciling everything else.
 
 That last point is the one to internalise: **the cluster is not finished when `make` returns.** Terraform hands off to Flux, and Flux takes several more minutes. A workload that never appears is a Flux question, not a Terraform one — re-running `make apply` will not summon it. See [GitOps structure](../../architecture/gitops-structure.md#how-flux-consumes-it).
+
+## Two stacks
+
+Terraform is split into two roots with separate state, and knowing which one a change belongs to is what makes day-2 work cheap ([ADR-015](../../architecture/decisions/015-two-stack-capability-config.md)).
+
+| Stack | Owns | State | Applies in |
+|-------|------|-------|-----------|
+| **infra** (`src/infra`) | VMs or managed cluster, Talos, Flux controllers | `artifacts/<env>/terraform/infra.tfstate` | minutes to tens of minutes |
+| **config** (`src/config`) | `OCIRepository`, Kustomizations, `cluster-config`, `cluster-secrets`, values overrides | `artifacts/<env>/terraform/config.tfstate` | seconds |
+
+The config stack has no provider that can address a VM, so a config-only change physically cannot disturb the cluster. `make plan-apply` runs both in order — infra first, then config against the real cluster.
 
 ## Pre-deploy checks
 
@@ -41,24 +54,36 @@ This must return the DNS provider's nameservers before deploying. If it returns 
 **Confirm the config and credentials are in place.** The environment needs both files:
 
 ```bash
-ls config/environments/<env>/config.yaml config/environments/<env>/.env
+ls environments/<env>/config.yaml environments/<env>/.env
 ```
 
-The credentials each role needs are listed in [Prerequisites](prerequisites.md#credentials-checklist). A missing one typically fails deep into reconciliation, not at plan time, so it is worth checking now.
+Then validate the configuration itself:
+
+```bash
+make validate ENV=<env>
+```
+
+This schema-checks `config.yaml`, the selected template, and the provider mapping before Terraform runs. The credentials each role needs are listed in [Prerequisites](prerequisites.md#credentials-checklist) — a missing one is not caught here, and typically fails deep into reconciliation rather than at plan time, so it is worth checking now.
 
 ## Deploy
 
-Run the three steps explicitly. `ENV=` selects the environment — there is no default, always pass it.
+`ENV=` selects the environment — there is no default, always pass it.
 
 ```bash
-make init ENV=<env>      # download providers, configure the backend
-make plan ENV=<env>      # compute and save the plan
-make apply ENV=<env>     # apply the saved plan
+make plan-apply ENV=<env>
 ```
 
-**Do not skip `init`.** It downloads the provider plugins and configures the state backend for this environment. `plan` and `apply` assume it has run; on a fresh environment, or after switching `ENV`, running them without `init` first fails or acts against the wrong backend.
+That initialises both stacks, plans and applies infra, then plans and applies config against the new cluster. It is the safer default once the config is known good, because nothing goes stale between plan and apply.
 
-Running `plan` then `apply` separately leaves room to read the plan before it executes — worth doing on a first deploy and on any infrastructure change. If state drifts between the two, `apply` reports a stale plan; the fix is `make plan-apply ENV=<env>`, which does both in one step and is the safer default once the config is known good.
+To read a plan before it executes — worth doing on a first deploy and on any infrastructure change — run the steps explicitly:
+
+```bash
+make init ENV=<env>      # download providers, configure both backends
+make plan ENV=<env>      # plan both stacks
+make apply ENV=<env>     # apply the saved infra plan, then config
+```
+
+**Do not skip `init`.** It downloads the provider plugins and configures the state backend for each stack. `plan` and `apply` assume it has run; on a fresh environment, or after switching `ENV`, running them without `init` first fails or acts against the wrong backend.
 
 Then wait. Terraform provisions and hands off to Flux:
 
@@ -68,6 +93,24 @@ Then wait. Terraform provisions and hands off to Flux:
 | Flux — reconcile workloads | ~10–15 min | ~20–30 min |
 
 A Hub takes longer because its chain waits for databases to come up before running migrations. Apparent inactivity during these windows is normal.
+
+## Changing configuration afterwards
+
+Most edits after the first deploy touch nothing physical — an alert recipient, an artifact version, a Helm value override, an SMTP host. Those belong to the config stack:
+
+```bash
+make apply-config ENV=<env>
+```
+
+It applies the config stack alone: seconds, no infrastructure plan to read, and no way for it to reach a VM. Flux re-reads its substitution sources on the next reconcile cycle, so the change converges without another command.
+
+Reach for `make plan-apply` when the change is infrastructural — a different `template`, more nodes, a new VIP, a changed placement map, Talos or Kubernetes versions. Those are the ones whose plan is worth reading line by line.
+
+Retrieve the generated internal passwords at any time:
+
+```bash
+make secrets ENV=<env>
+```
 
 ## Verify, up the stack
 
@@ -119,19 +162,22 @@ All commands run from the repository root. `ENV=` selects the environment.
 
 | Command | Does |
 |---------|------|
-| `make init ENV=<env>` | Download providers, configure the state backend. **Run first on any new environment.** |
-| `make plan ENV=<env>` | Compute and save the plan |
-| `make apply ENV=<env>` | Apply the saved plan; fails if none exists |
-| `make plan-apply ENV=<env>` | Plan and apply in one step — avoids stale-plan errors |
-| `make apply-direct ENV=<env>` | Apply with auto-approve, no saved plan |
+| `make init ENV=<env>` | Download providers, configure both state backends. **Run first on any new environment.** |
+| `make plan ENV=<env>` | Plan both stacks and save the plans |
+| `make apply ENV=<env>` | Apply the saved infra plan, then plan and apply config |
+| `make plan-apply ENV=<env>` | Plan and apply both stacks in order — avoids stale-plan errors |
+| `make apply-config ENV=<env>` | **Fast path** — plan and apply the config stack only |
+| `make plan-infra ENV=<env>` / `make apply-infra ENV=<env>` | Infra stack alone |
+| `make plan-config ENV=<env>` | Config stack alone, without applying |
 
 ### Inspect
 
 | Command | Does |
 |---------|------|
-| `make validate ENV=<env>` | Check configuration syntax |
-| `make show ENV=<env>` | Show current state |
-| `make list ENV=<env>` | List resources in state |
+| `make validate ENV=<env>` | Schema-validate `config.yaml`, the template and the provider mapping, then `terraform validate` both stacks |
+| `make secrets ENV=<env>` | Print the generated internal service passwords |
+| `make show ENV=<env>` | Show current infra-stack state |
+| `make list ENV=<env>` | List resources in both stacks' state |
 
 These load the environment's `.env`, so they need `ENV=` like everything else.
 
@@ -139,14 +185,14 @@ These load the environment's `.env`, so they need `ENV=` like everything else.
 
 | Command | Does |
 |---------|------|
-| `make destroy ENV=<env>` | Destroy all infrastructure — 5-second cancel window |
+| `make destroy ENV=<env>` | Destroy config then infra — 5-second cancel window |
 | `make destroy-fast ENV=<env>` | Destroy without refreshing state — 3-second window |
-| `make clean ENV=<env>` | Delete `artifacts/` — **including Terraform state** |
+| `make clean` | Delete the whole `artifacts/` tree — **including every environment's Terraform state** |
 
 ## Destroying
 
-`make destroy ENV=<env>` tears down everything Terraform provisioned, after a five-second cancel window and no other prompt.
+`make destroy ENV=<env>` tears down everything Terraform provisioned — config stack first, then infra — after a five-second cancel window and no other prompt.
 
 Across clusters, **destroy Hubs before the Tooling Cluster** they depend on — otherwise the Hubs lose their registry and secrets mid-teardown and the destroy can stall.
 
-**`make clean` deletes Terraform state.** After a clean, Terraform has no record of any infrastructure; anything still running is orphaned and must be removed by hand. Never `clean` a live environment. Back up `artifacts/` first — see [Recover → What the adopter must keep](../recover/disaster-recovery.md#what-the-adopter-must-keep).
+**`make clean` deletes Terraform state, for every environment.** It takes no `ENV` and removes the whole `artifacts/` tree. After a clean, Terraform has no record of any infrastructure; anything still running is orphaned and must be removed by hand, and every generated password held only in `config.tfstate` is gone. Never `clean` while an environment is live. Back up `artifacts/` first — see [Recover → What the adopter must keep](../recover/disaster-recovery.md#what-the-adopter-must-keep).

@@ -3,8 +3,10 @@
 [doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 012 — TPS-based sizing profiles
 
 **Date:** 2026-04-02
-**Status:** accepted
+**Status:** superseded by [015](015-two-stack-capability-config.md)
 **Audiences:** architect, platform developer, adopter (deploy)
+
+> **Superseded in mechanism, kept in principle.** [ADR-015](015-two-stack-capability-config.md) replaced the per-provider profile files described below with a provider-independent capacity template (`config/templates/{role}/{tier}.yaml`) plus a thin per-provider mapping, and renamed the `config.yaml` key from `profile:` to `template:`. What this record decided — that one named tier bundles infrastructure topology, application replicas, and data-layer tuning, and that Hub tiers are named for the transaction rate they sustain — still holds. Read it for the reasoning; read ADR-015 for the current layout.
 
 ## Context
 

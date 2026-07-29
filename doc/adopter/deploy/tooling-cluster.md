@@ -46,26 +46,32 @@ Decide these before starting — they are what `config.yaml` and the pre-checks 
 The distinguishing settings in `config.yaml`:
 
 ```yaml
-profile: "small"            # small | medium
+version: 1
+template: "small"           # small | medium
 cluster:
-  name: "my-cc"
+  name: "my-cc"             # must equal the environment directory name
   role: "cc"                # routes Flux to the Tooling Cluster paths
   vip: "192.168.0.210"
+  lb_ipam:
+    range: "192.168.0.211-192.168.0.212"   # two addresses
 dns:
   provider: "cloudflare"
   domain: "cc1.example.com"
-app:
-  lb_ipam:
-    range: "192.168.0.211-192.168.0.212"   # two addresses
-oci:
-  repo:
-    url: "oci://ghcr.io/<org>/ml-deployment-toolkit"
-    version: "latest"
+cert:
+  provider: "acme"
+  email: "ops@example.com"  # ACME account contact
+artifact:
+  url: "oci://ghcr.io/<org>/ml-deployment-toolkit"
+  version: "latest"
+registry:
+  provider: "none"          # Harbor lives here; nothing to proxy through
 ```
 
 **A Tooling Cluster needs two LB addresses** — `gw-int` and `gw-ext`. It has no FSPIOP endpoint, so no third.
 
-Full schema and secrets: [Configuration](configuration.md). The alerting-delivery secrets matter here specifically — the observability backend lives on this cluster, and without them alerts evaluate silently. See [Prerequisites](prerequisites.md#credentials-checklist).
+A Tooling Cluster has no `toolkit_cc`, no `data`, and no `app` section — it is the cluster others point at. Start from `environments/mlf-lab1-cc1/config.yaml.sample`.
+
+Full schema and secrets: [Configuration](configuration.md). Alerting matters here specifically — the observability backend lives on this cluster, so the `alerting:` section and its `.env` credentials are what decide whether alerts leave it. See [Prerequisites](prerequisites.md#credentials-checklist).
 
 ## Deploy
 
@@ -75,12 +81,11 @@ Confirm the DNS zone is delegated first — see [Deployment → Pre-deploy check
 dig +short NS cc1.example.com     # must return the DNS provider's nameservers
 ```
 
-Then deploy:
+Then validate and deploy:
 
 ```bash
-make init ENV=<cc-env>
-make plan ENV=<cc-env>
-make apply ENV=<cc-env>
+make validate ENV=<cc-env>
+make plan-apply ENV=<cc-env>
 ```
 
 Expect ~15–20 minutes for Terraform, then ~10–15 for Flux to converge.
@@ -118,31 +123,41 @@ Services are published at `https://<service>.int.<domain>`, where `<domain>` is 
 | MinIO console | `https://minio.int.<domain>` |
 | Grafana | `https://grafana.int.<domain>` |
 
-Admin credentials are the values the adopter set in `.env` — `HARBOR_ADMIN_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`, `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`.
-
-Read the admin passwords straight from the environment file:
+Admin credentials are **generated**, not authored. Read them back from the config stack:
 
 ```bash
-grep -E 'MINIO_ROOT|HARBOR_ADMIN|GRAFANA_ADMIN' config/environments/<cc-env>/.env
+make secrets ENV=<cc-env>
 ```
+
+That prints `harbor_admin_password`, `grafana_admin_password`, and `minio_root_password`. The MinIO user name is `minioadmin` unless `MINIO_ROOT_USER` was set in `.env`; Harbor and Grafana log in as `admin`.
 
 Vault is auto-unsealed by its operator, which stores the unseal keys as a Secret in the `vault` namespace.
 
 ## Hand-off to the Hub
 
-**All three service URLs must load before deploying a Hub against this cluster** — the Hub's config points at Harbor, S3, and the observability endpoints here. If any is not reachable, the Hub will fail partway through reconciliation.
+**All three service URLs must load before deploying a Hub against this cluster** — the Hub pulls images through Harbor, backs up to S3, and pushes telemetry to the observability endpoints here. If any is not reachable, the Hub will fail partway through reconciliation.
 
-These are the values a Hub's `config.yaml` consumes:
+There is nothing to transcribe. The Hub names this cluster once:
 
-| Hub input | Value |
-|-----------|-------|
-| OCI cache | `harbor.int.<domain>` |
-| S3 backups | `https://s3.int.<domain>` |
-| Metrics endpoint | `https://thanos.int.<domain>/api/v1/receive` |
-| Log endpoint | `https://loki.int.<domain>/loki/api/v1/push` |
-| Trace endpoint | `https://tempo.int.<domain>/v1/traces` |
+```yaml
+toolkit_cc:
+  domain: "cc1.example.com"     # this cluster's dns.domain
+```
 
-Carry them into [Deploy a Hub → Configuration](hub.md#configuration).
+and sets `provider: toolkit-cc` on `registry`, `object_storage`, and `observability`. The toolkit owns the URL scheme, so it derives Harbor, S3, and the three telemetry push endpoints from that one value — see [Configuration → The toolkit-cc preset](configuration.md#the-toolkit-cc-preset).
+
+Two credentials do have to travel, because they are generated here and supplied there:
+
+```bash
+make secrets ENV=<cc-env>
+```
+
+| Hub `.env` variable | Value from `make secrets` |
+|---------------------|---------------------------|
+| `OCI_PROXY_USERNAME` / `OCI_PROXY_PASSWORD` | `admin` / `harbor_admin_password` |
+| `BACKUP_S3_ACCESS_KEY` / `BACKUP_S3_SECRET_KEY` | `minioadmin` / `minio_root_password` |
+
+Carry those into [Deploy a Hub → Configuration](hub.md#configuration).
 
 ## After deploying
 

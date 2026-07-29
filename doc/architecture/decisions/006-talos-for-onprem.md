@@ -6,6 +6,8 @@
 **Status:** accepted
 **Audiences:** architect, platform developer, infrastructure engineer
 
+> Still accepted. Since [ADR-015](015-two-stack-capability-config.md) the provisioning pipeline described here is the **infra stack** (`src/infra`); the machine-config patches live in `config/patches/talos/`, and node counts and shapes come from a capacity template rather than a per-provider profile.
+
 ## Context
 
 On-prem Mojaloop deployments need a Kubernetes distribution that can be provisioned and managed declaratively via Terraform, without requiring SSH access or manual node configuration. The OS and Kubernetes lifecycle should be API-driven to match the infrastructure-as-code model used for cloud providers (EKS, DOKS). Immutability is desirable to reduce configuration drift and security surface area.
@@ -30,4 +32,5 @@ Talos Linux for all on-prem Kubernetes clusters (Proxmox). Machine configuration
 - **Two-phase Cilium deployment.** Talos cannot run Helm during node boot. Cilium must be pre-rendered and applied via `extraManifests` (Phase 1), then adopted by Flux HelmRelease for ongoing management (Phase 2). See ADR-002.
 - **Immutable infrastructure.** OS updates are atomic image replacements, not package upgrades. No configuration drift between nodes.
 - **Terraform-native lifecycle.** Cluster creation, scaling, and upgrades are all `make plan-apply` operations, consistent with cloud provider workflows.
+- **Node changes are infra-stack changes.** Since ADR-015 a config-only edit runs through `make apply-config` and cannot reach a node; anything that alters machine config or topology is a full `make plan-apply`.
 - **VIP for API endpoint.** On-prem clusters use a floating Virtual IP for the Kubernetes API endpoint, configured via Talos machine config patches.
