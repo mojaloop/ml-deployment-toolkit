@@ -21,13 +21,12 @@
       "description": "Cluster identity and networking",
       "type": "object",
       "required": [
-        "name",
         "role"
       ],
       "additionalProperties": false,
       "properties": {
         "name": {
-          "description": "Cluster name; prefixes all rendered node names",
+          "description": "Cluster identity \u2014 defaults to the environment directory name. Durable: it becomes the external-dns TXT owner id, backup prefixes, and VM name prefix. Do not change it on an existing cluster.",
           "type": "string",
           "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
         },
