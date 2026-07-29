@@ -66,26 +66,49 @@ A Hub runs far more internal services than a Tooling Cluster — the databases a
 
 - **`app.hub.admin_email` and the generated `hub_admin_password`** are the HubOps login for both MCM and the Finance Portal, used in [Configure the Hub](#configure-the-hub).
 
-### Pointing at a Tooling Cluster
+### Supporting services
 
-If this Hub uses a Tooling Cluster, name it once and bind the capabilities that should use it:
+A Hub needs three supporting services: an image pull-through cache, a backup target, and a telemetry sink. Each is chosen independently and may point anywhere — a Tooling Cluster, a cloud service, or your own hosts. Write the endpoints out:
+
+```yaml
+registry:
+  provider: "harbor"
+  url: "harbor.int.cc1.example.com"          # no oci:// prefix
+object_storage:
+  provider: "s3"
+  endpoint: "https://s3.int.cc1.example.com"
+  bucket: "backups"
+observability:
+  provider: "urls"
+  loki_url: "https://loki.int.cc1.example.com/loki/api/v1/push"
+  mimir_url: "https://thanos.int.cc1.example.com/api/v1/receive"
+  tempo_url: "https://tempo.int.cc1.example.com/v1/traces"
+```
+
+Set any of the three to `provider: "none"` to disable it. Credentials stay in `.env` — `OCI_PROXY_*` for the registry, `BACKUP_S3_*` for object storage. The telemetry sink has no credential field yet, so those URLs must be reachable without authentication (a private network, or mTLS terminated at the gateway); managed backends that require a token are not supported today.
+
+The Harbor proxy is a Talos-level registry mirror, transparent to the workloads.
+
+#### Shorthand when a Tooling Cluster provides all three
+
+If a Tooling Cluster deployed by this toolkit backs all three services, name it once instead:
 
 ```yaml
 toolkit_cc:
   domain: "cc1.example.com"
 
 registry:
-  provider: "toolkit-cc"    # image pulls route through Harbor
+  provider: "toolkit-cc"    # -> harbor.int.<domain>
 object_storage:
-  provider: "toolkit-cc"    # backups
+  provider: "toolkit-cc"    # -> https://s3.int.<domain>
   bucket: "backups"
 observability:
-  provider: "toolkit-cc"    # metrics, logs, traces
+  provider: "toolkit-cc"    # -> loki/thanos/tempo push URLs
 ```
 
-Harbor, S3, and the three telemetry push URLs are derived from `toolkit_cc.domain` — the adopter never transcribes them. The two credentials that do have to be carried over are in the [hand-off](tooling-cluster.md#hand-off-to-the-hub).
+This derives the same five endpoints from the one domain, so changing it later is a single edit rather than five. The resulting configuration is identical to writing them out — the shorthand only saves transcription. It relies on the URL layout this distribution gives its Tooling Cluster routes, so prefer the explicit form when the Hub and Tooling Cluster are upgraded independently, or when anything other than a toolkit-deployed CC provides a service.
 
-The Harbor proxy is a Talos-level registry mirror, transparent to the workloads.
+Either way, the two credentials that must be carried over are in the [hand-off](tooling-cluster.md#hand-off-to-the-hub).
 
 ### Data layer
 

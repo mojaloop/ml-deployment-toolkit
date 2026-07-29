@@ -13,7 +13,7 @@ Two files describe an environment: `config.yaml` for what the deployment is, and
 - [A Hub, annotated](#a-hub-annotated)
 - [Deployment templates](#deployment-templates)
 - [Data modes](#data-modes)
-- [The toolkit-cc preset](#the-toolkit-cc-preset)
+- [The toolkit-cc shorthand](#the-toolkit-cc-shorthand)
 - [Secrets](#secrets)
 - [Helm value overrides](#helm-value-overrides)
 - [Validating](#validating)
@@ -44,7 +44,7 @@ environments/
 
 Environments are fully independent — their own config, secrets, and Terraform state. One repository clone manages any number of them. A Tooling Cluster and its Hubs are separate environments, each deployed with its own `make plan-apply ENV=<name>`.
 
-**`cluster.name` must equal the directory name.** Terraform rejects the plan otherwise — the directory name and the cluster identity are one value, not two.
+**`cluster.name` defaults to the directory name** and can be omitted for a new deployment, so identity is normally one value rather than two. Set it explicitly only to keep a name a cluster already has — it is durable identity, becoming the external-dns record owner, the Vault backup prefix, and the VM name prefix, so changing it on a live cluster orphans its DNS records and forces VM replacement.
 
 State and generated artifacts land under `artifacts/<env>/` — see [System overview](../../architecture/system-overview.md#configuration-tiers).
 
@@ -93,7 +93,7 @@ From `environments/mlf-lab1-cc1/config.yaml.sample`:
 version: 1
 
 cluster:
-  name: "my-cc"                       # must equal the directory name
+  name: "my-cc"                       # optional — defaults to the directory name
   role: "cc"                          # cc | env | base
   vip: "192.168.0.210"                # Kubernetes API floating IP (on-prem only)
   lb_ipam:
@@ -162,19 +162,23 @@ cluster:
 
 template: "tps-10"                    # config/templates/env/tps-10.yaml
 
-# One value drives every toolkit-cc preset below.
-toolkit_cc:
-  domain: "cc1.lab1.example.com"
-
+# Supporting services — each independent, each may point anywhere.
+# See "The toolkit-cc shorthand" below for the one-value alternative.
 registry:
-  provider: "toolkit-cc"              # -> harbor.int.cc1.lab1.example.com
+  provider: "harbor"
+  url: "harbor.int.cc1.lab1.example.com"
 
 object_storage:
-  provider: "toolkit-cc"              # -> https://s3.int.cc1.lab1.example.com
+  provider: "s3"
+  endpoint: "https://s3.int.cc1.lab1.example.com"
   bucket: "backups"
+  region: "us-east-1"
 
 observability:
-  provider: "toolkit-cc"              # -> loki / thanos / tempo push URLs
+  provider: "urls"
+  loki_url: "https://loki.int.cc1.lab1.example.com/loki/api/v1/push"
+  mimir_url: "https://thanos.int.cc1.lab1.example.com/api/v1/receive"
+  tempo_url: "https://tempo.int.cc1.lab1.example.com/v1/traces"
 
 data:
   mysql:
@@ -266,16 +270,18 @@ Mixing is legitimate — external MySQL with in-cluster Kafka is a supported com
 
 Credentials for an external store come from `.env` under the same UPPER_CASE name the toolkit would otherwise generate (`MYSQL_ROOT_PASSWORD` and friends) — see [Secrets](#secrets). Backups of an external store are the adopter's responsibility; the toolkit's backup path covers in-cluster stores only.
 
-## The toolkit-cc preset
+## The toolkit-cc shorthand
 
-A Hub backed by a Tooling Cluster used to require hand-copying five URLs. It now takes one value:
+The registry, object-storage, and observability endpoints are normally written out, as in the Hub example above — the values stay visible and independent of anything this distribution decides.
+
+When a Tooling Cluster deployed by *this* toolkit backs all of them, the same five endpoints can be derived from its domain instead:
 
 ```yaml
 toolkit_cc:
   domain: "cc1.lab1.example.com"
 ```
 
-Then set `provider: toolkit-cc` on whichever capabilities should use it. The toolkit owns the URL scheme, so it derives them:
+Then set `provider: toolkit-cc` on whichever capabilities should use it. The toolkit owns that URL scheme, so it derives them:
 
 | Capability | Derived endpoint |
 |------------|------------------|
@@ -286,6 +292,8 @@ Then set `provider: toolkit-cc` on whichever capabilities should use it. The too
 | `observability` (traces) | `https://tempo.int.<domain>/v1/traces` |
 
 Setting `provider: toolkit-cc` on any capability without also setting `toolkit_cc.domain` fails at plan time, saying exactly that.
+
+The shorthand saves transcription and makes a domain change one edit instead of five, but it is a convenience rather than a contract: it assumes the route layout this distribution currently gives a Tooling Cluster, and nothing validates that assumption at plan time. Prefer the explicit endpoints when the Hub and Tooling Cluster are upgraded on separate schedules, or when anything other than a toolkit-deployed Tooling Cluster provides a service. The resolved configuration is identical either way.
 
 The presets are per capability, not all-or-nothing — a Hub may pull images through the Tooling Cluster's Harbor while pushing telemetry to an external stack:
 

@@ -54,22 +54,56 @@ artifact:
   url: "oci://ghcr.io/your-org/ml-deployment-toolkit"
   version: "latest"                   # OCI tag — "latest" or pin to a version
 
-# One value drives every toolkit-cc preset below: the Tooling Cluster's domain.
-toolkit_cc:
-  domain: "cc1.lab1.example.com"
+# ------------------------------------------------------------------
+# Supporting services: image cache, backup storage, telemetry sink.
+#
+# Each is independent and may point anywhere — a Tooling Cluster, a cloud
+# service, or your own hosts. The endpoints are written out below so the
+# values are visible and under your control.
+#
+# If a Tooling Cluster deployed by this toolkit backs all three, the
+# 'toolkit-cc' shorthand at the bottom of this section derives the same
+# five endpoints from its domain alone. It is convenience only: the
+# resulting configuration is identical either way.
+# ------------------------------------------------------------------
 
-# Image pull-through cache via the CC's Harbor (credentials OCI_PROXY_* in .env)
+# Image pull-through cache (credentials OCI_PROXY_* in .env)
 registry:
-  provider: "toolkit-cc"              # derives harbor.int.<toolkit_cc.domain>
+  provider: "harbor"
+  url: "harbor.int.cc1.lab1.example.com"     # no oci:// prefix — used in Talos registry mirrors
 
 # Backup target (credentials BACKUP_S3_ACCESS_KEY/SECRET_KEY in .env)
 object_storage:
-  provider: "toolkit-cc"              # derives https://s3.int.<toolkit_cc.domain>
+  provider: "s3"
+  endpoint: "https://s3.int.cc1.lab1.example.com"
   bucket: "backups"
+  region: "us-east-1"
 
-# Telemetry push sink
+# Telemetry push sink. Note: no credential field exists yet, so these must be
+# endpoints reachable without authentication (private network or mTLS at the
+# gateway) — managed backends requiring a token are not supported today.
 observability:
-  provider: "toolkit-cc"              # derives loki/thanos/tempo push URLs
+  provider: "urls"
+  loki_url: "https://loki.int.cc1.lab1.example.com/loki/api/v1/push"
+  mimir_url: "https://thanos.int.cc1.lab1.example.com/api/v1/receive"
+  tempo_url: "https://tempo.int.cc1.lab1.example.com/v1/traces"
+
+# --- Shorthand alternative -----------------------------------------
+# Replace all three blocks above with the following when a toolkit-deployed
+# Tooling Cluster provides them. One value then drives all five endpoints,
+# so changing the CC's domain is a single edit here instead of five:
+#
+# toolkit_cc:
+#   domain: "cc1.lab1.example.com"
+# registry:
+#   provider: "toolkit-cc"            # -> harbor.int.<domain>
+# object_storage:
+#   provider: "toolkit-cc"            # -> https://s3.int.<domain>
+#   bucket: "backups"
+# observability:
+#   provider: "toolkit-cc"            # -> loki/thanos/tempo push URLs
+#
+# Set any capability to provider: "none" to disable it entirely.
 
 # Data layer — per-store mode: in-cluster-managed | external-unmanaged
 # (external-managed is schema-reserved, not yet implemented)

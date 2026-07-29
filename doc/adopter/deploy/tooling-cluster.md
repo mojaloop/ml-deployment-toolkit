@@ -137,14 +137,17 @@ Vault is auto-unsealed by its operator, which stores the unseal keys as a Secret
 
 **All three service URLs must load before deploying a Hub against this cluster** — the Hub pulls images through Harbor, backs up to S3, and pushes telemetry to the observability endpoints here. If any is not reachable, the Hub will fail partway through reconciliation.
 
-There is nothing to transcribe. The Hub names this cluster once:
+A Hub reaches this cluster through three endpoints it names in its own config — the Harbor registry, the S3 backup target, and the telemetry push URLs. They follow this cluster's `dns.domain`:
 
-```yaml
-toolkit_cc:
-  domain: "cc1.example.com"     # this cluster's dns.domain
-```
+| Service | Endpoint |
+|---------|----------|
+| Registry | `harbor.int.<this cluster's domain>` |
+| Backup S3 | `https://s3.int.<domain>` |
+| Metrics | `https://thanos.int.<domain>/api/v1/receive` |
+| Logs | `https://loki.int.<domain>/loki/api/v1/push` |
+| Traces | `https://tempo.int.<domain>/v1/traces` |
 
-and sets `provider: toolkit-cc` on `registry`, `object_storage`, and `observability`. The toolkit owns the URL scheme, so it derives Harbor, S3, and the three telemetry push endpoints from that one value — see [Configuration → The toolkit-cc preset](configuration.md#the-toolkit-cc-preset).
+Write them into the Hub's `registry`, `object_storage`, and `observability` sections — see [Hub → Supporting services](hub.md#supporting-services). If this cluster backs all three, they can instead be derived from its domain alone with the [toolkit-cc shorthand](configuration.md#the-toolkit-cc-shorthand).
 
 Two credentials do have to travel, because they are generated here and supplied there:
 
