@@ -30,16 +30,12 @@ spec:
   upgrade:
     remediation:
       retries: 3
-  values:
-    recommender:
-      enabled: true
-      resources:
-        requests:
-          cpu: 50m
-          memory: 100Mi
-        limits:
-          memory: 256Mi
-    updater:
-      enabled: false
-    admissionController:
-      enabled: false
+  valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: vpa-values
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: vpa-values-override
+      valuesKey: values.yaml
+      optional: true

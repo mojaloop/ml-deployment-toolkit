@@ -41,7 +41,7 @@ flowchart TD
 | Document | Covers |
 |----------|--------|
 | [System overview](system-overview.md) | Delivery chain, cluster roles, reconciliation order, configuration tiers |
-| [Provider model](provider-model.md) | Infrastructure and DNS providers, what is supported, sizing profiles |
+| [Provider model](provider-model.md) | Infrastructure and DNS providers, what is supported, deployment templates |
 | [GitOps structure](gitops-structure.md) | OCI artifact layout, Flux consumption, substitution, versioning |
 | [Networking](networking.md) | Three entry points, gateways, load balancer addresses, DNS, certificates |
 | [Security](security.md) | Secret isolation, Ory identity, authorization model, encryption, hardening |

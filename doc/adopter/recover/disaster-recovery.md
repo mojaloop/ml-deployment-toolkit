@@ -19,10 +19,12 @@ A cluster can be rebuilt from the artifact and the configuration — but only if
 | Keep | Why | Without it |
 |------|-----|-----------|
 | **Vault unseal keys / root token** | The Secret in the `vault` namespace, which dies with the cluster | The raft snapshots are encrypted and unopenable — the PKI is lost |
-| **Terraform state** (`artifacts/<env>/`) | Terraform's record of the infrastructure — and, on Talos environments, the machine secrets (the Talos CA key, also written to `artifacts/<env>/talos-secrets/secrets.yaml`) | Terraform cannot manage or cleanly rebuild what it no longer knows exists; on Talos, expired client certs become a [permanent lockout](../operate/known-issues.md#lost-or-expired-cluster-access-kubeconfig-and-talosconfig) — the API is mTLS-only with no fallback |
-| **`config.yaml` and `.env`** | The environment's identity and secrets | No way to reproduce the same cluster |
+| **Terraform state** (`artifacts/<env>/`) | **Both** state files — `terraform/infra.tfstate` is Terraform's record of the infrastructure (and, on Talos environments, the machine secrets, also written to `artifacts/<env>/talos-secrets/secrets.yaml`); `terraform/config.tfstate` holds every **generated** internal service password | Terraform cannot manage or cleanly rebuild what it no longer knows exists; on Talos, expired client certs become a [permanent lockout](../operate/known-issues.md#lost-or-expired-cluster-access-kubeconfig-and-talosconfig) — the API is mTLS-only with no fallback. Losing the config state loses the database, Vault-backed, and admin passwords unless the cluster is still up to read them from |
+| **`config.yaml` and `.env`** | The environment's identity and its external credentials | No way to reproduce the same cluster |
 
 Back the first two up explicitly — see [Backups → What the adopter must back up](backup.md#what-the-adopter-must-back-up). The third is the adopter's to keep safe from the moment it is created; `.env` is git-ignored and exists nowhere but the adopter's disk.
+
+While a cluster is still running, its generated passwords can be read back two ways — `make secrets ENV=<env>` from the config state, or the `cluster-secrets` Secret in `flux-system`. Neither survives losing both the state and the cluster, which is why the state backup covers `artifacts/<env>/terraform/` in full.
 
 A rebuild with all three is a procedure. A rebuild missing any of them is a partial reconstruction with permanent loss — know which situation applies before starting.
 
@@ -41,8 +43,8 @@ When Hubs run without a Tooling Cluster, each is independent and the order does 
 
 ## Rebuilding a Hub
 
-1. **Restore the environment files.** Put `config.yaml` and `.env` back under `config/environments/<env>/`.
-2. **Restore Terraform state**, if rebuilding onto surviving infrastructure. On genuinely new infrastructure, start clean — but expect Terraform to provision everything fresh.
+1. **Restore the environment files.** Put `config.yaml` and `.env` back under `environments/<env>/`. If `config.yaml` sets `cluster.name`, restore that value exactly — it is the cluster's durable identity. If it does not, the name defaults to the directory name, so the directory must be recreated under the name the cluster already had.
+2. **Restore Terraform state** — both `infra.tfstate` and `config.tfstate` — if rebuilding onto surviving infrastructure. Restoring `config.tfstate` is what keeps the generated passwords stable; without it the rebuild generates new ones, which is fine on a clean rebuild and wrong on a partial one, where restored data still expects the old credentials. On genuinely new infrastructure, start clean and expect Terraform to provision everything fresh.
 3. **Provision:**
    ```bash
    make init ENV=<env>
@@ -60,8 +62,8 @@ The sequence is deliberate: infrastructure, then secrets/PKI, then data. Restori
 
 The same shape, and simpler — a Tooling Cluster holds no scheme PKI and no ledger:
 
-1. Restore `config.yaml` and `.env`.
-2. `make init && make plan && make apply`.
+1. Restore `config.yaml` and `.env` under `environments/<env>/`, plus both state files.
+2. `make init ENV=<env> && make plan ENV=<env> && make apply ENV=<env>`.
 3. Let Flux bring up Harbor, MinIO, and the observability stack.
 4. **Restore its Vault** if lost — it holds registry and storage credentials, not the scheme CA, so the blast radius is smaller, but services still need it.
 5. Confirm Harbor, MinIO, and Grafana respond before rebuilding any Hub against it.

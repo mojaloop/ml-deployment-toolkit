@@ -29,12 +29,12 @@ spec:
   upgrade:
     remediation:
       retries: 3
-  values:
-    args:
-      - --kubelet-insecure-tls
-    resources:
-      requests:
-        cpu: 100m
-        memory: 100Mi
-      limits:
-        memory: 200Mi
+  valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: metrics-server-values
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: metrics-server-values-override
+      valuesKey: values.yaml
+      optional: true

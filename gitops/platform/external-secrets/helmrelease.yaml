@@ -32,13 +32,14 @@ spec:
     crds: CreateReplace
     remediation:
       retries: 3
-  values:
-    webhook:
-      resources:
-        requests:
-          cpu: 10m
-          memory: 64Mi
-        limits:
-          memory: 256Mi
+  valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: external-secrets-values
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: external-secrets-values-override
+      valuesKey: values.yaml
+      optional: true
   dependsOn:
     - name: cert-manager

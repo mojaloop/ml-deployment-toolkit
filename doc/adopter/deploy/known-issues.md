@@ -61,13 +61,13 @@ make plan-apply ENV=<env>
 
 **Fix**
 
-1. Check `oci.repo.url` in `config.yaml` matches the registry
+1. Check `artifact.url` in `config.yaml` matches the registry
 2. Check `OCI_REPO_USERNAME` / `OCI_REPO_PASSWORD` in `.env`, and that they have read access
 3. Test access directly:
    ```bash
    flux pull artifact <oci-url> --output /tmp/test
    ```
-4. Re-apply
+4. Re-apply the config stack: `make apply-config ENV=<env>`
 
 ## Kustomization stuck on "dependency not ready"
 

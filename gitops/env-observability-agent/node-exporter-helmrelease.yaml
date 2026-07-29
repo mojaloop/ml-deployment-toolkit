@@ -25,34 +25,12 @@ spec:
     timeout: 5m
     remediation:
       retries: 3
-  values:
-    # Run on all nodes including control-plane (Talos mixed-plane)
-    tolerations:
-      - operator: Exists
-
-    # Host access for full visibility
-    hostNetwork: true
-    hostPID: true
-    hostRootFsMount:
-      enabled: true
-      mountPropagation: HostToContainer
-
-    # Resource limits
-    resources:
-      requests:
-        cpu: 10m
-        memory: 32Mi
-      limits:
-        cpu: 100m
-        memory: 64Mi
-
-    # Disable ServiceMonitor (scraped by Alloy directly)
-    prometheus:
-      monitor:
-        enabled: false
-
-    # Security context
-    securityContext:
-      runAsNonRoot: true
-      runAsUser: 65534
-      fsGroup: 65534
+  valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: node-exporter-values
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: node-exporter-values-override
+      valuesKey: values.yaml
+      optional: true

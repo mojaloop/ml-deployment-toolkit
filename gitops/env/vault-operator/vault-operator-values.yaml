@@ -1,0 +1,5 @@
+# Distribution values for the vault-operator HelmRelease.
+# Adopter overrides go in environments/<env>/values/vault-operator.yaml,
+# which is merged after this file and therefore wins.
+bankVaults:
+  watchNamespace: vault

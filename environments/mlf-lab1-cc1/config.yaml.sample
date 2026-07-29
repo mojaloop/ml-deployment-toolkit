@@ -1,0 +1,72 @@
+# yaml-language-server: $schema=../../config/schemas/environment.schema.json
+# ------------------------------------------------------------------
+# Environment config (sample — CC / Tooling Cluster)
+# Copy this file to config.yaml and edit for your environment.
+# Secrets live in .env next to this file (sourced via Makefile) —
+# never put credentials here.
+# ------------------------------------------------------------------
+version: 1
+
+cluster:
+  name: "my-cc"
+  role: "cc"                          # cc | env | base
+  vip: "192.168.0.210"                # Kubernetes API floating IP (on-prem only)
+  lb_ipam:
+    range: "192.168.0.211-192.168.0.213"
+
+# Deployment template — config/templates/{role}/{template}.yaml
+template: "medium"
+
+infra:
+  provider: "proxmox"                 # proxmox | aws | digitalocean
+  proxmox:
+    # Maps template placement groups -> Proxmox physical nodes
+    placement:
+      pg-1: "pve-node-1"
+      # pg-2: "pve-node-2"
+      # pg-3: "pve-node-3"
+    network_bridge: "vmbr0"
+    storage:
+      disks: "local-lvm"
+      images: "local"
+      snippets: "local"
+  # Talos node OS overrides (optional — any on-prem provider)
+  talos:
+    nameservers:
+      - "8.8.8.8"
+      - "1.1.1.1"
+    ntp_servers:
+      - "time.cloudflare.com"
+
+# Credentials in .env: DIGITALOCEAN_TOKEN, CLOUDFLARE_API_TOKEN,
+# or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_REGION for route53.
+dns:
+  provider: "route53"                 # digitalocean | cloudflare | route53
+  domain: "cc1.lab1.example.com"
+
+# Certificates (ACME). email is the ACME account contact.
+cert:
+  provider: "acme"
+  email: "ops@example.com"
+
+# Distribution gitops artifact consumed by Flux (credentials OCI_REPO_* in .env)
+artifact:
+  url: "oci://ghcr.io/your-org/ml-deployment-toolkit"
+  version: "latest"                   # OCI tag — "latest" or pin to a version
+
+# Container image pull-through cache (none on the CC itself — Harbor lives here)
+registry:
+  provider: "none"
+
+# Transactional email (SMTP). Credentials SMTP_USER/SMTP_PASSWORD in .env.
+email:
+  host: "smtp.example.com"
+  port: "587"
+  from: "grafana@example.com"
+
+# Alert delivery channels (Grafana contact points)
+alerting:
+  email:
+    to: "ops@example.com"
+  telegram:                           # token in .env (TELEGRAM_BOT_TOKEN)
+    chat_id: "0"

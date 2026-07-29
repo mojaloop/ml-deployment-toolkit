@@ -8,8 +8,8 @@ Adding an infrastructure provider. The contract is narrow — produce a cluster 
 
 - [The contract](#the-contract)
 - [1. Write the module](#1-write-the-module)
-- [2. Wire it into main.tf](#2-wire-it-into-maintf)
-- [3. Add provider config and profiles](#3-add-provider-config-and-profiles)
+- [2. Wire it into the infra stack](#2-wire-it-into-the-infra-stack)
+- [3. Add the provider mapping](#3-add-the-provider-mapping)
 - [4. Vendor layer, if needed](#4-vendor-layer-if-needed)
 - [What not to touch](#what-not-to-touch)
 
@@ -30,9 +30,9 @@ Create `src/modules/<provider>/`. It must:
 
 A managed provider is usually one module. A self-managed one composes sub-modules the way `proxmox` does. Match the output names of the existing modules exactly — downstream wiring reads them by name.
 
-## 2. Wire it into main.tf
+## 2. Wire it into the infra stack
 
-There are **four** edit points in `src/main.tf`, and missing the fourth is the common mistake — it leaves `kubeconfig_path` null and the deploy fails in a confusing way.
+There are **four** edit points in `src/infra/main.tf`, and missing the fourth is the common mistake — it leaves `kubeconfig_path` null and the deploy fails in a confusing way. The config stack (`src/config`) needs no provider-specific edit at all; it reads `infra.provider` only to name the vendor Kustomization.
 
 1. **The module block** — instantiate `module "<provider>"`, guarded so it only runs when selected.
 2. **`local.provider_outputs`** — add the new module's outputs under the provider name.
@@ -44,14 +44,17 @@ There are **four** edit points in `src/main.tf`, and missing the fourth is the c
 
 After all four, `local.kubeconfig_paths[<provider>]` resolves and `flux_bootstrap` receives a real path.
 
-## 3. Add provider config and profiles
+## 3. Add the provider mapping
 
-Create `config/providers/<provider>/`:
+Create one file: `config/templates/mappings/<provider>.yaml`, validated against `config/schemas/mapping.schema.json`.
 
-- `config.yaml` — provider defaults
-- `profiles/cc/` and `profiles/env/` — sizing profiles, matching the shape of the existing providers' profiles
+It translates the provider-independent capacity templates into concrete machines, and holds nothing else:
 
-The profile files are what `config.yaml`'s `profile:` field selects. Without at least one profile for each role the provider will support, an adopter cannot size a cluster on it.
+- `instance_types` — workload class → instance type or size, for managed services
+- `vm_defaults`, `storage`, `talos` — VM shape, datastores, and image platform, for self-managed providers
+- `talos-patches` — provider-specific machine-config patches, if any
+
+**No new tier files.** The capacity templates under `config/templates/{cc,env,base}/` are provider-independent and already cover the new provider — a class the mapping does not list falls back to a built-in default, so the mapping should name every class the templates use. `make validate` schema-checks the mapping alongside the environment config.
 
 ## 4. Vendor layer, if needed
 
@@ -67,4 +70,4 @@ If adding a provider means editing any of these, reconsider the design:
 - DNS, cert-manager, or observability configuration
 - Application manifests
 
-A new provider is a new module, its config and profiles, and possibly a vendor Kustomization. Nothing else. If a shared manifest would need to change, the provider-specific part of it belongs in a substituted variable or the vendor layer instead.
+A new provider is a new module, its mapping file, and possibly a vendor Kustomization. Nothing else. If a shared manifest would need to change, the provider-specific part of it belongs in a substituted variable or the vendor layer instead.

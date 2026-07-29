@@ -1,0 +1,4 @@
+# Distribution values for the psmdb-operator HelmRelease.
+# Adopter overrides go in environments/<env>/values/psmdb-operator.yaml,
+# which is merged after this file and therefore wins.
+watchNamespace: "data"

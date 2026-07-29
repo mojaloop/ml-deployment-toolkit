@@ -7,3 +7,18 @@ resources:
   - lb-ipam/lb-ipam.yaml
   - openebs/helmrelease.yaml
   - hubble-httproute.yaml
+
+# Distribution values for each HelmRelease in this kustomization.
+# Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;
+# the adopter's <release>-values-override is merged after them and wins.
+configMapGenerator:
+  - name: cilium-values
+    namespace: flux-system
+    files:
+      - values.yaml=cilium/cilium-values.yaml
+  - name: openebs-values
+    namespace: flux-system
+    files:
+      - values.yaml=openebs/openebs-values.yaml
+generatorOptions:
+  disableNameSuffixHash: true

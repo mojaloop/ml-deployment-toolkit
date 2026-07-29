@@ -34,13 +34,12 @@ spec:
   upgrade:
     remediation:
       retries: 3
-  values:
-    reloader:
-      watchGlobally: true
-      deployment:
-        resources:
-          requests:
-            cpu: 10m
-            memory: 64Mi
-          limits:
-            memory: 128Mi
+  valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: reloader-values
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: reloader-values-override
+      valuesKey: values.yaml
+      optional: true

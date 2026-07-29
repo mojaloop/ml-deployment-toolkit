@@ -42,7 +42,7 @@ export K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY=true
 ```
 
 Thanos runs in the **ml-cc cluster**, so the hostname uses the cc domain
-(`domain` in `config/environments/ml-cc/config.yaml`), not the switch domain.
+(`domain` in `environments/ml-cc/config.yaml`), not the switch domain.
 
 **Soak** — regression baseline at a constant rate. p99 needs samples: at 1 TPS run
 ≥ 30m (~1800 samples), at 10 TPS ≥ 10m.

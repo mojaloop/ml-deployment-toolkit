@@ -29,19 +29,16 @@ spec:
   upgrade:
     remediation:
       retries: 3
-  values:
-    podAnnotations:
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "7979"
-    sources:
-      - service
-      - gateway-httproute
-    domainFilters:
-      - ${domain}
-    txtOwnerId: ${cluster_name}
-    policy: sync
   # Provider-specific values (provider name, credential env vars) come from the
   # dns/{provider} kustomization — stays unready until that ConfigMap exists.
   valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: external-dns-values
+      valuesKey: values.yaml
     - kind: ConfigMap
       name: external-dns-provider-values
+    - kind: ConfigMap
+      name: external-dns-values-override
+      valuesKey: values.yaml
+      optional: true

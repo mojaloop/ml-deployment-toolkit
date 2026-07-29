@@ -10,7 +10,7 @@ How infrastructure and DNS providers plug in, and what is actually supported tod
 - [Infrastructure providers](#infrastructure-providers)
 - [DNS providers](#dns-providers)
 - [What the provider layer owns](#what-the-provider-layer-owns)
-- [Sizing profiles](#sizing-profiles)
+- [Deployment templates](#deployment-templates)
 - [Where provider differences live](#where-provider-differences-live)
 
 ## Two independent choices
@@ -50,7 +50,7 @@ Because the cluster is self-managed, a vendor layer supplies what a managed Kube
 | LB-IPAM | No cloud load balancer to allocate addresses |
 | OpenEBS | No cloud block storage driver |
 
-This is why a self-managed cluster needs an address range in `app.lb_ipam.range`.
+This is why a self-managed cluster needs an address range in `cluster.lb_ipam.range`.
 
 ## DNS providers
 
@@ -68,7 +68,9 @@ The DNS provider is an independent choice — Route53 with Proxmox is a normal c
 
 All three DNS providers use **DNS-01** ACME challenges ([ADR-011](decisions/011-dns01-over-http01.md)), which is what allows wildcard certificates and works before any ingress path is reachable.
 
-**Let's Encrypt is the only supported ACME provider.** The issuer is fixed; other ACME-compatible certificate authorities are not currently selectable. Making this configurable is tracked in `discrepancies.md` item 7.
+The ACME account contact is `cert.email` in the environment config — a real field with a real effect, unlike the `app.alert_email` it replaced, which despite its name only ever reached Let's Encrypt.
+
+**The ACME directory URL is configurable.** `cert.server` selects it and defaults to Let's Encrypt production, so any ACME-compatible certificate authority — or the Let's Encrypt staging endpoint, while working through rate-limited testing — can be used without touching the manifests. A private CA (Vault PKI) is not an option today: `cert.provider` accepts only `acme`.
 
 The scheme's own CA is separate and unrelated — see [Security](security.md#certificate-authorities).
 
@@ -88,22 +90,30 @@ Read the arrows as actions — each module is the actor performing the step to i
 
 The boundary is deliberately narrow. Adding a provider means implementing cluster creation and returning a kubeconfig; it means touching no DNS, TLS, observability, or application code. See [Platform → Adding providers](../platform/index.md).
 
-## Sizing profiles
+## Deployment templates
 
-Node counts and machine sizes come from named profiles per provider and role, not from hand-written values ([ADR-012](decisions/012-tps-sizing-profiles.md)).
+Node counts and machine sizes come from named templates per role, not from hand-written values ([ADR-012](decisions/012-tps-sizing-profiles.md), reshaped by [ADR-015](decisions/015-two-stack-capability-config.md)).
 
-| Role | Available profiles |
+| Role | Available templates |
 |------|--------------------|
 | Tooling Cluster (`cc`) | `small`, `medium` |
 | Hub (`env`) | `tps-1`, `tps-10` |
 | Platform-only (`base`) | `small` |
 
-Hub profiles are named for the transaction rate they are sized to sustain. `tps-1` is a functional lab; `tps-10` is the larger validated profile.
+Hub templates are named for the transaction rate they are sized to sustain. `tps-1` is a functional lab; `tps-10` is the larger validated tier.
 
 ```yaml
-cluster:
-  profile: "tps-10"
+template: "tps-10"
 ```
+
+A template is **provider-independent**. It declares node groups in resource terms — workload class, count, cores, memory, disks, placement — plus the replica counts and data-layer tuning that must scale with them. Translating a workload class into a machine is the mapping layer's job:
+
+| Layer | File | Owner |
+|-------|------|-------|
+| Capacity template | `config/templates/<role>/<tier>.yaml` | Distribution, one file per tier |
+| Provider mapping | `config/templates/mappings/<provider>.yaml` | Distribution, one file per provider |
+
+That split is why a new tier is one file rather than one per provider, and why adding a provider does not multiply the tier count. On Proxmox a node group expands into `count` individually-placed VMs; on a managed service it becomes a node group or pool of that size.
 
 ## Where provider differences live
 
@@ -112,7 +122,7 @@ Four places, and nowhere else:
 | Location | Contains |
 |----------|----------|
 | `src/modules/<provider>/` | Cluster provisioning |
-| `config/providers/<provider>/` | Defaults and sizing profiles |
+| `config/templates/mappings/<provider>.yaml` | Instance types, VM defaults, provider constants |
 | `gitops/talos/` | Vendor layer — self-managed clusters only |
 | `gitops/dns/<provider>/` | cert-manager issuer and external-dns config |
 

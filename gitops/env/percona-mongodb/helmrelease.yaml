@@ -31,5 +31,12 @@ spec:
     crds: CreateReplace
     remediation:
       retries: 3
-  values:
-    watchNamespace: "data"
+  valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: psmdb-operator-values
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: psmdb-operator-values-override
+      valuesKey: values.yaml
+      optional: true

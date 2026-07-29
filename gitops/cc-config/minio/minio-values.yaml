@@ -1,0 +1,24 @@
+# Distribution values for the minio HelmRelease.
+# Adopter overrides go in environments/<env>/values/minio.yaml,
+# which is merged after this file and therefore wins.
+mode: standalone
+replicas: ${minio_replicas}
+persistence:
+  enabled: true
+  size: ${minio_storage}
+resources:
+  requests:
+    memory: 256Mi
+buckets:
+  - name: harbor
+    policy: none
+  - name: backups
+    policy: none
+  - name: thanos
+    policy: none
+  - name: loki
+    policy: none
+  - name: tempo
+    policy: none
+consoleIngress:
+  enabled: false

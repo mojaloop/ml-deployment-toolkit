@@ -1,0 +1,150 @@
+# yaml-language-server: $schema=../../config/schemas/environment.schema.json
+# ------------------------------------------------------------------
+# Environment config (sample — env/switch cluster, backed by a CC)
+# Copy this file to config.yaml and edit for your environment.
+# Secrets live in .env next to this file (sourced via Makefile) —
+# never put credentials here.
+# ------------------------------------------------------------------
+version: 1
+
+cluster:
+  name: "my-switch"
+  role: "env"                         # cc | env | base
+  vip: "192.168.0.214"                # Kubernetes API floating IP (on-prem only)
+  lb_ipam:
+    range: "192.168.0.215-192.168.0.217"
+
+# Deployment template — config/templates/{role}/{template}.yaml
+template: "tps-10"
+
+infra:
+  provider: "proxmox"                 # proxmox | aws | digitalocean
+  proxmox:
+    # Maps template placement groups -> Proxmox physical nodes
+    placement:
+      pg-1: "pve-node-1"
+      pg-2: "pve-node-2"
+      pg-3: "pve-node-3"
+    network_bridge: "vmbr0"
+    storage:
+      disks: "local-lvm"
+      images: "local"
+      snippets: "local"
+  # Talos node OS overrides (optional — any on-prem provider)
+  talos:
+    nameservers:
+      - "8.8.8.8"
+      - "1.1.1.1"
+    ntp_servers:
+      - "time.cloudflare.com"
+
+# Credentials in .env: DIGITALOCEAN_TOKEN, CLOUDFLARE_API_TOKEN,
+# or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_REGION for route53.
+dns:
+  provider: "route53"                 # digitalocean | cloudflare | route53
+  domain: "sw1.lab1.example.com"
+
+# Certificates (ACME). email is the ACME account contact.
+cert:
+  provider: "acme"
+  email: "ops@example.com"
+
+# Distribution gitops artifact consumed by Flux (credentials OCI_REPO_* in .env)
+artifact:
+  url: "oci://ghcr.io/your-org/ml-deployment-toolkit"
+  version: "latest"                   # OCI tag — "latest" or pin to a version
+
+# ------------------------------------------------------------------
+# Supporting services: image cache, backup storage, telemetry sink.
+#
+# Each is independent and may point anywhere — a Tooling Cluster, a cloud
+# service, or your own hosts. The endpoints are written out below so the
+# values are visible and under your control.
+#
+# If a Tooling Cluster deployed by this toolkit backs all three, the
+# 'toolkit-cc' shorthand at the bottom of this section derives the same
+# five endpoints from its domain alone. It is convenience only: the
+# resulting configuration is identical either way.
+# ------------------------------------------------------------------
+
+# Image pull-through cache (credentials OCI_PROXY_* in .env)
+registry:
+  provider: "harbor"
+  url: "harbor.int.cc1.lab1.example.com"     # no oci:// prefix — used in Talos registry mirrors
+
+# Backup target (credentials BACKUP_S3_ACCESS_KEY/SECRET_KEY in .env)
+object_storage:
+  provider: "s3"
+  endpoint: "https://s3.int.cc1.lab1.example.com"
+  bucket: "backups"
+  region: "us-east-1"
+
+# Telemetry push sink. Note: no credential field exists yet, so these must be
+# endpoints reachable without authentication (private network or mTLS at the
+# gateway) — managed backends requiring a token are not supported today.
+observability:
+  provider: "urls"
+  loki_url: "https://loki.int.cc1.lab1.example.com/loki/api/v1/push"
+  mimir_url: "https://thanos.int.cc1.lab1.example.com/api/v1/receive"
+  tempo_url: "https://tempo.int.cc1.lab1.example.com/v1/traces"
+
+# --- Shorthand alternative -----------------------------------------
+# Replace all three blocks above with the following when a toolkit-deployed
+# Tooling Cluster provides them. One value then drives all five endpoints,
+# so changing the CC's domain is a single edit here instead of five:
+#
+# toolkit_cc:
+#   domain: "cc1.lab1.example.com"
+# registry:
+#   provider: "toolkit-cc"            # -> harbor.int.<domain>
+# object_storage:
+#   provider: "toolkit-cc"            # -> https://s3.int.<domain>
+#   bucket: "backups"
+# observability:
+#   provider: "toolkit-cc"            # -> loki/thanos/tempo push URLs
+#
+# Set any capability to provider: "none" to disable it entirely.
+
+# Data layer — per-store mode: in-cluster-managed | external-unmanaged
+# (external-managed is schema-reserved, not yet implemented)
+data:
+  mysql:
+    mode: "in-cluster-managed"
+  # External MySQL instead (credentials in .env):
+  # mysql:
+  #   mode: "external-unmanaged"
+  #   host: "mysql.lab1.example.com"
+  #   port: "3306"
+  kafka:
+    mode: "in-cluster-managed"
+  mongodb:
+    mode: "in-cluster-managed"
+  redis:
+    mode: "in-cluster-managed"
+
+# Transactional email (SMTP — Kratos courier). Credentials in .env.
+email:
+  host: "smtp.example.com"
+  port: "587"
+  from: "grafana@example.com"
+
+# Alert delivery channels (Grafana contact points)
+alerting:
+  email:
+    to: "ops@example.com"
+  telegram:                           # token in .env (TELEGRAM_BOT_TOKEN)
+    chat_id: "0"
+
+app:
+  # fspiop | iso20022 — set once at deploy time; switching mid-flight breaks
+  # in-progress transfers. DFSPs and simulators connecting to the switch must
+  # use the same dialect.
+  api_type: "fspiop"
+  hub:
+    participant_name: "Hub"
+    admin_email: "hub-admin@example.com"
+    onboarding:
+      # Initial deposit into DFSP settlement accounts (available liquidity)
+      funds_in: "1000000"
+      # Maximum net debit position — transfers blocked beyond this limit
+      net_debit_cap: "500000"

@@ -1,0 +1,13 @@
+# Distribution values for the external-dns HelmRelease.
+# Adopter overrides go in environments/<env>/values/external-dns.yaml,
+# which is merged after this file and therefore wins.
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "7979"
+sources:
+  - service
+  - gateway-httproute
+domainFilters:
+  - ${domain}
+txtOwnerId: ${cluster_name}
+policy: sync

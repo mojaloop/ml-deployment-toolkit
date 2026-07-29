@@ -30,31 +30,12 @@ spec:
   upgrade:
     remediation:
       retries: 3
-  values:
-    # Only enable localpv hostpath provisioner
-    localpv-provisioner:
-      enabled: true
-      hostpathClass:
-        enabled: true
-        isDefaultClass: true
-
-    # Disable all other engines and sub-charts
-    engines:
-      local:
-        lvm:
-          enabled: false
-        zfs:
-          enabled: false
-      replicated:
-        mayastor:
-          enabled: false
-    openebs-crds:
-      csi:
-        volumeSnapshots:
-          enabled: false
-    loki:
-      enabled: false
-    minio:
-      enabled: false
-    alloy:
-      enabled: false
+  valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: openebs-values
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: openebs-values-override
+      valuesKey: values.yaml
+      optional: true

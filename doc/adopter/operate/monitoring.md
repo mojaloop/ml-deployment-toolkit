@@ -16,7 +16,7 @@ Where to look, in what order, and what "healthy" looks like. For how the observa
 
 ## Where monitoring lives
 
-Grafana runs on the **Tooling Cluster**, at `https://grafana.int.<tooling-domain>`, with the admin password from `GRAFANA_ADMIN_PASSWORD`.
+Grafana runs on the **Tooling Cluster**, at `https://grafana.int.<tooling-domain>`. The user is `admin` and the password is generated — `make secrets ENV=<cc-env>` prints it as `grafana_admin_password`.
 
 A Hub ships metrics, logs, and traces to the Tooling Cluster — it runs no Grafana of its own. A deployment without a Tooling Cluster has no aggregated dashboard; a Hub keeps running, but there is no central place to watch it.
 
@@ -88,12 +88,22 @@ The dashboard is a live per-node view of CPU, memory, network, and services. Rea
 
 **22 alert rules ship and run** — across infrastructure, platform, data layer, and Mojaloop. They evaluate whether or not anyone is listening.
 
-**Delivery is separate, and silent if unconfigured.** Alerts go nowhere without the SMTP and Telegram secrets set on the Tooling Cluster. If no alert has ever arrived, the first thing to check is whether delivery is configured — not whether the rules exist.
+**Delivery is separate, and silent if unconfigured.** Alerts go nowhere without both the destinations and their credentials set on the Tooling Cluster. If no alert has ever arrived, the first thing to check is whether delivery is configured — not whether the rules exist.
+
+```yaml
+# config.yaml — destinations
+email:     { host: ..., port: "587", from: ... }
+alerting:
+  email:    { to: ... }
+  telegram: { chat_id: ... }
+```
 
 ```
-SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, ALERT_EMAIL_FROM, ALERT_EMAIL_TO
-TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+# .env — credentials
+SMTP_USER, SMTP_PASSWORD, TELEGRAM_BOT_TOKEN
 ```
+
+Changing any of them is a config-stack change: `make apply-config ENV=<cc-env>`.
 
 Everything routes to one policy, grouped by alert name and cluster, repeating every 4 hours. Confirm delivery by triggering a test through the contact point in Grafana rather than waiting for a real alert to find out it was never wired. See [Observability → Alerting](../../architecture/observability.md#alerting).
 

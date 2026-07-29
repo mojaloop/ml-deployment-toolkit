@@ -99,7 +99,7 @@ Grafana unified alerting is configured and active — **22 rules** across four g
 
 Two contact points are wired: **email** and **Telegram**. A single notification policy routes everything to both, grouping by alert name and cluster, waiting 30 seconds to group, and repeating every 4 hours.
 
-**Alerting is silent unless the adopter configures delivery.** The rules evaluate regardless, but nothing is sent without `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `ALERT_EMAIL_FROM`, `ALERT_EMAIL_TO`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_CHAT_ID`. There is no warning when they are missing — alerts simply fire into nothing.
+**Alerting is silent unless the adopter configures delivery.** The rules evaluate regardless, but nothing is sent without both halves: the destinations in `config.yaml` — `email.host`, `email.port`, `email.from`, `alerting.email.to`, `alerting.telegram.chat_id` — and their credentials in `.env` — `SMTP_USER`, `SMTP_PASSWORD`, `TELEGRAM_BOT_TOKEN`. There is no warning when they are missing — alerts simply fire into nothing. The Telegram contact point is provisioned with a placeholder token when none is supplied, so it exists and delivers nowhere.
 
 This is the most common way a deployment ends up believing it has no alerting when it has 22 rules running.
 

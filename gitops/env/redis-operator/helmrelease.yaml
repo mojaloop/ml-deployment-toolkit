@@ -31,3 +31,12 @@ spec:
     crds: CreateReplace
     remediation:
       retries: 3
+  valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: redis-operator-values
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: redis-operator-values-override
+      valuesKey: values.yaml
+      optional: true

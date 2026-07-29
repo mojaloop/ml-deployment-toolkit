@@ -1,0 +1,19 @@
+# Distribution values for the kratos-selfservice-ui HelmRelease.
+# Adopter overrides go in environments/<env>/values/kratos-selfservice-ui.yaml,
+# which is merged after this file and therefore wins.
+fullnameOverride: "kratos-ui"
+
+secret:
+  enabled: false
+  nameOverride: kratos-secret
+
+config:
+  csrfCookieName: "__HOST-auth.int.${domain}-x-csrf-token"
+
+kratosAdminUrl: "http://kratos-admin"
+kratosPublicUrl: "http://kratos-public"
+kratosBrowserUrl: "https://auth.int.${domain}/kratos"
+
+jwksUrl: "http://oathkeeper-api"
+
+projectName: "SecureApp"

@@ -1,0 +1,208 @@
+# Distribution values for the kratos HelmRelease.
+# Adopter overrides go in environments/<env>/values/kratos.yaml,
+# which is merged after this file and therefore wins.
+replicaCount: ${kratos_replicas}
+fullnameOverride: "kratos"
+
+secret:
+  enabled: false
+  nameOverride: kratos-secret
+
+courier:
+  enabled: true
+
+deployment:
+  extraInitContainers: |
+    - name: wait-for-db
+      image: percona/percona-xtradb-cluster:8.0.44-35.1
+      command: [sh, -c]
+      args:
+        - |
+          # Extract host, port, user, password from DSN
+          # DSN format: mysql://user:pass@tcp(host:port)/db?params
+          DB_USER=$(echo "$DSN" | sed 's|mysql://\([^:]*\):.*|\1|')
+          DB_PASS=$(echo "$DSN" | sed 's|mysql://[^:]*:\([^@]*\)@.*|\1|')
+          HOST=$(echo "$DSN" | sed 's|.*tcp(\([^:]*\):.*|\1|')
+          PORT=$(echo "$DSN" | sed 's|.*tcp([^:]*:\([^)]*\)).*|\1|')
+          DB=$(echo "$DSN" | sed 's|.*/\([^?]*\).*|\1|')
+          echo "Waiting for MySQL connectivity to $DB..."
+          until mysql -h "$HOST" -P "$PORT" -u "$DB_USER" -p"$DB_PASS" -e "SELECT 1" "$DB" 2>/dev/null; do
+            echo "Waiting for $DB database..."
+            sleep 5
+          done
+          echo "MySQL reachable. Verifying DDL readiness..."
+          STABLE=0
+          while [ $STABLE -lt 3 ]; do
+            if mysql -h "$HOST" -P "$PORT" -u "$DB_USER" -p"$DB_PASS" "$DB" \
+              -e "CREATE TABLE IF NOT EXISTS __init_check (id INT PRIMARY KEY) ENGINE=InnoDB; DROP TABLE IF EXISTS __init_check;" 2>/dev/null; then
+              STABLE=$((STABLE + 1))
+              echo "DDL check passed ($STABLE/3)"
+            else
+              STABLE=0
+              echo "DDL not ready, retrying..."
+            fi
+            sleep 2
+          done
+          echo "Database ready!"
+      env:
+        - name: DSN
+          valueFrom:
+            secretKeyRef:
+              name: kratos-secret
+              key: dsn
+  extraVolumes:
+    - name: kratos-email-templates
+      configMap:
+        name: kratos-email-templates
+  extraVolumeMounts:
+    - name: kratos-email-templates
+      mountPath: /etc/kratos-templates
+      readOnly: true
+
+service:
+  admin:
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "4434"
+      prometheus.io/path: "/metrics/prometheus"
+
+kratos:
+  automigration:
+    enabled: true
+    type: initContainer
+
+  identitySchemas:
+    "identity.default.schema.json": |
+      {
+        "$id": "https://mojaloop.io/kratos-schema/identity.schema.json",
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "Person",
+        "type": "object",
+        "properties": {
+          "traits": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "title": "E-Mail",
+                "type": "string",
+                "format": "email",
+                "ory.sh/kratos": {
+                  "credentials": {
+                    "password": {
+                      "identifier": true
+                    }
+                  },
+                  "recovery": {
+                    "via": "email"
+                  }
+                }
+              },
+              "subject": {
+                "title": "Subject",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "roles": {
+                "title": "User Roles",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+
+  config:
+    dsn: "mysql://kratos:${kratos_db_password}@tcp(${mysql_host}:${mysql_port})/kratos?max_conns=20&max_idle_conns=4"
+
+    courier:
+      smtp:
+        connection_uri: "smtp://placeholder@localhost:25"
+        from_address: "${smtp_user}"
+        from_name: "Mojaloop Hub"
+      templates:
+        recovery:
+          valid:
+            email:
+              subject: file:///etc/kratos-templates/recovery-subject.gotmpl
+              body:
+                plaintext: file:///etc/kratos-templates/recovery-body.txt.gotmpl
+                html: file:///etc/kratos-templates/recovery-body.html.gotmpl
+
+    identity:
+      default_schema_id: default
+      schemas:
+        - id: default
+          url: file:///etc/config/identity.default.schema.json
+
+    serve:
+      public:
+        base_url: "https://auth.int.${domain}/kratos/"
+        port: 4433
+        cors:
+          enabled: true
+          allowed_origins:
+          - "https://*.${domain}"
+      admin:
+        port: 4434
+
+    selfservice:
+      default_browser_return_url: "https://auth.int.${domain}/ui/welcome"
+      allowed_return_urls:
+        - "https://*.${domain}"
+
+      methods:
+        password:
+          enabled: true
+        link:
+          enabled: true
+          config:
+            lifespan: 1h
+        oidc:
+          enabled: false
+
+      flows:
+        login:
+          ui_url: "https://auth.int.${domain}/ui/login"
+          lifespan: 10m
+
+        registration:
+          enabled: false
+
+        settings:
+          ui_url: "https://auth.int.${domain}/ui/settings"
+
+        recovery:
+          enabled: true
+          use: link
+          ui_url: "https://auth.int.${domain}/ui/recovery"
+          lifespan: 1h
+
+        logout:
+          after:
+            default_browser_return_url: "https://auth.int.${domain}/ui/login"
+
+        error:
+          ui_url: "https://auth.int.${domain}/ui/error"
+
+    log:
+      level: debug
+      format: text
+      leak_sensitive_values: true
+
+    ciphers:
+      algorithm: xchacha20-poly1305
+
+    hashers:
+      algorithm: bcrypt
+      bcrypt:
+        cost: 8
+
+    session:
+      cookie:
+        domain: "${domain}"

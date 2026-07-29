@@ -24,20 +24,12 @@ spec:
       strategy: uninstall
   dependsOn:
     - name: kratos
-  values:
-    fullnameOverride: "kratos-ui"
-
-    secret:
-      enabled: false
-      nameOverride: kratos-secret
-
-    config:
-      csrfCookieName: "__HOST-auth.int.${domain}-x-csrf-token"
-
-    kratosAdminUrl: "http://kratos-admin"
-    kratosPublicUrl: "http://kratos-public"
-    kratosBrowserUrl: "https://auth.int.${domain}/kratos"
-
-    jwksUrl: "http://oathkeeper-api"
-
-    projectName: "SecureApp"
+  valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: kratos-selfservice-ui-values
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: kratos-selfservice-ui-values-override
+      valuesKey: values.yaml
+      optional: true
