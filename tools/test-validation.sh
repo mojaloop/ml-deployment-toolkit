@@ -66,6 +66,7 @@ expect_reject "lb_ipam without range"      'del(.cluster.lb_ipam.range)'
 expect_reject "lb_ipam range without dash" '.cluster.lb_ipam.range = "192.168.0.10"'
 expect_reject "unknown key in cert"        '.cert.bogus = "x"'
 expect_reject "unknown key in artifact"    '.artifact.bogus = "x"'
+expect_reject "invalid cert provider"      '.cert.provider = "vault-pki"' 
 
 echo
 echo "passed: $PASS   failed: $FAIL"
