@@ -37,7 +37,7 @@ The adopter cannot generate the participant's credentials for them — the autho
 - **SMTP is working.** MCM sends the participant an activation email; without SMTP, they never receive it and cannot proceed. Confirm it before creating anyone.
 - Each participant needs a **distinct email address** — MCM keys account activation on it.
 
-The adopter works in MCM at `https://mcm.int.<domain>`, using the HubOps login (`HUB_ADMIN_EMAIL` / `HUB_ADMIN_PASSWORD`).
+The adopter works in MCM at `https://mcm.int.<domain>`, using the HubOps login — `app.hub.admin_email` from `config.yaml`, and the generated `hub_admin_password` from `make secrets ENV=<hub-env>`.
 
 ## 1. Create the participant
 

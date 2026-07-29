@@ -52,9 +52,9 @@ The operator names the Secret after the Vault resource — list the namespace to
 
 ### Terraform state
 
-State lives locally under `artifacts/<env>/terraform/`. There is no remote backend, no locking, no versioning — and `make clean` deletes it. Losing it means Terraform no longer knows about the infrastructure: the cluster keeps running, but the adopter can no longer plan, apply, or cleanly destroy it.
+State lives locally under `artifacts/<env>/terraform/`, in two files: `infra.tfstate` for the cluster and `config.tfstate` for everything Flux consumes. There is no remote backend, no locking, no versioning — and `make clean` deletes both, for every environment. Losing the infra state means Terraform no longer knows about the infrastructure: the cluster keeps running, but the adopter can no longer plan, apply, or cleanly destroy it. Losing the config state loses Terraform's copy of the **generated internal service passwords**. While the cluster still runs they can be read back from the `cluster-secrets` Secret in `flux-system`; once both are gone they are gone. `make secrets ENV=<env>` reads the state file, not the cluster, so it stops working the moment that file does.
 
-Back up `artifacts/<env>/` on every environment that matters. A copy after each successful `make apply` is enough.
+Back up `artifacts/<env>/` — both state files — on every environment that matters. A copy after each successful `make apply` or `make apply-config` is enough.
 
 Both gaps are recorded in `discrepancies.md` — the toolkit does not yet discharge these, so treat them as standing operational tasks.
 

@@ -1,9 +1,12 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Capacity template",
-  "description": "Schema for config/templates/{cc,env,base}/*.yaml — provider-independent node groups plus service tuning sections.",
+  "description": "Schema for config/templates/{cc,env,base}/*.yaml \u2014 provider-independent node groups plus service tuning sections.",
   "type": "object",
-  "required": ["version", "node_groups"],
+  "required": [
+    "version",
+    "node_groups"
+  ],
   "additionalProperties": false,
   "properties": {
     "version": {
@@ -20,7 +23,15 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name", "class", "count", "cores", "memory", "disks", "placement"],
+        "required": [
+          "name",
+          "class",
+          "count",
+          "cores",
+          "memory",
+          "disks",
+          "placement"
+        ],
         "additionalProperties": false,
         "properties": {
           "name": {
@@ -29,8 +40,14 @@
             "pattern": "^[a-z][a-z0-9-]*$"
           },
           "class": {
-            "description": "Workload class — see config/definitions/workload-classes.yaml",
-            "enum": ["control-plane", "worker-general", "mixed-plane", "worker-kafka", "worker-db"]
+            "description": "Workload class \u2014 see config/definitions/workload-classes.yaml",
+            "enum": [
+              "control-plane",
+              "worker-general",
+              "mixed-plane",
+              "worker-kafka",
+              "worker-db"
+            ]
           },
           "count": {
             "description": "Number of nodes in this group",
@@ -62,22 +79,29 @@
               "type": "string",
               "pattern": "^pg-[0-9]+$"
             }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Extra Proxmox/cloud tags applied to every node in the group"
           }
         }
       }
     },
     "cc": {
-      "description": "CC services tuning (cc templates) — open-ended key set",
+      "description": "CC services tuning (cc templates) \u2014 open-ended key set",
       "type": "object",
       "additionalProperties": true
     },
     "app": {
-      "description": "Application horizontal scaling (env templates) — open-ended key set",
+      "description": "Application horizontal scaling (env templates) \u2014 open-ended key set",
       "type": "object",
       "additionalProperties": true
     },
     "data": {
-      "description": "Data layer tuning (env templates) — open-ended key set",
+      "description": "Data layer tuning (env templates) \u2014 open-ended key set",
       "type": "object",
       "additionalProperties": true
     }

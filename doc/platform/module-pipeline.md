@@ -77,7 +77,7 @@ The largest module, the whole of the config stack, and the one that encodes the 
 - The **OCIRepository** pointing at the artifact
 - The **`cluster-config` ConfigMap** and **`cluster-secrets` Secret** — the substitution inputs
 - The **generated internal passwords** (`random_password`), one per name in the role's set, overridable by a matching UPPER_CASE entry in the supplied secrets map
-- One **values-override ConfigMap** per `environments/<env>/values/<name>.yaml`, named `<name>-values-override`
+- One **values-override ConfigMap** per `environments/<env>/values/<name>.yaml`, named `<name>-values-override`. The config root templates the file before passing it in, so `${...}` in an override expands against the same non-secret variable set Flux substitutes with
 - The **Kustomization dependency graph** for the cluster's role, with `dependsOn` and health gates
 
 The role (`cc`, `env`, `base`) determines which Kustomizations exist and how they are chained; the data modes determine how many `env-data-<store>` Kustomizations the fan-out has. The health gates — waiting on operators, on database readiness, on the Ory stack — live here. This is the module that makes a Hub converge in the right order; see [Reconciliation order](../architecture/system-overview.md#reconciliation-order).

@@ -77,7 +77,7 @@ This is the same class of race as the [Mojaloop migration issue](../deploy/known
 
 **Fix** — restore access from the bottom up. Each step is only needed if the layer below it is broken.
 
-*Terraform path (all providers):* `make apply ENV=<env>` regenerates everything — the Talos provider re-issues expired client certificates on refresh and rewrites both files under `artifacts/`. On managed providers (AWS, DigitalOcean) this is the only path.
+*Terraform path (all providers):* `make plan-apply ENV=<env>` regenerates everything — the Talos provider re-issues expired client certificates on refresh and rewrites both files under `artifacts/`. It is the **infra** stack that does this, so `make apply-config` will not help here. On managed providers (AWS, DigitalOcean) this is the only path.
 
 *Manual path (Talos environments)* — needs only the `talosctl` binary and reachability to the cluster, no working Terraform:
 
@@ -102,7 +102,7 @@ This is the same class of race as the [Mojaloop migration issue](../deploy/known
 
 **The hard boundary** — every recovery above roots in the machine secrets, held in `secrets.yaml` and the Terraform state. If both are gone, there is no door: the Talos API is mTLS-only with no password or console fallback, and the only way forward is a rebuild per [Disaster recovery](../recover/disaster-recovery.md). This is why the state backup there is not optional.
 
-**Prevention** — the files themselves need no backup beyond the Terraform state (see [What the adopter must keep](../recover/disaster-recovery.md#what-the-adopter-must-keep)); they are regenerable, which is why `artifacts/` is not committed. The certificates do need a calendar: any `make apply` within the year re-issues them, but a cluster left untouched longer than that crosses the expiry — run `talosctl config info` when in doubt, and refresh before the date it prints.
+**Prevention** — the files themselves need no backup beyond the Terraform state (see [What the adopter must keep](../recover/disaster-recovery.md#what-the-adopter-must-keep)); they are regenerable, which is why `artifacts/` is not committed. The certificates do need a calendar: any infra-stack apply within the year re-issues them, but a cluster left untouched longer than that crosses the expiry — run `talosctl config info` when in doubt, and refresh before the date it prints.
 
 ## MCM returns HTTP 500 on Vault-backed operations
 

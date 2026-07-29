@@ -285,7 +285,7 @@ Then set `provider: toolkit-cc` on whichever capabilities should use it. The too
 | `observability` (logs) | `https://loki.int.<domain>/loki/api/v1/push` |
 | `observability` (traces) | `https://tempo.int.<domain>/v1/traces` |
 
-Setting `provider: toolkit-cc` anywhere without `toolkit_cc.domain` fails at plan time with that message.
+Setting `provider: toolkit-cc` on any capability without also setting `toolkit_cc.domain` fails at plan time, saying exactly that.
 
 The presets are per capability, not all-or-nothing — a Hub may pull images through the Tooling Cluster's Harbor while pushing telemetry to an external stack:
 
@@ -324,8 +324,8 @@ That is also how a Hub's `.env` gets its Tooling Cluster credentials: `make secr
 | `PROXMOX_VE_ENDPOINT`, `PROXMOX_VE_API_TOKEN`, `PROXMOX_VE_SSH_USERNAME`, `PROXMOX_VE_SSH_PASSWORD` | `infra.provider: proxmox` |
 | `DIGITALOCEAN_TOKEN` / `CLOUDFLARE_API_TOKEN` / `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` + `AWS_REGION` | the chosen `dns.provider` |
 | `OCI_REPO_USERNAME`, `OCI_REPO_PASSWORD` | private artifact registry, or publishing one |
-| `OCI_PROXY_USERNAME`, `OCI_PROXY_PASSWORD` | `registry.provider` is set |
-| `BACKUP_S3_ACCESS_KEY`, `BACKUP_S3_SECRET_KEY` | `object_storage.provider` is set |
+| `OCI_PROXY_USERNAME`, `OCI_PROXY_PASSWORD` | `registry.provider` is `toolkit-cc` or `harbor` |
+| `BACKUP_S3_ACCESS_KEY`, `BACKUP_S3_SECRET_KEY` | `object_storage.provider` is `toolkit-cc` or `s3` |
 | `SMTP_USER`, `SMTP_PASSWORD` | `email:` is configured |
 | `TELEGRAM_BOT_TOKEN` | `alerting.telegram` is configured |
 
@@ -354,9 +354,21 @@ environments/<env>/values/
 
 Each file becomes a `<name>-values-override` ConfigMap, layered over the platform defaults through the HelmRelease's `valuesFrom` as an optional reference — a missing file changes nothing. Merge order is chart defaults, then platform values, then the environment's file. The name must match the HelmRelease, not the chart's upstream name: `psmdb-operator.yaml`, not `percona-mongodb.yaml`.
 
-One constraint remains:
+**Override files are templated**, with the same `${...}` syntax the artifact's manifests use — the config stack expands them before writing the ConfigMap, because Flux does not substitute inside a ConfigMap it did not render:
 
-- **Flux substitution variables are not expanded** inside these files — `${...}` is taken literally. Hardcode the values.
+```yaml
+ingress:
+  hosts:
+    - "example.${domain}"
+replicas: ${cl_service_replicas}
+```
+
+Available variables are the cluster identity (`cluster_name`, `domain`), the resolved telemetry sinks (`loki_url`, `mimir_url`, `tempo_url`), and every key from the template's `app:`, `data:`, and `cc:` sections. **Credentials are deliberately not available** — override files are for values, not secrets.
+
+Two consequences of real templating:
+
+- **An unknown `${name}` fails the apply**, it is not left alone. That is the error to expect from a typo.
+- **A literal `${` must be escaped as `$${`** — relevant when a chart value itself carries shell or Helm-adjacent syntax.
 
 Override files belong to the config stack, so applying them is the fast path:
 
