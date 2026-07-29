@@ -44,7 +44,7 @@ PROXMOX_VE_API_TOKEN="root@pam!ml-deployment-toolkit=<uuid>"
 
 A scoped non-root user works too — grant `VM.Allocate`, `VM.Config.*`, `VM.PowerMgmt`, `VM.Console`, `Datastore.AllocateSpace`, `Datastore.Audit`, `SDN.Use`, `Sys.Audit`. Administrator is simplest.
 
-> **TLS verification is always off.** The Proxmox provider is configured with `insecure = true` and it is not overridable — `PROXMOX_VE_INSECURE` in `.env` has no effect. If the Proxmox host uses a CA-signed certificate, verification is skipped anyway. Tracked in `discrepancies.md` item D2.
+> **TLS verification is always off.** The Proxmox provider is configured with `insecure = true` in `src/infra/providers.tf` and it is not overridable from configuration. If the Proxmox host uses a CA-signed certificate, verification is skipped anyway.
 
 ## SSH access
 
@@ -55,7 +55,7 @@ PROXMOX_VE_SSH_USERNAME="root"
 PROXMOX_VE_SSH_PASSWORD="<password>"
 ```
 
-Password authentication is what the provider uses. SSH-agent auth is not available — the provider is configured with `agent = false` and it is not overridable (same tracking item as above).
+Password authentication is what the provider uses. SSH-agent auth is not available — the provider is configured with `agent = false` and it is not overridable from configuration.
 
 ## Storage pools
 
@@ -91,8 +91,8 @@ Plan addresses before deploying:
 | Purpose | Count | Notes |
 |---------|-------|-------|
 | Kubernetes API VIP | 1 | `cluster.vip` — floating IP, same L2 as the nodes |
-| Node IPs | 1 per VM | Assigned by Talos; the sizing profile sets the count |
-| LB-IPAM range | 2 or 3 | `app.lb_ipam.range` |
+| Node IPs | 1 per VM | Assigned by Talos; the deployment template sets the count |
+| LB-IPAM range | 2 or 3 | `cluster.lb_ipam.range` |
 
 **The LB range differs by role.** A Tooling Cluster needs 2 addresses (`gw-int`, `gw-ext`). A Hub needs 3 — it adds the FSPIOP endpoint. The range must sit outside the DHCP scope; overlap causes intermittent failures as addresses are handed out twice.
 
@@ -100,18 +100,18 @@ All addresses must be on the bridge in `infra.proxmox.network_bridge`.
 
 ## Placement groups
 
-`infra.proxmox.placement` maps logical placement groups — used by the sizing profile to spread VMs across failure domains — to physical node names:
+`infra.proxmox.placement` maps logical placement groups — used by the deployment template to spread VMs across failure domains — to physical node names:
 
 ```yaml
 infra:
   proxmox:
     placement:
-      placement-group-1: "node0"
-      placement-group-2: "node1"
-      placement-group-3: "node2"   # only if the profile uses three
+      pg-1: "node0"
+      pg-2: "node1"
+      pg-3: "node2"   # only if the template uses three
 ```
 
-How many groups a profile uses is in `config/providers/proxmox/profiles/{cc,env}/<profile>.yaml`. Provide a node mapping for each group the profile references.
+Which groups a template references is in `config/templates/{cc,env,base}/<template>.yaml`, in each node group's `placement:` list. Provide a node mapping for every group named there; an unmapped `pg-N` is passed through to Proxmox as a literal node name and fails.
 
 ## DNS zone
 
