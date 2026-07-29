@@ -13,12 +13,12 @@ Moving a running cluster to a new artifact version or a new infrastructure confi
 
 ## Two kinds of upgrade
 
-| What changes | Driven by |
-|--------------|-----------|
-| Platform workloads (the OCI artifact) | `oci.repo.version`, reconciled by Flux |
-| Infrastructure (nodes, topology, Flux itself) | `config.yaml`, applied by Terraform |
+| What changes | Driven by | Applied with |
+|--------------|-----------|--------------|
+| Platform workloads (the OCI artifact) | `artifact.version`, reconciled by Flux | `make apply-config` |
+| Infrastructure (nodes, topology, Flux itself) | `config.yaml`, applied by Terraform | `make plan-apply` |
 
-They are independent. A new artifact does not touch the nodes; a topology change does not touch the workloads.
+They are independent. A new artifact does not touch the nodes; a topology change does not touch the workloads. Because the artifact version belongs to the config stack, bumping it is the fast path — seconds, and no infrastructure plan to read.
 
 ## Platform version
 
@@ -35,13 +35,12 @@ All should return to `Ready: True` within a few minutes.
 **Pinned to a version** — bump the tag and apply:
 
 ```yaml
-oci:
-  repo:
-    version: "v1.3.0"
+artifact:
+  version: "v1.3.0"
 ```
 
 ```bash
-make plan-apply ENV=<env>
+make apply-config ENV=<env>
 kubectl get kustomizations -n flux-system
 ```
 
@@ -51,14 +50,15 @@ Whatever the mode, confirm afterward that the Kustomizations settle back to Read
 
 ## Infrastructure
 
-Changing node counts, sizing, VIPs, or the Flux version is a Terraform change.
+Changing node counts, the `template`, VIPs, the placement map, or the Flux version is an infra-stack change.
 
 ```bash
-make plan ENV=<env>      # review carefully — see below
-make apply ENV=<env>
+make plan-infra ENV=<env>      # review carefully — see below
+make apply-infra ENV=<env>
+make apply-config ENV=<env>    # push any config that moved with it
 ```
 
-**Read the plan before applying.** Infrastructure changes can be disruptive in ways an artifact change never is — a sizing change can replace nodes, a VIP change moves the API endpoint. The plan shows which; a workload-only change should show no node replacements.
+**Read the plan before applying.** Infrastructure changes can be disruptive in ways a config change never is — a `template` change can replace nodes, a VIP change moves the API endpoint. The plan shows which; a workload-only change should show no node replacements. A change that touches only config-stack inputs never needs this plan at all, which is the point of the split ([ADR-015](../../architecture/decisions/015-two-stack-capability-config.md)).
 
 Kubernetes and Talos versions are set centrally in the platform definitions, not in the environment's `config.yaml`. Moving to a new Kubernetes version follows a new artifact from the platform team, then `make plan-apply`.
 
