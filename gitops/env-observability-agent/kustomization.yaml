@@ -6,3 +6,22 @@ resources:
   - kube-state-metrics-helmrelease.yaml
   - node-exporter-helmrelease.yaml
   - alloy-helmrelease.yaml
+
+# Distribution values for each HelmRelease in this kustomization.
+# Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;
+# the adopter's <release>-values-override is merged after them and wins.
+configMapGenerator:
+  - name: alloy-values
+    namespace: flux-system
+    files:
+      - values.yaml=alloy-values.yaml
+  - name: kube-state-metrics-values
+    namespace: flux-system
+    files:
+      - values.yaml=kube-state-metrics-values.yaml
+  - name: node-exporter-values
+    namespace: flux-system
+    files:
+      - values.yaml=node-exporter-values.yaml
+generatorOptions:
+  disableNameSuffixHash: true

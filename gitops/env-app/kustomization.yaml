@@ -35,3 +35,22 @@ resources:
   - routes/simulator-httproute.yaml
   - routes/settlement-httproute.yaml
   - routes/tx-requests-httproute.yaml
+
+# Distribution values for each HelmRelease in this kustomization.
+# Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;
+# the adopter's <release>-values-override is merged after them and wins.
+configMapGenerator:
+  - name: finance-portal-values
+    namespace: flux-system
+    files:
+      - values.yaml=finance-portal/finance-portal-values.yaml
+  - name: mcm-values
+    namespace: flux-system
+    files:
+      - values.yaml=mcm/mcm-values.yaml
+  - name: mojaloop-values
+    namespace: flux-system
+    files:
+      - values.yaml=mojaloop/mojaloop-values.yaml
+generatorOptions:
+  disableNameSuffixHash: true

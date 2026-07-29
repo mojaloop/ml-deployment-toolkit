@@ -3,3 +3,14 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - vault-operator/helmrelease.yaml
+
+# Distribution values for each HelmRelease in this kustomization.
+# Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;
+# the adopter's <release>-values-override is merged after them and wins.
+configMapGenerator:
+  - name: vault-operator-values
+    namespace: flux-system
+    files:
+      - values.yaml=vault-operator/vault-operator-values.yaml
+generatorOptions:
+  disableNameSuffixHash: true

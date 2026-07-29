@@ -32,28 +32,11 @@ spec:
       retries: -1
       strategy: uninstall
   valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: bof-values
+      valuesKey: values.yaml
     - kind: ConfigMap
       name: bof-values-override
       valuesKey: values.yaml
       optional: true
-  values:
-    global:
-      keto:
-        readURL: "http://keto-read:80"
-        writeURL: "http://keto-write:80"
-      rolePermOperator:
-        mojaloopRole: {}
-        mojaloopPermissionExclusion: {}
-        apiSvc: {}
-
-    security-role-perm-operator-svc:
-      enabled: true
-      ingress:
-        enabled: false
-
-    security-hub-bop-api-svc:
-      enabled: false
-    security-hub-bop-kratos-svc:
-      enabled: false
-    security-hub-bop-shell-svc:
-      enabled: false

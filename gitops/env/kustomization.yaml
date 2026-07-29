@@ -7,3 +7,30 @@ resources:
   - percona-mongodb/helmrelease.yaml
   - redis-operator/helmrelease.yaml
   - vault-operator/helmrelease.yaml
+
+# Distribution values for each HelmRelease in this kustomization.
+# Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;
+# the adopter's <release>-values-override is merged after them and wins.
+configMapGenerator:
+  - name: psmdb-operator-values
+    namespace: flux-system
+    files:
+      - values.yaml=percona-mongodb/psmdb-operator-values.yaml
+  - name: pxc-operator-values
+    namespace: flux-system
+    files:
+      - values.yaml=percona-xtradb/pxc-operator-values.yaml
+  - name: redis-operator-values
+    namespace: flux-system
+    files:
+      - values.yaml=redis-operator/redis-operator-values.yaml
+  - name: strimzi-kafka-operator-values
+    namespace: flux-system
+    files:
+      - values.yaml=strimzi/strimzi-kafka-operator-values.yaml
+  - name: vault-operator-values
+    namespace: flux-system
+    files:
+      - values.yaml=vault-operator/vault-operator-values.yaml
+generatorOptions:
+  disableNameSuffixHash: true

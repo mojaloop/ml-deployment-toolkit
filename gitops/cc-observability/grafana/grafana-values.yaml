@@ -1,0 +1,166 @@
+# Distribution values for the grafana HelmRelease.
+# Adopter overrides go in environments/<env>/values/grafana.yaml,
+# which is merged after this file and therefore wins.
+# Admin credentials
+adminUser: admin
+adminPassword: "${grafana_admin_password}"
+
+# SMTP credentials via env vars (GF_SMTP_USER/GF_SMTP_PASSWORD) — see
+# smtp-secret.yaml; pairs with the grafana.ini smtp block below
+smtp:
+  existingSecret: grafana-smtp-credentials
+  userKey: user
+  passwordKey: password
+
+# Disable init-chown-data — fsGroup handles volume ownership
+initChownData:
+  enabled: false
+
+# Persistence for dashboards
+persistence:
+  enabled: true
+  size: 1Gi
+
+# Resources
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+
+# Datasources - configure Thanos, Loki, Tempo
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      # Thanos (Prometheus-compatible)
+      - name: Thanos
+        type: prometheus
+        uid: thanos
+        access: proxy
+        url: http://thanos-query.observability.svc.cluster.local:9090
+        isDefault: true
+        editable: false
+        jsonData:
+          httpMethod: POST
+          timeInterval: 30s
+
+      # Loki (Logs)
+      - name: Loki
+        type: loki
+        uid: loki
+        access: proxy
+        url: http://loki-gateway.observability.svc.cluster.local
+        editable: false
+        jsonData:
+          maxLines: 1000
+          derivedFields:
+            # Link from logs to traces
+            - datasourceUid: tempo
+              matcherRegex: "traceID=(\\w+)"
+              name: TraceID
+              url: "$${__value.raw}"
+
+      # Tempo (Traces)
+      - name: Tempo
+        type: tempo
+        uid: tempo
+        access: proxy
+        url: http://tempo.observability.svc.cluster.local:3200
+        editable: false
+        jsonData:
+          httpMethod: GET
+          tracesToLogs:
+            # Link from traces to logs
+            datasourceUid: loki
+            filterByTraceID: true
+            filterBySpanID: false
+            mapTagNamesEnabled: true
+            tags:
+              - key: service.name
+                value: service_name
+          tracesToMetrics:
+            # Link from traces to metrics
+            datasourceUid: thanos
+            tags:
+              - key: service.name
+                value: service
+          serviceMap:
+            datasourceUid: thanos
+          nodeGraph:
+            enabled: true
+
+# Dashboard sidecar — watches ConfigMaps with label grafana_dashboard=1
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    folderAnnotation: grafana_folder
+    searchNamespace: observability
+    provider:
+      # Required for folderAnnotation to materialize as Grafana folders:
+      # the sidecar writes per-annotation subdirectories, this makes the
+      # provider map them to folders
+      foldersFromFilesStructure: true
+  # Alerting sidecar — rules/policies from ConfigMaps, contact points
+  # from Secrets (they carry credentials), all labeled grafana_alert=1
+  alerts:
+    enabled: true
+    label: grafana_alert
+    labelValue: "1"
+    searchNamespace: observability
+    resource: both
+
+# Plugins to install (grafana-piechart-panel removed — Angular plugins unsupported in Grafana 11.x)
+plugins: []
+
+# Grafana configuration
+grafana.ini:
+  analytics:
+    check_for_updates: false
+    reporting_enabled: false
+  # Land on the L1 Switch Overview (sidecar mounts dashboards under
+  # /tmp/dashboards/<folderAnnotation>/)
+  dashboards:
+    default_home_dashboard_path: /tmp/dashboards/Home/switch-overview.json
+  # Alert email delivery. Always enabled by design: with the dummy
+  # defaults from .env.sample, sends fail visibly on the contact point
+  # until real SMTP values are provided (see .env.sample warning).
+  # Credentials come via smtp.existingSecret below (GF_SMTP_USER/PASSWORD
+  # env vars) — the chart rejects an inline smtp.password here.
+  smtp:
+    enabled: true
+    host: "${smtp_host}:${smtp_port}"
+    from_address: "${alert_email_from}"
+    from_name: "Grafana"
+    skip_verify: true
+  server:
+    root_url: "https://grafana.int.${domain}"
+  auth.anonymous:
+    enabled: false
+  security:
+    allow_embedding: true
+  users:
+    viewers_can_edit: false
+    editors_can_admin: false
+
+# RBAC
+rbac:
+  create: true
+  pspEnabled: false
+
+# ServiceAccount
+serviceAccount:
+  create: true
+  name: grafana
+
+# Disable test pods
+testFramework:
+  enabled: false

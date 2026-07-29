@@ -33,10 +33,11 @@ spec:
     remediation:
       retries: 3
   valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: vault-operator-values
+      valuesKey: values.yaml
     - kind: ConfigMap
       name: vault-operator-values-override
       valuesKey: values.yaml
       optional: true
-  values:
-    bankVaults:
-      watchNamespace: vault

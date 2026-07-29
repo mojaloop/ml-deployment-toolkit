@@ -1,0 +1,30 @@
+# Distribution values for the openebs HelmRelease.
+# Adopter overrides go in environments/<env>/values/openebs.yaml,
+# which is merged after this file and therefore wins.
+# Only enable localpv hostpath provisioner
+localpv-provisioner:
+  enabled: true
+  hostpathClass:
+    enabled: true
+    isDefaultClass: true
+
+# Disable all other engines and sub-charts
+engines:
+  local:
+    lvm:
+      enabled: false
+    zfs:
+      enabled: false
+  replicated:
+    mayastor:
+      enabled: false
+openebs-crds:
+  csi:
+    volumeSnapshots:
+      enabled: false
+loki:
+  enabled: false
+minio:
+  enabled: false
+alloy:
+  enabled: false
