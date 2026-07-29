@@ -19,8 +19,8 @@ From cheapest to most expensive to maintain:
 | Layer | Fork? | Carried at upgrade? | Reach for it when |
 |-------|:---:|:---:|-------------|
 | Configuration | No | No | Anything an adopter could set |
-| Helm value overrides | No | No | Tuning any shipped chart's values |
-| Fork | Yes | **Every upgrade** | Config genuinely cannot express it |
+| Helm values | No | No | Supplying a chart value the distribution leaves unset |
+| Fork | Yes | **Every upgrade** | Config cannot express it, or the distribution sets the value inline |
 
 The first two are not integrator-specific — they are the [adopter](../adopter/deploy/configuration.md) mechanisms. That is the point: most customization is configuration a client could have done themselves, and it costs the integrator nothing at upgrade time because it lives in the client's environment, not in the fork.
 
@@ -30,11 +30,11 @@ Everything in `config.yaml` and `.env` is per-environment and carried by no one.
 
 See [Configuration](../adopter/deploy/configuration.md) for the full schema.
 
-## Helm value overrides: no fork
+## Helm values: no fork
 
-The integrator can override the platform's Helm values for **any** chart the distribution ships, without forking, by placing files in the environment's `values/` directory named for the HelmRelease. Every HelmRelease carries an optional `valuesFrom` its own `<name>-values-override` ConfigMap, so the file is picked up with no wiring change.
+The integrator can supply Helm values to any chart the distribution ships, without forking, by placing files in the environment's `values/` directory named for the HelmRelease. Every HelmRelease carries an optional `valuesFrom` its own `<name>-values-override` ConfigMap, so the file is picked up with no wiring change. Applying one is `make apply-config ENV=<env>`: seconds, and it cannot touch infrastructure.
 
-This covers a large amount of application-level tailoring — resource sizing, feature flags, chart-exposed settings — with zero maintenance burden, because the override lives in the client's environment. Applying one is `make apply-config ENV=<env>`: seconds, and it cannot touch infrastructure.
+**Know the limit before planning around it.** Flux merges a HelmRelease's inline `spec.values` after everything in `spec.valuesFrom`, so this layer reaches only the keys the distribution leaves unset. Anything it sets inline — replica counts, storage sizes, root URLs, resource limits — cannot be changed here; the file is read and silently has no effect. Check the chart's HelmRelease in `gitops/` first. Where the value is set inline, the honest options are to persuade the distribution to stop setting it, or to fork.
 
 The files are templated: `${domain}`, `${cluster_name}`, the resolved telemetry URLs, and the template's tuning keys expand at apply time, so a client's override does not re-hardcode values the cluster already knows. Secrets are deliberately not exposed, and an unknown `${name}` fails the apply rather than passing through. See [Configuration → Helm value overrides](../adopter/deploy/configuration.md#helm-value-overrides).
 

@@ -121,7 +121,7 @@ Restore procedures: [Adopter → Recover](../adopter/index.md).
 
 Three things sit outside the backup story entirely, and each has bitten someone:
 
-**Terraform state.** Two files, stored locally under `artifacts/<env>/terraform/` — `infra.tfstate` and `config.tfstate` — with no remote backend, no locking, and no versioning. `make clean` deletes both, for every environment. Losing the infra state means losing Terraform's knowledge of the infrastructure — the cluster keeps running, but Terraform can no longer plan or apply against it. Losing the config state means losing the generated internal service passwords unless the cluster is still up to read them from. Backing up `artifacts/` falls to the adopter.
+**Terraform state.** Two files, stored locally under `artifacts/<env>/terraform/` — `infra.tfstate` and `config.tfstate` — with no remote backend, no locking, and no versioning. No make target deletes them — `make clean ENV=<env>` preserves `artifacts/<env>/terraform/` — but nothing else protects them either. Losing the infra state means losing Terraform's knowledge of the infrastructure — the cluster keeps running, but Terraform can no longer plan or apply against it. Losing the config state means losing the generated internal service passwords unless the cluster is still up to read them from. Backing up `artifacts/` falls to the adopter.
 
 **Vault unseal keys.** Less alarming than it sounds — the operator handles unsealing automatically. Vault is configured with `unsealConfig.kubernetes`, so the operator generates the unseal keys and root token at initialization and **stores them as a Secret in the `vault` namespace**. A pod restart unseals without human involvement.
 

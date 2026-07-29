@@ -43,7 +43,7 @@ When Hubs run without a Tooling Cluster, each is independent and the order does 
 
 ## Rebuilding a Hub
 
-1. **Restore the environment files.** Put `config.yaml` and `.env` back under `environments/<env>/`. The directory name must match `cluster.name`, or Terraform refuses the plan.
+1. **Restore the environment files.** Put `config.yaml` and `.env` back under `environments/<env>/`. If `config.yaml` sets `cluster.name`, restore that value exactly — it is the cluster's durable identity. If it does not, the name defaults to the directory name, so the directory must be recreated under the name the cluster already had.
 2. **Restore Terraform state** — both `infra.tfstate` and `config.tfstate` — if rebuilding onto surviving infrastructure. Restoring `config.tfstate` is what keeps the generated passwords stable; without it the rebuild generates new ones, which is fine on a clean rebuild and wrong on a partial one, where restored data still expects the old credentials. On genuinely new infrastructure, start clean and expect Terraform to provision everything fresh.
 3. **Provision:**
    ```bash
@@ -63,7 +63,7 @@ The sequence is deliberate: infrastructure, then secrets/PKI, then data. Restori
 The same shape, and simpler — a Tooling Cluster holds no scheme PKI and no ledger:
 
 1. Restore `config.yaml` and `.env` under `environments/<env>/`, plus both state files.
-2. `make init && make plan && make apply`.
+2. `make init ENV=<env> && make plan ENV=<env> && make apply ENV=<env>`.
 3. Let Flux bring up Harbor, MinIO, and the observability stack.
 4. **Restore its Vault** if lost — it holds registry and storage credentials, not the scheme CA, so the blast radius is smaller, but services still need it.
 5. Confirm Harbor, MinIO, and Grafana respond before rebuilding any Hub against it.
