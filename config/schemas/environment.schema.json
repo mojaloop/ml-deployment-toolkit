@@ -48,10 +48,14 @@
           "additionalProperties": false,
           "properties": {
             "range": {
-              "description": "IP range, e.g. 192.168.0.211-192.168.0.213",
-              "type": "string"
+              "description": "Cilium LB-IPAM range as \"start-stop\" (on-prem). Required for on-prem providers.",
+              "type": "string",
+              "pattern": "^[0-9.]+-[0-9.]+$"
             }
-          }
+          },
+          "required": [
+            "range"
+          ]
         },
         "flux": {
           "type": "object",

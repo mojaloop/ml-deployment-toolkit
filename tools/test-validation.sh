@@ -12,10 +12,18 @@ PASS=0
 FAIL=0
 
 # expect_reject <name> <yq mutation expression>
+# The mutation runs separately from validation so a broken yq expression is
+# reported as a test error rather than counted as a successful rejection.
 expect_reject() {
-  local name="$1" mutation="$2" out
-  out=$(yq e "$mutation" "$BASE" | yq -o json e '.' - | python3 tools/validate.py "$SCHEMA" 2>&1)
-  if [[ $? -eq 0 ]]; then
+  local name="$1" mutation="$2" out doc rc
+  if ! doc=$(yq e "$mutation" "$BASE" | yq -o json e '.' - 2>&1); then
+    echo "FAIL: '$name' — mutation itself failed: $doc"
+    FAIL=$((FAIL + 1))
+    return
+  fi
+  out=$(printf '%s' "$doc" | python3 tools/validate.py "$SCHEMA" 2>&1)
+  rc=$?
+  if [[ $rc -eq 0 ]]; then
     echo "FAIL: '$name' was accepted but should have been rejected"
     FAIL=$((FAIL + 1))
   else
@@ -25,9 +33,10 @@ expect_reject() {
 }
 
 expect_accept() {
-  local name="$1" file="$2" out
+  local name="$1" file="$2" out rc
   out=$(yq -o json e '.' "$file" | python3 tools/validate.py "$SCHEMA" 2>&1)
-  if [[ $? -eq 0 ]]; then
+  rc=$?
+  if [[ $rc -eq 0 ]]; then
     echo "ok: $name accepted"
     PASS=$((PASS + 1))
   else
@@ -53,6 +62,10 @@ expect_reject "missing dns.domain"         'del(.dns.domain)'
 expect_reject "invalid data mode"          '.data.mysql.mode = "managed"'
 expect_reject "invalid registry provider"  '.registry.provider = "dockerhub"'
 expect_reject "template as number"         '.template = 5'
+expect_reject "lb_ipam without range"      'del(.cluster.lb_ipam.range)'
+expect_reject "lb_ipam range without dash" '.cluster.lb_ipam.range = "192.168.0.10"'
+expect_reject "unknown key in cert"        '.cert.bogus = "x"'
+expect_reject "unknown key in artifact"    '.artifact.bogus = "x"'
 
 echo
 echo "passed: $PASS   failed: $FAIL"

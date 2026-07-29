@@ -95,6 +95,27 @@ for r in "${INFRA_RESOURCES[@]}"; do
   run terraform state rm -state="$CONFIG_STATE" "$r"
 done
 
+# Re-address the Kratos/Hydra secrets. They were six discrete resources; they are
+# now entries in one for_each map. Without these moves Terraform destroys the old
+# addresses and generates fresh values — rotating kratos_secrets_cipher makes
+# stored credential and recovery material undecryptable, and rotating
+# hydra_secrets_system invalidates every issued token and consent grant.
+GENERATED_MOVES=(
+  kratos_secrets_cipher
+  kratos_secrets_cookie
+  kratos_secrets_csrf_cookie
+  kratos_secrets_default
+  hydra_secrets_system
+  hydra_secrets_cookie
+)
+for name in "${GENERATED_MOVES[@]}"; do
+  old="module.flux_config[0].random_password.${name}[0]"
+  new="module.flux_config[0].random_password.generated[\"${name}\"]"
+  if printf '%s\n' "${CONFIG_RESOURCES[@]}" | grep -qxF "$old"; then
+    run terraform state mv -state="$CONFIG_STATE" "$old" "$new"
+  fi
+done
+
 echo
 if [[ "$MODE" == "--apply" ]]; then
   echo "Done. Next:"

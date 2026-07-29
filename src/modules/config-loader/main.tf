@@ -27,6 +27,12 @@ locals {
 
   node_groups = try(local.template.node_groups, [])
 
+  # On-prem providers render one VM per node and need real placement targets.
+  is_talos_provider = contains(["proxmox", "openstack"], local.provider_name)
+  template_placement_groups = distinct(flatten([
+    for g in local.node_groups : try(g.placement, [])
+  ]))
+
   # --- Versions (single source of truth: workload-classes.yaml) -----------
   kubernetes_version = local.workload_classes.kubernetes_version
   talos_version      = local.workload_classes.talos_version
@@ -171,7 +177,7 @@ locals {
   email_from = try(local.config.email.from, "noreply@${local.config.dns.domain}")
 
   # --- alerting (delivery channels) ----------------------------------------
-  alert_email_to   = try(local.config.alerting.email.to, "")
+  alert_email_to   = try(local.config.alerting.email.to, "alerts@example.invalid")
   telegram_chat_id = tostring(try(local.config.alerting.telegram.chat_id, "0"))
 
   # --- data (per-store mode) -----------------------------------------------
@@ -256,6 +262,57 @@ resource "terraform_data" "validation" {
     precondition {
       condition     = local.cluster_role != "env" || contains(["fspiop", "iso20022"], local.api_type)
       error_message = "app.api_type must be fspiop or iso20022."
+    }
+
+    # The in-cluster data layer is only packaged for Talos providers. Without
+    # this, a managed-Kubernetes hub reconciles green while cluster-config
+    # advertises in-cluster hostnames that were never deployed, and every app
+    # pod CrashLoops on DNS.
+    precondition {
+      condition = (
+        local.cluster_role != "env" || local.is_talos_provider ||
+        alltrue([for store, cfg in local.data_stores : !cfg.in_cluster])
+      )
+      error_message = "infra.provider '${local.provider_name}' has no in-cluster data layer — every data.<store>.mode must be external-unmanaged on this provider."
+    }
+
+    # Placement groups referenced by the template must be mapped to real targets;
+    # otherwise the provider is handed the literal group name as a node name and
+    # fails partway through apply with VMs already created.
+    precondition {
+      condition = (
+        !local.is_talos_provider ||
+        alltrue([
+          for g in local.node_groups : alltrue([
+            for pg in try(g.placement, []) : contains(keys(local.placement_map), pg)
+          ])
+        ])
+      )
+      error_message = "template '${local.config.template}' references placement groups that infra.${local.provider_name}.placement does not map: ${join(", ", setsubtract(local.template_placement_groups, keys(local.placement_map)))}."
+    }
+
+    # Node group names become VM name suffixes and for_each keys.
+    precondition {
+      condition     = length(local.node_groups) == length(distinct([for g in local.node_groups : g.name]))
+      error_message = "template '${local.config.template}' has duplicate node_group names."
+    }
+
+    # Capabilities bound to an explicit provider must carry their parameters,
+    # or the value silently reaches the cluster empty and fails at runtime.
+    precondition {
+      condition     = local.registry_provider != "harbor" || local.registry_url != ""
+      error_message = "registry.provider is 'harbor' but registry.url is not set."
+    }
+    precondition {
+      condition     = local.object_storage_provider != "s3" || local.backup_s3_endpoint != ""
+      error_message = "object_storage.provider is 's3' but object_storage.endpoint is not set."
+    }
+    precondition {
+      condition = (
+        local.observability_provider != "urls" ||
+        (local.loki_url != "" || local.mimir_url != "" || local.tempo_url != "")
+      )
+      error_message = "observability.provider is 'urls' but no loki_url/mimir_url/tempo_url is set."
     }
   }
 }
