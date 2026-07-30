@@ -32,14 +32,16 @@ To be found by other participants, register a party against the scheme's oracle.
 # Create the party in the simulator backend
 curl -X POST http://<participant-host>:<sim-port>/repository/parties \
   -H 'content-type: application/json' \
-  -d '{"displayName":"Test User","firstName":"Test","lastName":"User",
-       "idType":"MSISDN","idValue":"<msisdn>"}'
+  -d '{"displayName":"Test User","firstName":"Test","middleName":"A","lastName":"User",
+       "dateOfBirth":"1990-01-01","idType":"MSISDN","idValue":"<msisdn>"}'
 
 # Register it so other participants can discover it
 curl -X POST http://<participant-host>:<sdk-outbound-port>/accounts \
   -H 'content-type: application/json' \
-  -d '[{"idType":"MSISDN","idValue":"<msisdn>"}]' | jq .
+  -d '[{"idType":"MSISDN","idValue":"<msisdn>","currency":"<currency>"}]' | jq .
 ```
+
+The simulator's test API requires the full party object — every field above, including `middleName` and `dateOfBirth` — and the accounts registration requires `currency` on each entry (oracle registration is per-currency). Omitting any of them returns a 400 validation error.
 
 Every entry in the response must show success. A failure here almost always means the **oracle was not registered on the Hub** — that is the Hub operator's setup, not the participant's. See [Hub configuration](../../adopter/deploy/hub.md#configure-the-hub).
 
