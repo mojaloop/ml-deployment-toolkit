@@ -65,6 +65,9 @@ spec:
 
   # Vault server configuration
   config:
+    # Required explicitly since Vault 1.20 (fresh starts refuse to boot without it).
+    # True is correct on k8s: no IPC_LOCK cap needed; Talos nodes run swapless.
+    disable_mlock: true
     storage:
       file:
         path: "/vault/file"
