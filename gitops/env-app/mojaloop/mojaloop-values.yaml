@@ -90,14 +90,13 @@ centralledger:
         # OTLP/Tempo by trace-bridge (tools/trace-bridge). Toggleable per
         # perf campaign; producer config for TRACE is defined above.
         #
-        # KEEP 'kafka'. As of 2026-07-30 a native OTel path runs in parallel
-        # (see gitops/env-app/observability/instrumentation.yaml) but does NOT
-        # replace this one: it emits PRODUCER spans only — zero consumer-side
-        # spans across all 12 annotated services — so OTel traces stop at the
-        # Kafka produce and never reach the consuming service. This path still
-        # produces the connected end-to-end trace, because the Event SDK
-        # propagates context through the message body.
-        # Retirement preconditions are in observability/trace-bridge.yaml.
+        # KEEP 'kafka' for now, but this path is SUPERSEDED. As of 2026-07-30
+        # the native OTel path (observability/instrumentation.yaml) does verified
+        # end-to-end cross-service tracing, joined over Kafka via traceparent.
+        # The only remaining reason to keep Event-SDK tracing is that existing
+        # Tempo queries and Grafana dashboards are keyed on its business-level
+        # span names. Set to 'off' once those are migrated — recovers ~54 Kafka
+        # msg/s at 2 TPS. Full checklist in observability/trace-bridge.yaml.
         TRACE: kafka
   centralledger-handler-transfer-prepare:
     podAnnotations:

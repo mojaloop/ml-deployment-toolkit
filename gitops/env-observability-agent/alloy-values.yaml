@@ -532,7 +532,17 @@ alloy:
       // The 1000ms latency threshold is deliberately the p99<1s SLO: anything
       // that breaches the mandate is always kept.
       otelcol.processor.tail_sampling "default" {
-        decision_wait = "5s"
+        // LOAD-BEARING: do not lower without re-testing cross-service traces.
+        // At the default 5s, the sampling decision fired and flushed BEFORE the
+        // consuming service's RECEIVE span arrived, so every trace was cut off
+        // at the Kafka produce — producer-only "trace islands" that looked
+        // exactly like consumer instrumentation being broken or missing.
+        // Mojaloop consumers continue the producer's trace via the traceparent
+        // Kafka header, so the window must outlast produce -> consume latency
+        // for the WHOLE chain, not just one hop.
+        // Cost: traces are buffered in memory for this long (bounded by
+        // num_traces). Re-check Alloy memory when real transfer load resumes.
+        decision_wait = "30s"
         // Bounds memory — traces are buffered until a decision is made. This
         // pod has OOM-looped before; raise deliberately when more services are
         // annotated, and watch alloy memory when you do.

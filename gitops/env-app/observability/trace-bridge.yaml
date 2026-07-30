@@ -1,32 +1,32 @@
 # ============================================================================
-# STILL THE PRIMARY END-TO-END TRACING PATH as of 2026-07-30. Do not remove.
+# SUPERSEDED but still deployed, as of 2026-07-30. Retire once (2) below is done.
 #
-# A native OTel path now runs IN PARALLEL (OpenTelemetry Operator injects an SDK
-# into annotated pods, activating the instrumentation already present in
-# @mojaloop/central-services-stream — see observability/instrumentation.yaml).
-# It is NOT yet a replacement.
+# The native OTel path now does end-to-end cross-service tracing, verified:
+# a single trace of 24 spans across TWO services, joined over Kafka via the
+# traceparent header —
+#   moja-quoting-service          SPAN_KIND_PRODUCER  SEND:topic-quotes-post
+#   moja-quoting-service-handler  SPAN_KIND_CONSUMER  RECEIVE:topic-quotes-post
+# (OpenTelemetry Operator injects an SDK into annotated pods, activating the
+# instrumentation already in @mojaloop/central-services-stream — see
+# observability/instrumentation.yaml.)
 #
-# WHY NOT: the OTel path currently produces PRODUCER spans only. A Tempo query
-# for {span.messaging.operation.name="receive"} returns ZERO traces across all
-# 12 annotated services — nothing emits consumer-side spans, so an OTel trace
-# STOPS at the Kafka produce and never continues into the consuming service.
-# The result is per-service trace islands, not end-to-end transfers.
-# Cause appears upstream: producer tracing is automatic inside producer.js,
-# whereas consumer tracing requires the application to call
-# startConsumerTracingSpan() from central-services-stream's kafka/otel.js.
+# WHY IT IS STILL HERE: only one reason now — Event-SDK spans carry
+# business-level names (e.g. qs_quote_handleQuoteRequest) that existing Tempo
+# queries and Grafana dashboards are keyed on. The OTel path names spans by
+# infrastructure operation (SEND:/RECEIVE:, hapi routes, SQL) instead, so those
+# saved queries and panels break the moment this is switched off.
 #
-# This bridge does what the OTel path cannot yet: the Event SDK propagates trace
-# context through the message body, so its spans form a connected cross-service
-# trace — the view that identified the quote phase as ~half the latency budget.
-# It also carries business-level span names (qs_quote_handleQuoteRequest) that
-# existing Tempo queries and Grafana dashboards are keyed on.
-#
-# RETIREMENT PRECONDITIONS (none met yet):
-#   1. Consumer-side spans emitted, and cross-topic trace joining demonstrated
-#   2. Dashboards/queries migrated off Event-SDK business span names
+# RETIREMENT PRECONDITIONS:
+#   1. DONE — cross-service trace joining demonstrated (see above)
+#   2. TODO — migrate dashboards/queries off Event-SDK business span names
 #   3. Then: set EVENT_SDKrc TRACE: off in mojaloop/mojaloop-values.yaml
 #      (recovers ~54 Kafka msg/s at 2 TPS)
 #   4. Then: delete this file + tools/trace-bridge/ + the ghcr package
+#
+# NOTE for whoever touches Alloy: tail_sampling decision_wait is LOAD-BEARING at
+# 30s. At the 5s default the sampling decision flushed before the consumer's
+# RECEIVE span arrived, truncating every trace at the Kafka produce — which
+# looks exactly like consumer instrumentation being broken.
 # ============================================================================
 #
 # moja-trace-bridge: Event-SDK trace events (Kafka topic-event-trace) → Tempo OTLP.
