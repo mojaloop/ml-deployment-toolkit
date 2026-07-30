@@ -1,0 +1,38 @@
+# Distribution values for the opentelemetry-operator HelmRelease.
+# Adopter overrides go in environments/<env>/values/opentelemetry-operator.yaml,
+# which is merged after this file and therefore wins.
+#
+# WHY THIS IS HERE
+# We use exactly one feature of this operator: the Instrumentation CRD and the
+# mutating webhook that injects the Node.js OTel SDK into annotated pods.
+#
+# Mojaloop v17.x service images already ship semconv-compliant OTel
+# instrumentation in @mojaloop/central-services-stream (Kafka PRODUCER/CONSUMER
+# spans, traceparent propagation across topics) but ship only
+# @opentelemetry/api — no SDK — so every span is discarded by the NoopTracer.
+# Injecting an SDK registers a global TracerProvider, which activates that
+# dormant instrumentation without any image or upstream change.
+#
+# We do NOT use the OpenTelemetryCollector CR — Alloy is the collector.
+# See gitops/env-observability-agent/alloy-values.yaml (otelcol.receiver.otlp).
+
+crds:
+  create: true
+
+manager:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+admissionWebhooks:
+  # Fail OPEN. This webhook sits in the pod-creation path for the whole
+  # cluster; with the default `Fail` a sick operator would block every pod
+  # admission. Trade-off: pods created while the webhook is down start
+  # un-instrumented and need a rollout to pick injection back up.
+  failurePolicy: Ignore
+  certManager:
+    # cert-manager is a platform prerequisite and already deployed.
+    enabled: true

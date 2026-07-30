@@ -1,0 +1,43 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: opentelemetry
+  namespace: flux-system
+spec:
+  interval: 24h
+  url: https://open-telemetry.github.io/opentelemetry-helm-charts
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: opentelemetry-operator
+  namespace: flux-system
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: opentelemetry-operator
+      version: "0.120.x"
+      sourceRef:
+        kind: HelmRepository
+        name: opentelemetry
+      interval: 12h
+  targetNamespace: platform-system
+  install:
+    crds: Create
+    createNamespace: false
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: opentelemetry-operator-values
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: opentelemetry-operator-values-override
+      valuesKey: values.yaml
+      optional: true

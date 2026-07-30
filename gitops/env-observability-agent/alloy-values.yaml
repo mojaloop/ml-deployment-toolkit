@@ -7,18 +7,45 @@ controller:
 
 # Alloy configuration using River syntax
 alloy:
-  # 2Gi limit is load-bearing: at 1536Mi the pod OOM-looped (131 kills in
-  # 15h, ~4min up / ~5min CrashLoopBackOff) leaving 50% metric blind spots
+  # Sized from the Goldilocks/VPA recommendation (observability/goldilocks-alloy,
+  # updateMode Off) measured 2026-07-30: target cpu 109m / memory 2296Mi,
+  # lowerBound 1844Mi, upperBound 5917Mi.
+  #
+  # History: at 1536Mi the pod OOM-looped (131 kills in 15h, ~4min up / ~5min
+  # CrashLoopBackOff) leaving 50% metric blind spots. The old 2Gi limit was
+  # still BELOW the VPA target, and the old 512Mi request was 4.5x below it —
+  # the scheduler believed this pod needed half a gig while it actually held
+  # ~1.9Gi, which made node memory pressure unpredictable.
+  #
+  # requests == limits for memory means this pod never exceeds its memory
+  # request, so it ranks last for eviction under node memory pressure. (QoS is
+  # still Burstable, not Guaranteed — that would additionally require a CPU
+  # limit, which we deliberately omit so scrape bursts aren't throttled.)
+  # NOTE: the VPA reading predates the otelcol trace pipeline (tail_sampling
+  # buffers traces in memory). Re-check goldilocks-alloy after ~24h of real
+  # traffic, and before annotating many more services.
   resources:
     requests:
-      cpu: 100m
-      memory: 512Mi
+      cpu: 109m
+      memory: 2296Mi
     limits:
-      memory: 2Gi
+      memory: 2296Mi
   # Enable clustering so DaemonSet pods shard scrape targets
   # instead of all pods scraping all targets (avoids duplicate metrics)
   clustering:
     enabled: true
+  # OTLP ingress for traces from Mojaloop pods instrumented by the
+  # OpenTelemetry Operator. Must be declared here so the ports land on the
+  # Alloy Service — otelcol.receiver.otlp below only opens them in the pod.
+  extraPorts:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+      protocol: TCP
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+      protocol: TCP
   configMap:
     content: |
       /********************************************
@@ -423,6 +450,186 @@ alloy:
         // Add cluster identifier label to all metrics
         external_labels = {
           cluster_name = "${cluster_name}",
+        }
+      }
+
+      /********************************************
+       * TRACE COLLECTION (OTLP)
+       * Receives OTLP from Mojaloop pods instrumented by the OpenTelemetry
+       * Operator (see gitops/env-app/observability/instrumentation.yaml)
+       * and forwards to Tempo in the cc cluster.
+       *
+       * Deliberately minimal: a River syntax error anywhere in this file
+       * breaks the WHOLE Alloy config, taking metrics and logs down with it.
+       * Retry and an in-memory sending queue are on by default, which is what
+       * buffers traces while cc is unreachable.
+       ********************************************/
+
+      otelcol.receiver.otlp "default" {
+        grpc {
+          endpoint = "0.0.0.0:4317"
+        }
+
+        http {
+          endpoint = "0.0.0.0:4318"
+        }
+
+        output {
+          traces = [otelcol.processor.k8sattributes.default.input]
+        }
+      }
+
+      // Enrich spans with namespace/pod/node/deployment so traces filter the
+      // same way logs and metrics already do. The operator only injects pod
+      // name/uid/node; namespace and deployment come from here.
+      // NOTE: metadata list is deliberately limited to what Alloy's ClusterRole
+      // can actually read (pods, namespaces, nodes, apps/replicasets). Adding
+      // k8s.statefulset.name / daemonset / job / cronjob would fail RBAC.
+      otelcol.processor.k8sattributes "default" {
+        extract {
+          metadata = [
+            "k8s.namespace.name",
+            "k8s.pod.name",
+            "k8s.pod.uid",
+            "k8s.node.name",
+            "k8s.deployment.name",
+            "k8s.container.name",
+          ]
+        }
+
+        // Prefer the pod UID the operator already injects; fall back to the
+        // source IP of the connection.
+        pod_association {
+          source {
+            from = "resource_attribute"
+            name = "k8s.pod.uid"
+          }
+        }
+
+        pod_association {
+          source {
+            from = "connection"
+          }
+        }
+
+        output {
+          traces = [
+            // RED metrics + topology get the FULL span stream, deliberately
+            // BEFORE tail sampling — metrics computed on a sampled subset
+            // would understate call counts and distort latency percentiles.
+            otelcol.connector.spanmetrics.default.input,
+            otelcol.connector.servicegraph.default.input,
+            // Only this branch is sampled.
+            otelcol.processor.tail_sampling.default.input,
+          ]
+        }
+      }
+
+      // Tail sampling: decide AFTER the trace is complete, so we can keep every
+      // error and every slow trace and sample only the boring ones. This is why
+      // the SDK head sampler is at 1.0 — a tail sampler behind a 0.1 head
+      // sampler only ever sees 10% and cannot honour "keep all errors".
+      // The 1000ms latency threshold is deliberately the p99<1s SLO: anything
+      // that breaches the mandate is always kept.
+      otelcol.processor.tail_sampling "default" {
+        decision_wait = "5s"
+        // Bounds memory — traces are buffered until a decision is made. This
+        // pod has OOM-looped before; raise deliberately when more services are
+        // annotated, and watch alloy memory when you do.
+        num_traces = 5000
+
+        policy {
+          name = "keep-all-errors"
+          type = "status_code"
+
+          status_code {
+            status_codes = ["ERROR"]
+          }
+        }
+
+        policy {
+          name = "keep-slo-breaches"
+          type = "latency"
+
+          latency {
+            threshold_ms = 1000
+          }
+        }
+
+        policy {
+          name = "baseline-sample"
+          type = "probabilistic"
+
+          probabilistic {
+            sampling_percentage = 10
+          }
+        }
+
+        output {
+          traces = [otelcol.processor.batch.default.input]
+        }
+      }
+
+      // RED metrics per service/operation, derived from spans. Works only
+      // because central-services-stream sets real SpanKind PRODUCER/CONSUMER.
+      otelcol.connector.spanmetrics "default" {
+        namespace = "traces_span_metrics"
+
+        histogram {
+          unit = "ms"
+
+          explicit {
+            buckets = ["5ms", "10ms", "25ms", "50ms", "100ms", "250ms", "500ms", "1s", "2s", "5s", "10s"]
+          }
+        }
+
+        output {
+          metrics = [otelcol.exporter.prometheus.default.input]
+        }
+      }
+
+      // Service topology (who calls whom) derived from PRODUCER/CONSUMER and
+      // CLIENT/SERVER span pairs — the view trace-bridge could never produce,
+      // because Event-SDK spans carry no span kind.
+      otelcol.connector.servicegraph "default" {
+        output {
+          metrics = [otelcol.exporter.prometheus.default.input]
+        }
+      }
+
+      // Span-derived metrics rejoin the existing metrics path to Thanos.
+      // resource_to_telemetry_conversion stays OFF (default): promoting every
+      // k8s resource attribute to a Prometheus label would explode cardinality.
+      otelcol.exporter.prometheus "default" {
+        forward_to = [prometheus.remote_write.mimir.receiver]
+      }
+
+      otelcol.processor.batch "default" {
+        // Traces arrive in bursts under load; bound the batch so a spike
+        // cannot balloon Alloy's heap (this pod has OOM-looped before).
+        send_batch_size     = 512
+        send_batch_max_size = 1024
+        timeout             = "2s"
+
+        output {
+          traces = [otelcol.exporter.otlphttp.tempo.input]
+        }
+      }
+
+      otelcol.exporter.otlphttp "tempo" {
+        // tempo_url already ends in /v1/traces, so set traces_endpoint
+        // explicitly — client.endpoint would have /v1/traces appended again.
+        traces_endpoint = "${tempo_url}"
+
+        client {
+          endpoint = "${tempo_url}"
+
+          tls {
+            // Matches the existing loki/mimir posture: cc serves internal
+            // certs that Alloy does not trust. Trusting the cc CA once would
+            // let all three signals verify properly — worthwhile follow-up.
+            insecure_skip_verify = true
+          }
         }
       }
 

@@ -1,3 +1,28 @@
+# ============================================================================
+# DEPRECATED 2026-07-30 — superseded by native OpenTelemetry. Still RUNNING and
+# still the source of truth for business-level spans; do not delete yet.
+#
+# REPLACEMENT: the OpenTelemetry Operator injects an SDK into annotated pods,
+# which activates the semconv-compliant instrumentation already present in
+# @mojaloop/central-services-stream (proper SpanKind PRODUCER/CONSUMER,
+# traceparent propagation across Kafka topics, span links, typed attributes).
+# See gitops/env-app/observability/instrumentation.yaml.
+#
+# WHY THIS STILL EXISTS: the two paths are NOT equivalent. Event-SDK spans carry
+# business-level names (e.g. qs_quote_handleQuoteRequest) that existing Tempo
+# queries and Grafana dashboards are keyed on. The OTel path produces
+# infrastructure-level spans instead (SEND:/RECEIVE:, hapi routes, SQL). Deleting
+# this before those dashboards are migrated loses the view that found the
+# quote-phase latency.
+#
+# REMOVAL CHECKLIST:
+#   1. Migrate dashboards/queries off Event-SDK span names
+#   2. Confirm OTel coverage across the full transfer path (all services annotated)
+#   3. Set EVENT_SDKrc TRACE: off in gitops/env-app/mojaloop/mojaloop-values.yaml
+#      (recovers ~54 Kafka msg/s at 2 TPS)
+#   4. Delete this file + tools/trace-bridge/ + the ghcr package
+# ============================================================================
+#
 # moja-trace-bridge: Event-SDK trace events (Kafka topic-event-trace) → Tempo OTLP.
 # Source: tools/trace-bridge/ in this repo.
 # Produces traces only when Mojaloop services run with EVENT_SDK TRACE: kafka

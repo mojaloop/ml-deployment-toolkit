@@ -14,6 +14,8 @@ global:
 # Transfers page shows empty results.
 centralledger:
   centralledger-service:
+    podAnnotations:
+      instrumentation.opentelemetry.io/inject-nodejs: "true"
     replicaCount: ${cl_service_replicas}
     config:
       kafka_host: "${kafka_host}"
@@ -87,8 +89,16 @@ centralledger:
         # TRACE: kafka → spans flow to topic-event-trace, converted to
         # OTLP/Tempo by trace-bridge (tools/trace-bridge). Toggleable per
         # perf campaign; producer config for TRACE is defined above.
+        #
+        # DEPRECATED 2026-07-30 — this is the legacy tracing path. Native OTel
+        # now runs in parallel (see gitops/env-app/observability/
+        # instrumentation.yaml). Keep 'kafka' until dashboards are migrated off
+        # Event-SDK business span names, then set to 'off' — that also recovers
+        # ~54 Kafka msg/s at 2 TPS. Removal checklist is in trace-bridge.yaml.
         TRACE: kafka
   centralledger-handler-transfer-prepare:
+    podAnnotations:
+      instrumentation.opentelemetry.io/inject-nodejs: "true"
     replicaCount: ${cl_handler_prepare_replicas}
     config:
       kafka_host: "${kafka_host}"
@@ -101,6 +111,8 @@ centralledger:
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
   centralledger-handler-transfer-position:
+    podAnnotations:
+      instrumentation.opentelemetry.io/inject-nodejs: "true"
     config:
       kafka_host: "${kafka_host}"
       kafka_port: ${kafka_port}
@@ -112,6 +124,8 @@ centralledger:
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
   centralledger-handler-transfer-position-batch:
+    podAnnotations:
+      instrumentation.opentelemetry.io/inject-nodejs: "true"
     replicaCount: ${cl_handler_position_batch_replicas}
     config:
       kafka_host: "${kafka_host}"
@@ -124,6 +138,8 @@ centralledger:
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
   centralledger-handler-transfer-get:
+    podAnnotations:
+      instrumentation.opentelemetry.io/inject-nodejs: "true"
     replicaCount: ${cl_handler_get_replicas}
     metrics:
       enabled: true
@@ -138,6 +154,8 @@ centralledger:
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
   centralledger-handler-transfer-fulfil:
+    podAnnotations:
+      instrumentation.opentelemetry.io/inject-nodejs: "true"
     replicaCount: ${cl_handler_fulfil_replicas}
     config:
       kafka_host: "${kafka_host}"
@@ -150,6 +168,8 @@ centralledger:
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
   centralledger-handler-timeout:
+    podAnnotations:
+      instrumentation.opentelemetry.io/inject-nodejs: "true"
     replicaCount: ${cl_handler_timeout_replicas}
     metrics:
       enabled: true
@@ -186,6 +206,13 @@ quoting-service:
     podAnnotations:
       prometheus.io/scrape: "true"
       prometheus.io/port: "3002"
+      # PILOT (2026-07-30): opt this ONE service into OTel SDK injection by the
+      # OpenTelemetry Operator, which activates the dormant semconv
+      # instrumentation already inside central-services-stream. Runs in PARALLEL
+      # with the Event SDK path (TRACE: kafka -> trace-bridge) — both remain on.
+      # Roll back = delete this line, push, reconcile.
+      # Instrumentation CR: gitops/env-app/observability/instrumentation.yaml
+      instrumentation.opentelemetry.io/inject-nodejs: "true"
     metrics:
       enabled: true
     config:
@@ -205,6 +232,7 @@ quoting-service:
     commonAnnotations: &switchJwsReloader
       secret.reloader.stakater.com/reload: switch-jws
     podAnnotations:
+      instrumentation.opentelemetry.io/inject-nodejs: "true"
       prometheus.io/scrape: "true"
       prometheus.io/port: "3003"
     metrics:
@@ -283,6 +311,8 @@ centralsettlement:
 # Event SDK: produces audit events to Kafka for Finance Portal reporting
 account-lookup-service:
   account-lookup-service:
+    podAnnotations:
+      instrumentation.opentelemetry.io/inject-nodejs: "true"
     replicaCount: ${als_service_replicas}
     commonAnnotations: *switchJwsReloader
     config:
@@ -342,6 +372,8 @@ transaction-requests-service:
 # Event SDK: produces audit events to Kafka for Finance Portal reporting
 ml-api-adapter:
   ml-api-adapter-service:
+    podAnnotations:
+      instrumentation.opentelemetry.io/inject-nodejs: "true"
     replicaCount: ${ml_adapter_service_replicas}
     config:
       api_type: ${api_type}
@@ -350,6 +382,8 @@ ml-api-adapter:
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
   ml-api-adapter-handler-notification:
+    podAnnotations:
+      instrumentation.opentelemetry.io/inject-nodejs: "true"
     replicaCount: ${ml_adapter_handler_notification_replicas}
     commonAnnotations: *switchJwsReloader
     config:
