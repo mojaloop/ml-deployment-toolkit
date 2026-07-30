@@ -20,7 +20,7 @@ spec:
       initContainers:
         # 1. Download kubectl binary (reuses already-cached vault image)
         - name: install-kubectl
-          image: hashicorp/vault:1.18.4
+          image: hashicorp/vault:1.21.4
           command: ["/bin/sh", "-c", "wget -qO /tools/kubectl 'https://dl.k8s.io/release/v1.31.4/bin/linux/amd64/kubectl' && chmod +x /tools/kubectl"]
           volumeMounts:
             - name: tools
@@ -28,7 +28,7 @@ spec:
 
         # 2. Bootstrap whitelist secrets in Vault if missing
         - name: vault-agent-init
-          image: hashicorp/vault:1.18.4
+          image: hashicorp/vault:1.21.4
           command: ["vault", "agent", "-config=/etc/vault/init-config.hcl"]
           volumeMounts:
             - name: config
@@ -43,7 +43,7 @@ spec:
       containers:
         # Main agent: watches Vault, templates + applies K8s resources
         - name: vault-agent
-          image: hashicorp/vault:1.18.4
+          image: hashicorp/vault:1.21.4
           command: ["/bin/sh", "-c", "export PATH=/tools:$PATH && vault agent -config=/etc/vault/config.hcl"]
           volumeMounts:
             - name: config

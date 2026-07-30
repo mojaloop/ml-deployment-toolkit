@@ -50,7 +50,7 @@ metadata:
   namespace: vault
 spec:
   size: ${vault_replicas}
-  image: hashicorp/vault:1.18.4
+  image: hashicorp/vault:1.21.4
   bankVaultsImage: ghcr.io/bank-vaults/bank-vaults:v1.31.3
 
   serviceType: ClusterIP
