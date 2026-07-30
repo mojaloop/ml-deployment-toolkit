@@ -38,7 +38,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: envoy
-          image: envoyproxy/envoy:v1.32.13
+          image: envoyproxy/envoy:v1.39.0
           args: ["-c", "/etc/envoy/envoy.yaml"]
           ports:
             - name: https
