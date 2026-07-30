@@ -61,7 +61,7 @@ metadata:
     strimzi.io/kraft: enabled
 spec:
   kafka:
-    version: "4.1.1"
+    version: "4.2.1"
     # Fixed small heap for the lab's throughput (~10 TPS target); without this
     # the JVM sizes itself from the container limit and RSS creeps to ~1.7Gi
     jvmOptions:
