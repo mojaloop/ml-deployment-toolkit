@@ -4,8 +4,8 @@ metadata:
   name: bulk-mongodb
   namespace: data
 spec:
-  crVersion: "1.21.0"
-  image: percona/percona-server-mongodb:7.0
+  crVersion: "1.23.0"
+  image: percona/percona-server-mongodb:8.0
   allowUnsafeConfigurations: true
   secrets:
     users: bulk-mongodb-secrets
