@@ -8,15 +8,15 @@ terraform {
     }
     talos = {
       source  = "siderolabs/talos"
-      version = "~> 0.9"
+      version = "~> 0.11"
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = "~> 2.0"
+      version = "~> 3.0"
     }
     helm = {
       source  = "hashicorp/helm"
-      version = "~> 2.0"
+      version = "~> 3.0"
     }
     digitalocean = {
       source  = "digitalocean/digitalocean"
@@ -24,7 +24,7 @@ terraform {
     }
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = "~> 6.0"
     }
     kubectl = {
       source  = "alekc/kubectl"

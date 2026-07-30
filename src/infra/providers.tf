@@ -39,7 +39,7 @@ provider "kubernetes" {
 
 # Helm Provider — for Flux operator installation
 provider "helm" {
-  kubernetes {
+  kubernetes = {
     config_path = local.kubeconfig
   }
 }
