@@ -109,6 +109,12 @@
       "groupName": "ory stack"
     },
     {
+      "description": "flux-operator version is an interpolation here; tracked via variables.tf custom manager",
+      "matchManagers": ["terraform"],
+      "matchDepNames": ["flux-operator"],
+      "enabled": false
+    },
+    {
       "description": "TITLE_IMAGE logo URL is not a dependency",
       "matchFileNames": ["gitops/env-app/finance-portal/finance-portal-values.yaml"],
       "matchDepNames": ["https://mojaloop.io/wp-content/uploads/2020/07/mojaloop-foundation-orange.svg"],
