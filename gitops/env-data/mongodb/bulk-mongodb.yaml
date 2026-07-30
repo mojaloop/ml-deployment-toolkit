@@ -11,7 +11,7 @@ spec:
     users: bulk-mongodb-secrets
   backup:
     enabled: true
-    image: percona/percona-backup-mongodb:2.9.0
+    image: percona/percona-backup-mongodb:2.15.0
     storages:
       s3-backup:
         type: s3
@@ -82,7 +82,7 @@ spec:
                   topologyKey: kubernetes.io/hostname
       sidecars:
         - name: mongodb-exporter
-          image: percona/mongodb_exporter:0.43.1
+          image: percona/mongodb_exporter:0.51.0
           args:
             - --compatible-mode
             - --discovering-mode

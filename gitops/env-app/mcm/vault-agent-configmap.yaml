@@ -431,7 +431,7 @@ data:
 
           containers:
             - name: ml-ttk-add-dfsp
-              image: mojaloop/ml-testing-toolkit-client-lib:v1.10.3
+              image: mojaloop/ml-testing-toolkit-client-lib:v1.12.3
               command:
                 - /bin/sh
                 - '-c'

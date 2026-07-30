@@ -121,7 +121,7 @@ spec:
             storage: ${mysql_storage}
     sidecars:
       - name: mysqld-exporter
-        image: prom/mysqld-exporter:v0.16.0
+        image: prom/mysqld-exporter:v0.19.0
         args:
           - --mysqld.address=localhost:3306
           - --mysqld.username=monitor
@@ -156,7 +156,7 @@ spec:
   haproxy:
     enabled: true
     size: 3
-    image: percona/haproxy:2.8.17
+    image: percona/haproxy:2.8.26
     tolerations:
       - key: "node-role"
         operator: "Equal"

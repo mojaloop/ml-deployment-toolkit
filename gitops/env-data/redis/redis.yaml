@@ -5,7 +5,7 @@ metadata:
   namespace: data
 spec:
   kubernetesConfig:
-    image: quay.io/opstree/redis:v7.0.12
+    image: quay.io/opstree/redis:v7.4.8
     resources:
       requests:
         cpu: 100m
@@ -15,7 +15,7 @@ spec:
         memory: 256Mi
   redisExporter:
     enabled: true
-    image: quay.io/opstree/redis-exporter:v1.44.0
+    image: quay.io/opstree/redis-exporter:v1.84.0
     resources:
       requests:
         cpu: 10m

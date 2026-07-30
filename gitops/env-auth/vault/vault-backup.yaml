@@ -25,7 +25,7 @@ spec:
               emptyDir: {}
           initContainers:
             - name: snapshot
-              image: hashicorp/vault:1.18.4
+              image: hashicorp/vault:1.21.4
               volumeMounts:
                 - name: snapshots
                   mountPath: /snapshots
@@ -47,7 +47,7 @@ spec:
                   echo "Snapshot saved ($$(du -h /snapshots/vault-raft.snap | cut -f1))"
           containers:
             - name: upload
-              image: amazon/aws-cli:2.22.35
+              image: amazon/aws-cli:2.36.11
               volumeMounts:
                 - name: snapshots
                   mountPath: /snapshots

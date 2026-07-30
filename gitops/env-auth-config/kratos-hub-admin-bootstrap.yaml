@@ -13,7 +13,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: bootstrap
-          image: curlimages/curl:8.7.1
+          image: curlimages/curl:8.21.0
           command: [sh, -c]
           args:
             - |
