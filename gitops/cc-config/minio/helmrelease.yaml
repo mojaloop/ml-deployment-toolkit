@@ -17,7 +17,7 @@ spec:
   chart:
     spec:
       chart: minio
-      version: "5.x"
+      version: "5.4.0"
       sourceRef:
         kind: HelmRepository
         name: minio
