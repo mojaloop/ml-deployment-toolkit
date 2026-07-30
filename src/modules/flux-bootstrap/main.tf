@@ -9,6 +9,11 @@ resource "helm_release" "flux_operator" {
   chart            = "flux-operator"
   version          = var.operator_version
 
+  # A bootstrap attempt that times out (e.g. nodes NotReady) leaves a failed
+  # release that blocks plain re-install with "name still in use"; retry as
+  # upgrade so re-running apply is always safe.
+  upgrade_install = true
+
   wait = true
 }
 
