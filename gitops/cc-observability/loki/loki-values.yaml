@@ -94,6 +94,17 @@ ruler:
 gateway:
   enabled: true
   replicas: 1
+  # chart 7.x defaults to REQUIRED pod anti-affinity, which deadlocks
+  # rolling updates on single-node clusters — soften it
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: gateway
+            topologyKey: kubernetes.io/hostname
   # chart 7.x nginx container ships without a seccompProfile; required by
   # the namespace's restricted PodSecurity level
   podSecurityContext:
