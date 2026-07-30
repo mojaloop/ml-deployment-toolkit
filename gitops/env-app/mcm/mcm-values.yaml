@@ -27,7 +27,6 @@ api:
     HYDRA_PUBLIC_URL: "http://hydra-public.ory.svc.cluster.local:4444"
     KRATOS_ADMIN_URL: "http://kratos-admin.ory.svc.cluster.local:80"
     KRATOS_PUBLIC_URL: "http://kratos-public.ory.svc.cluster.local:80"
-    KETO_WRITE_URL: "http://keto-write.ory.svc.cluster.local:80"
     KETO_READ_URL: "http://keto-read.ory.svc.cluster.local:80"
     KETO_HUB_OBJECT: "${hub_participant_name}"
 
