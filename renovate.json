@@ -58,6 +58,14 @@
     },
     {
       "customType": "regex",
+      "description": "Gateway API CRD bundle (bootstrap patch URL; re-vendor gitops/talos/gateway-api/crds.yaml on bump)",
+      "fileMatch": ["^config/patches/talos/patch-cilium-install\\.yaml$"],
+      "matchStrings": ["gateway-api/releases/download/(?<currentValue>v[0-9.]+)/experimental-install\\.yaml"],
+      "depNameTemplate": "kubernetes-sigs/gateway-api",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
       "description": "Flux Operator chart version (variable default in flux-bootstrap)",
       "fileMatch": ["^src/modules/flux-bootstrap/variables\\.tf$"],
       "matchStrings": ["variable \"operator_version\" \\{[^}]*default\\s*=\\s*\"(?<currentValue>[0-9.]+)\""],
