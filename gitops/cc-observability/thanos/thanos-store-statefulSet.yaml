@@ -5,7 +5,7 @@ metadata:
     app.kubernetes.io/component: object-store-gateway
     app.kubernetes.io/instance: thanos-store
     app.kubernetes.io/name: thanos-store
-    app.kubernetes.io/version: v0.41.0
+    app.kubernetes.io/version: v0.42.2
   name: thanos-store
   namespace: observability
 spec:
@@ -22,7 +22,7 @@ spec:
         app.kubernetes.io/component: object-store-gateway
         app.kubernetes.io/instance: thanos-store
         app.kubernetes.io/name: thanos-store
-        app.kubernetes.io/version: v0.41.0
+        app.kubernetes.io/version: v0.42.2
     spec:
       affinity:
         podAntiAffinity:
@@ -38,8 +38,6 @@ spec:
                       operator: In
                       values:
                         - thanos-store
-                namespaces:
-                  - observability
                 topologyKey: kubernetes.io/hostname
               weight: 100
       containers:
@@ -62,7 +60,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.hostIP
-          image: quay.io/thanos/thanos:v0.41.0
+          image: quay.io/thanos/thanos:v0.42.2
           imagePullPolicy: IfNotPresent
           livenessProbe:
             failureThreshold: 8

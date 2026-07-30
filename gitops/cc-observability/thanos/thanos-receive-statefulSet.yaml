@@ -5,7 +5,7 @@ metadata:
     app.kubernetes.io/component: database-write-hashring
     app.kubernetes.io/instance: thanos-receive
     app.kubernetes.io/name: thanos-receive
-    app.kubernetes.io/version: v0.41.0
+    app.kubernetes.io/version: v0.42.2
   name: thanos-receive
   namespace: observability
 spec:
@@ -23,7 +23,7 @@ spec:
         app.kubernetes.io/component: database-write-hashring
         app.kubernetes.io/instance: thanos-receive
         app.kubernetes.io/name: thanos-receive
-        app.kubernetes.io/version: v0.41.0
+        app.kubernetes.io/version: v0.42.2
     spec:
       affinity:
         podAntiAffinity:
@@ -39,8 +39,6 @@ spec:
                       operator: In
                       values:
                         - thanos-receive
-                namespaces:
-                  - observability
                 topologyKey: kubernetes.io/hostname
               weight: 100
             - podAffinityTerm:
@@ -54,8 +52,6 @@ spec:
                       operator: In
                       values:
                         - thanos-receive
-                namespaces:
-                  - observability
                 topologyKey: topology.kubernetes.io/zone
               weight: 100
       containers:
@@ -91,7 +87,7 @@ spec:
                 secretKeyRef:
                   key: objstore.yml
                   name: thanos-objstore-config
-          image: quay.io/thanos/thanos:v0.41.0
+          image: quay.io/thanos/thanos:v0.42.2
           imagePullPolicy: IfNotPresent
           livenessProbe:
             failureThreshold: 8
@@ -117,7 +113,7 @@ spec:
             periodSeconds: 5
           resources:
             limits:
-              memory: 1536Mi
+              memory: 1Gi
             requests:
               cpu: 271m
               memory: 443Mi

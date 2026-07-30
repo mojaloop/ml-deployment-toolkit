@@ -5,7 +5,7 @@ metadata:
     app.kubernetes.io/component: database-compactor
     app.kubernetes.io/instance: thanos-compact
     app.kubernetes.io/name: thanos-compact
-    app.kubernetes.io/version: v0.41.0
+    app.kubernetes.io/version: v0.42.2
   name: thanos-compact
   namespace: observability
 spec:
@@ -22,7 +22,7 @@ spec:
         app.kubernetes.io/component: database-compactor
         app.kubernetes.io/instance: thanos-compact
         app.kubernetes.io/name: thanos-compact
-        app.kubernetes.io/version: v0.41.0
+        app.kubernetes.io/version: v0.42.2
     spec:
       affinity:
         podAntiAffinity:
@@ -38,8 +38,6 @@ spec:
                       operator: In
                       values:
                         - thanos-compact
-                namespaces:
-                  - observability
                 topologyKey: kubernetes.io/hostname
               weight: 100
       containers:
@@ -68,7 +66,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.hostIP
-          image: quay.io/thanos/thanos:v0.41.0
+          image: quay.io/thanos/thanos:v0.42.2
           imagePullPolicy: IfNotPresent
           livenessProbe:
             failureThreshold: 4

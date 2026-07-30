@@ -8,8 +8,8 @@ local t = import 'kube-thanos/thanos.libsonnet';
 
 local commonConfig = {
   namespace: 'observability',
-  version: 'v0.41.0',
-  image: 'quay.io/thanos/thanos:v0.41.0',
+  version: 'v0.42.2',
+  image: 'quay.io/thanos/thanos:v0.42.2',
   objectStorageConfig: {
     name: 'thanos-objstore-config',
     key: 'objstore.yml',
