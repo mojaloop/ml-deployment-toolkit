@@ -1,59 +1,104 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
-  "schedule": ["before 7am on monday"],
   "timezone": "UTC",
-  "flux": {
-    "fileMatch": ["gitops/.+\\.yaml$"]
-  },
+  "dependencyDashboardApproval": true,
+
+  "flux": { "fileMatch": ["gitops/.+\\.yaml$"] },
+  "kubernetes": { "fileMatch": ["gitops/.+\\.yaml$"] },
+  "helm-values": { "fileMatch": ["gitops/.+-values\\.yaml$"] },
+
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Images inside operator CRs and ConfigMaps (Vault, Percona, Redis, mcm)",
+      "fileMatch": [
+        "gitops/env-data/.+\\.yaml$",
+        "gitops/cc-config/vault/.+\\.yaml$",
+        "gitops/env-auth/.+\\.yaml$",
+        "gitops/env-app/mcm/.+\\.yaml$"
+      ],
+      "matchStrings": ["image:\\s*\"?(?<depName>[a-z0-9./-]+):(?<currentValue>[A-Za-z0-9][A-Za-z0-9._-]*)\"?"],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Cilium bootstrap version in Makefile (must match gitops/talos/cilium)",
+      "fileMatch": ["^Makefile$"],
+      "matchStrings": ["CILIUM_VERSION \\?= (?<currentValue>\\S+)"],
+      "depNameTemplate": "cilium",
+      "datasourceTemplate": "helm",
+      "registryUrlTemplate": "https://helm.cilium.io"
+    },
+    {
+      "customType": "regex",
+      "description": "Talos version",
+      "fileMatch": ["^config/definitions/workload-classes\\.yaml$"],
+      "matchStrings": ["talos_version: \"(?<currentValue>v[0-9.]+)\""],
+      "depNameTemplate": "siderolabs/talos",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "Kubernetes version (constrained by Talos support matrix)",
+      "fileMatch": ["^config/definitions/workload-classes\\.yaml$"],
+      "matchStrings": ["kubernetes_version: \"(?<currentValue>[0-9.]+)\""],
+      "depNameTemplate": "kubernetes/kubernetes",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Flux distribution fallback version",
+      "fileMatch": ["^src/modules/config-loader/main\\.tf$"],
+      "matchStrings": ["flux_version = try\\([^,]+, \"(?<currentValue>[0-9.]+)\"\\)"],
+      "depNameTemplate": "fluxcd/flux2",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    }
+  ],
+
   "packageRules": [
     {
       "description": "Terraform providers",
       "matchManagers": ["terraform"],
-      "groupName": "terraform providers",
-      "automerge": false
+      "groupName": "terraform providers"
     },
     {
-      "description": "Platform Helm charts (cert-manager, external-dns, external-secrets, metrics-server)",
+      "description": "Platform Helm charts",
       "matchManagers": ["flux"],
       "matchFileNames": ["gitops/platform/**"],
       "groupName": "platform helm charts"
     },
     {
-      "description": "Networking (Cilium)",
-      "matchManagers": ["flux"],
-      "matchFileNames": ["gitops/talos/cilium/**"],
-      "groupName": "networking helm charts"
+      "description": "Networking (Cilium, OpenEBS, incl. Makefile pin)",
+      "matchFileNames": ["gitops/talos/**", "Makefile"],
+      "groupName": "networking"
     },
     {
-      "description": "Data layer operators (Percona, Strimzi, Redis, MongoDB)",
-      "matchManagers": ["flux"],
-      "matchFileNames": ["gitops/env/**"],
-      "groupName": "data operator helm charts"
+      "description": "Data layer (operators + CR images)",
+      "matchFileNames": ["gitops/env/**", "gitops/env-data/**"],
+      "groupName": "data layer"
     },
     {
-      "description": "Application charts (Mojaloop, MCM, Finance Portal)",
-      "matchManagers": ["flux"],
+      "description": "Application charts",
       "matchFileNames": ["gitops/env-app/**"],
-      "groupName": "application helm charts"
+      "groupName": "application charts"
     },
     {
-      "description": "Control center (Vault, Harbor, MinIO)",
-      "matchManagers": ["flux"],
+      "description": "Control center",
       "matchFileNames": ["gitops/cc/**", "gitops/cc-config/**"],
-      "groupName": "control center helm charts"
+      "groupName": "control center"
     },
     {
-      "description": "Ory stack (Kratos, Keto, Oathkeeper, BOF, Selfservice UI)",
-      "matchManagers": ["flux"],
-      "matchFileNames": ["gitops/env-auth/ory/**"],
-      "groupName": "ory helm charts"
+      "description": "Observability",
+      "matchFileNames": ["gitops/cc-observability/**", "gitops/env-observability-agent/**"],
+      "groupName": "observability"
     },
     {
-      "description": "Separate major updates for review",
-      "matchUpdateTypes": ["major"],
-      "separateMinorPatch": true
+      "description": "Ory stack",
+      "matchFileNames": ["gitops/env-auth/**"],
+      "groupName": "ory stack"
     }
-  ],
-  "ignorePaths": ["legacy/**"]
+  ]
 }
