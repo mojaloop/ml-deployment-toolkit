@@ -221,7 +221,7 @@ locals {
   onboarding_funds_in      = tostring(try(local.config.app.hub.onboarding.funds_in, "100000"))
   onboarding_net_debit_cap = tostring(try(local.config.app.hub.onboarding.net_debit_cap, "1000"))
 
-  flux_version = try(local.cluster.flux.version, "2.7.2")
+  flux_version = try(local.cluster.flux.version, "2.9.3")
 }
 
 # Cross-field validation that JSON Schema cannot express.
