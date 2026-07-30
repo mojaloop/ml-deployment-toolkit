@@ -1,7 +1,7 @@
 # Kafka topics for bulk transfer processing.
 # Created by Strimzi entity operator (topicOperator: {} in Kafka CR).
 # These are required when mojaloop-bulk is enabled in the Mojaloop HelmRelease.
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata:
   name: topic-bulk-prepare
@@ -14,7 +14,7 @@ spec:
   config:
     min.insync.replicas: 2
 ---
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata:
   name: topic-bulk-fulfil
@@ -27,7 +27,7 @@ spec:
   config:
     min.insync.replicas: 2
 ---
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata:
   name: topic-bulk-processing
@@ -40,7 +40,7 @@ spec:
   config:
     min.insync.replicas: 2
 ---
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata:
   name: topic-bulk-get
