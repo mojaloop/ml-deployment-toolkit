@@ -94,6 +94,17 @@ ruler:
 gateway:
   enabled: true
   replicas: 1
+  # chart 7.x nginx container ships without a seccompProfile; required by
+  # the namespace's restricted PodSecurity level
+  podSecurityContext:
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    seccompProfile:
+      type: RuntimeDefault
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
   service:
     type: ClusterIP
   resources:
