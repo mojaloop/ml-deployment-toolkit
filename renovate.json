@@ -55,6 +55,14 @@
       "depNameTemplate": "fluxcd/flux2",
       "datasourceTemplate": "github-releases",
       "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Flux Operator chart version (variable default in flux-bootstrap)",
+      "fileMatch": ["^src/modules/flux-bootstrap/variables\\.tf$"],
+      "matchStrings": ["variable \"operator_version\" \\{[^}]*default\\s*=\\s*\"(?<currentValue>[0-9.]+)\""],
+      "depNameTemplate": "ghcr.io/controlplaneio-fluxcd/charts/flux-operator",
+      "datasourceTemplate": "docker"
     }
   ],
 
@@ -99,6 +107,12 @@
       "description": "Ory stack",
       "matchFileNames": ["gitops/env-auth/**"],
       "groupName": "ory stack"
+    },
+    {
+      "description": "TITLE_IMAGE logo URL is not a dependency",
+      "matchFileNames": ["gitops/env-app/finance-portal/finance-portal-values.yaml"],
+      "matchDepNames": ["https://mojaloop.io/wp-content/uploads/2020/07/mojaloop-foundation-orange.svg"],
+      "enabled": false
     }
   ]
 }
