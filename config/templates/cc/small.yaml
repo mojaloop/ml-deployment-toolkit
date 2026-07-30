@@ -15,7 +15,7 @@ node_groups:
     class: mixed-plane
     count: 1
     cores: 8
-    memory: 10240        # MB
+    memory: 8192        # MB
     disks: [64, 64]      # GB, rendered as scsi0..scsiN (Proxmox) / root+extra (cloud)
     placement: [pg-1]
 
