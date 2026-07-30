@@ -276,7 +276,7 @@ show:
 # Manifest Rendering (Jsonnet -> YAML)
 # --------------------------------------------------------------------------
 
-CILIUM_VERSION ?= 1.19.4
+CILIUM_VERSION ?= 1.20.0
 CILIUM_MANIFEST := config/manifests/cilium-$(CILIUM_VERSION).yaml
 
 render: render-thanos render-cilium
