@@ -66,6 +66,8 @@ resources:
   - grafana/dashboards/mojaloop/dfsp-mtls-gateway.yaml
   - grafana/dashboards/mojaloop/load-test.yaml
   - grafana/dashboards/mojaloop/dfsp-overview.yaml
+  - grafana/dashboards/mojaloop/central-services-characterization.yaml
+  - grafana/dashboards/mojaloop/performance-troubleshooting.yaml
 
 # Distribution values for each HelmRelease in this kustomization.
 # Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;

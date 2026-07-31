@@ -26,7 +26,7 @@ Open the **Switch Overview** dashboard first. It is the intended landing page â€
 
 ## Dashboards
 
-Thirty dashboards ship pre-provisioned, in five folders:
+Thirty-two dashboards ship pre-provisioned, in five folders:
 
 | Folder | Use it for |
 |--------|-----------|
@@ -34,7 +34,7 @@ Thirty dashboards ship pre-provisioned, in five folders:
 | **Infrastructure** | Nodes, cluster, pods, CoreDNS, Cilium, API server, storage, Proxmox hosts |
 | **Data Layer** | MySQL, PXC/Galera, Kafka, MongoDB, Redis |
 | **Platform** | cert-manager, external-dns, Vault, Ory, Oathkeeper, Flux |
-| **Mojaloop** | Transfer pipeline, account lookup, quoting, participant mTLS gateway, participant overview |
+| **Mojaloop** | Transfer pipeline, account lookup, quoting, participant mTLS gateway, participant overview; for load tests and incidents, Performance Troubleshooting and Central Services Characterization |
 
 The full list and folder breakdown is in [Observability â†’ Dashboards](../../architecture/observability.md#dashboards).
 

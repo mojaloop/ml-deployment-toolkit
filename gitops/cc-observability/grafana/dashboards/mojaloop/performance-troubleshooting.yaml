@@ -1,0 +1,315 @@
+# Adapted (slimmed) from mojaloop/helm monitoring/dashboards/mojaloop/
+# dashboard-performance-troubleshooting.json (upstream 2024-07-05).
+# Kept: the Mojaloop-specific triage panels — restart storms, OOM kills,
+# per-pod CPU/memory/network for the switch and data layer, MySQL
+# connections, consumer lag, node hotspots, event-loop lag.
+# Dropped from upstream, deliberately:
+#   - "Offending processes" panels — need process-exporter
+#     (namedprocess_namegroup_*), which this stack does not deploy
+#   - "Mojaloop sidecar" panels — Event-SDK sidecars are not deployed here
+#   - generic node detail — covered by the Infrastructure folder dashboards
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-perf-troubleshooting
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Mojaloop"
+data:
+  performance-troubleshooting.json: |
+    {
+      "uid": "moja-perf-troubleshooting",
+      "title": "Performance Troubleshooting",
+      "description": "Triage view for load-test and incident debugging: what is restarting, what is starved, where the lag is. Start here when TPS drops or p99 breaches; drill into Transfer Pipeline and the Infrastructure folder from what you find.",
+      "tags": ["mojaloop", "performance", "troubleshooting"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(moja_nodejs_eventloop_lag_seconds, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Mojaloop Restarts (15m)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"mojaloop\", cluster_name=\"$cluster_name\"}[15m]))",
+              "legendFormat": "restarts"
+            }
+          ],
+          "options": { "colorMode": "value", "graphMode": "area" }
+        },
+        {
+          "title": "Data-Layer Restarts (15m)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"data\", cluster_name=\"$cluster_name\"}[15m]))",
+              "legendFormat": "restarts"
+            }
+          ],
+          "options": { "colorMode": "value", "graphMode": "area" }
+        },
+        {
+          "title": "Pods Not Ready (mojaloop+data)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(kube_pod_status_ready{condition=\"false\", namespace=~\"mojaloop|data\", cluster_name=\"$cluster_name\"})",
+              "legendFormat": "not ready"
+            }
+          ],
+          "options": { "colorMode": "value", "graphMode": "none" }
+        },
+        {
+          "title": "Max Consumer Lag",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 100 },
+                  { "color": "red", "value": 1000 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "max(kafka_consumergroup_lag{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "max lag"
+            }
+          ],
+          "options": { "colorMode": "value", "graphMode": "area" }
+        },
+        {
+          "title": "Container Restarts by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "custom": { "fillOpacity": 15 } } },
+          "targets": [
+            {
+              "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=~\"mojaloop|data|mcm|ory\", cluster_name=\"$cluster_name\"}[15m])) by (namespace, pod) > 0",
+              "legendFormat": "{{namespace}}/{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Last Termination Was OOMKilled",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "custom": { "fillOpacity": 15 } } },
+          "targets": [
+            {
+              "expr": "sum(kube_pod_container_status_last_terminated_reason{reason=\"OOMKilled\", namespace=~\"mojaloop|data|mcm|ory\", cluster_name=\"$cluster_name\"}) by (namespace, pod)",
+              "legendFormat": "{{namespace}}/{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Mojaloop CPU by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "none", "decimals": 2, "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"mojaloop\", image!=\"\", cluster_name=\"$cluster_name\"}[$__rate_interval])) by (pod)",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Mojaloop Memory by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "sum(container_memory_working_set_bytes{namespace=\"mojaloop\", image!=\"\", cluster_name=\"$cluster_name\"}) by (pod)",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Data-Layer CPU by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "none", "decimals": 2, "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"data\", image!=\"\", cluster_name=\"$cluster_name\"}[$__rate_interval])) by (pod)",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Data-Layer Memory by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "sum(container_memory_working_set_bytes{namespace=\"data\", image!=\"\", cluster_name=\"$cluster_name\"}) by (pod)",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Mojaloop Network I/O by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(container_network_receive_bytes_total{namespace=\"mojaloop\", cluster_name=\"$cluster_name\"}[$__rate_interval])) by (pod)",
+              "legendFormat": "rx {{pod}}"
+            },
+            {
+              "expr": "sum(rate(container_network_transmit_bytes_total{namespace=\"mojaloop\", cluster_name=\"$cluster_name\"}[$__rate_interval])) by (pod)",
+              "legendFormat": "tx {{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "MySQL Connections",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "mysql_global_status_threads_connected{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "connected {{pod}}"
+            },
+            {
+              "expr": "mysql_global_variables_max_connections{cluster_name=\"$cluster_name\"}",
+              "legendFormat": "max {{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Kafka Consumer Lag by Group/Topic",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "sum(kafka_consumergroup_lag{topic=~\"topic-.*\", cluster_name=\"$cluster_name\"}) by (consumergroup, topic)",
+              "legendFormat": "{{consumergroup}} {{topic}}"
+            }
+          ]
+        },
+        {
+          "title": "Event-Loop Lag by Pod (all services)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "avg(moja_nodejs_eventloop_lag_seconds{cluster_name=\"$cluster_name\"}) by (pod)",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Node CPU Utilisation",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "percent", "max": 100, "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\", cluster_name=\"$cluster_name\"}[$__rate_interval])))",
+              "legendFormat": "{{instance}}"
+            }
+          ]
+        },
+        {
+          "title": "Node Memory Utilisation",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "percent", "max": 100, "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "100 * (1 - node_memory_MemAvailable_bytes{cluster_name=\"$cluster_name\"} / node_memory_MemTotal_bytes{cluster_name=\"$cluster_name\"})",
+              "legendFormat": "{{instance}}"
+            }
+          ]
+        }
+      ]
+    }

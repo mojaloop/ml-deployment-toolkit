@@ -1,0 +1,365 @@
+# Adapted from mojaloop/helm monitoring/dashboards/mojaloop/
+# dashboard-central-services-characterization.json (upstream 2024-06-21).
+# Changes from upstream: metric prefix moja_cl_* -> moja_* (our central-ledger
+# is configured without the cl_ infix — same convention as transfer-pipeline),
+# cluster="$cluster" -> cluster_name="$cluster_name", kubernetes_pod_name ->
+# pod, cAdvisor pod_name -> pod. Panels must be validated against live Thanos
+# on first deploy: an empty panel means the metric name drifted, not that the
+# service is idle.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-cs-characterization
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Mojaloop"
+data:
+  central-services-characterization.json: |
+    {
+      "uid": "moja-cs-characterization",
+      "title": "Central Services Characterization",
+      "description": "Where time goes inside central-ledger: per-model DB ops, domain/handler function timing, participant cache effectiveness, consumer lag, event-loop lag, per-handler CPU. Adapted from the upstream characterization dashboard.",
+      "tags": ["mojaloop", "central-ledger", "performance"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(moja_nodejs_eventloop_lag_seconds, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Transfer Prepares/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_transfer_prepare_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "prepares/s"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Transfer Positions/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_transfer_position_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "positions/s"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Transfer Fulfils/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_transfer_fulfil_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "fulfils/s"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "DB Saves/s (ok)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_model_transfer_count{queryName=\"facade_saveTransferPrepared_transaction\", success=\"true\", cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "saves/s"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "DB Save Failures/s",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 0.1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_model_transfer_count{queryName=\"facade_saveTransferPrepared_transaction\", success=\"false\", cluster_name=\"$cluster_name\"}[$__rate_interval])) or vector(0)",
+              "legendFormat": "failures/s"
+            }
+          ],
+          "options": { "colorMode": "value", "graphMode": "none" }
+        },
+        {
+          "title": "Max Event-Loop Lag",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "decimals": 3,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.1 },
+                  { "color": "red", "value": 0.5 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "max(moja_nodejs_eventloop_lag_seconds{pod=~\".*centralledger.*\", cluster_name=\"$cluster_name\"})",
+              "legendFormat": "max lag"
+            }
+          ],
+          "options": { "colorMode": "value", "graphMode": "none" }
+        },
+        {
+          "title": "Stage Processing Time (avg)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_transfer_prepare_sum{cluster_name=\"$cluster_name\"}[$__rate_interval])) / sum(rate(moja_transfer_prepare_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "prepare"
+            },
+            {
+              "expr": "sum(rate(moja_transfer_position_sum{cluster_name=\"$cluster_name\"}[$__rate_interval])) / sum(rate(moja_transfer_position_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "position"
+            },
+            {
+              "expr": "sum(rate(moja_transfer_fulfil_sum{cluster_name=\"$cluster_name\"}[$__rate_interval])) / sum(rate(moja_transfer_fulfil_count{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "fulfil"
+            }
+          ]
+        },
+        {
+          "title": "Stage Throughput by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_transfer_prepare_count{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (pod)",
+              "legendFormat": "prepare {{pod}}"
+            },
+            {
+              "expr": "sum(rate(moja_transfer_position_count{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (pod)",
+              "legendFormat": "position {{pod}}"
+            },
+            {
+              "expr": "sum(rate(moja_transfer_fulfil_count{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (pod)",
+              "legendFormat": "fulfil {{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "DB Model Ops/s by Query",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_model_transfer_count{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (queryName)",
+              "legendFormat": "{{queryName}}"
+            },
+            {
+              "expr": "sum(rate(moja_model_position_count{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (queryName)",
+              "legendFormat": "{{queryName}}"
+            },
+            {
+              "expr": "sum(rate(moja_model_participant_count{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (queryName)",
+              "legendFormat": "{{queryName}}"
+            }
+          ]
+        },
+        {
+          "title": "DB Model Latency by Query (avg)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "avg(rate(moja_model_transfer_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(moja_model_transfer_count{cluster_name=\"$cluster_name\"}[$__rate_interval]) >= 0) by (queryName)",
+              "legendFormat": "{{queryName}}"
+            },
+            {
+              "expr": "avg(rate(moja_model_position_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(moja_model_position_count{cluster_name=\"$cluster_name\"}[$__rate_interval]) >= 0) by (queryName)",
+              "legendFormat": "{{queryName}}"
+            },
+            {
+              "expr": "avg(rate(moja_model_participant_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(moja_model_participant_count{cluster_name=\"$cluster_name\"}[$__rate_interval]) >= 0) by (queryName)",
+              "legendFormat": "{{queryName}}"
+            }
+          ]
+        },
+        {
+          "title": "Participant Cache Hit vs Miss",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 15 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_model_participant_count{queryName=~\"model_.*Cached\", cluster_name=\"$cluster_name\"}[$__rate_interval])) by (queryName, hit)",
+              "legendFormat": "{{queryName}} hit={{hit}}"
+            }
+          ]
+        },
+        {
+          "title": "Domain/Handler Ops/s by Function",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_handler_transfers_count{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (funcName)",
+              "legendFormat": "{{funcName}}"
+            },
+            {
+              "expr": "sum(rate(moja_handlers_transfer_validator_count{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (funcName)",
+              "legendFormat": "{{funcName}}"
+            },
+            {
+              "expr": "sum(rate(moja_domain_transfer_count{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (funcName)",
+              "legendFormat": "{{funcName}}"
+            },
+            {
+              "expr": "sum(rate(moja_domain_position_count{cluster_name=\"$cluster_name\"}[$__rate_interval])) by (funcName)",
+              "legendFormat": "{{funcName}}"
+            }
+          ]
+        },
+        {
+          "title": "Domain/Handler Latency by Function (avg)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "avg(rate(moja_handler_transfers_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(moja_handler_transfers_count{cluster_name=\"$cluster_name\"}[$__rate_interval]) >= 0) by (funcName)",
+              "legendFormat": "{{funcName}}"
+            },
+            {
+              "expr": "avg(rate(moja_handlers_transfer_validator_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(moja_handlers_transfer_validator_count{cluster_name=\"$cluster_name\"}[$__rate_interval]) >= 0) by (funcName)",
+              "legendFormat": "{{funcName}}"
+            },
+            {
+              "expr": "avg(rate(moja_domain_transfer_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(moja_domain_transfer_count{cluster_name=\"$cluster_name\"}[$__rate_interval]) >= 0) by (funcName)",
+              "legendFormat": "{{funcName}}"
+            },
+            {
+              "expr": "avg(rate(moja_domain_position_sum{cluster_name=\"$cluster_name\"}[$__rate_interval]) / rate(moja_domain_position_count{cluster_name=\"$cluster_name\"}[$__rate_interval]) >= 0) by (funcName)",
+              "legendFormat": "{{funcName}}"
+            }
+          ]
+        },
+        {
+          "title": "Central-Ledger Kafka Consumer Lag",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "sum(kafka_consumergroup_lag{topic=~\"topic-transfer.*\", cluster_name=\"$cluster_name\"}) by (consumergroup, topic)",
+              "legendFormat": "{{consumergroup}} {{topic}}"
+            }
+          ]
+        },
+        {
+          "title": "Event-Loop Lag by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "avg(moja_nodejs_eventloop_lag_seconds{pod=~\".*centralledger.*\", cluster_name=\"$cluster_name\"}) by (pod)",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Central-Ledger CPU by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "none", "decimals": 2, "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"mojaloop\", pod=~\".*centralledger.*\", image!=\"\", cluster_name=\"$cluster_name\"}[$__rate_interval])) by (pod)",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Central-Ledger Memory by Pod",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "sum(container_memory_working_set_bytes{namespace=\"mojaloop\", pod=~\".*centralledger.*\", image!=\"\", cluster_name=\"$cluster_name\"}) by (pod)",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Central-Ledger Replicas",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 36 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            {
+              "expr": "kube_deployment_spec_replicas{deployment=~\".*centralledger.*\", cluster_name=\"$cluster_name\"}",
+              "legendFormat": "{{deployment}}"
+            }
+          ]
+        }
+      ]
+    }

@@ -84,7 +84,7 @@ This is what makes a single transfer traceable end to end — find it in the log
 
 ## Dashboards
 
-Thirty dashboards ship pre-provisioned, in five folders.
+Thirty-two dashboards ship pre-provisioned, in five folders.
 
 | Folder | Count | Covers |
 |--------|:---:|--------|
@@ -92,7 +92,7 @@ Thirty dashboards ship pre-provisioned, in five folders.
 | **Infrastructure** | 10 | Nodes, cluster, pods, CoreDNS, Cilium, API server, kubelet, volumes, namespaces, Proxmox hosts |
 | **Data Layer** | 5 | MySQL, PXC/Galera, Redis, Kafka, MongoDB |
 | **Platform** | 7 | cert-manager, external-dns, Vault, Ory Auth, Oathkeeper, Flux, Keycloak |
-| **Mojaloop** | 7 | Transfer pipeline, account lookup, Node.js runtime, quoting, participant mTLS gateway, load test, participant overview |
+| **Mojaloop** | 9 | Transfer pipeline, account lookup, Node.js runtime, quoting, participant mTLS gateway, load test, participant overview, central-services characterization, performance troubleshooting |
 
 Start at **Switch Overview**. It is built as the entry point, with drill-downs into the rest.
 
