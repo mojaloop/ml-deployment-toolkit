@@ -79,7 +79,7 @@ A single cluster hosts all seven rather than one cluster per service ([ADR-009](
 
 Strimzi-managed, three brokers in KRaft mode with `min.insync.replicas: 2`. Mojaloop services communicate through it for transfer and settlement events.
 
-It also carries the trace stream: services emit spans to `topic-event-trace`, which a bridge converts to OTLP and forwards to Tempo. See [Observability](observability.md#tracing).
+It also matters to tracing, in two ways: trace context crosses it as a `traceparent` message header, which is what joins producer and consumer spans into one end-to-end trace, and the legacy Event-SDK path still emits spans to `topic-event-trace`, which a (now superseded) bridge converts to OTLP and forwards to Tempo. See [Observability](observability.md#tracing).
 
 ## MongoDB
 

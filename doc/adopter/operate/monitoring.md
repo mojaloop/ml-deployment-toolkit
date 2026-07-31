@@ -73,6 +73,8 @@ Use Grafana's **Explore** tab with the Loki datasource. Note the real namespaces
 
 Logs are correlated with traces: a trace ID in a log line links straight into Tempo, and a span links back to its logs. Following a single transfer end to end usually starts from a log line, not a dashboard.
 
+One caveat when searching Tempo: traces are tail-sampled. Every error trace and every trace slower than 1 s is kept, but only 10% of healthy fast ones are. A missing trace for an unremarkable transfer is sampling, not an outage — the traces you actually need to debug (errors, SLO breaches) are always retained. See [Observability → Tracing](../../architecture/observability.md#tracing).
+
 ## Node and OS health
 
 Metrics stop at the Kubernetes boundary. For the Talos nodes underneath, use `talosctl`:

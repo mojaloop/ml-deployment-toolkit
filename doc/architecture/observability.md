@@ -21,7 +21,7 @@ Hubs collect. The Tooling Cluster stores and displays.
 
 ![Telemetry flow](../diagrams/telemetry-flow.svg)
 
-Read the arrows as actions: **Alloy** scrapes the exporters and writes outward; **trace-bridge** writes traces; **Grafana** queries all three backends. Nothing on the Tooling Cluster reaches into a Hub.
+Read the arrows as actions: **Alloy** scrapes the exporters, receives OTLP spans, and writes all three signals outward; **trace-bridge** still writes traces on the legacy path; **Grafana** queries all three backends. Nothing on the Tooling Cluster reaches into a Hub.
 
 A Hub runs **no Grafana, no Prometheus, no Loki, and no Tempo.** It runs agents that ship data outward. If the Tooling Cluster is unreachable, a Hub keeps serving traffic but the operator loses visibility into it — there is no local fallback UI.
 
@@ -43,23 +43,35 @@ Logs are shipped, not stored locally — a Hub keeps only what the container run
 
 ## Tracing
 
-Tracing is **deployed and working**. The path is indirect, which is why it is often assumed not to be:
+Tracing is **deployed and working**, over two paths that coexist: a native OpenTelemetry path, which is primary, and the original Event-SDK bridge, which it supersedes but has not yet retired.
 
 ```mermaid
 flowchart LR
-    ml["Mojaloop services<br/>Event SDK"]
+    ml["Mojaloop services<br/>injected OTel SDK"]
+    al["Alloy<br/>sample · derive metrics"]
     k["Kafka<br/>topic-event-trace"]
-    tb["trace-bridge"]
+    tb["trace-bridge<br/>(legacy)"]
     te["Tempo"]
 
-    ml -->|"publish spans"| k
-    tb -->|"consumes"| k
-    tb -->|"writes OTLP"| te
+    ml -->|"OTLP"| al
+    al -->|"writes OTLP"| te
+    ml -.->|"Event-SDK spans"| k
+    tb -.->|"consumes"| k
+    tb -.->|"writes OTLP"| te
 ```
 
-Mojaloop services are instrumented through the Event SDK, configured with `TRACE: kafka` across every service. Spans are published to `topic-event-trace` rather than sent directly to a collector. A bridge consumes that topic, converts to OTLP, and forwards to Tempo.
+**The OTel path.** Mojaloop v17.x images already ship OpenTelemetry instrumentation in `@mojaloop/central-services-stream`, but no SDK — so every span is silently discarded. The OpenTelemetry Operator (platform layer) injects a Node.js SDK into any pod annotated `instrumentation.opentelemetry.io/inject-nodejs`, activating that dormant instrumentation with no image change. The transfer path is annotated — central-ledger and its handlers, quoting, ml-api-adapter, account-lookup — and spans are sent directly to Alloy over OTLP. Trace context still crosses Kafka, but only as a `traceparent` message header: the consuming service continues the producer's trace, which is what joins one transfer into a single end-to-end trace.
 
-The consequence: **tracing depends on Kafka.** If Kafka is unhealthy, traces stop even though Tempo and the bridge are fine. Trace gaps are a Kafka symptom more often than a Tempo one.
+Alloy enriches spans with Kubernetes metadata, then splits the stream. **Spanmetrics and servicegraph see 100% of spans** — RED metrics per service/operation (under the `traces_span_metrics` prefix, shipped to Thanos with everything else) and a who-calls-whom topology, computed before sampling so counts and percentiles are not distorted. Only the branch bound for Tempo is **tail-sampled**: every error trace is kept, every trace slower than 1 s (deliberately the p99 SLO) is kept, and 10% of the rest.
+
+Two operational consequences:
+
+- **Tempo does not hold every trace.** A specific healthy, fast transfer has a 90% chance of not being there. That is sampling, not breakage — errors and SLO breaches are always kept, and the span-derived metrics count everything.
+- **Tail-sampling `decision_wait` (30 s) is load-bearing.** At a shorter wait, the sampling decision fires before the consuming service's spans arrive, truncating every trace at the Kafka produce — which looks exactly like consumer instrumentation being broken.
+
+**The legacy path** is the Event SDK, configured with `TRACE: kafka` across every service: spans are published to `topic-event-trace`, and trace-bridge consumes the topic, converts to OTLP, and forwards to Tempo. It is superseded but still deployed for one reason: Event-SDK spans carry business-level names (e.g. `qs_quote_handleQuoteRequest`) that existing dashboards and saved Tempo queries are keyed on, and the OTel path names spans by operation instead (`SEND:`/`RECEIVE:`, HTTP routes, SQL). The retirement preconditions live in `gitops/env-app/observability/trace-bridge.yaml`.
+
+Only the legacy path depends on Kafka to *deliver* spans. If Kafka is unhealthy the Event-SDK stream stops, but annotated services keep exporting over OTLP — trace gaps are no longer primarily a Kafka symptom.
 
 ## Correlation
 

@@ -87,7 +87,8 @@ A Tooling Cluster is optional. A single Hub can pull artifacts from any external
 | Oathkeeper | `ory` | Identity-aware proxy |
 | Vault | `vault` | Runtime secrets and the scheme PKI (3-node Raft) |
 | MySQL, Kafka, MongoDB, Redis | `data` | Data layer |
-| Alloy | `observability` | Metrics and log agent, remote-writing to the Tooling Cluster |
+| Alloy | `observability` | Telemetry agent — scrapes metrics, tails logs, receives OTLP traces; ships all three to the Tooling Cluster |
+| OpenTelemetry Operator | `platform-system` | Injects the OTel SDK into annotated Mojaloop pods, activating their built-in trace instrumentation |
 
 Authentication and authorization are Ory end to end. Keycloak is not deployed. See [Security](security.md#identity-and-access) for the identity model.
 
