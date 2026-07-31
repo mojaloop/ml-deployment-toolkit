@@ -5,6 +5,10 @@ metadata:
   namespace: mcm
   labels:
     app: vault-agent
+  annotations:
+    # Re-render on template changes: the agent reads vault-agent-config only at
+    # startup, so a shipped ConfigMap edit is inert until the pod restarts.
+    configmap.reloader.stakater.com/reload: vault-agent-config
 spec:
   replicas: 1
   selector:

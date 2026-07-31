@@ -269,14 +269,13 @@ data:
               "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
               sni: {{ .Data.fqdn }}
               common_tls_context:
+                # No sds_config here: Cilium fills it in with the xDS source matching
+                # the agent's envoy-xds-mode (ads since chart 1.20, split before).
+                # Hardcoding the split-mode GRPC source leaves the subscription
+                # unanswered under ads — the secret never leaves warming and every
+                # handshake fails with "Secret is not supplied by SDS".
                 tls_certificate_sds_secret_configs:
                   - name: "cilium-secrets/{{ .Data.host }}-clientcert-tls"
-                    sds_config:
-                      api_config_source:
-                        api_type: GRPC
-                        grpc_services:
-                          - envoy_grpc:
-                              cluster_name: xds-grpc-cilium
     {{ end }}{{ end }}
     ---
     # CiliumNetworkPolicy: redirect DFSP-bound egress through the CEC Envoy listener.
