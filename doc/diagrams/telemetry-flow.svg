@@ -34,12 +34,18 @@
   <text x="140" y="283" font-size="10.5" font-weight="700" fill="#334155" text-anchor="middle">node-exporter</text>
   <text x="140" y="299" font-size="9" fill="#64748b" text-anchor="middle">exporter</text>
 
+  <!-- Trace sources: annotated pods with an injected OTel SDK -->
+  <rect x="60" y="330" width="160" height="60" rx="6" fill="#f1f5f9" stroke="#64748b"/>
+  <text x="140" y="351" font-size="10.5" font-weight="700" fill="#334155" text-anchor="middle">instrumented services</text>
+  <text x="140" y="367" font-size="9" fill="#64748b" text-anchor="middle">OTel SDK injected</text>
+  <text x="140" y="380" font-size="9" fill="#64748b" text-anchor="middle">Mojaloop transfer path</text>
+
   <!-- Alloy -->
   <rect x="300" y="170" width="170" height="140" rx="8" fill="#f0fdfa" stroke="#14b8a6" stroke-width="1.5"/>
   <text x="385" y="220" font-size="13" font-weight="700" fill="#115e59" text-anchor="middle">Alloy</text>
   <text x="385" y="240" font-size="9.5" fill="#64748b" text-anchor="middle">scrapes exporters ·</text>
   <text x="385" y="253" font-size="9.5" fill="#64748b" text-anchor="middle">tails container logs ·</text>
-  <text x="385" y="266" font-size="9.5" fill="#64748b" text-anchor="middle">receives OTLP spans, tail-samples</text>
+  <text x="385" y="266" font-size="9.5" fill="#64748b" text-anchor="middle">tail-samples traces</text>
 
   <!-- trace-bridge (legacy Event-SDK path) -->
   <rect x="300" y="330" width="170" height="52" rx="8" fill="#f0fdfa" stroke="#14b8a6" stroke-width="1.5" stroke-dasharray="5 4"/>
@@ -51,6 +57,12 @@
   <text x="262" y="197" font-size="9" fill="#475569" text-anchor="middle">scrapes</text>
   <line x1="300" y1="286" x2="226" y2="286" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
   <text x="262" y="277" font-size="9" fill="#475569" text-anchor="middle">scrapes</text>
+
+  <!-- trace source arrows (inside Hub): services push, agents don't scrape -->
+  <polyline points="220,340 260,340 260,302 296,302" fill="none" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrowAmber)"/>
+  <text x="268" y="322" font-size="9" font-weight="600" fill="#f59e0b" text-anchor="start">OTLP spans</text>
+  <line x1="220" y1="364" x2="296" y2="364" stroke="#f59e0b" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrowAmber)"/>
+  <text x="258" y="357" font-size="9" font-weight="600" fill="#f59e0b" text-anchor="middle">via Kafka</text>
 
   <!-- ================= Tooling Cluster ================= -->
   <rect x="620" y="110" width="460" height="310" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
