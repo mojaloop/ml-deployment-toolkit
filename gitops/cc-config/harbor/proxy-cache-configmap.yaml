@@ -32,6 +32,21 @@ data:
     done
     echo "Harbor API is ready."
 
+    # Robot usernames become robot-<name> instead of the default robot$<name>:
+    # hub .env files are sourced by the Makefile, where a literal '$' in
+    # OCI_PROXY_USERNAME would be shell-expanded to nothing. The prefix is part
+    # of credential matching at auth time — set before any robot exists and
+    # never change it afterwards, or every existing robot login breaks.
+    echo "Setting robot name prefix..."
+    status=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+      -X PUT "$HARBOR_URL/api/v2.0/configurations" \
+      -u "$HARBOR_USER:$HARBOR_PASS" \
+      -H "Content-Type: application/json" \
+      -d '{"robot_name_prefix":"robot-"}')
+    if [ "$status" != "200" ]; then
+      echo "ERROR setting robot_name_prefix: HTTP $status"; cat /tmp/response.json; exit 1
+    fi
+
     REG_ID=""
 
     # create_registry <name> <type> <url> [<credential_json>]
@@ -118,6 +133,48 @@ data:
       esac
     }
 
+    # create_robot <name> <secret>
+    # System-level, never-expiring, pull-only across all projects (namespace
+    # "*"), so new proxy-cache projects need no robot change. The secret is
+    # PATCHed to the Terraform-generated value on every run — create once,
+    # converge always — which is what makes rotation work.
+    create_robot() {
+      name=$1; secret=$2
+      echo "Provisioning robot account: robot-$name..."
+
+      robot_id=$(curl -s -u "$HARBOR_USER:$HARBOR_PASS" \
+        "$HARBOR_URL/api/v2.0/robots?page_size=100" | \
+        jq -r ".[] | select(.name==\"robot-$name\") | .id")
+
+      if [ -z "$robot_id" ]; then
+        payload="{\"name\":\"$name\",\"level\":\"system\",\"duration\":-1,\"disable\":false,\"description\":\"toolkit pull robot\",\"permissions\":[{\"kind\":\"project\",\"namespace\":\"*\",\"access\":[{\"resource\":\"repository\",\"action\":\"pull\"}]}]}"
+        status=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+          -X POST "$HARBOR_URL/api/v2.0/robots" \
+          -u "$HARBOR_USER:$HARBOR_PASS" \
+          -H "Content-Type: application/json" \
+          -d "$payload")
+        if [ "$status" = "201" ]; then
+          robot_id=$(jq -r ".id" /tmp/response.json)
+          echo "  Created: robot-$name (id=$robot_id)"
+        else
+          echo "  ERROR creating robot-$name: HTTP $status"; cat /tmp/response.json; return 1
+        fi
+      else
+        echo "  Already exists (id=$robot_id)"
+      fi
+
+      status=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+        -X PATCH "$HARBOR_URL/api/v2.0/robots/$robot_id" \
+        -u "$HARBOR_USER:$HARBOR_PASS" \
+        -H "Content-Type: application/json" \
+        -d "{\"secret\":\"$secret\"}")
+      if [ "$status" = "200" ]; then
+        echo "  Secret converged."
+      else
+        echo "  ERROR setting secret for robot-$name: HTTP $status"; cat /tmp/response.json; return 1
+      fi
+    }
+
     echo ""
     echo "=== Configuring proxy caches ==="
 
@@ -136,6 +193,17 @@ data:
     # Kubernetes Registry (public)
     create_registry "k8s-registry" "docker-registry" "https://registry.k8s.io"
     create_project "k8s" "$REG_ID"
+
+    echo ""
+    echo "=== Provisioning robot accounts ==="
+    # robots.json: [{"name": ..., "secret": ...}, ...] from registry.robots in
+    # config.yaml (empty array when none declared). Additive only — robots
+    # removed from config are left untouched in Harbor.
+    jq -c '.[]' /robot-secrets/robots.json | while read -r robot; do
+      name=$(echo "$robot" | jq -r '.name')
+      secret=$(echo "$robot" | jq -r '.secret')
+      create_robot "$name" "$secret" || exit 1
+    done
 
     echo ""
     echo "=== Proxy cache setup complete ==="

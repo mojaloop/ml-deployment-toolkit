@@ -9,6 +9,7 @@ resources:
   - harbor/helmrelease.yaml
   - harbor/proxy-cache-externalsecret.yaml
   - harbor/proxy-cache-oci-secret.yaml
+  - harbor/proxy-cache-robots-secret.yaml
   - harbor/proxy-cache-configmap.yaml
   - harbor/proxy-cache-job.yaml
 
