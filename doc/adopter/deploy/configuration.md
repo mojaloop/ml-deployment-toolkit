@@ -130,6 +130,10 @@ artifact:
 registry:
   provider: "none"                    # Harbor lives on this cluster; nothing to proxy through
 
+object_storage:                       # extra MinIO buckets to serve — see below
+  buckets:
+    - name: "my-switch-backups"
+
 email:                                # transactional SMTP; credentials in .env
   host: "smtp.example.com"
   port: "587"
@@ -143,6 +147,10 @@ alerting:                             # Grafana contact points
 ```
 
 A Tooling Cluster carries no `data`, no `app`, and no `toolkit_cc` — it is the thing other clusters point at.
+
+**`object_storage.buckets` declares what this cluster serves** — the reverse of the section's meaning on a Hub, where it names the backup target to consume. Each declared bucket is created in MinIO alongside the system buckets (`harbor`, `backups`, `thanos`, `loki`, `tempo`, which always exist and cannot be re-declared) and gets a generated user scoped to that one bucket: the access key is the bucket name, the secret key is a generated secret named `minio_bucket_<name>_secret_key`. The convention is one bucket per Hub, named `<hub cluster.name>-backups`, so no Hub's credentials can touch another Hub's backups. Creation is additive and one-way — removing an entry stops managing the bucket but never deletes data.
+
+One rotation caveat: the MinIO provisioning job creates users but never updates an existing user's secret key. Pinning a new `MINIO_BUCKET_<NAME>_SECRET_KEY` in `.env` after the user exists — or removing a bucket entry and re-declaring it later, which regenerates its key while the MinIO user survives with the old one — leaves `make secrets` printing a key MinIO does not have. To rotate, delete the user in MinIO first; the next reconcile recreates it with the current key.
 
 **`cert.email` is the ACME account contact and nothing else.** It replaces the old `app.alert_email`, which despite its name only ever reached Let's Encrypt. Alert destinations are `alerting:`.
 
@@ -180,7 +188,7 @@ registry:
 object_storage:
   provider: "s3"
   endpoint: "https://s3.int.cc1.lab1.example.com"
-  bucket: "backups"
+  bucket: "my-switch-backups"         # declared on the Tooling Cluster, one per Hub
   region: "us-east-1"
 
 observability:
@@ -333,7 +341,7 @@ Read them back on demand:
 make secrets ENV=<env>
 ```
 
-That is also how a Hub's `.env` gets its Tooling Cluster credentials: `make secrets ENV=<cc-env>` prints `harbor_admin_password` and `minio_root_password`, which become the Hub's `OCI_PROXY_PASSWORD` and `BACKUP_S3_SECRET_KEY`.
+That is also how a Hub's `.env` gets its Tooling Cluster credentials: `make secrets ENV=<cc-env>` prints `harbor_admin_password`, which becomes the Hub's `OCI_PROXY_PASSWORD`, and one `minio_bucket_<name>_secret_key` per bucket declared under `object_storage.buckets`, which becomes the Hub's `BACKUP_S3_SECRET_KEY` (its `BACKUP_S3_ACCESS_KEY` is the bucket name). A Tooling Cluster with no declared buckets falls back to `minioadmin` / `minio_root_password`.
 
 **Supplied in `.env`.** Only credentials that exist outside the deployment:
 

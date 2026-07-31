@@ -149,6 +149,16 @@ A Hub reaches this cluster through three endpoints it names in its own config �
 
 Write them into the Hub's `registry`, `object_storage`, and `observability` sections — see [Hub → Supporting services](hub.md#supporting-services). If this cluster backs all three, they can instead be derived from its domain alone with the [toolkit-cc shorthand](configuration.md#the-toolkit-cc-shorthand).
 
+Give each Hub its own backup bucket by declaring it here, named after the Hub's `cluster.name`:
+
+```yaml
+object_storage:
+  buckets:
+    - name: "my-switch-backups"
+```
+
+Each declared bucket is created in MinIO with a generated user scoped to that one bucket, so a Hub's credentials cannot touch another Hub's backups — see [Configuration → A Tooling Cluster, annotated](configuration.md#a-tooling-cluster-annotated).
+
 Two credentials do have to travel, because they are generated here and supplied there:
 
 ```bash
@@ -158,7 +168,9 @@ make secrets ENV=<cc-env>
 | Hub `.env` variable | Value from `make secrets` |
 |---------------------|---------------------------|
 | `OCI_PROXY_USERNAME` / `OCI_PROXY_PASSWORD` | `admin` / `harbor_admin_password` |
-| `BACKUP_S3_ACCESS_KEY` / `BACKUP_S3_SECRET_KEY` | `minioadmin` / `minio_root_password` |
+| `BACKUP_S3_ACCESS_KEY` / `BACKUP_S3_SECRET_KEY` | `<bucket name>` / `minio_bucket_<name>_secret_key` |
+
+With no declared buckets, the fallback for `BACKUP_S3_*` is the shared `backups` system bucket with `minioadmin` / `minio_root_password` — workable for a single Hub, but root credentials in a Hub's `.env` are exactly what per-bucket users exist to avoid.
 
 Carry those into [Deploy a Hub → Configuration](hub.md#configuration).
 

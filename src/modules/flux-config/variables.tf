@@ -95,12 +95,13 @@ variable "observability" {
 }
 
 variable "object_storage" {
-  description = "Backup S3 target: endpoint, bucket, region; active is false when provider is 'none'"
+  description = "Backup S3 target: endpoint, bucket, region; active is false when provider is 'none'. buckets is cc-only: extra buckets served by the toolkit MinIO, each with a generated scoped user."
   type = object({
     active   = bool
     endpoint = string
     bucket   = string
     region   = string
+    buckets  = list(string)
   })
 }
 

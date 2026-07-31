@@ -58,6 +58,15 @@ artifact:
 registry:
   provider: "none"
 
+# Extra MinIO buckets to serve, on top of the system buckets (harbor, backups,
+# thanos, loki, tempo). Each gets a generated user scoped to that one bucket —
+# the access key is the bucket name, the secret key comes from `make secrets`.
+# Convention: one bucket per Hub, named <hub cluster.name>-backups. Creation
+# only — removing an entry stops managing the bucket but never deletes data.
+# object_storage:
+#   buckets:
+#     - name: "my-switch-backups"
+
 # Transactional email (SMTP). Credentials SMTP_USER/SMTP_PASSWORD in .env.
 email:
   host: "smtp.example.com"

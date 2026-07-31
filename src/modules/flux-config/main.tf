@@ -54,12 +54,24 @@ locals {
   # A matching non-empty UPPER_CASE key in var.secrets overrides generation
   # (used by external-unmanaged data stores and for migrating existing envs).
   # ---------------------------------------------------------------------------
+  # Declared buckets (cc only) each get a scoped MinIO user whose secret key
+  # follows the generated-secret pattern: minio_bucket_<name>_secret_key,
+  # overridable via the matching UPPER_CASE key in .env.
+  minio_declared_buckets = local.is_cc ? var.object_storage.buckets : []
+  # Mirrors the default buckets list in gitops/cc-config/minio/minio-values.yaml.
+  minio_system_buckets = ["harbor", "backups", "thanos", "loki", "tempo"]
+  minio_bucket_secret_names = {
+    for b in local.minio_declared_buckets :
+    b => "minio_bucket_${replace(replace(b, "-", "_"), ".", "_")}_secret_key"
+  }
+
   generated_secret_names = setunion(
     local.is_cc ? [
       "minio_root_password",
       "harbor_admin_password",
       "grafana_admin_password",
     ] : [],
+    values(local.minio_bucket_secret_names),
     local.is_env ? [
       "mysql_root_password",
       "mysql_central_ledger_password",
@@ -208,6 +220,53 @@ resource "kubernetes_secret_v1" "cluster_secrets" {
       backup_s3_secret_key          = lookup(local.s, "BACKUP_S3_SECRET_KEY", "")
     } : {}
   )
+
+  type = "Opaque"
+}
+
+# minio-buckets-values — buckets declared in object_storage.buckets plus the
+# scoped user and per-bucket policy for each. Delivered as a Secret (not a
+# ConfigMap) because the users[] entries carry generated secret keys. Helm
+# list-merge replaces lists wholesale, so the buckets list re-states the
+# system buckets from gitops/cc-config/minio/minio-values.yaml.
+resource "kubernetes_secret_v1" "minio_buckets_values" {
+  count = length(local.minio_declared_buckets) > 0 ? 1 : 0
+
+  metadata {
+    name      = "minio-buckets-values"
+    namespace = var.flux_namespace
+  }
+
+  data = {
+    "values.yaml" = yamlencode({
+      buckets = [
+        for b in concat(local.minio_system_buckets, local.minio_declared_buckets) :
+        { name = b, policy = "none", purge = false }
+      ]
+      policies = [
+        for b in local.minio_declared_buckets : {
+          name = "${b}-rw"
+          statements = [
+            {
+              resources = ["arn:aws:s3:::${b}"]
+              actions   = ["s3:ListBucket", "s3:GetBucketLocation", "s3:ListBucketMultipartUploads"]
+            },
+            {
+              resources = ["arn:aws:s3:::${b}/*"]
+              actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListMultipartUploadParts", "s3:AbortMultipartUpload"]
+            },
+          ]
+        }
+      ]
+      users = [
+        for b in local.minio_declared_buckets : {
+          accessKey = b
+          secretKey = local.generated_secrets[local.minio_bucket_secret_names[b]]
+          policy    = "${b}-rw"
+        }
+      ]
+    })
+  }
 
   type = "Opaque"
 }

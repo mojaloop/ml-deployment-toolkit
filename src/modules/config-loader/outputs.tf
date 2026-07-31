@@ -119,6 +119,7 @@ output "object_storage" {
     endpoint = local.backup_s3_endpoint
     bucket   = local.backup_s3_bucket
     region   = local.backup_s3_region
+    buckets  = local.object_storage_buckets
   }
 }
 

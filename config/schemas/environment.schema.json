@@ -269,6 +269,24 @@
         },
         "region": {
           "type": "string"
+        },
+        "buckets": {
+          "description": "cc role only: extra buckets to serve from the toolkit MinIO, each with a generated scoped user (access key = bucket name; 'make secrets' prints the secret key). System buckets (harbor, backups, thanos, loki, tempo) always exist and cannot be re-declared. Additive and creation-only — removing an entry never deletes data.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "description": "S3 bucket name (3-63 chars, lowercase alphanumeric, '.' or '-')",
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+              }
+            }
+          }
         }
       }
     },

@@ -157,6 +157,14 @@ locals {
   # must never reach the data-layer CRs.
   object_storage_active = local.object_storage_provider != "none"
 
+  # cc role only: extra buckets served by the toolkit MinIO, each backed by a
+  # generated scoped user (access key = bucket name). Creation is additive —
+  # the system buckets below always exist and cannot be re-declared, and
+  # removing an entry never deletes data.
+  object_storage_buckets = [for b in try(local.config.object_storage.buckets, []) : b.name]
+  # Mirrors the default buckets list in gitops/cc-config/minio/minio-values.yaml.
+  minio_system_buckets = ["harbor", "backups", "thanos", "loki", "tempo"]
+
   # --- observability (telemetry push sink) ---------------------------------
   observability_provider = try(local.config.observability.provider, "none")
   loki_url = (
@@ -311,6 +319,28 @@ resource "terraform_data" "validation" {
     precondition {
       condition     = local.object_storage_provider != "s3" || local.backup_s3_endpoint != ""
       error_message = "object_storage.provider is 's3' but object_storage.endpoint is not set."
+    }
+    precondition {
+      condition     = length(local.object_storage_buckets) == 0 || local.cluster_role == "cc"
+      error_message = "object_storage.buckets declares buckets to serve and is only valid on cluster.role 'cc'; env clusters consume one via object_storage.bucket."
+    }
+    precondition {
+      condition = alltrue([
+        for b in local.object_storage_buckets :
+        can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", b))
+      ])
+      error_message = "object_storage.buckets names must be valid S3 bucket names (3-63 chars, lowercase alphanumeric, '.' or '-')."
+    }
+    precondition {
+      condition = alltrue([
+        for b in local.object_storage_buckets :
+        !contains(local.minio_system_buckets, b)
+      ])
+      error_message = "object_storage.buckets must not re-declare a system bucket (${join(", ", local.minio_system_buckets)}) — those always exist."
+    }
+    precondition {
+      condition     = length(local.object_storage_buckets) == length(distinct(local.object_storage_buckets))
+      error_message = "object_storage.buckets contains duplicate names."
     }
     precondition {
       condition = (

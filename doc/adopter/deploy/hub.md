@@ -77,7 +77,7 @@ registry:
 object_storage:
   provider: "s3"
   endpoint: "https://s3.int.cc1.example.com"
-  bucket: "backups"
+  bucket: "my-switch-backups"                # declared on the Tooling Cluster
 observability:
   provider: "urls"
   loki_url: "https://loki.int.cc1.example.com/loki/api/v1/push"
@@ -85,7 +85,7 @@ observability:
   tempo_url: "https://tempo.int.cc1.example.com/v1/traces"
 ```
 
-Set any of the three to `provider: "none"` to disable it. Credentials stay in `.env` — `OCI_PROXY_*` for the registry, `BACKUP_S3_*` for object storage. The telemetry sink has no credential field yet, so those URLs must be reachable without authentication (a private network, or mTLS terminated at the gateway); managed backends that require a token are not supported today.
+Set any of the three to `provider: "none"` to disable it. Credentials stay in `.env` — `OCI_PROXY_*` for the registry, `BACKUP_S3_*` for object storage. When the target is a Tooling Cluster, the bucket is declared there under `object_storage.buckets` (convention: `<this cluster.name>-backups`) and comes with a user scoped to it: `BACKUP_S3_ACCESS_KEY` is the bucket name, `BACKUP_S3_SECRET_KEY` comes from `make secrets ENV=<cc-env>` — see the [hand-off](tooling-cluster.md#hand-off-to-the-hub). The telemetry sink has no credential field yet, so those URLs must be reachable without authentication (a private network, or mTLS terminated at the gateway); managed backends that require a token are not supported today.
 
 The Harbor proxy is a Talos-level registry mirror, transparent to the workloads.
 
@@ -101,7 +101,7 @@ registry:
   provider: "toolkit-cc"    # -> harbor.int.<domain>
 object_storage:
   provider: "toolkit-cc"    # -> https://s3.int.<domain>
-  bucket: "backups"
+  bucket: "my-switch-backups"
 observability:
   provider: "toolkit-cc"    # -> loki/thanos/tempo push URLs
 ```

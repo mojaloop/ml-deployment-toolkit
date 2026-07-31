@@ -46,6 +46,12 @@ spec:
       name: minio-credentials
       valuesKey: rootPassword
       targetPath: rootPassword
+    # Buckets declared in object_storage.buckets plus their scoped users,
+    # rendered on the deployer. A Secret because users[] carry secret keys.
+    - kind: Secret
+      name: minio-buckets-values
+      valuesKey: values.yaml
+      optional: true
     - kind: ConfigMap
       name: minio-values-override
       valuesKey: values.yaml

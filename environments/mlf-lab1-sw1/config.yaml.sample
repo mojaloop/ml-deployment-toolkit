@@ -78,10 +78,13 @@ registry:
 # without a backup target, set provider "none" — backups and PITR are then
 # disabled entirely and the vault-backup CronJob is suspended. Enabling
 # backups later restarts the mongod pods (PBM sidecars are added).
+# Convention: a bucket named <cluster.name>-backups, declared on the Tooling
+# Cluster under object_storage.buckets, with its generated scoped credentials
+# in .env. The system "backups" bucket still works for a single-Hub setup.
 object_storage:
   provider: "s3"
   endpoint: "https://s3.int.cc1.lab1.example.com"
-  bucket: "backups"
+  bucket: "my-switch-backups"
   region: "us-east-1"
 
 # Telemetry push sink. Note: no credential field exists yet, so these must be
