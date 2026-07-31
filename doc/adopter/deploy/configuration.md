@@ -341,7 +341,7 @@ Read them back on demand:
 make secrets ENV=<env>
 ```
 
-That is also how a Hub's `.env` gets its Tooling Cluster credentials: `make secrets ENV=<cc-env>` prints `harbor_admin_password`, which becomes the Hub's `OCI_PROXY_PASSWORD`, and one `minio_bucket_<name>_secret_key` per bucket declared under `object_storage.buckets`, which becomes the Hub's `BACKUP_S3_SECRET_KEY` (its `BACKUP_S3_ACCESS_KEY` is the bucket name). A Tooling Cluster with no declared buckets falls back to `minioadmin` / `minio_root_password`.
+That is also how a Hub's `.env` gets its Tooling Cluster credentials: `make secrets ENV=<cc-env>` prints one `harbor_robot_<name>_secret` per robot declared under `registry.robots`, which becomes the Hub's `OCI_PROXY_PASSWORD` (its `OCI_PROXY_USERNAME` is `robot-<name>`), and one `minio_bucket_<name>_secret_key` per bucket declared under `object_storage.buckets`, which becomes the Hub's `BACKUP_S3_SECRET_KEY` (its `BACKUP_S3_ACCESS_KEY` is the bucket name). A Tooling Cluster with nothing declared falls back to the shared credentials — `admin` / `harbor_admin_password` and `minioadmin` / `minio_root_password` — workable, but admin credentials in a Hub's `.env` are exactly what the scoped accounts exist to avoid.
 
 **Supplied in `.env`.** Only credentials that exist outside the deployment:
 

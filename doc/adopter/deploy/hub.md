@@ -85,7 +85,7 @@ observability:
   tempo_url: "https://tempo.int.cc1.example.com/v1/traces"
 ```
 
-Set any of the three to `provider: "none"` to disable it. Credentials stay in `.env` — `OCI_PROXY_*` for the registry, `BACKUP_S3_*` for object storage. When the target is a Tooling Cluster, the bucket is declared there under `object_storage.buckets` (convention: `<this cluster.name>-backups`) and comes with a user scoped to it: `BACKUP_S3_ACCESS_KEY` is the bucket name, `BACKUP_S3_SECRET_KEY` comes from `make secrets ENV=<cc-env>` — see the [hand-off](tooling-cluster.md#hand-off-to-the-hub). The telemetry sink has no credential field yet, so those URLs must be reachable without authentication (a private network, or mTLS terminated at the gateway); managed backends that require a token are not supported today.
+Set any of the three to `provider: "none"` to disable it. Credentials stay in `.env` — `OCI_PROXY_*` for the registry, `BACKUP_S3_*` for object storage. When the target is a Tooling Cluster, both accounts are declared there and scoped to this Hub: a pull-only robot under `registry.robots` (convention: this `cluster.name`; `OCI_PROXY_USERNAME` is `robot-<name>`) and a bucket under `object_storage.buckets` (convention: `<this cluster.name>-backups`; `BACKUP_S3_ACCESS_KEY` is the bucket name). Both passwords come from `make secrets ENV=<cc-env>` — see the [hand-off](tooling-cluster.md#hand-off-to-the-hub). The telemetry sink has no credential field yet, so those URLs must be reachable without authentication (a private network, or mTLS terminated at the gateway); managed backends that require a token are not supported today.
 
 The Harbor proxy is a Talos-level registry mirror, transparent to the workloads.
 

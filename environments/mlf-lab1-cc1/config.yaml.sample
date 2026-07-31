@@ -54,9 +54,15 @@ artifact:
   url: "oci://ghcr.io/your-org/ml-deployment-toolkit"
   version: "latest"                   # OCI tag — "latest" or pin to a version
 
-# Container image pull-through cache (none on the CC itself — Harbor lives here)
+# Container image pull-through cache (none on the CC itself — Harbor lives here).
+# robots: pull-only Harbor accounts for consuming Hubs. Each Hub authenticates
+# as robot-<name>; the secret comes from `make secrets`. Convention: one robot
+# per Hub, named after the Hub's cluster.name. Creation only — removing an
+# entry stops managing the robot but never deletes it.
 registry:
   provider: "none"
+  # robots:
+  #   - name: "my-switch"
 
 # Extra MinIO buckets to serve, on top of the system buckets (harbor, backups,
 # thanos, loki, tempo). Each gets a generated user scoped to that one bucket —

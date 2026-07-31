@@ -129,7 +129,7 @@ Admin credentials are **generated**, not authored. Read them back from the confi
 make secrets ENV=<cc-env>
 ```
 
-That prints `harbor_admin_password`, `grafana_admin_password`, and `minio_root_password`. The MinIO user name is `minioadmin` unless `MINIO_ROOT_USER` was set in `.env`; Harbor and Grafana log in as `admin`.
+That prints `harbor_admin_password`, `grafana_admin_password`, and `minio_root_password`, plus one entry per Hub credential declared here (`harbor_robot_<name>_secret`, `minio_bucket_<name>_secret_key`). The MinIO user name is `minioadmin` unless `MINIO_ROOT_USER` was set in `.env`; Harbor and Grafana log in as `admin`.
 
 Vault is auto-unsealed by its operator, which stores the unseal keys as a Secret in the `vault` namespace.
 
@@ -149,15 +149,18 @@ A Hub reaches this cluster through three endpoints it names in its own config �
 
 Write them into the Hub's `registry`, `object_storage`, and `observability` sections — see [Hub → Supporting services](hub.md#supporting-services). If this cluster backs all three, they can instead be derived from its domain alone with the [toolkit-cc shorthand](configuration.md#the-toolkit-cc-shorthand).
 
-Give each Hub its own backup bucket by declaring it here, named after the Hub's `cluster.name`:
+Give each Hub its own registry account and backup bucket by declaring them here, named after the Hub's `cluster.name`:
 
 ```yaml
+registry:
+  robots:
+    - name: "my-switch"
 object_storage:
   buckets:
     - name: "my-switch-backups"
 ```
 
-Each declared bucket is created in MinIO with a generated user scoped to that one bucket, so a Hub's credentials cannot touch another Hub's backups — see [Configuration → A Tooling Cluster, annotated](configuration.md#a-tooling-cluster-annotated).
+Each declared robot is created in Harbor as a pull-only account (`robot-<name>`) with a generated secret, so a Hub never holds the Harbor admin credential. Each declared bucket is created in MinIO with a generated user scoped to that one bucket, so a Hub's credentials cannot touch another Hub's backups — see [Configuration → A Tooling Cluster, annotated](configuration.md#a-tooling-cluster-annotated). Both are additive and creation-only: removing an entry stops managing it but deletes nothing.
 
 Two credentials do have to travel, because they are generated here and supplied there:
 
@@ -167,10 +170,10 @@ make secrets ENV=<cc-env>
 
 | Hub `.env` variable | Value from `make secrets` |
 |---------------------|---------------------------|
-| `OCI_PROXY_USERNAME` / `OCI_PROXY_PASSWORD` | `admin` / `harbor_admin_password` |
+| `OCI_PROXY_USERNAME` / `OCI_PROXY_PASSWORD` | `robot-<name>` / `harbor_robot_<name>_secret` |
 | `BACKUP_S3_ACCESS_KEY` / `BACKUP_S3_SECRET_KEY` | `<bucket name>` / `minio_bucket_<name>_secret_key` |
 
-With no declared buckets, the fallback for `BACKUP_S3_*` is the shared `backups` system bucket with `minioadmin` / `minio_root_password` — workable for a single Hub, but root credentials in a Hub's `.env` are exactly what per-bucket users exist to avoid.
+With no declared robots or buckets, the fallbacks are the shared credentials — `admin` / `harbor_admin_password` for the registry, and the `backups` system bucket with `minioadmin` / `minio_root_password` for S3. Workable for a single Hub, but admin credentials in a Hub's `.env` are exactly what the scoped accounts exist to avoid.
 
 Carry those into [Deploy a Hub → Configuration](hub.md#configuration).
 
