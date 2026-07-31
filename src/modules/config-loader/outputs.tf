@@ -109,6 +109,7 @@ output "registry" {
   value = {
     active = local.registry_active
     url    = local.registry_url
+    robots = local.registry_robots
   }
 }
 

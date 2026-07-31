@@ -94,6 +94,20 @@ variable "observability" {
   })
 }
 
+variable "registry" {
+  description = "Image pull-through cache: active, url. robots is cc-only: pull-only robot accounts to provision in the toolkit Harbor, each with a generated secret."
+  type = object({
+    active = bool
+    url    = string
+    robots = list(string)
+  })
+  default = {
+    active = false
+    url    = ""
+    robots = []
+  }
+}
+
 variable "object_storage" {
   description = "Backup S3 target: endpoint, bucket, region; active is false when provider is 'none'. buckets is cc-only: extra buckets served by the toolkit MinIO, each with a generated scoped user."
   type = object({

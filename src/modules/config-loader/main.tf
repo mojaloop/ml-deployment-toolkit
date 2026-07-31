@@ -142,6 +142,12 @@ locals {
   )
   registry_active = local.registry_url != ""
 
+  # cc role only: pull-only robot accounts provisioned in the toolkit Harbor,
+  # one per consuming hub (it authenticates as robot-<name>; the secret is
+  # generated). Creation is additive — removing an entry stops managing the
+  # robot but never deletes it in Harbor.
+  registry_robots = [for r in try(local.config.registry.robots, []) : r.name]
+
   # --- object_storage (backup target) --------------------------------------
   object_storage_provider = try(local.config.object_storage.provider, "none")
   backup_s3_endpoint = (
@@ -341,6 +347,21 @@ resource "terraform_data" "validation" {
     precondition {
       condition     = length(local.object_storage_buckets) == length(distinct(local.object_storage_buckets))
       error_message = "object_storage.buckets contains duplicate names."
+    }
+    precondition {
+      condition     = length(local.registry_robots) == 0 || local.cluster_role == "cc"
+      error_message = "registry.robots declares robot accounts to provision and is only valid on cluster.role 'cc'; env clusters consume one via OCI_PROXY_USERNAME/PASSWORD in .env."
+    }
+    precondition {
+      condition = alltrue([
+        for r in local.registry_robots :
+        can(regex("^[a-z0-9]+([._-][a-z0-9]+)*$", r))
+      ])
+      error_message = "registry.robots names must be lowercase alphanumeric with '.', '_' or '-' separators."
+    }
+    precondition {
+      condition     = length(local.registry_robots) == length(distinct(local.registry_robots))
+      error_message = "registry.robots contains duplicate names."
     }
     precondition {
       condition = (

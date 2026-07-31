@@ -65,6 +65,15 @@ locals {
     b => "minio_bucket_${replace(replace(b, "-", "_"), ".", "_")}_secret_key"
   }
 
+  # Declared robot accounts (cc only) each get a pull-only Harbor robot whose
+  # secret follows the same pattern: harbor_robot_<name>_secret, overridable
+  # via the matching UPPER_CASE key in .env.
+  harbor_declared_robots = local.is_cc ? var.registry.robots : []
+  harbor_robot_secret_names = {
+    for r in local.harbor_declared_robots :
+    r => "harbor_robot_${replace(replace(r, "-", "_"), ".", "_")}_secret"
+  }
+
   generated_secret_names = setunion(
     local.is_cc ? [
       "minio_root_password",
@@ -95,14 +104,30 @@ locals {
     ] : [],
   )
 
-  generated_secrets = {
-    for name in local.generated_secret_names :
-    name => (
-      lookup(local.s, upper(name), "") != ""
-      ? local.s[upper(name)]
-      : random_password.generated[name].result
-    )
-  }
+  generated_secrets = merge(
+    {
+      for name in local.generated_secret_names :
+      name => (
+        lookup(local.s, upper(name), "") != ""
+        ? local.s[upper(name)]
+        : random_password.generated[name].result
+      )
+    },
+    {
+      for r, name in local.harbor_robot_secret_names :
+      name => (
+        lookup(local.s, upper(name), "") != ""
+        ? local.s[upper(name)]
+        : random_password.harbor_robot[name].result
+      )
+    },
+  )
+
+  # Provisioning payload for the Harbor setup Job: [{name, secret}, ...].
+  harbor_robots = [
+    for r, name in local.harbor_robot_secret_names :
+    { name = r, secret = local.generated_secrets[name] }
+  ]
 }
 
 resource "random_password" "generated" {
@@ -112,6 +137,20 @@ resource "random_password" "generated" {
   # Alphanumeric only: these values travel through YAML substitution, DSN
   # strings, and shell-quoted seeds — special characters break too many layers.
   special = false
+}
+
+# Separate resource, not extra min_* arguments on "generated": changing any
+# parameter there would force-replace and silently rotate every generated
+# secret on existing environments.
+resource "random_password" "harbor_robot" {
+  for_each = toset(values(local.harbor_robot_secret_names))
+
+  length  = 32
+  special = false
+  # Harbor rejects robot secrets lacking an uppercase, lowercase, and digit.
+  min_upper   = 1
+  min_lower   = 1
+  min_numeric = 1
 }
 
 # ---------------------------------------------------------------------------
@@ -195,6 +234,15 @@ resource "kubernetes_secret_v1" "cluster_secrets" {
       minio_root_password    = local.generated_secrets["minio_root_password"]
       harbor_admin_password  = local.generated_secrets["harbor_admin_password"]
       grafana_admin_password = local.generated_secrets["grafana_admin_password"]
+      # Robot payload for the Harbor setup Job. base64 because it is
+      # substituted into the data: field of a Secret manifest — quoting-proof
+      # for JSON content. Always present ("W10=" = []) so substitution and the
+      # Job's mount never fail on a CC with no robots declared.
+      harbor_robots_json = base64encode(jsonencode(local.harbor_robots))
+      # Substituted into the Job's pod-template annotations: any robot or
+      # secret change alters the Job spec, and the force annotation on the Job
+      # lets Flux recreate (= re-run) it.
+      harbor_robots_hash = sha256(jsonencode(local.harbor_robots))
     } : {},
     local.is_env ? {
       mysql_root_password           = local.generated_secrets["mysql_root_password"]

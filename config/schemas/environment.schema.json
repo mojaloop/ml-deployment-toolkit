@@ -244,6 +244,24 @@
         "url": {
           "description": "Registry URL (harbor provider only; no oci:// prefix)",
           "type": "string"
+        },
+        "robots": {
+          "description": "cc role only: pull-only robot accounts to provision in the toolkit Harbor, one per consuming Hub (convention: name = the Hub's cluster.name). The Hub authenticates as robot-<name>; 'make secrets' prints the secret. Additive and creation-only — removing an entry never deletes the robot.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "description": "Robot account name (lowercase alphanumeric, '.', '_' or '-' separators)",
+                "type": "string",
+                "pattern": "^[a-z0-9]+([._-][a-z0-9]+)*$"
+              }
+            }
+          }
         }
       }
     },

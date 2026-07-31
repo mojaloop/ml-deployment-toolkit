@@ -62,6 +62,7 @@ module "flux_config" {
   email          = module.config.email
   alerting       = module.config.alerting
   observability  = module.config.observability
+  registry       = module.config.registry
   object_storage = module.config.object_storage
   data_stores    = module.config.data_stores
   app            = module.config.app
