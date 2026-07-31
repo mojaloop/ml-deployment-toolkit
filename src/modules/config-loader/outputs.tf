@@ -115,6 +115,7 @@ output "registry" {
 output "object_storage" {
   description = "Backup S3 target (resolved)"
   value = {
+    active   = local.object_storage_active
     endpoint = local.backup_s3_endpoint
     bucket   = local.backup_s3_bucket
     region   = local.backup_s3_region

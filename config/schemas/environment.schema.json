@@ -253,7 +253,7 @@
       "additionalProperties": false,
       "properties": {
         "provider": {
-          "description": "toolkit-cc derives https://s3.int.<toolkit_cc.domain>; s3 uses an explicit endpoint",
+          "description": "toolkit-cc derives https://s3.int.<toolkit_cc.domain>; s3 uses an explicit endpoint; none disables backups entirely (PSMDB/PXC backup+PITR off, vault-backup suspended). Enabling backups later restarts the mongod pods (PBM sidecars are added).",
           "enum": [
             "toolkit-cc",
             "s3",

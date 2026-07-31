@@ -151,6 +151,11 @@ locals {
   )
   backup_s3_bucket = try(local.config.object_storage.bucket, "backups")
   backup_s3_region = try(local.config.object_storage.region, "us-east-1")
+  # 'none' must translate into backups being structurally disabled downstream:
+  # PSMDB >=1.22 refuses to mark the cluster ready (and to create app users)
+  # while PBM's storage is unconfigured or unreachable, so an empty endpoint
+  # must never reach the data-layer CRs.
+  object_storage_active = local.object_storage_provider != "none"
 
   # --- observability (telemetry push sink) ---------------------------------
   observability_provider = try(local.config.observability.provider, "none")

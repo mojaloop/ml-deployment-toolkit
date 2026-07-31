@@ -352,6 +352,57 @@ locals {
     },
   )
 
+  # object_storage 'none' — switch the backup machinery off structurally.
+  # postBuild substitution can only swap scalars inside manifests; removing
+  # the PXC schedule or flipping booleans needs kustomize patches, attached
+  # here to the Kustomizations that own each consumer. PSMDB >=1.22 gates
+  # cluster readiness AND app-user creation on PBM reaching its storage, so
+  # shipping a backup config without a reachable endpoint deadlocks env-app.
+  backup_disabled_patches = {
+    for k, v in {
+      "env-data-mongodb" = [{
+        patch = yamlencode({
+          apiVersion = "psmdb.percona.com/v1"
+          kind       = "PerconaServerMongoDB"
+          metadata   = { name = "bulk-mongodb", namespace = "data" }
+          spec       = { backup = { enabled = false, pitr = { enabled = false } } }
+        })
+        target = {
+          group   = "psmdb.percona.com"
+          version = "v1"
+          kind    = "PerconaServerMongoDB"
+          name    = "bulk-mongodb"
+        }
+      }]
+      "env-data-mysql" = [{
+        patch = yamlencode([
+          { op = "remove", path = "/spec/backup/schedule" },
+          { op = "replace", path = "/spec/backup/pitr/enabled", value = false },
+        ])
+        target = {
+          group   = "pxc.percona.com"
+          version = "v1"
+          kind    = "PerconaXtraDBCluster"
+          name    = "mojaloop-db"
+        }
+      }]
+      "env-auth" = [{
+        patch = yamlencode({
+          apiVersion = "batch/v1"
+          kind       = "CronJob"
+          metadata   = { name = "vault-raft-snapshot", namespace = "vault" }
+          spec       = { suspend = true }
+        })
+        target = {
+          group   = "batch"
+          version = "v1"
+          kind    = "CronJob"
+          name    = "vault-raft-snapshot"
+        }
+      }]
+    } : k => v if !var.object_storage.active
+  }
+
   all_kustomizations = merge(
     {
       "platform" = {
@@ -543,6 +594,9 @@ resource "kubectl_manifest" "kustomization" {
       } : {},
       length(each.value.health_check_exprs) > 0 ? {
         healthCheckExprs = each.value.health_check_exprs
+      } : {},
+      length(lookup(local.backup_disabled_patches, each.key, [])) > 0 ? {
+        patches = local.backup_disabled_patches[each.key]
       } : {},
     )
   })

@@ -95,8 +95,9 @@ variable "observability" {
 }
 
 variable "object_storage" {
-  description = "Backup S3 target: endpoint, bucket, region"
+  description = "Backup S3 target: endpoint, bucket, region; active is false when provider is 'none'"
   type = object({
+    active   = bool
     endpoint = string
     bucket   = string
     region   = string

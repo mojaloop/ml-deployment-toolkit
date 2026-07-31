@@ -72,7 +72,12 @@ registry:
   provider: "harbor"
   url: "harbor.int.cc1.lab1.example.com"     # no oci:// prefix — used in Talos registry mirrors
 
-# Backup target (credentials BACKUP_S3_ACCESS_KEY/SECRET_KEY in .env)
+# Backup target (credentials BACKUP_S3_ACCESS_KEY/SECRET_KEY in .env).
+# The endpoint must be reachable at deploy time: PSMDB refuses to finish
+# provisioning (including app users) until PBM verifies its storage. To deploy
+# without a backup target, set provider "none" — backups and PITR are then
+# disabled entirely and the vault-backup CronJob is suspended. Enabling
+# backups later restarts the mongod pods (PBM sidecars are added).
 object_storage:
   provider: "s3"
   endpoint: "https://s3.int.cc1.lab1.example.com"
