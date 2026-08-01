@@ -1,0 +1,148 @@
+# Slow & Failed Traces — drill-down companion to Transfer Journey (moja-transfer-journey).
+#
+# The trace tables are COMPLETE by construction, not a sample: Alloy's
+# tail_sampling keeps every error trace and every trace breaching the 1s SLO
+# (only the healthy baseline is sampled at 10%). So an empty "slow traces"
+# table genuinely means no SLO breaches in the window.
+#
+# The Service Topology panel reads Tempo's service-graph API, which the Tempo
+# datasource resolves against traces_service_graph_* metrics in Thanos
+# (serviceMap.datasourceUid: thanos in grafana-values.yaml). Those metrics are
+# computed BEFORE tail sampling — the topology reflects all traffic.
+#
+# Notes:
+# - Event-SDK-rooted traces surface with business root names ("transfers",
+#   "QuotesPost", ...) via the trace-bridge; OTel-rooted ones with moja-*
+#   service names. Both appear in the tables; the topology panel only shows
+#   OTel spans (Event-SDK spans carry no span kind).
+# - Traces begin at the hub edge (no DFSP adapter / extapi-envoy spans), so
+#   "slow" here means hub-internal time.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-slow-failed-traces
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Mojaloop"
+data:
+  slow-failed-traces.json: |
+    {
+      "uid": "moja-slow-failed-traces",
+      "title": "Slow & Failed Traces",
+      "description": "Trace-level drill-down: service topology, per-edge call/failure rates, and complete tables of SLO-breaching (>1s) and errored traces. Tail sampling keeps ALL errors and ALL >1s traces, so these tables are exhaustive. Companion to the Transfer Journey dashboard.",
+      "tags": ["mojaloop", "tracing", "performance"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(traces_service_graph_request_total, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Service Topology (from traces)",
+          "type": "nodeGraph",
+          "gridPos": { "h": 12, "w": 14, "x": 0, "y": 0 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "serviceMap"
+            }
+          ]
+        },
+        {
+          "title": "Call Rate by Edge",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 10, "x": 14, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "lineWidth": 2, "fillOpacity": 8 } } },
+          "targets": [
+            {
+              "expr": "sum by (client, server) (rate(traces_service_graph_request_total{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "{{client}} -> {{server}}"
+            }
+          ]
+        },
+        {
+          "title": "Failed Calls by Edge",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 10, "x": 14, "y": 6 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "custom": { "lineWidth": 2, "fillOpacity": 8 },
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 0.001 } ] }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (client, server) (rate(traces_service_graph_request_failed_total{cluster_name=\"$cluster_name\"}[$__rate_interval]))",
+              "legendFormat": "{{client}} -> {{server}}"
+            }
+          ]
+        },
+        {
+          "title": "Slow Traces — SLO breach, traceDuration > 1s (complete, not sampled)",
+          "type": "table",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "traceql",
+              "query": "{ traceDuration > 1s }",
+              "limit": 20,
+              "tableType": "traces"
+            }
+          ]
+        },
+        {
+          "title": "Error Traces — status = error (complete, not sampled)",
+          "type": "table",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "traceql",
+              "query": "{ status = error }",
+              "limit": 20,
+              "tableType": "traces"
+            }
+          ]
+        },
+        {
+          "title": "Slow Spans > 1s — which hop is responsible",
+          "type": "table",
+          "gridPos": { "h": 9, "w": 24, "x": 0, "y": 22 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "traceql",
+              "query": "{ duration > 1s }",
+              "limit": 20,
+              "tableType": "spans"
+            }
+          ]
+        }
+      ]
+    }

@@ -1,0 +1,279 @@
+# Transfer Journey — per-hop RED metrics derived from traces (spanmetrics).
+#
+# Source metrics are traces_span_metrics_* produced by Alloy's spanmetrics
+# connector, which is teed off BEFORE tail sampling: rates and percentiles here
+# reflect 100% of traffic even though Tempo stores only a sample. Panels are
+# keyed to OTel span/service names ON PURPOSE — never Event-SDK business span
+# names (cl_transfer_prepare, QuotesPost, ...), which disappear when the
+# trace-bridge is retired.
+#
+# Caveats:
+# - This is HUB-INTERNAL latency. Traces start at the hub edge (DFSP SDK
+#   adapters and extapi-envoy emit no spans), so this dashboard explains where
+#   hub time goes; true end-to-end latency comes from k6 outside.
+# - p99 resolution is bounded by the connector's explicit buckets
+#   (5..10000 ms). 1000 ms is an exact bucket boundary, so SLO-breach counts
+#   (le="1000") are exact, not interpolated.
+# - GET /health and GET /metrics spans are excluded everywhere; they dominate
+#   call counts at lab traffic levels and carry no journey signal.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-transfer-journey
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Mojaloop"
+data:
+  transfer-journey.json: |
+    {
+      "uid": "moja-transfer-journey",
+      "title": "Transfer Journey",
+      "description": "Per-hop request rate, error rate and latency percentiles across the FSPIOP chain (ALS -> quoting -> ml-api-adapter -> central-ledger handlers), derived from trace span metrics computed before tail sampling. Hub-internal view: traces begin at the hub edge, so DFSP-side time is not included.",
+      "tags": ["mojaloop", "tracing", "performance"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "cluster_name",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(traces_span_metrics_calls_total, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Transfers/s (POST /transfers)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 2 } },
+          "targets": [
+            {
+              "expr": "sum(rate(traces_span_metrics_calls_total{cluster_name=\"$cluster_name\", service_name=\"moja-ml-api-adapter-service\", span_kind=\"SPAN_KIND_SERVER\", span_name=\"POST /transfers\"}[$__rate_interval]))",
+              "legendFormat": "transfers/s"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area" }
+        },
+        {
+          "title": "Journey Error Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 2,
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 0.01 }, { "color": "red", "value": 0.05 } ] }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(traces_span_metrics_calls_total{cluster_name=\"$cluster_name\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", status_code=\"STATUS_CODE_ERROR\", span_name!~\"GET /(health|metrics)\"}[$__rate_interval])) / sum(rate(traces_span_metrics_calls_total{cluster_name=\"$cluster_name\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name!~\"GET /(health|metrics)\"}[$__rate_interval]))",
+              "legendFormat": "error rate"
+            }
+          ],
+          "options": { "colorMode": "value", "graphMode": "area" }
+        },
+        {
+          "title": "Worst-Hop p99",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "decimals": 0,
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 500 }, { "color": "red", "value": 1000 } ] }
+            }
+          },
+          "targets": [
+            {
+              "expr": "max(histogram_quantile(0.99, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$cluster_name\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name!~\"GET /(health|metrics)\"}[$__rate_interval]))))",
+              "legendFormat": "worst hop p99"
+            }
+          ],
+          "options": { "colorMode": "value", "graphMode": "area" }
+        },
+        {
+          "title": "SLO Breaches >1s (1h, entry spans)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] }
+            }
+          },
+          "targets": [
+            {
+              "expr": "(sum(increase(traces_span_metrics_duration_milliseconds_count{cluster_name=\"$cluster_name\", service_name=~\"moja-(account-lookup-service|quoting-service|ml-api-adapter-service)\", span_kind=\"SPAN_KIND_SERVER\", span_name!~\"GET /(health|metrics)\"}[1h])) - sum(increase(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$cluster_name\", service_name=~\"moja-(account-lookup-service|quoting-service|ml-api-adapter-service)\", span_kind=\"SPAN_KIND_SERVER\", span_name!~\"GET /(health|metrics)\", le=\"1000\"}[1h]))) or vector(0)",
+              "legendFormat": "breaches"
+            }
+          ],
+          "options": { "colorMode": "value", "graphMode": "none" }
+        },
+        {
+          "title": "Entry-Point Request Rate (FSPIOP edge)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "lineWidth": 2, "fillOpacity": 8 } } },
+          "targets": [
+            {
+              "expr": "sum by (span_name) (rate(traces_span_metrics_calls_total{cluster_name=\"$cluster_name\", service_name=~\"moja-(account-lookup-service|quoting-service|ml-api-adapter-service)\", span_kind=\"SPAN_KIND_SERVER\", span_name!~\"GET /(health|metrics)\"}[$__rate_interval]))",
+              "legendFormat": "{{span_name}}"
+            }
+          ]
+        },
+        {
+          "title": "Entry-Point p99 Latency (SLO 1s)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": { "lineWidth": 2, "fillOpacity": 0, "thresholdsStyle": { "mode": "dashed" } },
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1000 } ] }
+            }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (span_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$cluster_name\", service_name=~\"moja-(account-lookup-service|quoting-service|ml-api-adapter-service)\", span_kind=\"SPAN_KIND_SERVER\", span_name!~\"GET /(health|metrics)\"}[$__rate_interval])))",
+              "legendFormat": "{{span_name}}"
+            }
+          ]
+        },
+        {
+          "title": "Request Rate by Service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "lineWidth": 2, "fillOpacity": 8 } } },
+          "targets": [
+            {
+              "expr": "sum by (service_name) (rate(traces_span_metrics_calls_total{cluster_name=\"$cluster_name\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name!~\"GET /(health|metrics)\"}[$__rate_interval]))",
+              "legendFormat": "{{service_name}}"
+            }
+          ]
+        },
+        {
+          "title": "Error Rate by Service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "max": 1,
+              "custom": { "lineWidth": 2, "fillOpacity": 8 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (service_name) (rate(traces_span_metrics_calls_total{cluster_name=\"$cluster_name\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", status_code=\"STATUS_CODE_ERROR\", span_name!~\"GET /(health|metrics)\"}[$__rate_interval])) / sum by (service_name) (rate(traces_span_metrics_calls_total{cluster_name=\"$cluster_name\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name!~\"GET /(health|metrics)\"}[$__rate_interval]))",
+              "legendFormat": "{{service_name}}"
+            }
+          ]
+        },
+        {
+          "title": "p95 Latency by Service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": { "lineWidth": 2, "fillOpacity": 0, "thresholdsStyle": { "mode": "dashed" } },
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1000 } ] }
+            }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$cluster_name\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name!~\"GET /(health|metrics)\"}[$__rate_interval])))",
+              "legendFormat": "{{service_name}}"
+            }
+          ]
+        },
+        {
+          "title": "Kafka Handler Processing Rate by Topic",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "lineWidth": 2, "fillOpacity": 8 } } },
+          "targets": [
+            {
+              "expr": "sum by (span_name) (rate(traces_span_metrics_calls_total{cluster_name=\"$cluster_name\", span_kind=\"SPAN_KIND_CONSUMER\"}[$__rate_interval]))",
+              "legendFormat": "{{span_name}}"
+            }
+          ]
+        },
+        {
+          "title": "Kafka Handler Processing p99 by Topic (SLO 1s)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": { "lineWidth": 2, "fillOpacity": 0, "thresholdsStyle": { "mode": "dashed" } },
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1000 } ] }
+            }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (span_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$cluster_name\", span_kind=\"SPAN_KIND_CONSUMER\"}[$__rate_interval])))",
+              "legendFormat": "{{span_name}}"
+            }
+          ]
+        },
+        {
+          "title": "Kafka Publish p99 (producer SEND spans)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": { "lineWidth": 2, "fillOpacity": 0 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (span_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$cluster_name\", span_kind=\"SPAN_KIND_PRODUCER\", span_name!~\"SEND:topic-event-.*\"}[$__rate_interval])))",
+              "legendFormat": "{{span_name}}"
+            }
+          ]
+        },
+        {
+          "title": "Downstream Client Call p99 by Service (DB/cache)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": { "lineWidth": 2, "fillOpacity": 0 }
+            }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$cluster_name\", span_kind=\"SPAN_KIND_CLIENT\"}[$__rate_interval])))",
+              "legendFormat": "{{service_name}}"
+            }
+          ]
+        }
+      ]
+    }
