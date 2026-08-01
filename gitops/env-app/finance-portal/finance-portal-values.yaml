@@ -316,12 +316,14 @@ role-assignment-service:
       }
 
 reporting-aggregator-svc:
-  # EXPERIMENT (perf campaign): its transfer/quote aggregation query
-  # averages 28s/execution on grown data (1884 DB-seconds total, see
-  # perf/RESULTS.md digest analysis) and starves PXC for the transaction
-  # path. Disabled pending an index/query fix; Transfers UI stops
-  # updating while disabled.
-  enabled: false
+  # Disabled during the 2026-07-02 perf campaign: its transfer/quote
+  # aggregation query averaged 28s/execution on grown data (1884 DB-seconds,
+  # see perf/RESULTS.md) and starved PXC. That was perf-scale data; at normal
+  # volumes it is harmless, and without it the Mongo `transaction` collection
+  # is never built, so the Transfers UI is empty on every fresh cluster.
+  # Perf environments should disable it via adopter override until the
+  # index/query fix lands.
+  enabled: true
   image:
     tag: v0.0.9
 
