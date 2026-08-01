@@ -37,18 +37,18 @@ gitops/
   talos/                     # Self-managed only: Cilium, Gateway API CRDs,
                              # LB-IPAM, OpenEBS
 
-  cc/                        # Tooling Cluster: namespaces, Vault operator
-  cc-config/                 #   Vault, Harbor, MinIO
-  cc-routes/                 #   HTTPRoutes
-  cc-observability/          #   Thanos, Loki, Tempo, Grafana, dashboards, alerts
-  cc-observability-routes/   #   HTTPRoutes
+  tooling/                        # Tooling Cluster: namespaces, Vault operator
+  tooling-config/                 #   Vault, Harbor, MinIO
+  tooling-routes/                 #   HTTPRoutes
+  tooling-observability/          #   Thanos, Loki, Tempo, Grafana, dashboards, alerts
+  tooling-observability-routes/   #   HTTPRoutes
 
-  env/                       # Hub: namespaces, database operators
-  env-data/                  #   MySQL, Kafka, MongoDB, Redis
-  env-auth/                  #   Vault, Ory (Kratos, Hydra, Keto, Oathkeeper)
-  env-auth-config/           #   Bootstrap jobs, access rules
-  env-app/                   #   Mojaloop, MCM, Finance Portal, extapi Envoy
-  env-observability-agent/   #   Alloy, kube-state-metrics, node-exporter
+  hub/                       # Hub: namespaces, database operators
+  hub-data/                  #   MySQL, Kafka, MongoDB, Redis
+  hub-auth/                  #   Vault, Ory (Kratos, Hydra, Keto, Oathkeeper)
+  hub-auth-config/           #   Bootstrap jobs, access rules
+  hub-app/                   #   Mojaloop, MCM, Finance Portal, extapi Envoy
+  hub-observability-agent/   #   Alloy, kube-state-metrics, node-exporter
 ```
 
 Each top-level directory is a Kustomization root. Which roots are applied depends on `cluster.role` — see [System overview](system-overview.md#reconciliation-order).
@@ -119,8 +119,8 @@ Kustomizations declare `dependsOn` and health gates rather than applying in para
 | `platform` before everything | cert-manager and ESO webhooks must be live or dependent resources are rejected |
 | `dns` before `platform-config` | Gateways need a working issuer to obtain certificates |
 | vendor before role layers | CNI and storage must exist before workloads schedule |
-| `env-data` before `env-auth` | Ory migrations need their databases and users to exist |
-| `env-auth-config` before `env-app` | Applications expect access rules and bootstrapped identities |
+| `hub-data` before `hub-auth` | Ory migrations need their databases and users to exist |
+| `hub-auth-config` before `hub-app` | Applications expect access rules and bootstrapped identities |
 
 The database gate is the one that surprises people. The MySQL operator creates users asynchronously — roughly 7–10 minutes — and a service whose migration starts first fails with access denied. Gating on cluster health rather than object existence is what makes the deployment reliable, and it is why a Hub takes time to converge.
 

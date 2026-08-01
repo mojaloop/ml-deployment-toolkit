@@ -13,22 +13,16 @@ Two files describe an environment: `config.yaml` for what the deployment is, and
 - [A Hub, annotated](#a-hub-annotated)
 - [Deployment templates](#deployment-templates)
 - [Data modes](#data-modes)
-- [The toolkit-cc shorthand](#the-toolkit-cc-shorthand)
+- [The tooling shorthand](#the-tooling-shorthand)
 - [Secrets](#secrets)
 - [Helm value overrides](#helm-value-overrides)
 - [Validating](#validating)
 
 ## Vocabulary
 
-The documentation uses reader-facing names; the configuration uses code values. They map one to one:
+Configuration values match the documentation's names: `role: tooling` deploys a Tooling Cluster, `role: hub` deploys a Hub. The one remaining translation is **Participant**, which appears in code and APIs as `dfsp` / `DFSP_ID`.
 
-| Configuration value | The docs call it |
-|---------------------|------------------|
-| `role: cc` | Tooling Cluster |
-| `role: env` | Hub |
-| `dfsp`, `DFSP_ID` | Participant |
-
-When a page says "deploy a Hub," set `role: env`. This is the only translation needed.
+> **"Hub" is the Mojaloop hub** — the switch this cluster runs — not the hub of a hub-and-spoke fleet topology. The central shared-services cluster in this toolkit is the Tooling Cluster.
 
 ## Environment layout
 
@@ -63,10 +57,10 @@ State and generated artifacts land under `artifacts/<env>/` — see [System over
 | `dns` | yes | `digitalocean`, `cloudflare`, `route53` | — |
 | `cert` | no | `email` (ACME contact), `server` (ACME directory URL) | `admin@<dns.domain>`, Let's Encrypt production |
 | `artifact` | no | `url`, `version`, `active` — the gitops OCI artifact Flux reconciles | none — no Kustomizations created; `active` defaults to true once `url` is set |
-| `toolkit_cc` | no | the backing Tooling Cluster's domain | — |
-| `registry` | no | `toolkit-cc`, `harbor`, `none` | `none` (pull direct from upstream) |
-| `object_storage` | no | `toolkit-cc`, `s3`, `none` | `none` |
-| `observability` | no | `toolkit-cc`, `urls`, `none` | `none` |
+| `tooling` | no | the backing Tooling Cluster's domain | — |
+| `registry` | no | `tooling`, `harbor`, `none` | `none` (pull direct from upstream) |
+| `object_storage` | no | `tooling`, `s3`, `none` | `none` |
+| `observability` | no | `tooling`, `urls`, `none` | `none` |
 | `data` | no (Hub only) | per store: `in-cluster-managed`, `external-unmanaged` | `in-cluster-managed` |
 | `email` | no | SMTP relay for transactional mail | off |
 | `alerting` | no | Grafana contact points — email, Telegram | off |
@@ -76,7 +70,7 @@ Three fields decide the shape of everything else:
 
 | Field | Effect |
 |-------|--------|
-| `cluster.role` | Which Kustomizations deploy — `cc` or `env` — and which template directory is read |
+| `cluster.role` | Which Kustomizations deploy — `tooling` or `hub` — and which template directory is read |
 | `template` | Node count, machine sizing, replica counts, data-layer tuning |
 | `artifact.version` | `latest` follows publishes; a tag pins |
 
@@ -94,12 +88,12 @@ version: 1
 
 cluster:
   name: "my-cc"                       # optional — defaults to the directory name
-  role: "cc"                          # cc | env | base
+  role: "tooling"                          # tooling | hub | bare
   vip: "192.168.0.210"                # Kubernetes API floating IP (on-prem only)
   lb_ipam:
     range: "192.168.0.211-192.168.0.213"
 
-template: "medium"                    # config/templates/cc/medium.yaml
+template: "medium"                    # config/templates/tooling/medium.yaml
 
 infra:
   provider: "proxmox"                 # proxmox | aws | digitalocean
@@ -146,7 +140,7 @@ alerting:                             # Grafana contact points
     chat_id: "0"                      # token in .env
 ```
 
-A Tooling Cluster carries no `data`, no `app`, and no `toolkit_cc` — it is the thing other clusters point at.
+A Tooling Cluster carries no `data`, no `app`, and no `tooling` — it is the thing other clusters point at.
 
 **`object_storage.buckets` declares what this cluster serves** — the reverse of the section's meaning on a Hub, where it names the backup target to consume. Each declared bucket is created in MinIO alongside the system buckets (`harbor`, `backups`, `thanos`, `loki`, `tempo`, which always exist and cannot be re-declared) and gets a generated user scoped to that one bucket: the access key is the bucket name, the secret key is a generated secret named `minio_bucket_<name>_secret_key`. The convention is one bucket per Hub, named `<hub cluster.name>-backups`, so no Hub's credentials can touch another Hub's backups. Creation is additive and one-way — removing an entry stops managing the bucket but never deletes data.
 
@@ -172,15 +166,15 @@ version: 1
 
 cluster:
   name: "my-switch"
-  role: "env"
+  role: "hub"
   vip: "192.168.0.214"
   lb_ipam:
     range: "192.168.0.215-192.168.0.217"   # three addresses
 
-template: "tps-10"                    # config/templates/env/tps-10.yaml
+template: "tps-10"                    # config/templates/hub/tps-10.yaml
 
 # Supporting services — each independent, each may point anywhere.
-# See "The toolkit-cc shorthand" below for the one-value alternative.
+# See "The tooling shorthand" below for the one-value alternative.
 registry:
   provider: "harbor"
   url: "harbor.int.cc1.lab1.example.com"
@@ -232,7 +226,7 @@ app:
 
 **`app.hub.admin_email` is the HubOps login for MCM and the Finance Portal.** The matching password is generated — read it with `make secrets` ([Secrets](#secrets)).
 
-Without `toolkit_cc`, a Hub is standalone: it pulls the artifact straight from a public registry, keeps no off-cluster backups, and ships no telemetry. That is a valid deployment, not a broken one.
+Without `tooling`, a Hub is standalone: it pulls the artifact straight from a public registry, keeps no off-cluster backups, and ships no telemetry. That is a valid deployment, not a broken one.
 
 ## Deployment templates
 
@@ -240,9 +234,9 @@ Without `toolkit_cc`, a Hub is standalone: it pulls the artifact straight from a
 
 | Role | Templates |
 |------|-----------|
-| Tooling Cluster (`cc`) | `small`, `medium` |
-| Hub (`env`) | `tps-1`, `tps-10` |
-| Platform-only (`base`) | `small` |
+| Tooling Cluster (`tooling`) | `small`, `medium` |
+| Hub (`hub`) | `tps-1`, `tps-10` |
+| Platform-only (`bare`) | `small` |
 
 Hub templates are named for the transactions-per-second they are sized to sustain. Rationale in [ADR-012](../../architecture/decisions/012-tps-sizing-profiles.md); the current two-layer shape in [ADR-015](../../architecture/decisions/015-two-stack-capability-config.md).
 
@@ -271,7 +265,7 @@ Each of the Hub's four stores is chosen independently, in `data.<store>.mode`:
 | Mode | Behaviour |
 |------|-----------|
 | `in-cluster-managed` (default) | Operators and CRs deploy from the artifact, endpoints derived, sizing from the template |
-| `external-unmanaged` | The adopter supplies `host` (and optionally `port`) and credentials; that store's `env-data` Kustomization is **not** created and the toolkit reconciles nothing |
+| `external-unmanaged` | The adopter supplies `host` (and optionally `port`) and credentials; that store's `hub-data` Kustomization is **not** created and the toolkit reconciles nothing |
 | `external-managed` | Schema-reserved. Terraform rejects it today with an explicit message — not yet implemented |
 
 ```yaml
@@ -288,18 +282,18 @@ Mixing is legitimate — external MySQL with in-cluster Kafka is a supported com
 
 Credentials for an external store come from `.env` under the same UPPER_CASE name the toolkit would otherwise generate (`MYSQL_ROOT_PASSWORD` and friends) — see [Secrets](#secrets). Backups of an external store are the adopter's responsibility; the toolkit's backup path covers in-cluster stores only.
 
-## The toolkit-cc shorthand
+## The tooling shorthand
 
 The registry, object-storage, and observability endpoints are normally written out, as in the Hub example above — the values stay visible and independent of anything this distribution decides.
 
 When a Tooling Cluster deployed by *this* toolkit backs all of them, the same five endpoints can be derived from its domain instead:
 
 ```yaml
-toolkit_cc:
+tooling:
   domain: "cc1.lab1.example.com"
 ```
 
-Then set `provider: toolkit-cc` on whichever capabilities should use it. The toolkit owns that URL scheme, so it derives them:
+Then set `provider: tooling` on whichever capabilities should use it. The toolkit owns that URL scheme, so it derives them:
 
 | Capability | Derived endpoint |
 |------------|------------------|
@@ -309,7 +303,7 @@ Then set `provider: toolkit-cc` on whichever capabilities should use it. The too
 | `observability` (logs) | `https://loki.int.<domain>/loki/api/v1/push` |
 | `observability` (traces) | `https://tempo.int.<domain>/v1/traces` |
 
-Setting `provider: toolkit-cc` on any capability without also setting `toolkit_cc.domain` fails at plan time, saying exactly that.
+Setting `provider: tooling` on any capability without also setting `tooling.domain` fails at plan time, saying exactly that.
 
 The shorthand saves transcription and makes a domain change one edit instead of five, but it is a convenience rather than a contract: it assumes the route layout this distribution currently gives a Tooling Cluster, and nothing validates that assumption at plan time. Prefer the explicit endpoints when the Hub and Tooling Cluster are upgraded on separate schedules, or when anything other than a toolkit-deployed Tooling Cluster provides a service. The resolved configuration is identical either way.
 
@@ -317,7 +311,7 @@ The presets are per capability, not all-or-nothing — a Hub may pull images thr
 
 ```yaml
 registry:
-  provider: "toolkit-cc"
+  provider: "tooling"
 observability:
   provider: "urls"
   mimir_url: "https://metrics.example.com/api/v1/receive"
@@ -341,7 +335,7 @@ Read them back on demand:
 make secrets ENV=<env>
 ```
 
-That is also how a Hub's `.env` gets its Tooling Cluster credentials: `make secrets ENV=<cc-env>` prints one `harbor_robot_<name>_secret` per robot declared under `registry.robots`, which becomes the Hub's `OCI_PROXY_PASSWORD` (its `OCI_PROXY_USERNAME` is `robot-<name>`), and one `minio_bucket_<name>_secret_key` per bucket declared under `object_storage.buckets`, which becomes the Hub's `BACKUP_S3_SECRET_KEY` (its `BACKUP_S3_ACCESS_KEY` is the bucket name). A Tooling Cluster with nothing declared falls back to the shared credentials — `admin` / `harbor_admin_password` and `minioadmin` / `minio_root_password` — workable, but admin credentials in a Hub's `.env` are exactly what the scoped accounts exist to avoid.
+That is also how a Hub's `.env` gets its Tooling Cluster credentials: `make secrets ENV=<tooling-env>` prints one `harbor_robot_<name>_secret` per robot declared under `registry.robots`, which becomes the Hub's `OCI_PROXY_PASSWORD` (its `OCI_PROXY_USERNAME` is `robot-<name>`), and one `minio_bucket_<name>_secret_key` per bucket declared under `object_storage.buckets`, which becomes the Hub's `BACKUP_S3_SECRET_KEY` (its `BACKUP_S3_ACCESS_KEY` is the bucket name). A Tooling Cluster with nothing declared falls back to the shared credentials — `admin` / `harbor_admin_password` and `minioadmin` / `minio_root_password` — workable, but admin credentials in a Hub's `.env` are exactly what the scoped accounts exist to avoid.
 
 **Supplied in `.env`.** Only credentials that exist outside the deployment:
 
@@ -350,8 +344,8 @@ That is also how a Hub's `.env` gets its Tooling Cluster credentials: `make secr
 | `PROXMOX_VE_ENDPOINT`, `PROXMOX_VE_API_TOKEN`, `PROXMOX_VE_SSH_USERNAME`, `PROXMOX_VE_SSH_PASSWORD` | `infra.provider: proxmox` |
 | `DIGITALOCEAN_TOKEN` / `CLOUDFLARE_API_TOKEN` / `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` + `AWS_REGION` | the chosen `dns.provider` |
 | `OCI_REPO_USERNAME`, `OCI_REPO_PASSWORD` | private artifact registry, or publishing one |
-| `OCI_PROXY_USERNAME`, `OCI_PROXY_PASSWORD` | `registry.provider` is `toolkit-cc` or `harbor` |
-| `BACKUP_S3_ACCESS_KEY`, `BACKUP_S3_SECRET_KEY` | `object_storage.provider` is `toolkit-cc` or `s3` |
+| `OCI_PROXY_USERNAME`, `OCI_PROXY_PASSWORD` | `registry.provider` is `tooling` or `harbor` |
+| `BACKUP_S3_ACCESS_KEY`, `BACKUP_S3_SECRET_KEY` | `object_storage.provider` is `tooling` or `s3` |
 | `SMTP_USER`, `SMTP_PASSWORD` | `email:` is configured |
 | `TELEGRAM_BOT_TOKEN` | `alerting.telegram` is configured |
 
@@ -392,7 +386,7 @@ ingress:
 replicas: ${cl_service_replicas}
 ```
 
-Available variables are the cluster identity (`cluster_name`, `domain`), the resolved telemetry sinks (`loki_url`, `mimir_url`, `tempo_url`), and every key from the template's `app:`, `data:`, and `cc:` sections. **Credentials are deliberately not available** — override files are for values, not secrets.
+Available variables are the cluster identity (`cluster_name`, `domain`), the resolved telemetry sinks (`loki_url`, `mimir_url`, `tempo_url`), and every key from the template's `app:`, `data:`, and `tooling:` sections. **Credentials are deliberately not available** — override files are for values, not secrets.
 
 Two consequences of real templating:
 
@@ -427,13 +421,13 @@ Cross-field rules the schema cannot express are Terraform preconditions on the c
 | Condition | What it means |
 |-----------|---------------|
 | `version` is not `1` | `config.yaml` must declare the schema version it is written against |
-| `cluster.role` is not `cc`, `env`, or `base` | The role selects both the template directory and the Kustomization set |
+| `cluster.role` is not `tooling`, `hub`, or `bare` | The role selects both the template directory and the Kustomization set |
 | `cluster.name` resolves to an empty string | Set it, or let it default by naming the environment directory |
-| A capability uses `provider: toolkit-cc` but `toolkit_cc.domain` is unset | Nothing to derive the endpoints from — see [The toolkit-cc shorthand](#the-toolkit-cc-shorthand) |
+| A capability uses `provider: tooling` but `tooling.domain` is unset | Nothing to derive the endpoints from — see [The tooling shorthand](#the-tooling-shorthand) |
 | Any `data.<store>.mode` is `external-managed` | Schema-reserved, not implemented — use `in-cluster-managed` or `external-unmanaged` |
 | An `external-unmanaged` store has no `host` | The endpoint cannot be derived for a store the toolkit does not deploy |
-| On `role: env`, `app.api_type` is not `fspiop` or `iso20022` | The message dialect must be one the platform ships |
-| On `role: env`, a non-Talos provider with any `in-cluster-managed` store | The in-cluster data layer is packaged for Talos providers only; on AWS or DigitalOcean every store must be `external-unmanaged`, or the cluster advertises hostnames that were never deployed |
+| On `role: hub`, `app.api_type` is not `fspiop` or `iso20022` | The message dialect must be one the platform ships |
+| On `role: hub`, a non-Talos provider with any `in-cluster-managed` store | The in-cluster data layer is packaged for Talos providers only; on AWS or DigitalOcean every store must be `external-unmanaged`, or the cluster advertises hostnames that were never deployed |
 | The template references a placement group absent from `infra.<provider>.placement` | Unmapped groups reach the provider as literal node names and fail partway through apply, with VMs already created |
 | The template has duplicate `node_groups[].name` | Group names become VM name suffixes and `for_each` keys |
 | `registry.provider: harbor` without `registry.url` | An explicitly bound capability must carry its parameters |

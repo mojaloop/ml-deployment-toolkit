@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=../../config/schemas/environment.schema.json
 # ------------------------------------------------------------------
-# Environment config (sample — env/switch cluster, backed by a CC)
+# Environment config (sample — hub cluster, backed by a Tooling Cluster)
 # Copy this file to config.yaml and edit for your environment.
 # Secrets live in .env next to this file (sourced via Makefile) —
 # never put credentials here.
@@ -9,7 +9,7 @@ version: 1
 
 cluster:
   name: "my-switch"
-  role: "env"                         # cc | env | base
+  role: "hub"                         # tooling | hub | bare
   vip: "192.168.0.214"                # Kubernetes API floating IP (on-prem only)
   lb_ipam:
     range: "192.168.0.215-192.168.0.217"
@@ -62,7 +62,7 @@ artifact:
 # values are visible and under your control.
 #
 # If a Tooling Cluster deployed by this toolkit backs all three, the
-# 'toolkit-cc' shorthand at the bottom of this section derives the same
+# 'tooling' shorthand at the bottom of this section derives the same
 # five endpoints from its domain alone. It is convenience only: the
 # resulting configuration is identical either way.
 # ------------------------------------------------------------------
@@ -99,17 +99,17 @@ observability:
 # --- Shorthand alternative -----------------------------------------
 # Replace all three blocks above with the following when a toolkit-deployed
 # Tooling Cluster provides them. One value then drives all five endpoints,
-# so changing the CC's domain is a single edit here instead of five:
+# so changing the Tooling Cluster's domain is a single edit here instead of five:
 #
-# toolkit_cc:
+# tooling:
 #   domain: "cc1.lab1.example.com"
 # registry:
-#   provider: "toolkit-cc"            # -> harbor.int.<domain>
+#   provider: "tooling"            # -> harbor.int.<domain>
 # object_storage:
-#   provider: "toolkit-cc"            # -> https://s3.int.<domain>
+#   provider: "tooling"            # -> https://s3.int.<domain>
 #   bucket: "backups"
 # observability:
-#   provider: "toolkit-cc"            # -> loki/thanos/tempo push URLs
+#   provider: "tooling"            # -> loki/thanos/tempo push URLs
 #
 # Set any capability to provider: "none" to disable it entirely.
 

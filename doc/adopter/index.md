@@ -33,8 +33,8 @@ Getting from nothing to a running switch.
 | [Provider setup](deploy/provider-setup.md) | Preparing Proxmox and the DNS zone |
 | [Configuration](deploy/configuration.md) | `config.yaml`, `.env`, and the vocabulary mapping |
 | [Deployment](deploy/deployment.md) | The deploy workflow, commands, and verification |
-| [Deploy a Tooling Cluster](deploy/tooling-cluster.md) | Role `cc` — registry, secrets, observability backend |
-| [Deploy a Hub](deploy/hub.md) | Role `env` — the Mojaloop switch |
+| [Deploy a Tooling Cluster](deploy/tooling-cluster.md) | Role `tooling` — registry, secrets, observability backend |
+| [Deploy a Hub](deploy/hub.md) | Role `hub` — the Mojaloop switch |
 | [Upgrading](deploy/upgrading.md) | Moving to a new artifact or infrastructure change |
 | [Known issues](deploy/known-issues.md) | Deployment-time issues and workarounds |
 

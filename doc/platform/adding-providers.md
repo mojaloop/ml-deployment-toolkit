@@ -54,7 +54,7 @@ It translates the provider-independent capacity templates into concrete machines
 - `vm_defaults`, `storage`, `talos` — VM shape, datastores, and image platform, for self-managed providers
 - `talos-patches` — provider-specific machine-config patches, if any
 
-**No new tier files.** The capacity templates under `config/templates/{cc,env,base}/` are provider-independent and already cover the new provider — a class the mapping does not list falls back to a built-in default, so the mapping should name every class the templates use. `make validate` schema-checks the mapping alongside the environment config.
+**No new tier files.** The capacity templates under `config/templates/{tooling,hub,bare}/` are provider-independent and already cover the new provider — a class the mapping does not list falls back to a built-in default, so the mapping should name every class the templates use. `make validate` schema-checks the mapping alongside the environment config.
 
 ## 4. Vendor layer, if needed
 
@@ -66,7 +66,7 @@ A self-managed cluster needs cluster-level resources a managed service would pro
 
 If adding a provider means editing any of these, reconsider the design:
 
-- `gitops/platform/`, `gitops/env*/`, `gitops/cc*/` — the shared layers are provider-agnostic by invariant
+- `gitops/platform/`, `gitops/hub*/`, `gitops/tooling*/` — the shared layers are provider-agnostic by invariant
 - DNS, cert-manager, or observability configuration
 - Application manifests
 

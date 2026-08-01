@@ -8,7 +8,7 @@
 
 ## Context
 
-The `gitops/` directory contains multiple kustomization roots spanning platform services, DNS provider config, vendor-specific resources (Talos, AWS, GCP), role-specific services (Tooling Cluster, Hub), and application layers. These layers have interdependencies (e.g., platform-config depends on platform, env-app depends on env-data) and must be version-coherent — mixing platform v1.2 with env-app v1.3 can cause breakage.
+The `gitops/` directory contains multiple kustomization roots spanning platform services, DNS provider config, vendor-specific resources (Talos, AWS, GCP), role-specific services (Tooling Cluster, Hub), and application layers. These layers have interdependencies (e.g., platform-config depends on platform, hub-app depends on hub-data) and must be version-coherent — mixing platform v1.2 with hub-app v1.3 can cause breakage.
 
 ## Alternatives considered
 
@@ -21,7 +21,7 @@ The `gitops/` directory contains multiple kustomization roots spanning platform 
 
 Single OCI artifact containing the entire `gitops/` directory. Flux Kustomizations select specific paths within the artifact based on environment configuration (provider, DNS provider, cluster role). The `flux-config` Terraform module creates the appropriate set of Kustomizations for each environment.
 
-Dependency chain within the artifact: `platform` -> `dns/{provider}` -> `platform-config` -> vendor (`talos`|`aws`|`gcp`) -> role-specific (`cc`|`cc-config`|`cc-routes`|`env`|`env-data`|`env-auth`|`env-app`).
+Dependency chain within the artifact: `platform` -> `dns/{provider}` -> `platform-config` -> vendor (`talos`|`aws`|`gcp`) -> role-specific (`tooling`|`tooling-config`|`tooling-routes`|`hub`|`hub-data`|`hub-auth`|`hub-app`).
 
 ## Consequences
 

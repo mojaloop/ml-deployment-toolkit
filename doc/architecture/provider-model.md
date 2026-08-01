@@ -96,9 +96,9 @@ Node counts and machine sizes come from named templates per role, not from hand-
 
 | Role | Available templates |
 |------|--------------------|
-| Tooling Cluster (`cc`) | `small`, `medium` |
-| Hub (`env`) | `tps-1`, `tps-10` |
-| Platform-only (`base`) | `small` |
+| Tooling Cluster (`tooling`) | `small`, `medium` |
+| Hub (`hub`) | `tps-1`, `tps-10` |
+| Platform-only (`bare`) | `small` |
 
 Hub templates are named for the transaction rate they are sized to sustain. `tps-1` is a functional lab; `tps-10` is the larger validated tier.
 
@@ -126,4 +126,4 @@ Four places, and nowhere else:
 | `gitops/talos/` | Vendor layer — self-managed clusters only |
 | `gitops/dns/<provider>/` | cert-manager issuer and external-dns config |
 
-Nothing in `gitops/platform/`, `gitops/env*/`, or `gitops/cc*/` is provider-aware. That is what makes the same artifact deployable everywhere, and it is the constraint to preserve when extending the toolkit.
+Nothing in `gitops/platform/`, `gitops/hub*/`, or `gitops/tooling*/` is provider-aware. That is what makes the same artifact deployable everywhere, and it is the constraint to preserve when extending the toolkit.

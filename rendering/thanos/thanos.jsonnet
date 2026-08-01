@@ -1,5 +1,5 @@
 // Thanos configuration for Mojaloop CC observability
-// Renders to YAML manifests in gitops/cc-observability/thanos/
+// Renders to YAML manifests in gitops/tooling-observability/thanos/
 //
 // Components: Receive (remote_write), Query, Store Gateway, Compactor
 // S3 storage: MinIO at minio.minio:9000, bucket: thanos

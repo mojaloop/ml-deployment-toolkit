@@ -45,8 +45,8 @@ Reader-facing terms are fixed. Code identifiers are not renamed — they are map
 
 | Concept | Use | Never use | Code identifier |
 |---------|-----|-----------|-----------------|
-| Management-plane cluster | **Tooling Cluster** | Control Center, CC | `role: cc` |
-| Mojaloop switch cluster | **Hub** | Switch, App Environment, env cluster, SW | `role: env` |
+| Management-plane cluster | **Tooling Cluster** | Control Center, CC | `role: tooling` |
+| Mojaloop switch cluster | **Hub** | Switch, App Environment, env cluster, SW | `role: hub` |
 | Connecting institution | **Participant** | DFSP (in prose) | `dfsp`, `DFSP_ID` |
 
 `DFSP` remains correct when naming a code identifier, an environment variable, or a Mojaloop API field.

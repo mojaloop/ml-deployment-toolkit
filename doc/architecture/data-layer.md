@@ -46,12 +46,12 @@ Each store is bound independently, in `data.<store>.mode`:
 | Mode | Effect on this page |
 |------|---------------------|
 | `in-cluster-managed` (default) | Everything below applies — operator, custom resource, and the toolkit's backup path |
-| `external-unmanaged` | The adopter supplies the endpoint and credentials. No operator, no custom resource, no `env-data-<store>` Kustomization, and **no toolkit backup** — provisioning, tuning, and recovery are the adopter's |
+| `external-unmanaged` | The adopter supplies the endpoint and credentials. No operator, no custom resource, no `hub-data-<store>` Kustomization, and **no toolkit backup** — provisioning, tuning, and recovery are the adopter's |
 | `external-managed` | Reserved in the schema, rejected at plan time. Not available |
 
 Mixing modes is supported — external MySQL alongside in-cluster Kafka is a valid Hub. See [Configuration → Data modes](../adopter/deploy/configuration.md#data-modes).
 
-The database **operators** live elsewhere again, in `env-system`. Three namespaces are therefore involved in a data-layer problem: `env-system` for the operator, `data` for the cluster, and `mojaloop` for the client.
+The database **operators** live elsewhere again, in `hub-system`. Three namespaces are therefore involved in a data-layer problem: `hub-system` for the operator, `data` for the cluster, and `mojaloop` for the client.
 
 ## MySQL
 
@@ -73,7 +73,7 @@ There is no `keycloak` database. Any reference to one is stale ([ADR-010](decisi
 
 A single cluster hosts all seven rather than one cluster per service ([ADR-009](decisions/009-single-mysql-cluster.md)).
 
-**Users are created asynchronously by the operator**, taking roughly 7–10 minutes after the cluster is created. Services whose migrations start before their user exists fail with access-denied errors. This is why the reconciliation chain gates `env-auth` behind `env-data` — see [System overview](system-overview.md#reconciliation-order).
+**Users are created asynchronously by the operator**, taking roughly 7–10 minutes after the cluster is created. Services whose migrations start before their user exists fail with access-denied errors. This is why the reconciliation chain gates `hub-auth` behind `hub-data` — see [System overview](system-overview.md#reconciliation-order).
 
 ## Kafka
 
@@ -107,7 +107,7 @@ MySQL and MongoDB each run **two mechanisms together**, and the distinction matt
 
 Practically: PITR recovers the ledger to the second before a bad write, not merely to the previous night. Without it, worst-case exposure would be a full day of transfers.
 
-Both mechanisms write to whatever the `object_storage` capability is bound to — MinIO on the Tooling Cluster via the `toolkit-cc` preset, or any S3-compatible endpoint. A store bound to `external-unmanaged` is outside this table entirely: the toolkit schedules nothing for it. **A full backup alone is not restorable to a point in time, and streamed logs alone are not restorable at all** — recovery needs both, so both must survive.
+Both mechanisms write to whatever the `object_storage` capability is bound to — MinIO on the Tooling Cluster via the `tooling` preset, or any S3-compatible endpoint. A store bound to `external-unmanaged` is outside this table entirely: the toolkit schedules nothing for it. **A full backup alone is not restorable to a point in time, and streamed logs alone are not restorable at all** — recovery needs both, so both must survive.
 
 **Read the Vault row carefully.** Snapshots run every fifteen minutes and only the last seven are kept, so the retained history is about **one hour and forty-five minutes** — not seven days. Vault holds the scheme PKI. If a compromise or corruption is discovered after two hours, there is no snapshot from before it.
 

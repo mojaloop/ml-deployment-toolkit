@@ -26,7 +26,7 @@ make render-thanos   # Thanos manifests from kube-thanos Jsonnet
 make render-cilium   # Cilium bootstrap manifest from the Helm chart
 ```
 
-**Thanos** is rendered from Jsonnet into `gitops/cc-observability/thanos/`. Re-render it when bumping the Thanos version or changing its topology. Note that because these are raw rendered manifests rather than a HelmRelease, values like retention are baked in at render time — see `discrepancies.md` item 8.
+**Thanos** is rendered from Jsonnet into `gitops/tooling-observability/thanos/`. Re-render it when bumping the Thanos version or changing its topology. Note that because these are raw rendered manifests rather than a HelmRelease, values like retention are baked in at render time — see `discrepancies.md` item 8.
 
 **Cilium** is rendered because it is fetched by Talos as an extra manifest at boot, before Flux exists. `make render-cilium` templates a minimal bootstrap manifest into `config/manifests/`. It carries a safety guard: if the render produces any `Secret` (which would mean private keys committed to git), it refuses to write the file. Keep Hubble disabled in the render values so no TLS secrets are generated — the guard enforces this, and a render failure here usually means Hubble was enabled.
 

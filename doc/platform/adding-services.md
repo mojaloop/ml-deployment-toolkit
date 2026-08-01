@@ -20,10 +20,10 @@ Which Kustomization a service belongs in follows from which clusters need it and
 |---------------|----------------------|
 | `platform/` | Every cluster needs — cert-manager, ESO, external-dns, metrics-server |
 | `talos/` | Only self-managed clusters need — CNI, storage, LB-IPAM |
-| `cc*/` | Only the Tooling Cluster runs — registry, storage, observability backend |
-| `env*/` | Only a Hub runs — data layer, auth, Mojaloop |
+| `tooling*/` | Only the Tooling Cluster runs — registry, storage, observability backend |
+| `hub*/` | Only a Hub runs — data layer, auth, Mojaloop |
 
-Match the reconciliation stage to the dependency. A service needing the database goes in `env-app` (which gates on the data layer); one needing nothing goes earlier. Placing it too early means it starts before its dependencies exist.
+Match the reconciliation stage to the dependency. A service needing the database goes in `hub-app` (which gates on the data layer); one needing nothing goes earlier. Placing it too early means it starts before its dependencies exist.
 
 ## Adding a platform service
 

@@ -5,9 +5,9 @@
 #
 # Kustomization graph (Flux dependsOn, role-gated):
 #   platform -> dns/<provider> -> platform-config -> <vendor> -> <role>
-#   cc:  cc -> cc-config -> {cc-routes, cc-observability -> cc-observability-routes}
-#   env: env -> env-data-common -> env-data-<store>... -> env-auth -> env-auth-config -> env-app
-#        env-observability-agent (parallel, after platform-config)
+#   tooling: tooling -> tooling-config -> {tooling-routes, tooling-observability -> tooling-observability-routes}
+#   hub: hub -> hub-data-common -> hub-data-<store>... -> hub-auth -> hub-auth-config -> hub-app
+#        hub-observability-agent (parallel, after platform-config)
 
 locals {
   s = var.secrets
@@ -20,8 +20,8 @@ locals {
   has_oci_credentials = lookup(local.s, "OCI_REPO_USERNAME", "") != "" && lookup(local.s, "OCI_REPO_PASSWORD", "") != ""
   is_talos            = contains(["proxmox", "openstack"], var.infra_provider)
   has_vendor          = contains(["proxmox", "openstack", "aws", "gcp"], var.infra_provider)
-  is_env              = var.cluster_role == "env"
-  is_cc               = var.cluster_role == "cc"
+  is_hub              = var.cluster_role == "hub"
+  is_tooling          = var.cluster_role == "tooling"
   vendor_name         = local.is_talos ? "talos" : var.infra_provider
 
   # Extract registry host from artifact URL ("oci://ghcr.io/x/y" -> "ghcr.io")
@@ -54,34 +54,34 @@ locals {
   # A matching non-empty UPPER_CASE key in var.secrets overrides generation
   # (used by external-unmanaged data stores and for migrating existing envs).
   # ---------------------------------------------------------------------------
-  # Declared buckets (cc only) each get a scoped MinIO user whose secret key
+  # Declared buckets (tooling only) each get a scoped MinIO user whose secret key
   # follows the generated-secret pattern: minio_bucket_<name>_secret_key,
   # overridable via the matching UPPER_CASE key in .env.
-  minio_declared_buckets = local.is_cc ? var.object_storage.buckets : []
-  # Mirrors the default buckets list in gitops/cc-config/minio/minio-values.yaml.
+  minio_declared_buckets = local.is_tooling ? var.object_storage.buckets : []
+  # Mirrors the default buckets list in gitops/tooling-config/minio/minio-values.yaml.
   minio_system_buckets = ["harbor", "backups", "thanos", "loki", "tempo"]
   minio_bucket_secret_names = {
     for b in local.minio_declared_buckets :
     b => "minio_bucket_${replace(replace(b, "-", "_"), ".", "_")}_secret_key"
   }
 
-  # Declared robot accounts (cc only) each get a pull-only Harbor robot whose
+  # Declared robot accounts (tooling only) each get a pull-only Harbor robot whose
   # secret follows the same pattern: harbor_robot_<name>_secret, overridable
   # via the matching UPPER_CASE key in .env.
-  harbor_declared_robots = local.is_cc ? var.registry.robots : []
+  harbor_declared_robots = local.is_tooling ? var.registry.robots : []
   harbor_robot_secret_names = {
     for r in local.harbor_declared_robots :
     r => "harbor_robot_${replace(replace(r, "-", "_"), ".", "_")}_secret"
   }
 
   generated_secret_names = setunion(
-    local.is_cc ? [
+    local.is_tooling ? [
       "minio_root_password",
       "harbor_admin_password",
       "grafana_admin_password",
     ] : [],
     values(local.minio_bucket_secret_names),
-    local.is_env ? [
+    local.is_hub ? [
       "mysql_root_password",
       "mysql_central_ledger_password",
       "mysql_account_lookup_password",
@@ -186,7 +186,7 @@ resource "kubernetes_config_map_v1" "cluster_config" {
       mimir_url = var.observability.mimir_url
       tempo_url = var.observability.tempo_url
     },
-    local.is_env ? {
+    local.is_hub ? {
       mysql_host   = var.data_stores["mysql"].host
       mysql_port   = var.data_stores["mysql"].port
       kafka_host   = var.data_stores["kafka"].host
@@ -229,7 +229,7 @@ resource "kubernetes_secret_v1" "cluster_secrets" {
       # Grafana Telegram contact point tolerates a dummy token; empty breaks provisioning
       telegram_bot_token = lookup(local.set_secrets, "TELEGRAM_BOT_TOKEN", "unset")
     },
-    local.is_cc ? {
+    local.is_tooling ? {
       minio_root_user        = lookup(local.set_secrets, "MINIO_ROOT_USER", "minioadmin")
       minio_root_password    = local.generated_secrets["minio_root_password"]
       harbor_admin_password  = local.generated_secrets["harbor_admin_password"]
@@ -237,14 +237,14 @@ resource "kubernetes_secret_v1" "cluster_secrets" {
       # Robot payload for the Harbor setup Job. base64 because it is
       # substituted into the data: field of a Secret manifest — quoting-proof
       # for JSON content. Always present ("W10=" = []) so substitution and the
-      # Job's mount never fail on a CC with no robots declared.
+      # Job's mount never fail on a Tooling Cluster with no robots declared.
       harbor_robots_json = base64encode(jsonencode(local.harbor_robots))
       # Substituted into the Job's pod-template annotations: any robot or
       # secret change alters the Job spec, and the force annotation on the Job
       # lets Flux recreate (= re-run) it.
       harbor_robots_hash = sha256(jsonencode(local.harbor_robots))
     } : {},
-    local.is_env ? {
+    local.is_hub ? {
       mysql_root_password           = local.generated_secrets["mysql_root_password"]
       mysql_central_ledger_password = local.generated_secrets["mysql_central_ledger_password"]
       mysql_account_lookup_password = local.generated_secrets["mysql_account_lookup_password"]
@@ -276,7 +276,7 @@ resource "kubernetes_secret_v1" "cluster_secrets" {
 # scoped user and per-bucket policy for each. Delivered as a Secret (not a
 # ConfigMap) because the users[] entries carry generated secret keys. Helm
 # list-merge replaces lists wholesale, so the buckets list re-states the
-# system buckets from gitops/cc-config/minio/minio-values.yaml.
+# system buckets from gitops/tooling-config/minio/minio-values.yaml.
 resource "kubernetes_secret_v1" "minio_buckets_values" {
   count = length(local.minio_declared_buckets) > 0 ? 1 : 0
 
@@ -385,8 +385,8 @@ resource "kubectl_manifest" "oci_repository" {
 # Ordering between Kustomizations is Flux's job (dependsOn), not Terraform's.
 # ---------------------------------------------------------------------------
 locals {
-  # env-data: one Kustomization per in-cluster store + a common slice.
-  in_cluster_stores = local.is_env && local.is_talos ? sort([
+  # hub-data: one Kustomization per in-cluster store + a common slice.
+  in_cluster_stores = local.is_hub && local.is_talos ? sort([
     for store, cfg in var.data_stores : store if cfg.in_cluster
   ]) : []
 
@@ -426,19 +426,19 @@ locals {
   }
 
   # Auth needs MySQL (Ory/MCM databases); apps additionally need every other store.
-  auth_depends = contains(local.in_cluster_stores, "mysql") ? ["env-data-mysql"] : ["env"]
+  auth_depends = contains(local.in_cluster_stores, "mysql") ? ["hub-data-mysql"] : ["hub"]
   app_depends = concat(
-    ["env-auth-config"],
-    [for store in local.in_cluster_stores : "env-data-${store}" if store != "mysql"],
+    ["hub-auth-config"],
+    [for store in local.in_cluster_stores : "hub-data-${store}" if store != "mysql"],
   )
 
   # Per-store Kustomizations (always same shape; enabled drives inclusion)
   data_kustomizations = merge(
     {
-      "env-data-common" = {
+      "hub-data-common" = {
         enabled            = length(local.in_cluster_stores) > 0
-        path               = "./env-data/common"
-        depends_on         = ["env"]
+        path               = "./hub-data/common"
+        depends_on         = ["hub"]
         timeout            = "5m"
         wait               = false
         health_checks      = []
@@ -447,10 +447,10 @@ locals {
     },
     {
       for store, cfg in var.data_stores :
-      "env-data-${store}" => {
+      "hub-data-${store}" => {
         enabled            = contains(local.in_cluster_stores, store)
-        path               = "./env-data/${store}"
-        depends_on         = ["env-data-common"]
+        path               = "./hub-data/${store}"
+        depends_on         = ["hub-data-common"]
         timeout            = "20m"
         wait               = false
         health_checks      = local.store_health[store].health_checks
@@ -464,10 +464,10 @@ locals {
   # the PXC schedule or flipping booleans needs kustomize patches, attached
   # here to the Kustomizations that own each consumer. PSMDB >=1.22 gates
   # cluster readiness AND app-user creation on PBM reaching its storage, so
-  # shipping a backup config without a reachable endpoint deadlocks env-app.
+  # shipping a backup config without a reachable endpoint deadlocks hub-app.
   backup_disabled_patches = {
     for k, v in {
-      "env-data-mongodb" = [{
+      "hub-data-mongodb" = [{
         patch = yamlencode({
           apiVersion = "psmdb.percona.com/v1"
           kind       = "PerconaServerMongoDB"
@@ -481,7 +481,7 @@ locals {
           name    = "bulk-mongodb"
         }
       }]
-      "env-data-mysql" = [{
+      "hub-data-mysql" = [{
         patch = yamlencode([
           { op = "remove", path = "/spec/backup/schedule" },
           { op = "replace", path = "/spec/backup/pitr/enabled", value = false },
@@ -493,7 +493,7 @@ locals {
           name    = "mojaloop-db"
         }
       }]
-      "env-auth" = [{
+      "hub-auth" = [{
         patch = yamlencode({
           apiVersion = "batch/v1"
           kind       = "CronJob"
@@ -552,25 +552,25 @@ locals {
         health_checks      = []
         health_check_exprs = []
       }
-      # role chain entry (cc or env); "base" gets no role kustomization
+      # role chain entry (tooling or hub); "bare" gets no role kustomization
       (var.cluster_role) = {
-        enabled    = var.cluster_role != "base"
+        enabled    = var.cluster_role != "bare"
         path       = "./${var.cluster_role}"
         depends_on = [local.has_vendor ? local.vendor_name : "platform-config"]
-        timeout    = local.is_env ? "10m" : "5m"
+        timeout    = local.is_hub ? "10m" : "5m"
         wait       = false
-        health_checks = local.is_env ? [
+        health_checks = local.is_hub ? [
           { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "psmdb-operator", namespace = var.flux_namespace },
           { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "pxc-operator", namespace = var.flux_namespace },
           { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "strimzi-kafka-operator", namespace = var.flux_namespace },
         ] : []
         health_check_exprs = []
       }
-      # --- cc chain ---
-      "cc-config" = {
-        enabled    = local.is_cc
-        path       = "./cc-config"
-        depends_on = ["cc"]
+      # --- tooling chain ---
+      "tooling-config" = {
+        enabled    = local.is_tooling
+        path       = "./tooling-config"
+        depends_on = ["tooling"]
         timeout    = "20m"
         wait       = false
         health_checks = [
@@ -579,19 +579,19 @@ locals {
         ]
         health_check_exprs = []
       }
-      "cc-routes" = {
-        enabled            = local.is_cc
-        path               = "./cc-routes"
-        depends_on         = ["cc-config"]
+      "tooling-routes" = {
+        enabled            = local.is_tooling
+        path               = "./tooling-routes"
+        depends_on         = ["tooling-config"]
         timeout            = ""
         wait               = false
         health_checks      = []
         health_check_exprs = []
       }
-      "cc-observability" = {
-        enabled    = local.is_cc
-        path       = "./cc-observability"
-        depends_on = ["cc-config"]
+      "tooling-observability" = {
+        enabled    = local.is_tooling
+        path       = "./tooling-observability"
+        depends_on = ["tooling-config"]
         timeout    = "20m"
         wait       = false
         health_checks = [
@@ -603,19 +603,19 @@ locals {
         ]
         health_check_exprs = []
       }
-      "cc-observability-routes" = {
-        enabled            = local.is_cc
-        path               = "./cc-observability-routes"
-        depends_on         = ["cc-observability"]
+      "tooling-observability-routes" = {
+        enabled            = local.is_tooling
+        path               = "./tooling-observability-routes"
+        depends_on         = ["tooling-observability"]
         timeout            = ""
         wait               = false
         health_checks      = []
         health_check_exprs = []
       }
-      # --- env chain ---
-      "env-auth" = {
-        enabled    = local.is_env
-        path       = "./env-auth"
+      # --- hub chain ---
+      "hub-auth" = {
+        enabled    = local.is_hub
+        path       = "./hub-auth"
         depends_on = local.auth_depends
         timeout    = "20m"
         wait       = false
@@ -627,18 +627,18 @@ locals {
         ]
         health_check_exprs = []
       }
-      "env-auth-config" = {
-        enabled            = local.is_env
-        path               = "./env-auth-config"
-        depends_on         = ["env-auth"]
+      "hub-auth-config" = {
+        enabled            = local.is_hub
+        path               = "./hub-auth-config"
+        depends_on         = ["hub-auth"]
         timeout            = "10m"
         wait               = false
         health_checks      = []
         health_check_exprs = []
       }
-      "env-app" = {
-        enabled    = local.is_env
-        path       = "./env-app"
+      "hub-app" = {
+        enabled    = local.is_hub
+        path       = "./hub-app"
         depends_on = local.app_depends
         timeout    = "30m"
         wait       = false
@@ -649,9 +649,9 @@ locals {
         ]
         health_check_exprs = []
       }
-      "env-observability-agent" = {
-        enabled            = local.is_env
-        path               = "./env-observability-agent"
+      "hub-observability-agent" = {
+        enabled            = local.is_hub
+        path               = "./hub-observability-agent"
         depends_on         = ["platform-config"]
         timeout            = "5m"
         wait               = true

@@ -37,6 +37,6 @@ Keep that boundary clean. Provider-specific logic belongs in a Terraform module 
 
 The single rule that keeps the distribution a distribution:
 
-> Nothing in `gitops/platform/`, `gitops/env*/`, or `gitops/cc*/` is provider-aware.
+> Nothing in `gitops/platform/`, `gitops/hub*/`, or `gitops/tooling*/` is provider-aware.
 
 If a change would make a shared manifest depend on the infrastructure provider, it belongs somewhere else — a provider module, a vendor Kustomization, or a substituted variable. When in doubt, check that the same manifest would still be correct on a different provider.

@@ -33,9 +33,9 @@
         "role": {
           "description": "Determines which gitops paths are deployed and which template directory is used",
           "enum": [
-            "cc",
-            "env",
-            "base"
+            "tooling",
+            "hub",
+            "bare"
           ]
         },
         "vip": {
@@ -218,8 +218,8 @@
         }
       }
     },
-    "toolkit_cc": {
-      "description": "Backing Tooling Cluster \u2014 one value drives every toolkit-cc preset",
+    "tooling": {
+      "description": "Backing Tooling Cluster \u2014 one value drives every tooling preset",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -234,9 +234,9 @@
       "additionalProperties": false,
       "properties": {
         "provider": {
-          "description": "toolkit-cc derives harbor.int.<toolkit_cc.domain>; harbor uses an explicit url",
+          "description": "tooling derives harbor.int.<tooling.domain>; harbor uses an explicit url",
           "enum": [
-            "toolkit-cc",
+            "tooling",
             "harbor",
             "none"
           ]
@@ -246,7 +246,7 @@
           "type": "string"
         },
         "robots": {
-          "description": "cc role only: pull-only robot accounts to provision in the toolkit Harbor, one per consuming Hub (convention: name = the Hub's cluster.name). The Hub authenticates as robot-<name>; 'make secrets' prints the secret. Additive and creation-only — removing an entry never deletes the robot.",
+          "description": "tooling role only: pull-only robot accounts to provision in the toolkit Harbor, one per consuming Hub (convention: name = the Hub's cluster.name). The Hub authenticates as robot-<name>; 'make secrets' prints the secret. Additive and creation-only — removing an entry never deletes the robot.",
           "type": "array",
           "items": {
             "type": "object",
@@ -271,9 +271,9 @@
       "additionalProperties": false,
       "properties": {
         "provider": {
-          "description": "toolkit-cc derives https://s3.int.<toolkit_cc.domain>; s3 uses an explicit endpoint; none disables backups entirely (PSMDB/PXC backup+PITR off, vault-backup suspended). Enabling backups later restarts the mongod pods (PBM sidecars are added).",
+          "description": "tooling derives https://s3.int.<tooling.domain>; s3 uses an explicit endpoint; none disables backups entirely (PSMDB/PXC backup+PITR off, vault-backup suspended). Enabling backups later restarts the mongod pods (PBM sidecars are added).",
           "enum": [
-            "toolkit-cc",
+            "tooling",
             "s3",
             "none"
           ]
@@ -289,7 +289,7 @@
           "type": "string"
         },
         "buckets": {
-          "description": "cc role only: extra buckets to serve from the toolkit MinIO, each with a generated scoped user (access key = bucket name; 'make secrets' prints the secret key). System buckets (harbor, backups, thanos, loki, tempo) always exist and cannot be re-declared. Additive and creation-only — removing an entry never deletes data.",
+          "description": "tooling role only: extra buckets to serve from the toolkit MinIO, each with a generated scoped user (access key = bucket name; 'make secrets' prints the secret key). System buckets (harbor, backups, thanos, loki, tempo) always exist and cannot be re-declared. Additive and creation-only — removing an entry never deletes data.",
           "type": "array",
           "items": {
             "type": "object",
@@ -314,9 +314,9 @@
       "additionalProperties": false,
       "properties": {
         "provider": {
-          "description": "toolkit-cc derives loki/thanos/tempo push URLs; urls uses the explicit *_url fields",
+          "description": "tooling derives loki/thanos/tempo push URLs; urls uses the explicit *_url fields",
           "enum": [
-            "toolkit-cc",
+            "tooling",
             "urls",
             "none"
           ]
@@ -463,7 +463,7 @@
       }
     },
     "app": {
-      "description": "Mojaloop application parameters (env clusters)",
+      "description": "Mojaloop application parameters (hub clusters)",
       "type": "object",
       "additionalProperties": false,
       "properties": {

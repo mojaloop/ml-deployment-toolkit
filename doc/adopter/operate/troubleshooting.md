@@ -110,10 +110,10 @@ Usually memory (PXC needs a substantial InnoDB buffer pool), an unbound PVC, or 
 ```bash
 kubectl get pods -n data -l strimzi.io/kind=Kafka
 kubectl get pvc -n data -l strimzi.io/kind=Kafka
-kubectl logs -n env-system deploy/strimzi-cluster-operator --tail=50
+kubectl logs -n hub-system deploy/strimzi-cluster-operator --tail=50
 ```
 
-Note the operator is in `env-system`, not `data`. KRaft needs a majority of brokers up to form a quorum, so a single stuck broker can block the cluster.
+Note the operator is in `hub-system`, not `data`. KRaft needs a majority of brokers up to form a quorum, so a single stuck broker can block the cluster.
 
 ## Vault
 
@@ -121,7 +121,7 @@ Note the operator is in `env-system`, not `data`. KRaft needs a majority of brok
 
 ```bash
 kubectl get pods -n vault
-kubectl logs -n <cc-system|env-system> deploy/vault-operator
+kubectl logs -n <tooling-system|hub-system> deploy/vault-operator
 ```
 
 If it stays sealed, the operator is the place to look, not Vault itself. The unseal keys live in a Secret in the `vault` namespace; auto-unseal reads them on restart. See [Data layer → What the adopter must keep](../recover/disaster-recovery.md#what-the-adopter-must-keep) for why that Secret is also the adopter's responsibility to back up.
@@ -133,7 +133,7 @@ More time is lost to this than to any real fault. Kubernetes returns an empty li
 | Looking for | Namespace |
 |-------------|-----------|
 | MySQL, Kafka, MongoDB, Redis | `data` |
-| Database operators | `env-system` |
+| Database operators | `hub-system` |
 | Kratos, Hydra, Keto, Oathkeeper | `ory` |
 | MCM, its Vault Agent | `mcm` |
 | Mojaloop pods, Finance Portal, the FSPIOP Envoy | `mojaloop` |

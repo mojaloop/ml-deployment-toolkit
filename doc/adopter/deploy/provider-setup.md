@@ -111,7 +111,7 @@ infra:
       pg-3: "node2"   # only if the template uses three
 ```
 
-Which groups a template references is in `config/templates/{cc,env,base}/<template>.yaml`, in each node group's `placement:` list. Provide a node mapping for every group named there; an unmapped `pg-N` is passed through to Proxmox as a literal node name and fails.
+Which groups a template references is in `config/templates/{tooling,hub,bare}/<template>.yaml`, in each node group's `placement:` list. Provide a node mapping for every group named there; an unmapped `pg-N` is passed through to Proxmox as a literal node name and fails.
 
 ## DNS zone
 

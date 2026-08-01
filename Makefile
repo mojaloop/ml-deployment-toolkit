@@ -284,10 +284,10 @@ render: render-thanos render-cilium
 render-thanos:
 	@echo "Rendering Thanos manifests..."
 	@cd rendering/thanos && jb install && \
-	jsonnet -J vendor -m ../../gitops/cc-observability/thanos/ thanos.jsonnet && \
-	cd ../../gitops/cc-observability/thanos && \
+	jsonnet -J vendor -m ../../gitops/tooling-observability/thanos/ thanos.jsonnet && \
+	cd ../../gitops/tooling-observability/thanos && \
 	for f in thanos-*; do [ -f "$$f" ] && [ "$${f##*.}" != "yaml" ] && yq -p json -o yaml "$$f" > "$$f.yaml" && rm "$$f"; done || true
-	@echo "Thanos manifests rendered to gitops/cc-observability/thanos/"
+	@echo "Thanos manifests rendered to gitops/tooling-observability/thanos/"
 
 render-cilium:
 	@echo "Rendering Cilium $(CILIUM_VERSION) bootstrap manifest..."

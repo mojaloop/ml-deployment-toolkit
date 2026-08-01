@@ -14,7 +14,7 @@
 # dormant instrumentation without any image or upstream change.
 #
 # We do NOT use the OpenTelemetryCollector CR — Alloy is the collector.
-# See gitops/env-observability-agent/alloy-values.yaml (otelcol.receiver.otlp).
+# See gitops/hub-observability-agent/alloy-values.yaml (otelcol.receiver.otlp).
 
 crds:
   create: true

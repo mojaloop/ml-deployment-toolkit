@@ -83,12 +83,12 @@ The full reference is [Configuration → Secrets](configuration.md#secrets); che
 - SMTP — `SMTP_USER`, `SMTP_PASSWORD` when `email:` is configured. The host, port, and sender address are `config.yaml`, not secrets
 - Telegram — `TELEGRAM_BOT_TOKEN` when `alerting.telegram` is configured
 
-**Tooling Cluster (`cc`):**
+**Tooling Cluster (`tooling`):**
 
 - Nothing further is required. `MINIO_ROOT_USER` may be set to override the default `minioadmin`; the MinIO, Harbor, and Grafana passwords are generated.
 - **Alerting delivery is still the thing to get right.** The destinations live in `config.yaml` under `alerting:` and the credentials in `.env`. **Without them, 22 alert rules evaluate but nothing is delivered** — the most common way a deployment ends up believing it has no alerting. See [Observability](../../architecture/observability.md#alerting).
 
-**Hub (`env`):**
+**Hub (`hub`):**
 
 - `OCI_PROXY_USERNAME` / `OCI_PROXY_PASSWORD` and `BACKUP_S3_ACCESS_KEY` / `BACKUP_S3_SECRET_KEY` when the Hub uses a Tooling Cluster's Harbor and object storage — both come from `make secrets` on that Tooling Cluster ([hand-off](tooling-cluster.md#hand-off-to-the-hub))
 - Credentials for any `external-unmanaged` data store, under the generated name they replace (`MYSQL_ROOT_PASSWORD`, `MONGODB_ROOT_PASSWORD`, …)

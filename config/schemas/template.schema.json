@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Capacity template",
-  "description": "Schema for config/templates/{cc,env,base}/*.yaml \u2014 provider-independent node groups plus service tuning sections.",
+  "description": "Schema for config/templates/{tooling,hub,bare}/*.yaml \u2014 provider-independent node groups plus service tuning sections.",
   "type": "object",
   "required": [
     "version",
@@ -90,18 +90,18 @@
         }
       }
     },
-    "cc": {
-      "description": "CC services tuning (cc templates) \u2014 open-ended key set",
+    "tooling": {
+      "description": "Tooling services tuning (tooling templates) \u2014 open-ended key set",
       "type": "object",
       "additionalProperties": true
     },
     "app": {
-      "description": "Application horizontal scaling (env templates) \u2014 open-ended key set",
+      "description": "Application horizontal scaling (hub templates) \u2014 open-ended key set",
       "type": "object",
       "additionalProperties": true
     },
     "data": {
-      "description": "Data layer tuning (env templates) \u2014 open-ended key set",
+      "description": "Data layer tuning (hub templates) \u2014 open-ended key set",
       "type": "object",
       "additionalProperties": true
     }

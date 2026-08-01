@@ -82,7 +82,7 @@ Both `extapi-envoy` replicas (limits **128Mi**) were **OOMKilled 9–10 times**
 during the day, last kills 17:25:20/27 — coinciding with `ramp-qs6`'s http_500
 phase. The DFSP↔switch gateway was dying inside every ramp. **All collapse
 points above are suspect until envoy gets a sane memory limit and a ramp is
-re-run.** Manifest: `gitops/env-app/routes/extapi-envoy-deployment.yaml`.
+re-run.** Manifest: `gitops/hub-app/routes/extapi-envoy-deployment.yaml`.
 
 ### State at end of day
 - Live config: qs_handler=6 (Honor patch ×19 targets), audit sync:true, all else 1 replica.

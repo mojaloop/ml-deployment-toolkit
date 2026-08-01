@@ -56,7 +56,7 @@ The first module in both stacks. It reads the environment's `config.yaml`, loads
 
 This is where the three configuration tiers collapse into one — see [Configuration tiers](../architecture/system-overview.md#configuration-tiers). Downstream modules never read `config.yaml` directly; they read config-loader's output. When the platform developer adds a configuration field, it flows through here.
 
-It also carries the cross-field validation JSON Schema cannot express, as `terraform_data` preconditions: the config version, `cluster.name` matching the environment directory, a `toolkit-cc` binding without a domain, an `external-unmanaged` store without a host, and `external-managed` being rejected outright. Add a new invariant here, next to the others, rather than in a consuming module.
+It also carries the cross-field validation JSON Schema cannot express, as `terraform_data` preconditions: the config version, `cluster.name` matching the environment directory, a `tooling` binding without a domain, an `external-unmanaged` store without a host, and `external-managed` being rejected outright. Add a new invariant here, next to the others, rather than in a consuming module.
 
 ## Provider modules
 
@@ -80,7 +80,7 @@ The largest module, the whole of the config stack, and the one that encodes the 
 - One **values-override ConfigMap** per `environments/<env>/values/<name>.yaml`, named `<name>-values-override`. The config root templates the file before passing it in, so `${...}` in an override expands against the same non-secret variable set Flux substitutes with
 - The **Kustomization dependency graph** for the cluster's role, with `dependsOn` and health gates
 
-The role (`cc`, `env`, `base`) determines which Kustomizations exist and how they are chained; the data modes determine how many `env-data-<store>` Kustomizations the fan-out has. The health gates — waiting on operators, on database readiness, on the Ory stack — live here. This is the module that makes a Hub converge in the right order; see [Reconciliation order](../architecture/system-overview.md#reconciliation-order).
+The role (`tooling`, `hub`, `bare`) determines which Kustomizations exist and how they are chained; the data modes determine how many `hub-data-<store>` Kustomizations the fan-out has. The health gates — waiting on operators, on database readiness, on the Ory stack — live here. This is the module that makes a Hub converge in the right order; see [Reconciliation order](../architecture/system-overview.md#reconciliation-order).
 
 ## The Terraform–Flux boundary
 

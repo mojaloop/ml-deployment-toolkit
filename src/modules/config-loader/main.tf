@@ -131,18 +131,18 @@ locals {
   # =========================================================================
   # Capability resolution
   # =========================================================================
-  tcc_domain = try(local.config.toolkit_cc.domain, "")
+  tooling_domain = try(local.config.tooling.domain, "")
 
   # --- registry (image pull-through cache) ---------------------------------
   registry_provider = try(local.config.registry.provider, "none")
   registry_url = (
-    local.registry_provider == "toolkit-cc" ? "harbor.int.${local.tcc_domain}" :
+    local.registry_provider == "tooling" ? "harbor.int.${local.tooling_domain}" :
     local.registry_provider == "harbor" ? try(local.config.registry.url, "") :
     ""
   )
   registry_active = local.registry_url != ""
 
-  # cc role only: pull-only robot accounts provisioned in the toolkit Harbor,
+  # tooling role only: pull-only robot accounts provisioned in the toolkit Harbor,
   # one per consuming hub (it authenticates as robot-<name>; the secret is
   # generated). Creation is additive — removing an entry stops managing the
   # robot but never deletes it in Harbor.
@@ -151,7 +151,7 @@ locals {
   # --- object_storage (backup target) --------------------------------------
   object_storage_provider = try(local.config.object_storage.provider, "none")
   backup_s3_endpoint = (
-    local.object_storage_provider == "toolkit-cc" ? "https://s3.int.${local.tcc_domain}" :
+    local.object_storage_provider == "tooling" ? "https://s3.int.${local.tooling_domain}" :
     local.object_storage_provider == "s3" ? try(local.config.object_storage.endpoint, "") :
     ""
   )
@@ -163,26 +163,26 @@ locals {
   # must never reach the data-layer CRs.
   object_storage_active = local.object_storage_provider != "none"
 
-  # cc role only: extra buckets served by the toolkit MinIO, each backed by a
+  # tooling role only: extra buckets served by the toolkit MinIO, each backed by a
   # generated scoped user (access key = bucket name). Creation is additive —
   # the system buckets below always exist and cannot be re-declared, and
   # removing an entry never deletes data.
   object_storage_buckets = [for b in try(local.config.object_storage.buckets, []) : b.name]
-  # Mirrors the default buckets list in gitops/cc-config/minio/minio-values.yaml.
+  # Mirrors the default buckets list in gitops/tooling-config/minio/minio-values.yaml.
   minio_system_buckets = ["harbor", "backups", "thanos", "loki", "tempo"]
 
   # --- observability (telemetry push sink) ---------------------------------
   observability_provider = try(local.config.observability.provider, "none")
   loki_url = (
-    local.observability_provider == "toolkit-cc" ? "https://loki.int.${local.tcc_domain}/loki/api/v1/push" :
+    local.observability_provider == "tooling" ? "https://loki.int.${local.tooling_domain}/loki/api/v1/push" :
     try(local.config.observability.loki_url, "")
   )
   mimir_url = (
-    local.observability_provider == "toolkit-cc" ? "https://thanos.int.${local.tcc_domain}/api/v1/receive" :
+    local.observability_provider == "tooling" ? "https://thanos.int.${local.tooling_domain}/api/v1/receive" :
     try(local.config.observability.mimir_url, "")
   )
   tempo_url = (
-    local.observability_provider == "toolkit-cc" ? "https://tempo.int.${local.tcc_domain}/v1/traces" :
+    local.observability_provider == "tooling" ? "https://tempo.int.${local.tooling_domain}/v1/traces" :
     try(local.config.observability.tempo_url, "")
   )
 
@@ -201,7 +201,7 @@ locals {
 
   # --- data (per-store mode) -----------------------------------------------
   # in-cluster-managed: operators + CRs deployed, endpoints derived.
-  # external-unmanaged: adopter-supplied endpoint/credentials, env-data slice suppressed.
+  # external-unmanaged: adopter-supplied endpoint/credentials, hub-data slice suppressed.
   # external-managed: schema-reserved, rejected below until implemented.
   data_store_defaults = {
     mysql   = { host = "mojaloop-db-haproxy.data.svc.cluster.local", port = "3306" }
@@ -251,8 +251,8 @@ resource "terraform_data" "validation" {
       error_message = "config.yaml must declare 'version: 1' (schema version)."
     }
     precondition {
-      condition     = contains(["cc", "env", "base"], local.cluster_role)
-      error_message = "cluster.role must be one of: cc, env, base."
+      condition     = contains(["tooling", "hub", "bare"], local.cluster_role)
+      error_message = "cluster.role must be one of: tooling, hub, bare."
     }
     precondition {
       condition     = local.cluster_name != ""
@@ -261,9 +261,9 @@ resource "terraform_data" "validation" {
     precondition {
       condition = alltrue([
         for p in [local.registry_provider, local.object_storage_provider, local.observability_provider] :
-        p != "toolkit-cc"
-      ]) || local.tcc_domain != ""
-      error_message = "A capability uses provider 'toolkit-cc' but toolkit_cc.domain is not set."
+        p != "tooling"
+      ]) || local.tooling_domain != ""
+      error_message = "A capability uses provider 'tooling' but tooling.domain is not set."
     }
     precondition {
       condition = alltrue([
@@ -279,7 +279,7 @@ resource "terraform_data" "validation" {
       error_message = "external-unmanaged data stores must set data.<store>.host."
     }
     precondition {
-      condition     = local.cluster_role != "env" || contains(["fspiop", "iso20022"], local.api_type)
+      condition     = local.cluster_role != "hub" || contains(["fspiop", "iso20022"], local.api_type)
       error_message = "app.api_type must be fspiop or iso20022."
     }
 
@@ -289,7 +289,7 @@ resource "terraform_data" "validation" {
     # pod CrashLoops on DNS.
     precondition {
       condition = (
-        local.cluster_role != "env" || local.is_talos_provider ||
+        local.cluster_role != "hub" || local.is_talos_provider ||
         alltrue([for store, cfg in local.data_stores : !cfg.in_cluster])
       )
       error_message = "infra.provider '${local.provider_name}' has no in-cluster data layer — every data.<store>.mode must be external-unmanaged on this provider."
@@ -327,8 +327,8 @@ resource "terraform_data" "validation" {
       error_message = "object_storage.provider is 's3' but object_storage.endpoint is not set."
     }
     precondition {
-      condition     = length(local.object_storage_buckets) == 0 || local.cluster_role == "cc"
-      error_message = "object_storage.buckets declares buckets to serve and is only valid on cluster.role 'cc'; env clusters consume one via object_storage.bucket."
+      condition     = length(local.object_storage_buckets) == 0 || local.cluster_role == "tooling"
+      error_message = "object_storage.buckets declares buckets to serve and is only valid on cluster.role 'tooling'; hub clusters consume one via object_storage.bucket."
     }
     precondition {
       condition = alltrue([
@@ -349,8 +349,8 @@ resource "terraform_data" "validation" {
       error_message = "object_storage.buckets contains duplicate names."
     }
     precondition {
-      condition     = length(local.registry_robots) == 0 || local.cluster_role == "cc"
-      error_message = "registry.robots declares robot accounts to provision and is only valid on cluster.role 'cc'; env clusters consume one via OCI_PROXY_USERNAME/PASSWORD in .env."
+      condition     = length(local.registry_robots) == 0 || local.cluster_role == "tooling"
+      error_message = "registry.robots declares robot accounts to provision and is only valid on cluster.role 'tooling'; hub clusters consume one via OCI_PROXY_USERNAME/PASSWORD in .env."
     }
     precondition {
       condition = alltrue([

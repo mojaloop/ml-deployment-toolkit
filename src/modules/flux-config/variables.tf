@@ -16,8 +16,8 @@ variable "cluster_role" {
   type        = string
 
   validation {
-    condition     = contains(["base", "cc", "env"], var.cluster_role)
-    error_message = "cluster_role must be 'base', 'cc', or 'env'."
+    condition     = contains(["bare", "tooling", "hub"], var.cluster_role)
+    error_message = "cluster_role must be 'bare', 'tooling', or 'hub'."
   }
 }
 
@@ -95,7 +95,7 @@ variable "observability" {
 }
 
 variable "registry" {
-  description = "Image pull-through cache: active, url. robots is cc-only: pull-only robot accounts to provision in the toolkit Harbor, each with a generated secret."
+  description = "Image pull-through cache: active, url. robots is tooling-only: pull-only robot accounts to provision in the toolkit Harbor, each with a generated secret."
   type = object({
     active = bool
     url    = string
@@ -109,7 +109,7 @@ variable "registry" {
 }
 
 variable "object_storage" {
-  description = "Backup S3 target: endpoint, bucket, region; active is false when provider is 'none'. buckets is cc-only: extra buckets served by the toolkit MinIO, each with a generated scoped user."
+  description = "Backup S3 target: endpoint, bucket, region; active is false when provider is 'none'. buckets is tooling-only: extra buckets served by the toolkit MinIO, each with a generated scoped user."
   type = object({
     active   = bool
     endpoint = string
@@ -157,7 +157,7 @@ variable "secrets" {
 # --- Template tuning + overrides ------------------------------------------
 
 variable "profile_vars" {
-  description = "Template tuning variables (app/data/cc sections, flattened) for postBuild substitution"
+  description = "Template tuning variables (app/data/tooling sections, flattened) for postBuild substitution"
   type        = map(string)
   default     = {}
 }

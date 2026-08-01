@@ -4,9 +4,9 @@
 
 **Audiences:** adopter (deploy)
 
-The Tooling Cluster (`role: cc`) is the management plane — OCI registry, secrets, object storage, and the observability backend that Hubs report into. Deploy it first if using one.
+The Tooling Cluster (`role: tooling`) is the management plane — OCI registry, secrets, object storage, and the observability backend that Hubs report into. Deploy it first if using one.
 
-For the shared workflow and commands, see [Deployment](deployment.md). This page is the `cc`-specific configuration and checks.
+For the shared workflow and commands, see [Deployment](deployment.md). This page is the `tooling`-specific configuration and checks.
 
 - [When to deploy one](#when-to-deploy-one)
 - [Inputs](#inputs)
@@ -50,7 +50,7 @@ version: 1
 template: "small"           # small | medium
 cluster:
   name: "my-cc"             # must equal the environment directory name
-  role: "cc"                # routes Flux to the Tooling Cluster paths
+  role: "tooling"                # routes Flux to the Tooling Cluster paths
   vip: "192.168.0.210"
   lb_ipam:
     range: "192.168.0.211-192.168.0.212"   # two addresses
@@ -69,7 +69,7 @@ registry:
 
 **A Tooling Cluster needs two LB addresses** — `gw-int` and `gw-ext`. It has no FSPIOP endpoint, so no third.
 
-A Tooling Cluster has no `toolkit_cc`, no `data`, and no `app` section — it is the cluster others point at. Start from `environments/mlf-lab1-cc1/config.yaml.sample`.
+A Tooling Cluster has no `tooling`, no `data`, and no `app` section — it is the cluster others point at. Start from `environments/mlf-lab1-cc1/config.yaml.sample`.
 
 Full schema and secrets: [Configuration](configuration.md). Alerting matters here specifically — the observability backend lives on this cluster, so the `alerting:` section and its `.env` credentials are what decide whether alerts leave it. See [Prerequisites](prerequisites.md#credentials-checklist).
 
@@ -84,8 +84,8 @@ dig +short NS cc1.example.com     # must return the DNS provider's nameservers
 Then validate and deploy:
 
 ```bash
-make validate ENV=<cc-env>
-make plan-apply ENV=<cc-env>
+make validate ENV=<tooling-env>
+make plan-apply ENV=<tooling-env>
 ```
 
 Expect ~15–20 minutes for Terraform, then ~10–15 for Flux to converge.
@@ -95,7 +95,7 @@ Expect ~15–20 minutes for Terraform, then ~10–15 for Flux to converge.
 Check up the stack — VMs, then Talos, then Kubernetes. The full commands are in [Deployment → Verify](deployment.md#verify-up-the-stack). The Tooling-Cluster-specific checks:
 
 ```bash
-export KUBECONFIG=$(pwd)/artifacts/<cc-env>/kubernetes/kubeconfig
+export KUBECONFIG=$(pwd)/artifacts/<tooling-env>/kubernetes/kubeconfig
 
 # Two gateways, each with a LoadBalancer address
 kubectl get gateways -n platform-system
@@ -126,7 +126,7 @@ Services are published at `https://<service>.int.<domain>`, where `<domain>` is 
 Admin credentials are **generated**, not authored. Read them back from the config stack:
 
 ```bash
-make secrets ENV=<cc-env>
+make secrets ENV=<tooling-env>
 ```
 
 That prints `harbor_admin_password`, `grafana_admin_password`, and `minio_root_password`, plus one entry per Hub credential declared here (`harbor_robot_<name>_secret`, `minio_bucket_<name>_secret_key`). The MinIO user name is `minioadmin` unless `MINIO_ROOT_USER` was set in `.env`; Harbor and Grafana log in as `admin`.
@@ -147,7 +147,7 @@ A Hub reaches this cluster through three endpoints it names in its own config �
 | Logs | `https://loki.int.<domain>/loki/api/v1/push` |
 | Traces | `https://tempo.int.<domain>/v1/traces` |
 
-Write them into the Hub's `registry`, `object_storage`, and `observability` sections — see [Hub → Supporting services](hub.md#supporting-services). If this cluster backs all three, they can instead be derived from its domain alone with the [toolkit-cc shorthand](configuration.md#the-toolkit-cc-shorthand).
+Write them into the Hub's `registry`, `object_storage`, and `observability` sections — see [Hub → Supporting services](hub.md#supporting-services). If this cluster backs all three, they can instead be derived from its domain alone with the [tooling shorthand](configuration.md#the-tooling-shorthand).
 
 Give each Hub its own registry account and backup bucket by declaring them here, named after the Hub's `cluster.name`:
 
@@ -165,7 +165,7 @@ Each declared robot is created in Harbor as a pull-only account (`robot-<name>`)
 Two credentials do have to travel, because they are generated here and supplied there:
 
 ```bash
-make secrets ENV=<cc-env>
+make secrets ENV=<tooling-env>
 ```
 
 | Hub `.env` variable | Value from `make secrets` |
@@ -183,7 +183,7 @@ Carry those into [Deploy a Hub → Configuration](hub.md#configuration).
 
 ```bash
 kubectl -n vault get secrets
-kubectl -n vault get secret <unseal-secret> -o yaml > vault-unseal-<cc-env>.yaml
+kubectl -n vault get secret <unseal-secret> -o yaml > vault-unseal-<tooling-env>.yaml
 ```
 
 Store that file offline. Full rationale and the disaster-recovery procedure: [Recover → Disaster recovery](../recover/disaster-recovery.md#what-the-adopter-must-keep).

@@ -103,7 +103,7 @@ Traffic inside the cluster past the mTLS boundary is plain HTTP at the applicati
 
 ## Cluster hardening
 
-**Pod Security Admission.** Most namespaces run under default restrictions. Four are explicitly `privileged` because their workloads require it: `platform-system`, `cc-system`, `vault`, and `openebs-system`.
+**Pod Security Admission.** Most namespaces run under default restrictions. Four are explicitly `privileged` because their workloads require it: `platform-system`, `tooling-system`, `vault`, and `openebs-system`.
 
 **Network policy is narrow, not comprehensive.** Only two policies ship:
 

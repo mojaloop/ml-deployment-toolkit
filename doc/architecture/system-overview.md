@@ -56,9 +56,9 @@ A cluster's role determines which Flux Kustomizations are created. The value is 
 
 | Role | Reader-facing name | Purpose |
 |------|-------------------|---------|
-| `cc` | **Tooling Cluster** | Management plane — registry, secrets, object storage, observability backend |
-| `env` | **Hub** | The Mojaloop switch and its data layer |
-| `base` | — | Platform layer only; no role-specific workloads |
+| `tooling` | **Tooling Cluster** | Management plane — registry, secrets, object storage, observability backend |
+| `hub` | **Hub** | The Mojaloop switch and its data layer |
+| `bare` | — | Platform layer only; no role-specific workloads |
 
 A Tooling Cluster is optional. A single Hub can pull artifacts from any external OCI registry. The Tooling Cluster earns its place in multi-environment and air-gapped operation, where it provides a pull-through cache, shared object storage, and aggregated observability.
 
@@ -102,13 +102,13 @@ Flux applies Kustomizations as a dependency graph, not a flat list. Each stage w
 
 Every role shares the same four-stage prefix — `platform` → `dns` → `platform-config` → `talos`. `platform` gates on the cert-manager and external-secrets webhooks being live. The vendor stage is named for the infrastructure provider — `talos` on Proxmox — and is skipped on providers that need no vendor layer.
 
-The **Tooling Cluster** adds five stages. `cc-config` gates on Harbor and MinIO. `cc-observability` gates on Thanos receive and query, plus Loki, Tempo, and Grafana.
+The **Tooling Cluster** adds five stages. `tooling-config` gates on Harbor and MinIO. `tooling-observability` gates on Thanos receive and query, plus Loki, Tempo, and Grafana.
 
-The **Hub** adds a gated chain at every step: `env` waits for the PXC, PSMDB, and Strimzi operators; `env-data-common` fans out into one Kustomization per in-cluster store, each with its own health gate — `env-data-mysql` waits for the MySQL cluster to report `ready`, Kafka and MongoDB for their custom resources to be healthy; `env-auth` waits for Vault, Kratos, Keto, and Hydra; `env-app` waits for Mojaloop, MCM, and Finance Portal.
+The **Hub** adds a gated chain at every step: `hub` waits for the PXC, PSMDB, and Strimzi operators; `hub-data-common` fans out into one Kustomization per in-cluster store, each with its own health gate — `hub-data-mysql` waits for the MySQL cluster to report `ready`, Kafka and MongoDB for their custom resources to be healthy; `hub-auth` waits for Vault, Kratos, Keto, and Hydra; `hub-app` waits for Mojaloop, MCM, and Finance Portal.
 
-A store bound to `external-unmanaged` gets no Kustomization at all — the fan-out is built from the stores that are actually in-cluster, so `env-auth` and `env-app` gate only on what this deployment runs. See [Configuration → Data modes](../adopter/deploy/configuration.md#data-modes).
+A store bound to `external-unmanaged` gets no Kustomization at all — the fan-out is built from the stores that are actually in-cluster, so `hub-auth` and `hub-app` gate only on what this deployment runs. See [Configuration → Data modes](../adopter/deploy/configuration.md#data-modes).
 
-This is why a Hub takes time to converge and why an early failure blocks everything downstream — the ordering is deliberate, because migrations run against databases that must already exist. `env-observability-agent` is a parallel branch off `platform-config` and does not block the application chain.
+This is why a Hub takes time to converge and why an early failure blocks everything downstream — the ordering is deliberate, because migrations run against databases that must already exist. `hub-observability-agent` is a parallel branch off `platform-config` and does not block the application chain.
 
 ## Configuration tiers
 
@@ -138,7 +138,7 @@ A value takes one of two routes.
 
 | Step | Where |
 |------|-------|
-| Capacity template tuning — replica counts, storage sizes, buffer pools | `config/templates/<role>/<name>.yaml`, sections `app:` / `data:` / `cc:` |
+| Capacity template tuning — replica counts, storage sizes, buffer pools | `config/templates/<role>/<name>.yaml`, sections `app:` / `data:` / `tooling:` |
 | Environment config — capability bindings, domain, cluster identity | `environments/<env>/config.yaml` |
 | Supplied credentials | `environments/<env>/.env` |
 | Generated credentials — the ~20 internal service passwords | created by the config stack, never authored |

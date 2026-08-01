@@ -24,7 +24,7 @@ Two cluster kinds, each driven from its own environment config under `environmen
 
 **Hub** — the Mojaloop switch. Central ledger, account lookup, quoting, settlements, MCM, the Ory auth stack, and the data layer (MySQL, Kafka, MongoDB, Redis). Participants connect over mTLS through the Cilium-based gateway.
 
-> In configuration these are `role: cc` and `role: env`. See [vocabulary](adopter/deploy/configuration.md#vocabulary).
+> In configuration these are `role: tooling` and `role: hub`. See [vocabulary](adopter/deploy/configuration.md#vocabulary).
 
 ## Where this sits
 

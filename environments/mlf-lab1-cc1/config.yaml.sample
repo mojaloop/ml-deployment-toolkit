@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=../../config/schemas/environment.schema.json
 # ------------------------------------------------------------------
-# Environment config (sample — CC / Tooling Cluster)
+# Environment config (sample — Tooling Cluster)
 # Copy this file to config.yaml and edit for your environment.
 # Secrets live in .env next to this file (sourced via Makefile) —
 # never put credentials here.
@@ -9,7 +9,7 @@ version: 1
 
 cluster:
   name: "my-cc"
-  role: "cc"                          # cc | env | base
+  role: "tooling"                          # tooling | hub | bare
   vip: "192.168.0.210"                # Kubernetes API floating IP (on-prem only)
   lb_ipam:
     range: "192.168.0.211-192.168.0.213"
@@ -54,7 +54,7 @@ artifact:
   url: "oci://ghcr.io/your-org/ml-deployment-toolkit"
   version: "latest"                   # OCI tag — "latest" or pin to a version
 
-# Container image pull-through cache (none on the CC itself — Harbor lives here).
+# Container image pull-through cache (none on the Tooling Cluster itself — Harbor lives here).
 # robots: pull-only Harbor accounts for consuming Hubs. Each Hub authenticates
 # as robot-<name>; the secret comes from `make secrets`. Convention: one robot
 # per Hub, named after the Hub's cluster.name. Creation only — removing an

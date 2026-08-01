@@ -16,7 +16,7 @@ output "cluster" {
 }
 
 output "cluster_role" {
-  description = "Cluster role: cc | env | base"
+  description = "Cluster role: tooling | hub | bare"
   value       = local.cluster_role
 }
 
@@ -97,9 +97,9 @@ output "template_data" {
   value       = try(local.template.data, {})
 }
 
-output "template_cc" {
-  description = "CC services scaling variables from the template"
-  value       = try(local.template.cc, {})
+output "template_tooling" {
+  description = "Tooling services scaling variables from the template"
+  value       = try(local.template.tooling, {})
 }
 
 # --- Resolved capabilities ------------------------------------------------

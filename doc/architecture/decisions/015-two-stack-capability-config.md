@@ -44,11 +44,11 @@ It plans and applies the config stack alone. Flux re-reads `postBuild.substitute
 
 **Capability sections.** `config.yaml` is a flat list of top-level sections, one per capability, each naming its provider: `infra`, `dns`, `cert`, `artifact`, `registry`, `object_storage`, `observability`, `data`, `email`, `alerting`, `app`. Only `infra` and `dns` are required. "Capability" stays internal vocabulary — the adopter sees sections, not jargon. `profile:` is renamed `template:`; per-environment config moves from `config/environments/` to `environments/`.
 
-**Two-layer templates.** A generic capacity template per tier (`config/templates/<role>/<tier>.yaml`) declares node groups — `{name, class, count, cores, memory, disks[], placement[]}` — plus the `app`/`data`/`cc` tuning sections. A thin per-provider mapping (`config/templates/mappings/<provider>.yaml`) translates workload classes into instance types or VM defaults. `placement` is index-aligned, so per-node placement stays deterministic.
+**Two-layer templates.** A generic capacity template per tier (`config/templates/<role>/<tier>.yaml`) declares node groups — `{name, class, count, cores, memory, disks[], placement[]}` — plus the `app`/`data`/`tooling` tuning sections. A thin per-provider mapping (`config/templates/mappings/<provider>.yaml`) translates workload classes into instance types or VM defaults. `placement` is index-aligned, so per-node placement stays deterministic.
 
-**The toolkit-cc preset.** `toolkit_cc.domain` plus `provider: toolkit-cc` on `registry`, `object_storage`, or `observability` derives all five endpoints from the one domain value.
+**The tooling preset.** `tooling.domain` plus `provider: tooling` on `registry`, `object_storage`, or `observability` derives all five endpoints from the one domain value.
 
-**Per-store data modes.** `in-cluster-managed` (default), `external-unmanaged` (adopter-supplied endpoint; that store's `env-data` Kustomization is not created), and `external-managed`, reserved in the schema and rejected with an explicit message until it exists.
+**Per-store data modes.** `in-cluster-managed` (default), `external-unmanaged` (adopter-supplied endpoint; that store's `hub-data` Kustomization is not created), and `external-managed`, reserved in the schema and rejected with an explicit message until it exists.
 
 **Generated internal secrets.** The `random_password` pattern already used for Kratos and Hydra extends to every internal service password, generated in the config stack. A matching UPPER_CASE name in `.env` overrides generation. `make secrets ENV=<env>` prints them. `.env` keeps only external credentials.
 

@@ -13,10 +13,10 @@
       "customType": "regex",
       "description": "Images inside operator CRs and ConfigMaps (Vault, Percona, Redis, mcm)",
       "fileMatch": [
-        "gitops/env-data/.+\\.yaml$",
-        "gitops/cc-config/vault/.+\\.yaml$",
-        "gitops/env-auth/.+\\.yaml$",
-        "gitops/env-app/mcm/.+\\.yaml$"
+        "gitops/hub-data/.+\\.yaml$",
+        "gitops/tooling-config/vault/.+\\.yaml$",
+        "gitops/hub-auth/.+\\.yaml$",
+        "gitops/hub-app/mcm/.+\\.yaml$"
       ],
       "matchStrings": ["image:\\s*\"?(?<depName>[a-z0-9./-]+):(?<currentValue>[A-Za-z0-9][A-Za-z0-9._-]*)\"?"],
       "datasourceTemplate": "docker"
@@ -93,27 +93,27 @@
     },
     {
       "description": "Data layer (operators + CR images)",
-      "matchFileNames": ["gitops/env/**", "gitops/env-data/**"],
+      "matchFileNames": ["gitops/hub/**", "gitops/hub-data/**"],
       "groupName": "data layer"
     },
     {
       "description": "Application charts",
-      "matchFileNames": ["gitops/env-app/**"],
+      "matchFileNames": ["gitops/hub-app/**"],
       "groupName": "application charts"
     },
     {
       "description": "Control center",
-      "matchFileNames": ["gitops/cc/**", "gitops/cc-config/**"],
+      "matchFileNames": ["gitops/tooling/**", "gitops/tooling-config/**"],
       "groupName": "control center"
     },
     {
       "description": "Observability",
-      "matchFileNames": ["gitops/cc-observability/**", "gitops/env-observability-agent/**"],
+      "matchFileNames": ["gitops/tooling-observability/**", "gitops/hub-observability-agent/**"],
       "groupName": "observability"
     },
     {
       "description": "Ory stack",
-      "matchFileNames": ["gitops/env-auth/**"],
+      "matchFileNames": ["gitops/hub-auth/**"],
       "groupName": "ory stack"
     },
     {
@@ -124,7 +124,7 @@
     },
     {
       "description": "TITLE_IMAGE logo URL is not a dependency",
-      "matchFileNames": ["gitops/env-app/finance-portal/finance-portal-values.yaml"],
+      "matchFileNames": ["gitops/hub-app/finance-portal/finance-portal-values.yaml"],
       "matchDepNames": ["https://mojaloop.io/wp-content/uploads/2020/07/mojaloop-foundation-orange.svg"],
       "enabled": false
     }

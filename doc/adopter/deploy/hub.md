@@ -4,9 +4,9 @@
 
 **Audiences:** adopter (deploy)
 
-A Hub (`role: env`) runs the Mojaloop switch — central ledger, account lookup, quoting, settlements, MCM, the Ory auth stack, and the data layer. If a Tooling Cluster is in use, deploy it first.
+A Hub (`role: hub`) runs the Mojaloop switch — central ledger, account lookup, quoting, settlements, MCM, the Ory auth stack, and the data layer. If a Tooling Cluster is in use, deploy it first.
 
-For the shared workflow and commands, see [Deployment](deployment.md). This page is the `env`-specific configuration and checks.
+For the shared workflow and commands, see [Deployment](deployment.md). This page is the `hub`-specific configuration and checks.
 
 - [Inputs](#inputs)
 - [Configuration](#configuration)
@@ -38,7 +38,7 @@ version: 1
 template: "tps-10"          # tps-1 | tps-10
 cluster:
   name: "my-hub"            # must equal the environment directory name
-  role: "env"
+  role: "hub"
   vip: "192.168.0.214"
   lb_ipam:
     range: "192.168.0.215-192.168.0.217"   # three addresses
@@ -94,19 +94,19 @@ The Harbor proxy is a Talos-level registry mirror, transparent to the workloads.
 If a Tooling Cluster deployed by this toolkit backs all three services, name it once instead:
 
 ```yaml
-toolkit_cc:
+tooling:
   domain: "cc1.example.com"
 
 registry:
-  provider: "toolkit-cc"    # -> harbor.int.<domain>
+  provider: "tooling"    # -> harbor.int.<domain>
 object_storage:
-  provider: "toolkit-cc"    # -> https://s3.int.<domain>
+  provider: "tooling"    # -> https://s3.int.<domain>
   bucket: "my-switch-backups"
 observability:
-  provider: "toolkit-cc"    # -> loki/thanos/tempo push URLs
+  provider: "tooling"    # -> loki/thanos/tempo push URLs
 ```
 
-This derives the same five endpoints from the one domain, so changing it later is a single edit rather than five. The resulting configuration is identical to writing them out — the shorthand only saves transcription. It relies on the URL layout this distribution gives its Tooling Cluster routes, so prefer the explicit form when the Hub and Tooling Cluster are upgraded independently, or when anything other than a toolkit-deployed CC provides a service.
+This derives the same five endpoints from the one domain, so changing it later is a single edit rather than five. The resulting configuration is identical to writing them out — the shorthand only saves transcription. It relies on the URL layout this distribution gives its Tooling Cluster routes, so prefer the explicit form when the Hub and Tooling Cluster are upgraded independently, or when anything other than a toolkit-deployed Tooling Cluster provides a service.
 
 Either way, the two credentials that must be carried over are in the [hand-off](tooling-cluster.md#hand-off-to-the-hub).
 
@@ -122,7 +122,7 @@ data:
     port: "3306"
 ```
 
-That store's `env-data` Kustomization is then not created and the toolkit reconciles nothing for it — provisioning, tuning, and backups become the adopter's. Credentials go in `.env` under the generated name they replace (`MYSQL_ROOT_PASSWORD`). See [Configuration → Data modes](configuration.md#data-modes).
+That store's `hub-data` Kustomization is then not created and the toolkit reconciles nothing for it — provisioning, tuning, and backups become the adopter's. Credentials go in `.env` under the generated name they replace (`MYSQL_ROOT_PASSWORD`). See [Configuration → Data modes](configuration.md#data-modes).
 
 ## Deploy
 
@@ -139,7 +139,7 @@ make validate ENV=<hub-env>
 make plan-apply ENV=<hub-env>
 ```
 
-Expect ~20–30 minutes for Terraform, then ~20–30 for Flux to converge the full stack — data layer, auth, then Mojaloop. The chain waits for the data layer to be healthy before the application layer starts, because migrations run against databases that must already exist. Apparent inactivity after `env-data` goes Ready is normal — see [Reconciliation order](../../architecture/system-overview.md#reconciliation-order).
+Expect ~20–30 minutes for Terraform, then ~20–30 for Flux to converge the full stack — data layer, auth, then Mojaloop. The chain waits for the data layer to be healthy before the application layer starts, because migrations run against databases that must already exist. Apparent inactivity after `hub-data` goes Ready is normal — see [Reconciliation order](../../architecture/system-overview.md#reconciliation-order).
 
 ## Verify the cluster
 

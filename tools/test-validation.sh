@@ -46,7 +46,7 @@ expect_accept() {
 }
 
 echo "--- positive cases ---"
-expect_accept "cc sample" environments/mlf-lab1-cc1/config.yaml.sample
+expect_accept "tooling sample" environments/mlf-lab1-cc1/config.yaml.sample
 expect_accept "hub sample" environments/mlf-lab1-sw1/config.yaml.sample
 
 echo "--- negative cases ---"

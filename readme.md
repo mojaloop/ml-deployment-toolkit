@@ -6,13 +6,13 @@ An infrastructure-agnostic distribution of [Mojaloop](https://mojaloop.io/) — 
 
 Two cluster kinds, each driven from its own environment config under `environments/<env>/`.
 
-### Tooling Cluster (`role: cc`)
+### Tooling Cluster (`role: tooling`)
 
 A management-plane cluster hosting the shared services that the rest of the platform depends on: Harbor (OCI registry and pull-through cache), Vault (secrets and PKI), MinIO or managed object storage (state and backups), FluxCD, and the observability stack. A Tooling Cluster is optional — a Hub can pull artifacts from a public OCI registry and send telemetry anywhere — but recommended for multi-environment setups and air-gapped operation.
 
 → [Deploy a Tooling Cluster](doc/adopter/deploy/tooling-cluster.md)
 
-### Hub / Switch (`role: env`)
+### Hub / Switch (`role: hub`)
 
 A cluster running Mojaloop itself: central ledger, account lookup, quoting, settlements, MCM, the Ory auth stack, and the data layer (MySQL, Kafka, MongoDB, Redis — in-cluster or external). DFSPs connect to it over mTLS via the Cilium-based gateway.
 

@@ -22,7 +22,7 @@ locals {
     },
     { for k, v in module.config.template_app : k => tostring(v) },
     { for k, v in module.config.template_data : k => tostring(v) },
-    { for k, v in module.config.template_cc : k => tostring(v) },
+    { for k, v in module.config.template_tooling : k => tostring(v) },
   )
 
   # Deployer Helm value overrides — environments/<env>/values/<chart>.yaml
@@ -72,7 +72,7 @@ module "flux_config" {
   profile_vars = merge(
     { for k, v in module.config.template_app : k => tostring(v) },
     { for k, v in module.config.template_data : k => tostring(v) },
-    { for k, v in module.config.template_cc : k => tostring(v) },
+    { for k, v in module.config.template_tooling : k => tostring(v) },
   )
 
   helm_value_overrides = local.helm_value_overrides
