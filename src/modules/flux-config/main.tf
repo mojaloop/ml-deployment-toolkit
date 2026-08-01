@@ -167,8 +167,13 @@ resource "kubernetes_config_map_v1" "cluster_config" {
       cluster_name       = var.cluster_name
       domain             = var.domain
       gateway_class_name = var.gateway_class_name
-      lb_ipam_start      = split("-", var.lb_ipam_range)[0]
-      lb_ipam_stop       = split("-", var.lb_ipam_range)[1]
+
+      # Per-gateway LB pool addresses. Empty on cloud providers, where the
+      # talos layer (and with it every pool manifest) is never applied.
+      gw_int_ip         = try(var.lb_ipam_pools["gw-int"].lan, "")
+      gw_int_dns_target = try(var.lb_ipam_pools["gw-int"].dns_target, "")
+      gw_ext_ip         = try(var.lb_ipam_pools["gw-ext"].lan, "")
+      gw_ext_dns_target = try(var.lb_ipam_pools["gw-ext"].dns_target, "")
 
       # cert capability (ACME)
       acme_email  = var.cert.acme_email
@@ -187,6 +192,11 @@ resource "kubernetes_config_map_v1" "cluster_config" {
       tempo_url = var.observability.tempo_url
     },
     local.is_hub ? {
+      gw_extapi_ip         = try(var.lb_ipam_pools["gw-extapi"].lan, "")
+      gw_extapi_dns_target = try(var.lb_ipam_pools["gw-extapi"].dns_target, "")
+      gw_intapi_ip         = try(var.lb_ipam_pools["gw-intapi"].lan, "")
+      gw_intapi_dns_target = try(var.lb_ipam_pools["gw-intapi"].dns_target, "")
+
       mysql_host   = var.data_stores["mysql"].host
       mysql_port   = var.data_stores["mysql"].port
       kafka_host   = var.data_stores["kafka"].host

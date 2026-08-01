@@ -42,9 +42,14 @@ variable "gateway_class_name" {
   default     = "cilium"
 }
 
-variable "lb_ipam_range" {
-  description = "Cilium LB-IPAM range (start-stop)"
-  type        = string
+variable "lb_ipam_pools" {
+  description = "Per-gateway LB IPAM pools: name => { lan, wan, dns_target }"
+  type = map(object({
+    lan        = string
+    wan        = string
+    dns_target = string
+  }))
+  default = {}
 }
 
 variable "artifact_url" {

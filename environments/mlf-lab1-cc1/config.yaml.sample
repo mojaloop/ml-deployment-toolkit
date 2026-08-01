@@ -12,7 +12,11 @@ cluster:
   role: "tooling"                          # tooling | hub | bare
   vip: "192.168.0.210"                # Kubernetes API floating IP (on-prem only)
   lb_ipam:
-    range: "192.168.0.211-192.168.0.213"
+    pools:                            # one single-IP pool per gateway; optional wan = border-DNAT outside IP
+      gw-int:
+        lan: "192.168.0.211"
+      gw-ext:
+        lan: "192.168.0.212"
 
 # Deployment template — config/templates/{role}/{template}.yaml
 template: "medium"

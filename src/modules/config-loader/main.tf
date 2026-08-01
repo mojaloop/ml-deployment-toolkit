@@ -29,6 +29,19 @@ locals {
 
   # On-prem providers render one VM per node and need real placement targets.
   is_talos_provider = contains(["proxmox", "openstack"], local.provider_name)
+
+  # --- LB IPAM (on-prem): one dedicated single-IP pool per gateway ----------
+  # dns_target is what external-dns publishes for everything attached to the
+  # gateway: the wan side of the border 1:1 DNAT when set, the lan IP otherwise.
+  lb_ipam_pools = {
+    for name, pool in try(local.cluster.lb_ipam.pools, {}) :
+    name => {
+      lan        = pool.lan
+      wan        = try(pool.wan, "")
+      dns_target = try(pool.wan, pool.lan)
+    }
+  }
+  hub_only_pools = ["gw-extapi", "gw-intapi"]
   template_placement_groups = distinct(flatten([
     for g in local.node_groups : try(g.placement, [])
   ]))
@@ -281,6 +294,34 @@ resource "terraform_data" "validation" {
     precondition {
       condition     = local.cluster_role != "hub" || contains(["fspiop", "iso20022"], local.api_type)
       error_message = "app.api_type must be fspiop or iso20022."
+    }
+
+    # The pools are the cluster's entire LB address supply; without them no
+    # gateway gets an address on a self-managed cluster.
+    precondition {
+      condition     = !local.is_talos_provider || length(local.lb_ipam_pools) > 0
+      error_message = "infra.provider '${local.provider_name}' is on-prem — cluster.lb_ipam.pools is required."
+    }
+    precondition {
+      condition = length(local.lb_ipam_pools) == 0 || (
+        local.cluster_role == "hub"
+        ? alltrue([for k in local.hub_only_pools : contains(keys(local.lb_ipam_pools), k)])
+        : alltrue([for k in local.hub_only_pools : !contains(keys(local.lb_ipam_pools), k)])
+      )
+      error_message = "lb_ipam.pools: gw-extapi and gw-intapi are required on role 'hub' and rejected on other roles — only a hub serves the FSPIOP endpoints."
+    }
+    precondition {
+      condition = length(distinct(concat(
+        [for p in values(local.lb_ipam_pools) : p.lan],
+        [tostring(try(local.cluster.vip, ""))],
+      ))) == length(local.lb_ipam_pools) + 1
+      error_message = "lb_ipam.pools lan addresses must be distinct from each other and from cluster.vip."
+    }
+    precondition {
+      condition = length(distinct([
+        for p in values(local.lb_ipam_pools) : p.wan if p.wan != ""
+      ])) == length([for p in values(local.lb_ipam_pools) : p.wan if p.wan != ""])
+      error_message = "lb_ipam.pools wan addresses must be unique — two gateways cannot share one outside IP on :443."
     }
 
     # The in-cluster data layer is only packaged for Talos providers. Without

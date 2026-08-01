@@ -5,8 +5,15 @@ kind: Service
 metadata:
   name: cilium-gateway-gw-extapi
   namespace: mojaloop
+  # Hand-authored Service (not a real Gateway), so the pool-selector label is
+  # set directly instead of via spec.infrastructure.labels.
+  labels:
+    lb-pool: gw-extapi
   annotations:
     external-dns.alpha.kubernetes.io/hostname: "extapi.${domain}"
+    # The wan side of the border DNAT when cluster.lb_ipam.pools.gw-extapi.wan
+    # is set, the lan IP otherwise.
+    external-dns.alpha.kubernetes.io/target: "${gw_extapi_dns_target}"
 spec:
   type: LoadBalancer
   selector:

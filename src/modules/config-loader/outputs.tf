@@ -104,6 +104,11 @@ output "template_tooling" {
 
 # --- Resolved capabilities ------------------------------------------------
 
+output "lb_ipam_pools" {
+  description = "Per-gateway LB IPAM pools (resolved): name => { lan, wan, dns_target }"
+  value       = local.lb_ipam_pools
+}
+
 output "registry" {
   description = "Image pull-through cache (resolved)"
   value = {

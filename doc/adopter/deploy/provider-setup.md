@@ -92,9 +92,9 @@ Plan addresses before deploying:
 |---------|-------|-------|
 | Kubernetes API VIP | 1 | `cluster.vip` — floating IP, same L2 as the nodes |
 | Node IPs | 1 per VM | Assigned by Talos; the deployment template sets the count |
-| LB-IPAM range | 2 or 3 | `cluster.lb_ipam.range` |
+| LB-IPAM pools | 2 or 4 | `cluster.lb_ipam.pools` — one address per gateway |
 
-**The LB range differs by role.** A Tooling Cluster needs 2 addresses (`gw-int`, `gw-ext`). A Hub needs 3 — it adds the FSPIOP endpoint. The range must sit outside the DHCP scope; overlap causes intermittent failures as addresses are handed out twice.
+**The pool count differs by role.** A Tooling Cluster needs 2 addresses (`gw-int`, `gw-ext`). A Hub needs 4 — it adds the FSPIOP endpoints (`gw-extapi`, `gw-intapi`). Every address must sit outside the DHCP scope; overlap causes intermittent failures as addresses are handed out twice. Because each gateway's address is fixed in config, firewall rules can be written before the cluster exists.
 
 All addresses must be on the bridge in `infra.proxmox.network_bridge`.
 

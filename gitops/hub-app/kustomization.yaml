@@ -22,6 +22,8 @@ resources:
   - routes/mcm-ext-httproute.yaml
   - routes/hydra-ext-httproute.yaml
   - routes/referencegrant-ext.yaml
+  # hub-only LB pools (gw-extapi + gw-intapi; gw-int/gw-ext live in the talos layer)
+  - routes/lb-ipam-pools.yaml
   # extapi mTLS (DFSP-facing — mutual TLS via standalone Envoy Deployment)
   - routes/extapi-service.yaml
   - routes/extapi-cert.yaml
@@ -29,8 +31,10 @@ resources:
   - routes/extapi-envoy-deployment.yaml
   - observability/trace-bridge.yaml
   - observability/instrumentation.yaml
-  # gw-int routes (internal ops)
+  # gw-intapi (FSPIOP mirror without mTLS — dedicated gateway + IP)
+  - routes/gateway-intapi.yaml
   - routes/intapi-httproute.yaml
+  # gw-int routes (internal ops)
   - routes/ttk-httproute.yaml
   - routes/ttk-backend-httproute.yaml
   - routes/simulator-httproute.yaml

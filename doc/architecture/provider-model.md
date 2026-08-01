@@ -50,7 +50,7 @@ Because the cluster is self-managed, a vendor layer supplies what a managed Kube
 | LB-IPAM | No cloud load balancer to allocate addresses |
 | OpenEBS | No cloud block storage driver |
 
-This is why a self-managed cluster needs an address range in `cluster.lb_ipam.range`.
+This is why a self-managed cluster needs per-gateway addresses in `cluster.lb_ipam.pools`.
 
 ## DNS providers
 

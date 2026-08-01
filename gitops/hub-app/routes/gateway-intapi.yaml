@@ -1,0 +1,33 @@
+# Dedicated Gateway for the FSPIOP internal API mirror. It shares gw-int's
+# wildcard cert but owns its own IP, so the no-mTLS FSPIOP surface can be
+# firewalled independently of the ops UIs on gw-int.
+# NO cert-manager annotation here: gw-int is the sole annotated owner of
+# wildcard-int-tls — a second annotated Gateway would fight over the secret.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: gw-intapi
+  namespace: platform-system
+  annotations:
+    # What external-dns publishes for every attached route: the wan side of the
+    # border DNAT when cluster.lb_ipam.pools.gw-intapi.wan is set, the lan IP otherwise.
+    external-dns.alpha.kubernetes.io/target: "${gw_intapi_dns_target}"
+spec:
+  gatewayClassName: ${gateway_class_name}
+  # Propagated to the generated LoadBalancer Service; the gw-intapi
+  # CiliumLoadBalancerIPPool selects on it.
+  infrastructure:
+    labels:
+      lb-pool: gw-intapi
+  listeners:
+    - name: https
+      hostname: "intapi.int.${domain}"
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: wildcard-int-tls
+      allowedRoutes:
+        namespaces:
+          from: All

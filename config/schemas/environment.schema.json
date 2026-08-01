@@ -43,18 +43,100 @@
           "type": "string"
         },
         "lb_ipam": {
-          "description": "Cilium LB IPAM pool",
+          "description": "Cilium LB IPAM \u2014 one dedicated single-IP pool per gateway (on-prem). Required for on-prem providers.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "range": {
-              "description": "Cilium LB-IPAM range as \"start-stop\" (on-prem). Required for on-prem providers.",
-              "type": "string",
-              "pattern": "^[0-9.]+-[0-9.]+$"
+            "pools": {
+              "description": "Per-gateway address pools. gw-int and gw-ext apply to every role; gw-extapi and gw-intapi are required on role 'hub' and rejected elsewhere. These pools are the cluster's entire load-balancer address supply.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "gw-int": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "lan": {
+                      "description": "Address the pool hands to this gateway's LoadBalancer Service, announced via L2 on the LAN",
+                      "type": "string",
+                      "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+                    },
+                    "wan": {
+                      "description": "Optional outside address the border firewall 1:1-DNATs to lan. Becomes the external-dns target for everything attached to the gateway; LAN clients then need hairpin NAT or split DNS.",
+                      "type": "string",
+                      "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+                    }
+                  },
+                  "required": [
+                    "lan"
+                  ]
+                },
+                "gw-ext": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "lan": {
+                      "description": "Address the pool hands to this gateway's LoadBalancer Service, announced via L2 on the LAN",
+                      "type": "string",
+                      "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+                    },
+                    "wan": {
+                      "description": "Optional outside address the border firewall 1:1-DNATs to lan. Becomes the external-dns target for everything attached to the gateway; LAN clients then need hairpin NAT or split DNS.",
+                      "type": "string",
+                      "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+                    }
+                  },
+                  "required": [
+                    "lan"
+                  ]
+                },
+                "gw-extapi": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "lan": {
+                      "description": "Address the pool hands to this gateway's LoadBalancer Service, announced via L2 on the LAN",
+                      "type": "string",
+                      "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+                    },
+                    "wan": {
+                      "description": "Optional outside address the border firewall 1:1-DNATs to lan. Becomes the external-dns target for everything attached to the gateway; LAN clients then need hairpin NAT or split DNS.",
+                      "type": "string",
+                      "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+                    }
+                  },
+                  "required": [
+                    "lan"
+                  ]
+                },
+                "gw-intapi": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "lan": {
+                      "description": "Address the pool hands to this gateway's LoadBalancer Service, announced via L2 on the LAN",
+                      "type": "string",
+                      "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+                    },
+                    "wan": {
+                      "description": "Optional outside address the border firewall 1:1-DNATs to lan. Becomes the external-dns target for everything attached to the gateway; LAN clients then need hairpin NAT or split DNS.",
+                      "type": "string",
+                      "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+                    }
+                  },
+                  "required": [
+                    "lan"
+                  ]
+                }
+              },
+              "required": [
+                "gw-int",
+                "gw-ext"
+              ]
             }
           },
           "required": [
-            "range"
+            "pools"
           ]
         },
         "flux": {
@@ -246,7 +328,7 @@
           "type": "string"
         },
         "robots": {
-          "description": "tooling role only: pull-only robot accounts to provision in the toolkit Harbor, one per consuming Hub (convention: name = the Hub's cluster.name). The Hub authenticates as robot-<name>; 'make secrets' prints the secret. Additive and creation-only — removing an entry never deletes the robot.",
+          "description": "tooling role only: pull-only robot accounts to provision in the toolkit Harbor, one per consuming Hub (convention: name = the Hub's cluster.name). The Hub authenticates as robot-<name>; 'make secrets' prints the secret. Additive and creation-only \u2014 removing an entry never deletes the robot.",
           "type": "array",
           "items": {
             "type": "object",
@@ -289,7 +371,7 @@
           "type": "string"
         },
         "buckets": {
-          "description": "tooling role only: extra buckets to serve from the toolkit MinIO, each with a generated scoped user (access key = bucket name; 'make secrets' prints the secret key). System buckets (harbor, backups, thanos, loki, tempo) always exist and cannot be re-declared. Additive and creation-only — removing an entry never deletes data.",
+          "description": "tooling role only: extra buckets to serve from the toolkit MinIO, each with a generated scoped user (access key = bucket name; 'make secrets' prints the secret key). System buckets (harbor, backups, thanos, loki, tempo) always exist and cannot be re-declared. Additive and creation-only \u2014 removing an entry never deletes data.",
           "type": "array",
           "items": {
             "type": "object",

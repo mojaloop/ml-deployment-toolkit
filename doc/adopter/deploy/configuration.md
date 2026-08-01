@@ -51,7 +51,7 @@ State and generated artifacts land under `artifacts/<env>/` — see [System over
 | Section | Required | Choices | Default |
 |---------|:---:|---------|---------|
 | `version` | yes | `1` | — |
-| `cluster` | yes | `name`, `role`, `vip`, `lb_ipam.range`, `flux.version`, `gateway_class_name` | Flux `2.7.2`, GatewayClass `cilium` |
+| `cluster` | yes | `name`, `role`, `vip`, `lb_ipam.pools` (per-gateway `lan`/`wan`), `flux.version`, `gateway_class_name` | Flux `2.7.2`, GatewayClass `cilium` |
 | `template` | yes | a name under `config/templates/<role>/` | — |
 | `infra` | yes | `proxmox`, `aws`, `digitalocean` | — |
 | `dns` | yes | `digitalocean`, `cloudflare`, `route53` | — |
@@ -91,7 +91,11 @@ cluster:
   role: "tooling"                          # tooling | hub | bare
   vip: "192.168.0.210"                # Kubernetes API floating IP (on-prem only)
   lb_ipam:
-    range: "192.168.0.211-192.168.0.213"
+    pools:                            # one single-IP pool per gateway
+      gw-int:
+        lan: "192.168.0.211"
+      gw-ext:
+        lan: "192.168.0.212"
 
 template: "medium"                    # config/templates/tooling/medium.yaml
 
@@ -169,7 +173,16 @@ cluster:
   role: "hub"
   vip: "192.168.0.214"
   lb_ipam:
-    range: "192.168.0.215-192.168.0.217"   # three addresses
+    pools:                            # a hub serves all four gateways
+      gw-int:
+        lan: "192.168.0.215"
+      gw-ext:
+        lan: "192.168.0.216"
+        wan: "203.0.113.10"           # optional: border-DNAT outside IP, becomes the published DNS target
+      gw-extapi:
+        lan: "192.168.0.217"
+      gw-intapi:
+        lan: "192.168.0.218"
 
 template: "tps-10"                    # config/templates/hub/tps-10.yaml
 

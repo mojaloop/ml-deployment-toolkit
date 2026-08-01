@@ -41,7 +41,15 @@ cluster:
   role: "hub"
   vip: "192.168.0.214"
   lb_ipam:
-    range: "192.168.0.215-192.168.0.217"   # three addresses
+    pools:                    # four addresses — one per gateway
+      gw-int:
+        lan: "192.168.0.215"
+      gw-ext:
+        lan: "192.168.0.216"
+      gw-extapi:
+        lan: "192.168.0.217"
+      gw-intapi:
+        lan: "192.168.0.218"
 dns:
   provider: "cloudflare"
   domain: "sw1.example.com"

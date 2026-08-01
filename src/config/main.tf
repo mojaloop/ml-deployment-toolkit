@@ -53,7 +53,7 @@ module "flux_config" {
   dns_provider       = module.config.dns.provider
   domain             = module.config.dns.domain
   gateway_class_name = try(module.config.cluster.gateway_class_name, "cilium")
-  lb_ipam_range      = module.config.cluster.lb_ipam.range
+  lb_ipam_pools      = module.config.lb_ipam_pools
 
   artifact_url     = module.config.artifact.url
   artifact_version = module.config.artifact.version

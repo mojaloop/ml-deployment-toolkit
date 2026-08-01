@@ -53,7 +53,11 @@ cluster:
   role: "tooling"                # routes Flux to the Tooling Cluster paths
   vip: "192.168.0.210"
   lb_ipam:
-    range: "192.168.0.211-192.168.0.212"   # two addresses
+    pools:                    # two addresses — one per gateway
+      gw-int:
+        lan: "192.168.0.211"
+      gw-ext:
+        lan: "192.168.0.212"
 dns:
   provider: "cloudflare"
   domain: "cc1.example.com"

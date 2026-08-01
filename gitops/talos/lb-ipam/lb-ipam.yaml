@@ -1,11 +1,33 @@
+# One dedicated single-IP pool per gateway — the pools are the cluster's
+# entire LB address supply, so every gateway gets a predictable address.
+# Cilium LB-IPAM has no pool priority: every pool MUST carry a serviceSelector,
+# or it would match all LoadBalancer Services and assignment would be
+# nondeterministic. The lb-pool label reaches each generated Service via the
+# Gateway's spec.infrastructure.labels.
+# The hub-only pools (gw-extapi, gw-intapi) live in the hub-app layer.
 apiVersion: "cilium.io/v2alpha1"
 kind: CiliumLoadBalancerIPPool
 metadata:
-  name: default-pool
+  name: gw-int
 spec:
   blocks:
-    - start: "${lb_ipam_start}"
-      stop: "${lb_ipam_stop}"
+    - start: "${gw_int_ip}"
+      stop: "${gw_int_ip}"
+  serviceSelector:
+    matchLabels:
+      lb-pool: gw-int
+---
+apiVersion: "cilium.io/v2alpha1"
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: gw-ext
+spec:
+  blocks:
+    - start: "${gw_ext_ip}"
+      stop: "${gw_ext_ip}"
+  serviceSelector:
+    matchLabels:
+      lb-pool: gw-ext
 ---
 apiVersion: "cilium.io/v2alpha1"
 kind: CiliumL2AnnouncementPolicy

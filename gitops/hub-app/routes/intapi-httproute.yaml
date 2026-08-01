@@ -1,4 +1,5 @@
-# FSPIOP internal API mirror — same routes as extapi but on gw-int
+# FSPIOP internal API mirror — same routes as extapi but without mTLS, on its
+# own gateway (dedicated IP) so it can be firewalled independently.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -6,7 +7,7 @@ metadata:
   namespace: mojaloop
 spec:
   parentRefs:
-    - name: gw-int
+    - name: gw-intapi
       namespace: platform-system
   hostnames:
     - "intapi.int.${domain}"

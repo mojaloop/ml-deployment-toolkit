@@ -13,19 +13,20 @@ Ingress topology, the three load balancers, and how DNS and certificates are iss
 - [DNS](#dns)
 - [Certificates](#certificates)
 
-## Three entry points
+## Four entry points
 
-A Hub exposes three independent load-balanced addresses. Each has a different audience and a different trust model — which is why they are separate rather than one gateway with routing rules ([ADR-008](decisions/008-three-lb-architecture.md)).
+A Hub exposes four independent load-balanced addresses. Each has a different audience and a different trust model — which is why they are separate rather than one gateway with routing rules ([ADR-008](decisions/008-three-lb-architecture.md)).
 
 | Entry point | Hostname pattern | Audience | TLS |
 |-------------|-----------------|----------|-----|
 | `gw-int` | `*.int.${domain}` | In-house operations | Server TLS, Let's Encrypt |
 | `gw-ext` | `*.ext.${domain}` | External parties | Server TLS, Let's Encrypt |
-| `extapi` | `extapi.${domain}` | Participant FSPIOP traffic | **Mutual TLS**, scheme CA |
+| `gw-extapi` | `extapi.${domain}` | Participant FSPIOP traffic | **Mutual TLS**, scheme CA |
+| `gw-intapi` | `intapi.int.${domain}` | FSPIOP mirror without mTLS — internal testing only | Server TLS, Let's Encrypt |
 
-`gw-int` and `gw-ext` are Gateway API Gateways in `platform-system`. The FSPIOP endpoint is not — see [below](#the-fspiop-endpoint-is-not-a-gateway).
+`gw-int`, `gw-ext`, and `gw-intapi` are Gateway API Gateways in `platform-system`. The FSPIOP mTLS endpoint is not — see [below](#the-fspiop-endpoint-is-not-a-gateway).
 
-A Tooling Cluster uses the same two gateways, hosting its own services rather than Mojaloop's.
+A Tooling Cluster uses only `gw-int` and `gw-ext`, hosting its own services rather than Mojaloop's.
 
 ## What is on each gateway
 
@@ -44,11 +45,12 @@ A Tooling Cluster uses the same two gateways, hosting its own services rather th
 | `simulator.int` | Simulator |
 | `settlement.int` | Settlement API |
 | `tx-requests.int` | Transaction requests API |
-| `intapi.int` | FSPIOP mirror without mTLS — internal testing only |
 
 On a Tooling Cluster: `harbor.int`, `minio.int`, `s3.int`, `grafana.int`, `loki.int`, `tempo.int`, `thanos.int`.
 
-`intapi.int` deserves a warning: it exposes the same FSPIOP paths as the participant endpoint with **no client certificate requirement**. It exists for internal testing. Anything that can reach it can transact as any participant.
+### `gw-intapi` — FSPIOP mirror, internal testing only
+
+A single host, `intapi.int`, exposing the same FSPIOP paths as the participant endpoint with **no client certificate requirement**. Anything that can reach it can transact as any participant — which is exactly why it sits on its own gateway with its own dedicated address rather than riding on `gw-int`: it can (and should) be firewalled independently of the ops UIs. It shares `gw-int`'s wildcard certificate.
 
 ### `gw-ext` — external parties
 
@@ -82,17 +84,30 @@ Envoy requires a client certificate on every connection and routes by path prefi
 
 ## Load balancer addresses
 
-On self-hosted infrastructure, Cilium LB-IPAM assigns addresses from a pool the adopter defines, announced on the local network via L2.
+On self-hosted infrastructure, Cilium LB-IPAM assigns addresses the adopter defines, announced on the local network via L2. Each gateway owns a dedicated single-IP pool, so every endpoint's address is known before the cluster exists — firewall rules can be written up front.
 
 ```yaml
-app:
+cluster:
   lb_ipam:
-    range: "192.168.0.211-192.168.0.213"
+    pools:
+      gw-int:
+        lan: "192.168.0.215"
+      gw-ext:
+        lan: "192.168.0.216"
+        wan: "203.0.113.10"   # optional — see below
+      gw-extapi:
+        lan: "192.168.0.217"
+      gw-intapi:
+        lan: "192.168.0.218"
 ```
 
-**A Hub needs three addresses** — `gw-int`, `gw-ext`, and `extapi`. **A Tooling Cluster needs two** — it has no FSPIOP endpoint.
+**A Hub needs four addresses** — `gw-int`, `gw-ext`, `gw-extapi`, and `gw-intapi`. **A Tooling Cluster needs two** — it has no FSPIOP endpoints, so only `gw-int` and `gw-ext` are accepted. These pools are the cluster's entire load-balancer address supply; a Service that matches no pool stays Pending.
 
-The range must sit outside the local DHCP scope. Overlap produces intermittent, hard-to-diagnose failures as addresses are handed out twice.
+Every pool selects its gateway's Service by label (`lb-pool: <gateway>`), delivered through the Gateway's `spec.infrastructure.labels`. Cilium LB-IPAM has no pool priority, so a selectorless pool would match every LoadBalancer Service and make assignment nondeterministic — never add one.
+
+Each `lan` address must sit outside the local DHCP scope. Overlap produces intermittent, hard-to-diagnose failures as addresses are handed out twice.
+
+Setting `wan` on a pool declares that the border firewall 1:1-DNATs that outside address to the gateway's `lan` address. external-dns then publishes the `wan` address for everything attached to that gateway (via the `external-dns.alpha.kubernetes.io/target` annotation) instead of the LAN address. Caveat: LAN clients — DFSP VMs included — then resolve the public address too, and need hairpin NAT or split DNS to reach the gateway.
 
 ## DNS
 
