@@ -172,3 +172,12 @@ variable "helm_value_overrides" {
   type        = map(string)
   default     = {}
 }
+
+# Deliberately `any`: each value is a list of Flux patch entries whose elements
+# differ in shape (a bare `patch`, or `patch` + `target`), which no concrete
+# type constraint accepts. Keys naming no Kustomization are dropped downstream.
+variable "kustomize_patches" {
+  description = "Per-Kustomization kustomize patches (kustomization name -> list of Flux spec.patches entries)"
+  type        = any
+  default     = {}
+}

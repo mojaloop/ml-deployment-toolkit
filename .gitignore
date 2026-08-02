@@ -23,6 +23,7 @@ environments/*/.env
 # Per-environment config (use config.yaml.sample as a template)
 environments/*/config.yaml
 environments/*/values/
+environments/*/patches/
 
 # Rendering (Jsonnet vendor dependencies, downloaded by jb install)
 rendering/*/vendor/

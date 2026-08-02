@@ -9,6 +9,7 @@ Where the integrator can customize, and what each layer costs at upgrade time. T
 - [The layers](#the-layers)
 - [Configuration — no fork](#configuration-no-fork)
 - [Helm value overrides — no fork](#helm-value-overrides-no-fork)
+- [Manifest patches — no fork](#manifest-patches-no-fork)
 - [Forking — carried forever](#forking-carried-forever)
 - [Deciding](#deciding)
 
@@ -20,9 +21,10 @@ From cheapest to most expensive to maintain:
 |-------|:---:|:---:|-------------|
 | Configuration | No | No | Anything an adopter could set |
 | Helm value overrides | No | No | Tuning any shipped chart's values |
-| Fork | Yes | **Every upgrade** | Config and values genuinely cannot express it |
+| Manifest patches | No | No | Tuning what is not a chart — the data layer above all |
+| Fork | Yes | **Every upgrade** | Config, values, and patches genuinely cannot express it |
 
-The first two are not integrator-specific — they are the [adopter](../adopter/deploy/configuration.md) mechanisms. That is the point: most customization is configuration a client could have done themselves, and it costs the integrator nothing at upgrade time because it lives in the client's environment, not in the fork.
+The first three are not integrator-specific — they are the [adopter](../adopter/deploy/configuration.md) mechanisms. That is the point: most customization is configuration a client could have done themselves, and it costs the integrator nothing at upgrade time because it lives in the client's environment, not in the fork.
 
 ## Configuration: no fork
 
@@ -38,6 +40,16 @@ This covers a large amount of application-level tailoring — resource sizing, f
 
 The files are templated: `${domain}`, `${cluster_name}`, the resolved telemetry URLs, and the template's tuning keys expand at apply time, so a client's override does not re-hardcode values the cluster already knows. Secrets are deliberately not exposed, and an unknown `${name}` fails the apply rather than passing through. See [Configuration → Helm value overrides](../adopter/deploy/configuration.md#helm-value-overrides).
 
+## Manifest patches: no fork
+
+Value overrides stop where charts stop. The data layer is the case that matters: Kafka, MySQL, MongoDB, and Redis ship as custom resources for their operators, not as charts, so no values file reaches them. Their `config.yaml` surface is the six scalars in the template's `data:` block — storage sizes, `num.partitions`, two MySQL settings — and nothing else.
+
+For everything past that, the integrator drops a file named for the Flux Kustomization in the environment's `patches/` directory, and its contents are appended to that Kustomization's `spec.patches`. JVM heap, replica counts, resource requests, an operator setting the distribution never anticipated — all reachable, without touching `gitops/`. The mechanism is not data-layer-specific: any Kustomization can be named, so it covers every plain manifest the distribution ships.
+
+Two differences from value overrides shape when to use it. Patches are **kustomize**, so the client writes target-matching semantics rather than a YAML map, and lists replace rather than merge. And a patch whose target matches nothing fails the whole Kustomization rather than one release — on a data store, that blocks `hub-app` behind it. It is the more powerful and the sharper tool; prefer a value override wherever one exists.
+
+See [Configuration → Manifest patches](../adopter/deploy/configuration.md#manifest-patches).
+
 ## Forking: carried forever
 
 When configuration and overrides genuinely cannot express the need — a new provider, a changed module, a service the distribution does not include — the integrator forks and changes the code. The mechanics are the [Platform guide](../platform/index.md): the same module pipeline, the same "add a provider / add a service" procedures.
@@ -50,7 +62,8 @@ For any client requirement, walk down the layers and stop at the first that work
 
 1. **Can `config.yaml` / `.env` express it?** → configuration. Done, free.
 2. **Is it a value on a chart the distribution ships?** → value override. Done, free.
-3. **Could it be either, if the field existed?** → consider [contributing it upstream](../platform/index.md) so it becomes free — for the integrator and everyone.
-4. **Only then, fork** — and change the minimum.
+3. **Is it a field on a manifest the distribution ships?** → manifest patch. Done, free.
+4. **Could it be any of those, if the field existed?** → consider [contributing it upstream](../platform/index.md) so it becomes free — for the integrator and everyone.
+5. **Only then, fork** — and change the minimum.
 
-The trap is reaching for a fork when a value override would do, because the fork is invisible today and expensive at every future upgrade. When in doubt, spend the effort finding a no-fork path before spending it on a fork.
+The trap is reaching for a fork when a value override or a patch would do, because the fork is invisible today and expensive at every future upgrade. When in doubt, spend the effort finding a no-fork path before spending it on a fork.

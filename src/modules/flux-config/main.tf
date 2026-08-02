@@ -673,6 +673,16 @@ locals {
   )
 
   kustomizations = { for k, v in local.all_kustomizations : k => v if v.enabled }
+
+  # Distribution patches first, deployer patches second: kustomize applies the
+  # list in order, so the deployer's win. A patches/<name>.yaml naming no
+  # enabled Kustomization is ignored — nothing here validates the filename.
+  effective_patches = {
+    for k, _ in local.kustomizations : k => concat(
+      lookup(local.backup_disabled_patches, k, []),
+      lookup(var.kustomize_patches, k, []),
+    )
+  }
 }
 
 resource "kubectl_manifest" "kustomization" {
@@ -712,8 +722,8 @@ resource "kubectl_manifest" "kustomization" {
       length(each.value.health_check_exprs) > 0 ? {
         healthCheckExprs = each.value.health_check_exprs
       } : {},
-      length(lookup(local.backup_disabled_patches, each.key, [])) > 0 ? {
-        patches = local.backup_disabled_patches[each.key]
+      length(local.effective_patches[each.key]) > 0 ? {
+        patches = local.effective_patches[each.key]
       } : {},
     )
   })

@@ -16,6 +16,7 @@ Two files describe an environment: `config.yaml` for what the deployment is, and
 - [The tooling shorthand](#the-tooling-shorthand)
 - [Secrets](#secrets)
 - [Helm value overrides](#helm-value-overrides)
+- [Manifest patches](#manifest-patches)
 - [Validating](#validating)
 
 ## Vocabulary
@@ -34,6 +35,7 @@ environments/
     config.yaml        # what the deployment is
     .env               # external credentials (git-ignored)
     values/            # optional Helm overrides (git-ignored)
+    patches/           # optional manifest patches (git-ignored)
 ```
 
 Environments are fully independent — their own config, secrets, and Terraform state. One repository clone manages any number of them. A Tooling Cluster and its Hubs are separate environments, each deployed with its own `make plan-apply ENV=<name>`.
@@ -413,6 +415,84 @@ make apply-config ENV=<env>
 ```
 
 Seconds, no infrastructure plan, and Flux picks the change up on its next reconcile. This is configuration, not customization — changing the distribution itself is the [Integrator](../../integrator/index.md) guide.
+
+## Manifest patches
+
+Helm value overrides reach every chart the distribution ships, which leaves out everything the distribution ships as a plain manifest — most importantly **the data layer**. Kafka, MySQL, MongoDB, and Redis are deployed as custom resources handed to their operators (`Kafka`, `PerconaXtraDBCluster`, `PerconaServerMongoDB`, `Redis`), not as charts. A `values/kafka.yaml` has nothing to attach to.
+
+The tuning those stores expose through `config.yaml` is the template's `data:` block, which substitutes six scalars:
+
+| Key | Reaches |
+|-----|---------|
+| `kafka_default_partitions` | `num.partitions` |
+| `kafka_storage` | Kafka JBOD volume size |
+| `mysql_innodb_buffer_pool_size`, `mysql_max_connections` | the PXC `[mysqld]` config |
+| `mysql_storage`, `mongodb_storage` | PXC / PSMDB volume sizes |
+
+Anything else — JVM heap, replica counts, resource requests, MongoDB cache sizing, every Redis setting — needs a patch. Drop a file named for the **Flux Kustomization** in `patches/`:
+
+```
+environments/<env>/patches/
+  hub-data-kafka.yaml
+  hub-data-mysql.yaml
+  hub-data-mongodb.yaml
+  hub-data-redis.yaml
+```
+
+The name is the Kustomization, not the chart or the resource. The data layer's are `hub-data-<store>` for each `in-cluster-managed` store plus `hub-data-common`; the rest of the distribution is reachable by the same rule (`hub-app`, `tooling-observability`, `platform-config`, and so on), so this is not a data-layer-only mechanism.
+
+### What goes in the file
+
+A YAML **list**. Each element is either a partial resource, where kustomize infers the target from `apiVersion` / `kind` / `metadata.name`, or an explicit `{ target, patch }` entry carrying [JSON 6902](https://datatracker.ietf.org/doc/html/rfc6902) operations — the second form exists because a merge patch cannot remove a field:
+
+```yaml
+# environments/<env>/patches/hub-data-kafka.yaml
+
+# Partial resource — merged into the shipped Kafka
+- apiVersion: kafka.strimzi.io/v1
+  kind: Kafka
+  metadata:
+    name: mojaloop-kafka
+    namespace: data
+  spec:
+    kafka:
+      jvmOptions:
+        "-Xms": "2g"
+        "-Xmx": "2g"
+      config:
+        log.retention.hours: 48
+
+# Explicit target — required for a removal
+- target:
+    group: kafka.strimzi.io
+    version: v1
+    kind: KafkaNodePool
+    name: dual-role
+  patch: |
+    - op: replace
+      path: /spec/replicas
+      value: 5
+```
+
+**Patches are templated**, exactly like values files: `${domain}`, `${cluster_name}`, the telemetry URLs, and every `app:` / `data:` / `tooling:` template key expand at apply time, an unknown `${name}` fails the apply, and a literal `${` must be written `$${`.
+
+**The distribution's own patches apply first, so yours win.** When `object_storage` is `none` the toolkit already patches the backup machinery off; a file of yours is appended after that list, and kustomize applies patches in order.
+
+### Semantics worth knowing
+
+- **Maps merge, lists replace.** Adding `log.retention.hours` to `spec.kafka.config` leaves the other keys alone. Patching `spec.kafka.listeners` or a `tolerations` array replaces that array wholesale — kustomize has no schema for a CRD's lists and cannot merge them by key. To change one element, restate the whole list.
+- **Patches run before substitution.** The order is kustomize build → your patch → `${...}` substitution from `cluster-config`. A patch can therefore introduce a new `$${var}` hole for Flux to fill, but it cannot read an already-substituted value.
+- **A filename matching no Kustomization is ignored**, silently. Check the spelling against the list above if a patch appears to do nothing.
+- **A patch matching no resource fails the whole Kustomization.** kustomize errors with `no matches for target`, that Kustomization goes NotReady, and because `hub-app` depends on every `hub-data-<store>`, the applications stop reconciling until it is fixed. This is the one way a patch is more dangerous than a values file, which can only break its own release. Nothing validates the target ahead of time — expect this error from a typo in a resource name, or after an upgrade renames a resource.
+- **Operators reconcile their own fields.** Patching something Strimzi or Percona actively manages produces a drift loop rather than an error: the patch applies, the operator reverts it, Flux re-applies. Tune the fields the CR exposes as configuration, not the ones the operator computes.
+
+Patches belong to the config stack, so the apply path is the same fast one:
+
+```bash
+make apply-config ENV=<env>
+```
+
+Deleting a patch file and re-applying reverts the field — the patch disappears from the rendered output and Flux applies the distribution's value back over it.
 
 ## Validating
 

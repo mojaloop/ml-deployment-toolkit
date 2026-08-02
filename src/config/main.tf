@@ -31,6 +31,28 @@ locals {
     for f in try(fileset(local.values_dir, "*.yaml"), []) :
     trimsuffix(f, ".yaml") => templatefile("${local.values_dir}/${f}", local.override_vars)
   }
+
+  # Deployer kustomize patches — environments/<env>/patches/<kustomization>.yaml.
+  # Reaches what Helm values cannot: the CRs of the data layer and every other
+  # plain manifest the distribution ships. Same templating contract as values/.
+  #
+  # Each file is a list whose elements are either a partial resource (kustomize
+  # infers the target from apiVersion/kind/metadata.name) or an explicit
+  # { patch, target } entry — the latter for JSON 6902 ops, which a strategic
+  # merge cannot express. The try() chain distinguishes them: a string `patch`
+  # passes through, a structured one is encoded, and anything without a `patch`
+  # key is the resource itself.
+  patches_dir = "../../environments/${var.env_name}/patches"
+  kustomize_patches = {
+    for f in try(fileset(local.patches_dir, "*.yaml"), []) :
+    trimsuffix(f, ".yaml") => [
+      for doc in yamldecode(templatefile("${local.patches_dir}/${f}", local.override_vars)) :
+      merge(
+        { patch = try(tostring(doc.patch), yamlencode(doc.patch), yamlencode(doc)) },
+        can(doc.target) ? { target = doc.target } : {},
+      )
+    ]
+  }
 }
 
 # Load and resolve configuration
@@ -76,4 +98,5 @@ module "flux_config" {
   )
 
   helm_value_overrides = local.helm_value_overrides
+  kustomize_patches    = local.kustomize_patches
 }
