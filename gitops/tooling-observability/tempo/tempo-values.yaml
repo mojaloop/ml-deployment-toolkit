@@ -42,13 +42,35 @@ tempo:
   global_overrides:
     max_bytes_per_trace: 5000000
 
-# Resources
-resources:
-  requests:
-    cpu: 100m
-    memory: 128Mi
-  limits:
-    memory: 512Mi
+  # Resources — MUST be nested under `tempo:`. A top-level `resources:` block
+  # is silently ignored by this chart, which is how tempo-0 came to run with
+  # `resources: {}`: unbounded, unaccounted for by the scheduler, and therefore
+  # the kernel's preferred victim on a node already at 77% memory. It was
+  # OOM-killed (exit 137) 35 times before this was spotted on 2026-08-02.
+  #
+  # Sizing is bounded by the cc node, not by Tempo's appetite: 7.7Gi total,
+  # ~5.6Gi in use by the rest of the stack (thanos-receive 1.3Gi, apiserver
+  # 876Mi, loki 588Mi, grafana 356Mi), leaving ~2.2Gi. 1Gi keeps the node under
+  # ~90% with margin for spikes elsewhere.
+  resources:
+    requests:
+      cpu: 100m
+      # The request is the half that was really missing: with none, the
+      # scheduler reserved nothing for Tempo and let the node fill up.
+      memory: 512Mi
+    limits:
+      # Bounds the blast radius. A cgroup kill takes only Tempo down, instead
+      # of the kernel choosing among Grafana/Loki/Thanos.
+      memory: 1Gi
+
+  # GOMEMLIMIT is what lets Tempo SURVIVE rather than just die predictably:
+  # a soft ceiling that makes Go's GC progressively more aggressive as it
+  # approaches, so Tempo sheds memory instead of being killed. Set to ~90% of
+  # limits.memory, leaving headroom for non-heap (stacks, mmap'd blocks).
+  # Without it, a hard limit merely relocates the execution.
+  extraEnv:
+    - name: GOMEMLIMIT
+      value: "900MiB"
 
 # Persistence
 persistence:
