@@ -52,15 +52,43 @@ loki:
 # Single binary deployment
 singleBinary:
   replicas: 1
+  # Sizing revised 2026-08-02 after repeated OOMKills (exit 137, 3 restarts).
+  # The old values were requests == limits == 588Mi with steady usage at
+  # 574Mi — 97.6% of the ceiling, so every flush/compaction spike was fatal.
+  #
+  # request 1Gi  : real steady demand plus room for 7-day retention upkeep.
+  # limit  1.5Gi : DELIBERATELY above the request. requests == limits gives
+  #   Guaranteed QoS, which sounds safer but means Loki can never exceed its
+  #   request — that is exactly what killed it. The 50% gap absorbs spikes.
+  #   Trade-off accepted: Burstable QoS is more evictable under node pressure,
+  #   which is the right trade for a component whose data lives in S3.
   resources:
     requests:
       cpu: 163m
-      memory: 588Mi
+      memory: 1Gi
     limits:
-      memory: 588Mi
+      memory: 1.5Gi
+  # GOMEMLIMIT is the lever that lets Loki SURVIVE rather than die predictably:
+  # a soft ceiling making Go's GC progressively more aggressive as it nears the
+  # value, so Loki sheds memory instead of being OOMKilled. ~90% of the limit,
+  # leaving headroom for non-heap (stacks, mmap'd chunks). Same pattern applied
+  # to Tempo in tooling-observability/tempo/tempo-values.yaml.
+  extraEnv:
+    - name: GOMEMLIMIT
+      value: "1350MiB"
   persistence:
     enabled: true
     size: 5Gi
+
+# The rules sidecar ran unbounded (using ~70Mi) — a hole in the node's memory
+# accounting on a cluster that is already oversubscribed on limits.
+sidecar:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
 
 # Disable all individual components (using SingleBinary instead)
 write:
