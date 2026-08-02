@@ -23,7 +23,7 @@ node_groups:
     class: worker-general
     count: 3
     cores: 6
-    memory: 12288        # MB
+    memory: 11264        # MB
     disks: [64, 64]      # GB
     placement: [pg-3, pg-2, pg-1]
 
