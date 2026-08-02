@@ -155,3 +155,31 @@ spec:
               - op: add
                 path: /spec/template/spec/containers/0/env/-
                 value: {name: QUOTE_KAFKA__CONSUMER__QUOTE__POST__config__options__consumeTimeout, value: "5"}
+          # V8 young-gen enlargement (whitepaper-derived, ml-perf-whitepaper-ws):
+          # short-lived per-message objects (parsed payloads, log/audit events,
+          # OTel spans) overflow the default 16MB semi-space and get promoted to
+          # old-space, causing major-GC event-loop freezes that inflate every
+          # in-flight span. 64MB lets them die young in cheap scavenges. Costs
+          # up to ~128MB RSS per pod. NODE_OPTIONS is read by the node binary at
+          # startup — no chart values key exists for it, hence the env patch.
+          - target: {kind: Deployment, name: moja-centralledger-service}
+            patch: &nodeGcEnv |
+              - op: add
+                path: /spec/template/spec/containers/0/env/-
+                value: {name: NODE_OPTIONS, value: "--max-semi-space-size=64"}
+          - target: {kind: Deployment, name: moja-centralledger-handler-transfer-prepare}
+            patch: *nodeGcEnv
+          - target: {kind: Deployment, name: moja-centralledger-handler-transfer-fulfil}
+            patch: *nodeGcEnv
+          - target: {kind: Deployment, name: moja-handler-pos-batch}
+            patch: *nodeGcEnv
+          - target: {kind: Deployment, name: moja-ml-api-adapter-service}
+            patch: *nodeGcEnv
+          - target: {kind: Deployment, name: moja-ml-api-adapter-handler-notification}
+            patch: *nodeGcEnv
+          - target: {kind: Deployment, name: moja-quoting-service}
+            patch: *nodeGcEnv
+          - target: {kind: Deployment, name: moja-quoting-service-handler}
+            patch: *nodeGcEnv
+          - target: {kind: Deployment, name: moja-account-lookup-service}
+            patch: *nodeGcEnv
