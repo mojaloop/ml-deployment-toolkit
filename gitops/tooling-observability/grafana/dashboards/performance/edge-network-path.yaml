@@ -1,0 +1,265 @@
+# Edge & Network Path — how much of the latency is transport, not compute?
+#
+# Everything on the other dashboards measures work being done. This one
+# measures the cost of getting to the work: TLS handshakes, connection setup,
+# DNS, packet loss and policy drops. On a scheme with mutual TLS to every
+# participant, that cost is not a rounding error.
+#
+# CONNECTION REUSE IS THE HEADLINE. Establishing a new mTLS connection costs a
+# TCP handshake plus a full TLS handshake with client-certificate verification
+# — routinely 50-150ms on a WAN, before a single byte of FSPIOP is exchanged.
+# If Envoy opens a fresh connection per callback, that cost lands on EVERY
+# transfer and no amount of hub tuning removes it. "Requests per connection"
+# is the panel that tells you: values near 1 mean no reuse at all, and the fix
+# is keep-alive configuration, not capacity.
+#
+# WHERE THE DFSP CALLBACK PATH LIVES: envoy_cluster_name carries values like
+# `mojaloop/dfsp-callback-mtls/<dfsp>-cluster` — one Envoy cluster per DFSP,
+# discovered dynamically by the regex on that label. Nothing here hardcodes a
+# participant name.
+#
+# SERVICE GRAPH client-vs-server: the same call measured at both ends. The
+# difference between the client-side and server-side duration is time on the
+# wire plus time queued in the receiver's accept backlog. A widening gap with
+# flat server-side latency is a network or saturation problem, not application
+# slowness. Note the graph's `server` values are Event SDK service names
+# (central_ledger, account_lookup) while `client` values are OTel service
+# names — they are two different naming schemes on the same edge.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-perf-edge-network-path
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Performance"
+data:
+  edge-network-path.json: |
+    {
+      "uid": "perf-edge",
+      "title": "Edge & Network Path",
+      "description": "Transport cost of the FSPIOP path: mTLS handshakes and connection reuse on the DFSP callback clusters, Envoy upstream and downstream latency, service-graph wire time, DNS, policy drops and TCP health.",
+      "tags": ["performance", "network", "mtls", "mojaloop"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "1m",
+      "time": { "from": "now-6h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "hub",
+            "label": "Hub cluster",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(envoy_cluster_upstream_rq_total, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          },
+          {
+            "name": "envoy_cluster",
+            "label": "Envoy upstream",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(envoy_cluster_upstream_rq_total{cluster_name=\"$hub\"}, envoy_cluster_name)",
+            "refresh": 2,
+            "includeAll": true,
+            "multi": true,
+            "current": {}
+          },
+          {
+            "name": "callback_cluster",
+            "label": "DFSP callback upstreams",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "description": "Discovered from envoy_cluster_name, which encodes one cluster per DFSP. No participant names are hardcoded.",
+            "query": "label_values(envoy_cluster_upstream_rq_total{cluster_name=\"$hub\", envoy_cluster_name=~\".*callback.*\"}, envoy_cluster_name)",
+            "refresh": 2,
+            "includeAll": true,
+            "multi": true,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Requests per connection (DFSP callbacks)",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Callback requests divided by connections established. Near 1 means every callback pays a full TCP + mTLS handshake — typically 50-150ms added to every single transfer, fixable only by keep-alive configuration. High values mean connections are being reused as intended.",
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 1, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": 5 }, { "color": "green", "value": 20 } ] } } },
+          "targets": [
+            {
+              "expr": "sum(rate(envoy_cluster_upstream_rq_total{cluster_name=\"$hub\", envoy_cluster_name=~\"$callback_cluster\"}[$__rate_interval])) / clamp_min(sum(rate(envoy_cluster_upstream_cx_connect_ms_count{cluster_name=\"$hub\", envoy_cluster_name=~\"$callback_cluster\"}[$__rate_interval])), 0.0000001)",
+              "legendFormat": "req/conn"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Connection setup p99",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Time to establish an upstream connection, excluding the request itself. Multiply by the inverse of requests-per-connection to get the amortised handshake tax on every transfer.",
+          "fieldConfig": { "defaults": { "unit": "ms", "decimals": 1, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 50 }, { "color": "red", "value": 150 } ] } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (le) (rate(envoy_cluster_upstream_cx_connect_ms_bucket{cluster_name=\"$hub\", envoy_cluster_name=~\"$callback_cluster\"}[$__rate_interval])))",
+              "legendFormat": "connect p99"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "TLS handshakes/s",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Inbound TLS handshakes at the listeners. Should be far lower than the request rate. Tracking the request rate means clients are not reusing connections either.",
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 2 } },
+          "targets": [
+            { "expr": "sum(rate(envoy_listener_ssl_handshake{cluster_name=\"$hub\"}[$__rate_interval])) or vector(0)", "legendFormat": "handshakes/s" }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Policy drops/s",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Packets dropped by Cilium. Any sustained value means retries and timeouts upstream, which surface as latency long before they surface as errors.",
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 2, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.1 }, { "color": "red", "value": 1 } ] } } },
+          "targets": [
+            { "expr": "sum(rate(cilium_drop_count_total{cluster_name=\"$hub\"}[$__rate_interval])) or vector(0)", "legendFormat": "drops/s" }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "DFSP callback latency at the edge — p99",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 5 },
+          "datasource": { "uid": "thanos" },
+          "description": "Envoy's own measurement of each DFSP callback, per upstream cluster. Compare against the hub-side delivery histogram on DFSP Latency: they measure the same call from either side of the proxy, and a gap between them is time spent inside Envoy.",
+          "fieldConfig": { "defaults": { "unit": "ms", "decimals": 1, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (envoy_cluster_name, le) (rate(envoy_cluster_upstream_rq_time_bucket{cluster_name=\"$hub\", envoy_cluster_name=~\"$callback_cluster\"}[$__rate_interval])))",
+              "legendFormat": "{{envoy_cluster_name}}"
+            }
+          ]
+        },
+        {
+          "title": "Connection churn on the callback path",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 5 },
+          "datasource": { "uid": "thanos" },
+          "description": "Connections opened per second against connections held open. Churn tracking the request rate is the no-reuse signature; a stable pool of active connections with near-zero new connections is what healthy keep-alive looks like.",
+          "fieldConfig": { "defaults": { "decimals": 2, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "sum by (envoy_cluster_name) (rate(envoy_cluster_upstream_cx_total{cluster_name=\"$hub\", envoy_cluster_name=~\"$callback_cluster\"}[$__rate_interval]))", "legendFormat": "new conns/s — {{envoy_cluster_name}}" },
+            { "expr": "sum by (envoy_cluster_name) (envoy_cluster_upstream_cx_active{cluster_name=\"$hub\", envoy_cluster_name=~\"$callback_cluster\"})", "legendFormat": "active conns — {{envoy_cluster_name}}" },
+            { "expr": "sum by (envoy_cluster_name) (rate(envoy_cluster_upstream_rq_total{cluster_name=\"$hub\", envoy_cluster_name=~\"$callback_cluster\"}[$__rate_interval]))", "legendFormat": "requests/s — {{envoy_cluster_name}}" }
+          ]
+        },
+        {
+          "title": "Envoy upstream latency — all clusters",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 15 },
+          "datasource": { "uid": "thanos" },
+          "description": "Every upstream Envoy proxies to, including hub-internal services. Use the Envoy upstream selector to isolate one.",
+          "fieldConfig": { "defaults": { "unit": "ms", "decimals": 1, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (envoy_cluster_name, le) (rate(envoy_cluster_upstream_rq_time_bucket{cluster_name=\"$hub\", envoy_cluster_name=~\"$envoy_cluster\", envoy_cluster_name!=\"/envoy-admin\"}[$__rate_interval])))",
+              "legendFormat": "{{envoy_cluster_name}}"
+            }
+          ]
+        },
+        {
+          "title": "Envoy downstream latency by listener",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 15 },
+          "datasource": { "uid": "thanos" },
+          "description": "Inbound request duration per listener — extapi_mtls is the participant-facing mTLS edge, dfsp_egress the outbound path. Admin, health and metrics listeners are excluded as noise.",
+          "fieldConfig": { "defaults": { "unit": "ms", "decimals": 1, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (envoy_http_conn_manager_prefix, le) (rate(envoy_http_downstream_rq_time_bucket{cluster_name=\"$hub\", envoy_http_conn_manager_prefix!~\"admin|envoy-health-listener|envoy-prometheus-metrics-listener\"}[$__rate_interval])))",
+              "legendFormat": "{{envoy_http_conn_manager_prefix}}"
+            }
+          ]
+        },
+        {
+          "title": "Envoy retries, overflow and connection failures",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 24 },
+          "datasource": { "uid": "thanos" },
+          "description": "Retries hide failures behind latency — a retried request succeeds but takes twice as long, so this often moves before any error rate does. Pending overflow means the connection pool is saturated and requests are queueing inside the proxy.",
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 3, "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            { "expr": "sum by (envoy_cluster_name) (rate(envoy_cluster_upstream_rq_retry{cluster_name=\"$hub\", envoy_cluster_name=~\"$envoy_cluster\"}[$__rate_interval])) > 0", "legendFormat": "retries — {{envoy_cluster_name}}" },
+            { "expr": "sum by (envoy_cluster_name) (rate(envoy_cluster_upstream_rq_pending_overflow{cluster_name=\"$hub\", envoy_cluster_name=~\"$envoy_cluster\"}[$__rate_interval])) > 0", "legendFormat": "pending overflow — {{envoy_cluster_name}}" }
+          ]
+        },
+        {
+          "title": "Wire time — service graph client vs server",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 24 },
+          "datasource": { "uid": "thanos" },
+          "description": "The same hop timed by the caller and by the callee. Client minus server is time on the wire plus time queued in the receiver's accept backlog. A widening gap while server-side latency stays flat is a network or saturation problem, not slow code.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 4, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "histogram_quantile(0.99, sum by (client, server, le) (rate(traces_service_graph_request_client_seconds_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "client — {{client}} -> {{server}}" },
+            { "expr": "histogram_quantile(0.99, sum by (client, server, le) (rate(traces_service_graph_request_server_seconds_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "server — {{client}} -> {{server}}" }
+          ]
+        },
+        {
+          "title": "Cilium drops by reason",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 33 },
+          "datasource": { "uid": "thanos" },
+          "description": "Drops split by direction and reason. 'Policy denied' after a network policy change is the usual cause of a sudden latency cliff on one path only.",
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 3, "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            { "expr": "sum by (reason, direction) (rate(cilium_drop_count_total{cluster_name=\"$hub\"}[$__rate_interval])) > 0", "legendFormat": "{{direction}} — {{reason}}" }
+          ]
+        },
+        {
+          "title": "DNS resolution latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 33 },
+          "datasource": { "uid": "thanos" },
+          "description": "CoreDNS request duration. Every outbound callback resolves a participant hostname first; slow or failing DNS adds to every request and is easy to overlook because it appears as uniform slowness everywhere at once.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 4, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(coredns_dns_request_duration_seconds_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "p99" },
+            { "expr": "histogram_quantile(0.5, sum by (le) (rate(coredns_dns_request_duration_seconds_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "p50" }
+          ]
+        },
+        {
+          "title": "TCP health",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 33 },
+          "datasource": { "uid": "thanos" },
+          "description": "Retransmits mean packet loss, which TCP hides by re-sending — the request still succeeds, just far slower. Listen overflows mean the accept backlog is full and connections are being refused at the kernel.",
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 3, "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            { "expr": "sum(rate(node_netstat_Tcp_RetransSegs{cluster_name=\"$hub\"}[$__rate_interval])) > 0", "legendFormat": "retransmits/s" },
+            { "expr": "sum(rate(node_netstat_TcpExt_ListenOverflows{cluster_name=\"$hub\"}[$__rate_interval])) > 0", "legendFormat": "listen overflows/s" },
+            { "expr": "sum(rate(node_netstat_TcpExt_ListenDrops{cluster_name=\"$hub\"}[$__rate_interval])) > 0", "legendFormat": "listen drops/s" }
+          ]
+        },
+        {
+          "title": "Drill-down",
+          "type": "text",
+          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 41 },
+          "options": {
+            "mode": "markdown",
+            "content": "Requests-per-connection near 1 → keep-alive configuration on the callback path, not capacity; this is a fixed tax on every transfer. Envoy upstream latency high but hub delivery latency low → the time is in the proxy. Both high → the DFSP: [DFSP Latency](/d/perf-dfsp?var-hub=$hub). Everything here clean → the time is compute: [Hub Latency Breakdown](/d/perf-hub-stages?var-hub=$hub). Back to [Transfer SLO](/d/perf-slo?var-hub=$hub)."
+          }
+        }
+      ]
+    }

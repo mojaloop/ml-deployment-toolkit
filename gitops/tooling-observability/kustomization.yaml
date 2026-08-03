@@ -71,6 +71,20 @@ resources:
   - grafana/dashboards/mojaloop/transfer-journey.yaml
   - grafana/dashboards/mojaloop/slow-failed-traces.yaml
 
+  # Grafana Dashboards — Performance
+  # Self-contained folder for characterising, investigating and fixing
+  # performance. perf-slo is the L1 entry point; the rest are drill-downs it
+  # links to. Nothing here modifies or depends on the Mojaloop folder above.
+  - grafana/dashboards/performance/transfer-slo.yaml
+  - grafana/dashboards/performance/hub-latency-breakdown.yaml
+  - grafana/dashboards/performance/dfsp-latency.yaml
+  - grafana/dashboards/performance/async-kafka-pipeline.yaml
+  - grafana/dashboards/performance/runtime-saturation.yaml
+  - grafana/dashboards/performance/data-layer-load.yaml
+  - grafana/dashboards/performance/edge-network-path.yaml
+  - grafana/dashboards/performance/load-test-runs.yaml
+  - grafana/dashboards/performance/capacity-headroom.yaml
+
 # Distribution values for each HelmRelease in this kustomization.
 # Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;
 # the adopter's <release>-values-override is merged after them and wins.

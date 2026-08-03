@@ -1,0 +1,224 @@
+# Capacity & Headroom — how much more load will this take, and what breaks first?
+#
+# Every other dashboard in this folder explains latency that already happened.
+# This one is for sizing decisions: whether to add replicas, raise a limit,
+# add partitions, or none of the above because the bottleneck is not capacity
+# at all.
+#
+# THE CENTRAL IDEA IS EFFICIENCY, NOT UTILISATION. Utilisation tells you a pod
+# is busy; it does not tell you whether more pods would help. Throughput per
+# replica does. If it falls as replicas rise, the workload is contending on
+# something shared — the position row, a partition, a connection pool — and
+# scaling out is making it worse. That is the single most expensive mistake
+# available on this stack, because the symptom (slow) and the instinct (add
+# replicas) point in opposite directions.
+#
+# KAFKA PARTITIONS ARE A HARD CEILING ON CONSUMER SCALING. A consumer group
+# cannot use more members than the topic has partitions. Members beyond that
+# sit idle: the replica count goes up, the cost goes up, throughput does not.
+# The partition-headroom panel exists so you check that before scaling.
+#
+# WHAT THIS DASHBOARD DELIBERATELY DOES NOT DO: predict. There is no
+# extrapolation or trend fitting here. It shows current headroom against
+# current limits at current load. Extrapolating a saturation knee from
+# steady-state metrics is guesswork; run a ladder on Load Test Runs instead.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-perf-capacity-headroom
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Performance"
+data:
+  capacity-headroom.json: |
+    {
+      "uid": "perf-capacity",
+      "title": "Capacity & Headroom",
+      "description": "Sizing view: throughput per replica, CPU and memory headroom against configured limits, Kafka partition ceilings and node capacity. Answers whether scaling out will help before you scale out.",
+      "tags": ["performance", "capacity", "mojaloop"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "1m",
+      "time": { "from": "now-24h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "hub",
+            "label": "Hub cluster",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(moja_nodejs_eventloop_lag_seconds, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          },
+          {
+            "name": "namespace",
+            "label": "Namespace",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(kube_deployment_spec_replicas{cluster_name=\"$hub\"}, namespace)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": { "text": "mojaloop", "value": "mojaloop" }
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Transfers per replica",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Completed transfers per second divided by total on-path handler replicas. Track this across scaling changes: if it falls when you add replicas, the workload is contending on something shared and scaling out is actively hurting.",
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 3 } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_tx_transfer_fulfil_count{cluster_name=\"$hub\"}[$__rate_interval])) / clamp_min(sum(kube_deployment_status_replicas_available{cluster_name=\"$hub\", namespace=\"$namespace\", deployment=~\".*(transfer|position|notification|pos-batch).*\"}), 1)",
+              "legendFormat": "transfers/s per replica"
+            }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Tightest CPU headroom",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Lowest remaining CPU margin against a configured limit, across all pods in the namespace. Low values here explain throttling on Service Runtime Saturation.",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 3, "max": 1, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": 0.2 }, { "color": "green", "value": 0.4 } ] } } },
+          "targets": [
+            {
+              "expr": "min(1 - (sum by (pod) (rate(container_cpu_usage_seconds_total{cluster_name=\"$hub\", namespace=\"$namespace\", container!=\"\"}[$__rate_interval])) / clamp_min(sum by (pod) (kube_pod_container_resource_limits{cluster_name=\"$hub\", namespace=\"$namespace\", resource=\"cpu\"}), 0.0000001)))",
+              "legendFormat": "min headroom"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Tightest memory headroom",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Lowest remaining memory margin against a configured limit. This is the number that predicts the next OOM kill, and OOM kills present as latency incidents.",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 3, "max": 1, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": 0.15 }, { "color": "green", "value": 0.3 } ] } } },
+          "targets": [
+            {
+              "expr": "min(1 - (sum by (pod) (container_memory_working_set_bytes{cluster_name=\"$hub\", namespace=\"$namespace\", container!=\"\"}) / clamp_min(sum by (pod) (kube_pod_container_resource_limits{cluster_name=\"$hub\", namespace=\"$namespace\", resource=\"memory\"}), 1)))",
+              "legendFormat": "min headroom"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Deployments not at desired replicas",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Deployments running fewer pods than requested — pending scheduling, crash-looping or evicted. Capacity you think you have but do not, which is the usual explanation for a scaling change that produced no improvement.",
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } } },
+          "targets": [
+            {
+              "expr": "count(kube_deployment_spec_replicas{cluster_name=\"$hub\", namespace=\"$namespace\"} > kube_deployment_status_replicas_available{cluster_name=\"$hub\", namespace=\"$namespace\"}) or vector(0)",
+              "legendFormat": "short"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Throughput against replica count",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 5 },
+          "datasource": { "uid": "thanos" },
+          "description": "Transfer throughput and on-path replica count on one axis pair. The useful reading is what happened at each replica change: throughput that did not move means the bottleneck was elsewhere and the extra pods are pure cost.",
+          "fieldConfig": { "defaults": { "decimals": 2, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "sum(rate(moja_tx_transfer_fulfil_count{cluster_name=\"$hub\"}[$__rate_interval]))", "legendFormat": "transfers/s" },
+            { "expr": "sum(kube_deployment_status_replicas_available{cluster_name=\"$hub\", namespace=\"$namespace\", deployment=~\".*(transfer|position|notification|pos-batch).*\"})", "legendFormat": "on-path replicas" }
+          ]
+        },
+        {
+          "title": "Efficiency — throughput per replica over time",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 5 },
+          "datasource": { "uid": "thanos" },
+          "description": "The scaling verdict. Flat as replicas rise means linear scaling and more replicas will keep helping. Falling means contention on a shared resource — position rows, a hot partition, a connection pool — and adding replicas increases contention rather than capacity.",
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 4, "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_tx_transfer_fulfil_count{cluster_name=\"$hub\"}[$__rate_interval])) / clamp_min(sum(kube_deployment_status_replicas_available{cluster_name=\"$hub\", namespace=\"$namespace\", deployment=~\".*(transfer|position|notification|pos-batch).*\"}), 1)",
+              "legendFormat": "transfers/s per replica"
+            }
+          ]
+        },
+        {
+          "title": "Kafka consumer headroom — members against partitions",
+          "type": "table",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 15 },
+          "datasource": { "uid": "thanos" },
+          "description": "A consumer group cannot use more members than its topic has partitions; members beyond that sit idle. Check this BEFORE scaling a handler: if members already equal partitions, more replicas add cost and nothing else, and the fix is more partitions.",
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } },
+          "targets": [
+            { "expr": "sum by (topic) (kafka_topic_partitions{cluster_name=\"$hub\", topic!~\"topic-event-.*\"})", "instant": true, "format": "table", "refId": "A" },
+            { "expr": "sum by (topic) (kafka_consumergroup_members{cluster_name=\"$hub\", topic!~\"topic-event-.*\"})", "instant": true, "format": "table", "refId": "B" },
+            { "expr": "sum by (topic) (kafka_consumergroup_lag_sum{cluster_name=\"$hub\", topic!~\"topic-event-.*\"})", "instant": true, "format": "table", "refId": "C" }
+          ],
+          "transformations": [
+            { "id": "merge", "options": {} },
+            { "id": "organize", "options": { "excludeByName": { "Time": true, "Time 1": true, "Time 2": true, "Time 3": true }, "renameByName": { "topic": "Topic", "Value #A": "partitions", "Value #B": "consumers", "Value #C": "lag" } } },
+            { "id": "sortBy", "options": { "fields": {}, "sort": [ { "field": "lag", "desc": true } ] } }
+          ]
+        },
+        {
+          "title": "CPU headroom by pod",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 15 },
+          "datasource": { "uid": "thanos" },
+          "description": "Remaining CPU margin per pod against its limit. Anything trending toward zero will start throttling, and throttling shows up as tail latency well before it shows up as high average utilisation.",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 3, "max": 1, "custom": { "fillOpacity": 4 }, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "transparent", "value": 0.2 } ] } } },
+          "targets": [
+            {
+              "expr": "1 - (sum by (pod) (rate(container_cpu_usage_seconds_total{cluster_name=\"$hub\", namespace=\"$namespace\", container!=\"\"}[$__rate_interval])) / clamp_min(sum by (pod) (kube_pod_container_resource_limits{cluster_name=\"$hub\", namespace=\"$namespace\", resource=\"cpu\"}), 0.0000001))",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Requested against allocatable — is there room to scale?",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 25 },
+          "datasource": { "uid": "thanos" },
+          "description": "Total CPU and memory REQUESTS in the namespace against node capacity. Requests, not usage, are what the scheduler enforces: when requests approach capacity, new replicas stay Pending regardless of how idle the nodes look.",
+          "fieldConfig": { "defaults": { "decimals": 2, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "sum(kube_pod_container_resource_requests{cluster_name=\"$hub\", namespace=\"$namespace\", resource=\"cpu\"})", "legendFormat": "CPU requested (cores)" },
+            { "expr": "count(count by (instance) (node_cpu_seconds_total{cluster_name=\"$hub\"})) * count(count by (cpu) (node_cpu_seconds_total{cluster_name=\"$hub\"}))", "legendFormat": "CPU present (cores, approx)" },
+            { "expr": "sum(kube_pod_container_resource_requests{cluster_name=\"$hub\", namespace=\"$namespace\", resource=\"memory\"}) / 1024 / 1024 / 1024", "legendFormat": "memory requested (GiB)" },
+            { "expr": "sum(node_memory_MemTotal_bytes{cluster_name=\"$hub\"}) / 1024 / 1024 / 1024", "legendFormat": "memory present (GiB)" }
+          ]
+        },
+        {
+          "title": "Node pressure",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 25 },
+          "datasource": { "uid": "thanos" },
+          "description": "Node CPU busy and memory used. Memory has been the binding constraint on this cluster historically — Alloy, Thanos and Loki have all OOM-looped here — so check this before adding anything, not after.",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 3, "max": 1, "custom": { "fillOpacity": 6 }, "thresholds": { "mode": "absolute", "steps": [ { "color": "transparent", "value": null }, { "color": "red", "value": 0.85 } ] } } },
+          "targets": [
+            { "expr": "1 - avg by (instance) (rate(node_cpu_seconds_total{cluster_name=\"$hub\", mode=\"idle\"}[$__rate_interval]))", "legendFormat": "CPU busy — {{instance}}" },
+            { "expr": "1 - (node_memory_MemAvailable_bytes{cluster_name=\"$hub\"} / node_memory_MemTotal_bytes{cluster_name=\"$hub\"})", "legendFormat": "memory used — {{instance}}" }
+          ]
+        },
+        {
+          "title": "How to use this",
+          "type": "text",
+          "gridPos": { "h": 5, "w": 24, "x": 0, "y": 34 },
+          "options": {
+            "mode": "markdown",
+            "content": "**Before scaling a handler, in order:**\n\n1. **Is it actually saturated?** [Service Runtime Saturation](/d/perf-runtime?var-hub=$hub) — event loop lag and CPU throttling. Idle pods do not benefit from company.\n2. **Are there partitions left?** The consumer-headroom table above. Members already equal to partitions means extra replicas idle.\n3. **Is efficiency flat or falling?** The efficiency panel. Falling means contention — usually position-row locks ([Data Layer Under Load](/d/perf-datalayer?var-hub=$hub)) or a hot partition ([Async & Kafka Pipeline](/d/perf-async?var-hub=$hub)) — and scaling out makes it worse.\n4. **Is there room to schedule?** The requests-against-allocatable panel. Requests, not usage, decide whether a new pod ever starts.\n\n**No prediction here on purpose.** This shows current headroom at current load. To find a saturation knee, run a ladder and read it on [Load Test Runs](/d/perf-loadtest). Back to [Transfer SLO](/d/perf-slo?var-hub=$hub)."
+          }
+        }
+      ]
+    }

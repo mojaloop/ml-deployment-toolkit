@@ -1,0 +1,280 @@
+# Service Runtime Saturation — is the process itself the bottleneck?
+#
+# Mojaloop services are single-threaded Node.js. That makes EVENT LOOP LAG the
+# single most predictive latency signal in the stack: when the loop is behind,
+# every request queues behind it regardless of how fast the database, Kafka or
+# the network are. Read this dashboard before blaming any downstream system.
+#
+# THE FOUR WAYS A NODE SERVICE GOES SLOW WITHOUT ANYTHING BEING "DOWN":
+#   1. Event loop lag        — CPU-bound work or too much work per pod
+#   2. GC pause time         — heap pressure; pauses stop the world
+#   3. CFS throttling        — the CPU limit is lower than the pod's demand,
+#                              so the kernel parks it mid-request
+#   4. Silent restarts       — OOM kills that look like a latency blip
+#
+# CFS THROTTLING IS THE ONE PEOPLE MISS. A pod can show low CPU utilisation
+# and still be throttled hard: utilisation is averaged over the scrape window,
+# throttling happens per 100ms slice. Low CPU with high throttling means the
+# limit is too tight, not that the pod is idle.
+#
+# RESTARTS RESET COUNTERS. Every moja_* metric here is per-process. A restart
+# zeroes them, so rate() over a window containing a restart understates. The
+# restart panel is positioned next to the latency panels for exactly that
+# reason — check it before trusting a suspiciously good number.
+#
+# $service matches the `service` label on the Mojaloop pod metrics, which is
+# the chart's service name (ml-api-adapter-service, centralledger-service...),
+# NOT the OTel service_name used on Hub Latency Breakdown. They differ.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-perf-runtime-saturation
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Performance"
+data:
+  runtime-saturation.json: |
+    {
+      "uid": "perf-runtime",
+      "title": "Service Runtime Saturation",
+      "description": "Node.js event loop lag, GC pressure, CPU throttling, heap headroom and restarts across the hub services. The four ways a Mojaloop service gets slow without anything appearing to be down.",
+      "tags": ["performance", "nodejs", "mojaloop"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "1m",
+      "time": { "from": "now-6h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "hub",
+            "label": "Hub cluster",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(moja_nodejs_eventloop_lag_seconds, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          },
+          {
+            "name": "service",
+            "label": "Service",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(moja_nodejs_eventloop_lag_p99_seconds{cluster_name=\"$hub\"}, service)",
+            "refresh": 2,
+            "includeAll": true,
+            "multi": true,
+            "current": {}
+          },
+          {
+            "name": "namespace",
+            "label": "Namespace",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(kube_pod_container_status_restarts_total{cluster_name=\"$hub\"}, namespace)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": { "text": "mojaloop", "value": "mojaloop" }
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Worst event loop lag p99",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "The most backed-up service. Anything above ~50ms means requests are queueing inside the process before any real work starts, and every downstream measurement on other dashboards is inflated by it.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 4, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.05 }, { "color": "red", "value": 0.2 } ] } } },
+          "targets": [
+            { "expr": "max(moja_nodejs_eventloop_lag_p99_seconds{cluster_name=\"$hub\", service=~\"$service\"})", "legendFormat": "worst p99" }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Worst CPU throttling",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Share of CPU scheduling periods in which a container was parked because it hit its limit. Non-trivial values mean the limit is too tight — this can be high while average CPU utilisation looks comfortable.",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 3, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.01 }, { "color": "red", "value": 0.05 } ] } } },
+          "targets": [
+            {
+              "expr": "max(sum by (pod) (rate(container_cpu_cfs_throttled_periods_total{cluster_name=\"$hub\", namespace=\"$namespace\", container!=\"\"}[$__rate_interval])) / clamp_min(sum by (pod) (rate(container_cpu_cfs_throttled_periods_total{cluster_name=\"$hub\", namespace=\"$namespace\", container!=\"\"}[$__rate_interval])) + sum by (pod) (rate(container_cpu_usage_seconds_total{cluster_name=\"$hub\", namespace=\"$namespace\", container!=\"\"}[$__rate_interval])), 0.0000001))",
+              "legendFormat": "worst throttling"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "GC time share",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Fraction of wall-clock time the worst service spends in garbage collection. GC pauses stop the event loop entirely, so this converts directly into tail latency.",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 4, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.02 }, { "color": "red", "value": 0.05 } ] } } },
+          "targets": [
+            { "expr": "max(sum by (service) (rate(moja_nodejs_gc_duration_seconds_sum{cluster_name=\"$hub\", service=~\"$service\"}[$__rate_interval])))", "legendFormat": "worst GC share" }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Restarts in range",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Container restarts over the dashboard time range. Non-zero invalidates rate() based numbers on this and every other dashboard for the affected service, because per-process counters reset. Check here first when a metric looks implausibly good.",
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 } ] } } },
+          "targets": [
+            { "expr": "sum(increase(kube_pod_container_status_restarts_total{cluster_name=\"$hub\", namespace=\"$namespace\"}[$__range])) or vector(0)", "legendFormat": "restarts" }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Event loop lag p99 by service",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 5 },
+          "datasource": { "uid": "thanos" },
+          "description": "The primary latency predictor for this stack. A service whose lag rises in step with a latency regression on Hub Latency Breakdown is the cause, not a victim. Lag that is flat while latency rises means the wait is elsewhere — Kafka, the database or a downstream participant.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 4, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            {
+              "expr": "max by (service) (moja_nodejs_eventloop_lag_p99_seconds{cluster_name=\"$hub\", service=~\"$service\"})",
+              "legendFormat": "{{service}}"
+            }
+          ]
+        },
+        {
+          "title": "Event loop lag — mean vs p99 spread",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 5 },
+          "datasource": { "uid": "thanos" },
+          "description": "A large gap between mean and p99 means the loop is mostly fine but occasionally blocked for a long time — a synchronous operation on the hot path, or a GC pause. A high mean means sustained overload, which is a scaling problem instead.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 4, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "max by (service) (moja_nodejs_eventloop_lag_mean_seconds{cluster_name=\"$hub\", service=~\"$service\"})", "legendFormat": "mean — {{service}}" },
+            { "expr": "max by (service) (moja_nodejs_eventloop_lag_p99_seconds{cluster_name=\"$hub\", service=~\"$service\"})", "legendFormat": "p99 — {{service}}" }
+          ]
+        },
+        {
+          "title": "GC pause time by service",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 15 },
+          "datasource": { "uid": "thanos" },
+          "description": "Seconds spent collecting per second of wall clock, split by collection kind. Rising minor (scavenge) time usually responds to a larger young generation; rising major time means the live set is genuinely too big for the heap.",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 4, "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (service, kind) (rate(moja_nodejs_gc_duration_seconds_sum{cluster_name=\"$hub\", service=~\"$service\"}[$__rate_interval])) > 0",
+              "legendFormat": "{{service}} — {{kind}}"
+            }
+          ]
+        },
+        {
+          "title": "GC frequency by service",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 15 },
+          "datasource": { "uid": "thanos" },
+          "description": "Collections per second. Frequent short collections and rare long ones produce very different tail-latency shapes even at the same total GC time, so read this alongside the pause-time panel.",
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 2, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            {
+              "expr": "sum by (service, kind) (rate(moja_nodejs_gc_duration_seconds_count{cluster_name=\"$hub\", service=~\"$service\"}[$__rate_interval])) > 0",
+              "legendFormat": "{{service}} — {{kind}}"
+            }
+          ]
+        },
+        {
+          "title": "CPU throttling by pod",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 24 },
+          "datasource": { "uid": "thanos" },
+          "description": "Seconds of enforced stall per second, per pod. This is the kernel parking the process mid-request. It becomes the dominant latency source after any exercise that tightens CPU limits, and it is invisible on average-utilisation panels.",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 4, "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(container_cpu_cfs_throttled_seconds_total{cluster_name=\"$hub\", namespace=\"$namespace\", container!=\"\"}[$__rate_interval])) > 0",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "CPU usage against limit",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 24 },
+          "datasource": { "uid": "thanos" },
+          "description": "Cores used as a fraction of the configured CPU limit. Approaching 1 guarantees throttling; well below 1 with throttling present means bursty demand inside individual scheduling periods.",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 3, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{cluster_name=\"$hub\", namespace=\"$namespace\", container!=\"\"}[$__rate_interval])) / clamp_min(sum by (pod) (kube_pod_container_resource_limits{cluster_name=\"$hub\", namespace=\"$namespace\", resource=\"cpu\"}), 0.0000001)",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Heap used against limit",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 33 },
+          "datasource": { "uid": "thanos" },
+          "description": "V8 heap in use per service. Read with the memory-limit panel: heap approaching the container limit is the classic Mojaloop OOM shape, and an OOM kill mid-load reads as a latency spike followed by suspiciously clean metrics.",
+          "fieldConfig": { "defaults": { "unit": "bytes", "decimals": 0, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "max by (service) (moja_nodejs_heap_size_used_bytes{cluster_name=\"$hub\", service=~\"$service\"})", "legendFormat": "heap used — {{service}}" },
+            { "expr": "max by (service) (moja_process_resident_memory_bytes{cluster_name=\"$hub\", service=~\"$service\"})", "legendFormat": "RSS — {{service}}" },
+            { "expr": "max by (service) (moja_nodejs_external_memory_bytes{cluster_name=\"$hub\", service=~\"$service\"})", "legendFormat": "external — {{service}}" }
+          ]
+        },
+        {
+          "title": "Container memory against limit",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 33 },
+          "datasource": { "uid": "thanos" },
+          "description": "Working set as a fraction of the memory limit. Anything sustained above ~0.9 is living on borrowed time; the kill will look like a performance problem before anyone checks the exit code.",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 3, "max": 1.1, "custom": { "fillOpacity": 6 }, "thresholds": { "mode": "absolute", "steps": [ { "color": "transparent", "value": null }, { "color": "red", "value": 0.9 } ] } } },
+          "targets": [
+            {
+              "expr": "sum by (pod) (container_memory_working_set_bytes{cluster_name=\"$hub\", namespace=\"$namespace\", container!=\"\"}) / clamp_min(sum by (pod) (kube_pod_container_resource_limits{cluster_name=\"$hub\", namespace=\"$namespace\", resource=\"memory\"}), 1)",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "Restarts over time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
+          "datasource": { "uid": "thanos" },
+          "description": "Container restarts per interval. Each bar is a point where per-process counters reset and a consumer group rebalanced. Line these up against latency spikes elsewhere before investigating anything more exotic.",
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "custom": { "fillOpacity": 40, "drawStyle": "bars", "lineWidth": 0 }, "color": { "mode": "fixed", "fixedColor": "orange" } } },
+          "targets": [
+            {
+              "expr": "sum by (pod) (increase(kube_pod_container_status_restarts_total{cluster_name=\"$hub\", namespace=\"$namespace\"}[$__interval])) > 0",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "title": "In-flight work per service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
+          "datasource": { "uid": "thanos" },
+          "description": "Active libuv handles and requests — open sockets, timers and pending I/O. A steady climb with no corresponding throughput increase is a leak, and it precedes both memory exhaustion and event loop degradation.",
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "max by (service) (moja_nodejs_active_handles_total{cluster_name=\"$hub\", service=~\"$service\"})", "legendFormat": "handles — {{service}}" },
+            { "expr": "max by (service) (moja_nodejs_active_requests_total{cluster_name=\"$hub\", service=~\"$service\"})", "legendFormat": "requests — {{service}}" }
+          ]
+        },
+        {
+          "title": "Drill-down",
+          "type": "text",
+          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 50 },
+          "options": {
+            "mode": "markdown",
+            "content": "Event loop lag high and CPU near its limit → scale out or raise the limit: [Capacity & Headroom](/d/perf-capacity?var-hub=$hub). Lag high with CPU idle → the process is blocked on I/O: [Data Layer Under Load](/d/perf-datalayer?var-hub=$hub) or [Async & Kafka Pipeline](/d/perf-async?var-hub=$hub). Everything here healthy → the time is not in the hub processes: [DFSP Latency](/d/perf-dfsp?var-hub=$hub) · [Edge & Network Path](/d/perf-edge?var-hub=$hub). Back to [Transfer SLO](/d/perf-slo?var-hub=$hub)."
+          }
+        }
+      ]
+    }

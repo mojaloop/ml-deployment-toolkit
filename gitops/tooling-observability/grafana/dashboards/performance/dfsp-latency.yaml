@@ -1,0 +1,264 @@
+# DFSP Latency — which DFSP is slow, and whether it is them or us.
+#
+# TWO VIEWPOINTS, and the difference between them is the point:
+#
+#   HUB-OBSERVED (moja_notification_event_delivery, moja_sendRequest)
+#     How long the hub takes to push a callback into each DFSP, labelled by
+#     `dest`/`destination`. Emitted by the hub, so EVERY DFSP appears here —
+#     no cooperation, no agent, no config on the DFSP side. This is the
+#     authoritative per-DFSP view and it is never empty.
+#
+#   DFSP-OBSERVED (mojaloop_connector_*)
+#     The DFSP's own sdk-scheme-adapter histograms: what its core banking
+#     system actually experienced, end to end, including hub time. Only
+#     present for DFSPs running the integration-toolkit observability
+#     profile. EMPTY MEANS NOT REPORTING, NOT ZERO — the "Reporting status"
+#     panel exists so you can tell those two apart at a glance.
+#
+# Reading them together: if hub-observed delivery is fast but DFSP-observed
+# end-to-end is slow, the time is in the DFSP or the network, not the switch.
+# If both are slow, start at Hub Latency Breakdown.
+#
+# The DFSP list is driven by the hub-side `dest` label, so it discovers DFSPs
+# dynamically and carries no naming convention — nothing here assumes a
+# "dfsp-*" prefix or any fixed participant.
+#
+# ASYMMETRY WORTH KNOWING: mojaloop_connector_outbound_* only exists on a
+# PAYER. A DFSP that only ever receives will show hub-observed data and
+# nothing under the payer journey rows. That is correct, not a gap.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-perf-dfsp-latency
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Performance"
+data:
+  dfsp-latency.json: |
+    {
+      "uid": "perf-dfsp",
+      "title": "DFSP Latency",
+      "description": "Per-DFSP latency from two independent viewpoints: how fast the hub can deliver callbacks to each DFSP (hub-emitted, always available), and what each DFSP's own SDK experienced end to end (only where the DFSP ships telemetry).",
+      "tags": ["performance", "dfsp", "mojaloop"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "1m",
+      "time": { "from": "now-6h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "hub",
+            "label": "Hub cluster",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(moja_nodejs_eventloop_lag_seconds, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          },
+          {
+            "name": "dfsp",
+            "label": "DFSP",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(moja_notification_event_delivery_count{cluster_name=\"$hub\"}, dest)",
+            "refresh": 2,
+            "includeAll": true,
+            "multi": true,
+            "current": {}
+          },
+          {
+            "name": "slo_latency",
+            "label": "Max latency",
+            "type": "custom",
+            "description": "Regex over the le label, covering both the \"1\" and \"1.0\" spellings used by different exporters.",
+            "query": "10ms : 0\\.01, 50ms : 0\\.05, 100ms : 0\\.1, 500ms : 0\\.5, 1s : 1(\\.0+)?, 5s : 5(\\.0+)?",
+            "includeAll": false,
+            "current": { "text": "1s", "value": "1(\\.0+)?" }
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Reporting status — which DFSPs ship their own telemetry",
+          "type": "table",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "1 = the DFSP runs an observability agent and its own SDK metrics are available below. A DFSP absent from this table still appears in every hub-observed panel — it simply cannot contribute its own view. Use this to tell 'not reporting' apart from 'zero'.",
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "mappings": [ { "type": "value", "options": { "1": { "text": "reporting", "color": "green", "index": 0 }, "0": { "text": "agent down", "color": "red", "index": 1 } } } ] } },
+          "targets": [
+            {
+              "expr": "max by (cluster_name) (up{job=\"prometheus.scrape.sdk_scheme_adapter\"})",
+              "legendFormat": "{{cluster_name}}",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "transformations": [
+            { "id": "organize", "options": { "excludeByName": { "Time": true, "job": true, "instance": true, "service": true, "receive": true, "tenant_id": true, "__name__": true }, "renameByName": { "cluster_name": "DFSP", "Value": "Status" } } }
+          ]
+        },
+        {
+          "title": "Callback delivery p99 by DFSP — hub-observed",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "How long the hub's outbound HTTP call to each DFSP takes. Almost entirely the DFSP's own accept-and-respond time plus network — the hub does very little here. A DFSP that is slow on this panel is slow, full stop.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (dest, le) (rate(moja_notification_event_delivery_bucket{cluster_name=\"$hub\", dest=~\"$dfsp\"}[$__rate_interval])))",
+              "legendFormat": "{{dest}}"
+            }
+          ]
+        },
+        {
+          "title": "Callback delivery failures by DFSP",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Deliveries the hub could not complete, per DFSP and action. Sustained failure here usually means the DFSP's inbound endpoint, its mTLS material or its callback URL registration — not switch capacity.",
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 3, "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "sum by (dest, action) (rate(moja_notification_event_delivery_count{cluster_name=\"$hub\", dest=~\"$dfsp\", success=\"false\"}[$__rate_interval])) > 0",
+              "legendFormat": "{{dest}} — {{action}}"
+            }
+          ]
+        },
+        {
+          "title": "Callback delivery within SLO, by DFSP and action",
+          "type": "bargauge",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "datasource": { "uid": "thanos" },
+          "description": "Bucket-exact share of callbacks delivered inside the selected max latency, over the dashboard time range. Split by action because a DFSP is often fine on prepare and slow on commit, or the reverse.",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 3, "min": 0, "max": 1, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": 0.95 }, { "color": "green", "value": 0.99 } ] } } },
+          "targets": [
+            {
+              "expr": "sum by (dest, action) (increase(moja_notification_event_delivery_bucket{cluster_name=\"$hub\", dest=~\"$dfsp\", le=~\"$slo_latency\"}[$__range])) / sum by (dest, action) (increase(moja_notification_event_delivery_count{cluster_name=\"$hub\", dest=~\"$dfsp\"}[$__range]))",
+              "legendFormat": "{{dest}} — {{action}}",
+              "instant": true
+            }
+          ],
+          "options": { "displayMode": "gradient", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Callback traffic by DFSP and action",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "datasource": { "uid": "thanos" },
+          "description": "Delivery attempts per second. Establishes whether a latency number is backed by enough volume to mean anything.",
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 2, "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (dest, action) (rate(moja_notification_event_delivery_count{cluster_name=\"$hub\", dest=~\"$dfsp\"}[$__rate_interval]))",
+              "legendFormat": "{{dest}} — {{action}}"
+            }
+          ]
+        },
+        {
+          "title": "Hub outbound requests by destination — p99",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+          "datasource": { "uid": "thanos" },
+          "description": "Every outbound HTTP call the hub makes, by destination and method — callbacks plus internal service-to-service traffic. Destination 'Hub' is the switch calling itself; anything else is a participant.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (destination, method, le) (rate(moja_sendRequest_bucket{cluster_name=\"$hub\"}[$__rate_interval])))",
+              "legendFormat": "{{method}} -> {{destination}}"
+            }
+          ]
+        },
+        {
+          "title": "Hub outbound request failures by destination",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+          "datasource": { "uid": "thanos" },
+          "description": "Failed outbound calls per destination. Correlate with the mTLS and connection-reuse panels on Edge & Network Path before assuming the far end is down.",
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 3, "custom": { "fillOpacity": 20 } } },
+          "targets": [
+            {
+              "expr": "sum by (destination, method) (rate(moja_sendRequest_count{cluster_name=\"$hub\", success=\"false\"}[$__rate_interval])) > 0",
+              "legendFormat": "{{method}} -> {{destination}}"
+            }
+          ]
+        },
+        {
+          "title": "Payer journey — p99 per phase (DFSP-observed)",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 22 },
+          "datasource": { "uid": "thanos" },
+          "description": "The three phases a payer's core banking system actually waits through: party lookup, quote, transfer. Measured by the DFSP's own SDK, so it includes hub time, network and payee time. Empty for DFSPs without an observability agent.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "histogram_quantile(0.99, sum by (cluster_name, le) (rate(mojaloop_connector_outbound_party_lookup_latency_bucket{cluster_name=~\"$dfsp\"}[$__rate_interval])))", "legendFormat": "{{cluster_name}} — party lookup" },
+            { "expr": "histogram_quantile(0.99, sum by (cluster_name, le) (rate(mojaloop_connector_outbound_quote_request_latency_bucket{cluster_name=~\"$dfsp\"}[$__rate_interval])))", "legendFormat": "{{cluster_name}} — quote" },
+            { "expr": "histogram_quantile(0.99, sum by (cluster_name, le) (rate(mojaloop_connector_outbound_transfer_latency_bucket{cluster_name=~\"$dfsp\"}[$__rate_interval])))", "legendFormat": "{{cluster_name}} — transfer" }
+          ]
+        },
+        {
+          "title": "Payer journey — mean time budget (DFSP-observed)",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 22 },
+          "datasource": { "uid": "thanos" },
+          "description": "Same three phases as stacked means, which sum to the total journey a payer experiences. Means are additive; stacked percentiles would not be. Shows which phase owns the customer-visible wait.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "custom": { "fillOpacity": 25, "stacking": { "mode": "normal" }, "lineWidth": 1 } } },
+          "targets": [
+            { "expr": "sum(rate(mojaloop_connector_outbound_party_lookup_latency_sum{cluster_name=~\"$dfsp\"}[$__rate_interval])) / clamp_min(sum(rate(mojaloop_connector_outbound_party_lookup_latency_count{cluster_name=~\"$dfsp\"}[$__rate_interval])), 0.0000001)", "legendFormat": "party lookup" },
+            { "expr": "sum(rate(mojaloop_connector_outbound_quote_request_latency_sum{cluster_name=~\"$dfsp\"}[$__rate_interval])) / clamp_min(sum(rate(mojaloop_connector_outbound_quote_request_latency_count{cluster_name=~\"$dfsp\"}[$__rate_interval])), 0.0000001)", "legendFormat": "quote" },
+            { "expr": "sum(rate(mojaloop_connector_outbound_transfer_latency_sum{cluster_name=~\"$dfsp\"}[$__rate_interval])) / clamp_min(sum(rate(mojaloop_connector_outbound_transfer_latency_count{cluster_name=~\"$dfsp\"}[$__rate_interval])), 0.0000001)", "legendFormat": "transfer" }
+          ]
+        },
+        {
+          "title": "Unanswered requests per phase",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 31 },
+          "datasource": { "uid": "thanos" },
+          "description": "Requests sent minus responses received, per phase. Latency percentiles only describe requests that CAME BACK — a request that never returns is invisible to them but shows up here. A line that trends upward rather than oscillating around zero means callbacks are being lost, not merely delayed. Small positive values are just in-flight work at the scrape instant.",
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            { "expr": "sum by (cluster_name) (mojaloop_connector_outbound_party_lookup_request_count{cluster_name=~\"$dfsp\"} - mojaloop_connector_outbound_party_lookup_response_count{cluster_name=~\"$dfsp\"})", "legendFormat": "{{cluster_name}} — party lookup" },
+            { "expr": "sum by (cluster_name) (mojaloop_connector_outbound_quote_request_count{cluster_name=~\"$dfsp\"} - mojaloop_connector_outbound_quote_response_count{cluster_name=~\"$dfsp\"})", "legendFormat": "{{cluster_name}} — quote" },
+            { "expr": "sum by (cluster_name) (mojaloop_connector_outbound_transfer_prepare_count{cluster_name=~\"$dfsp\"} - mojaloop_connector_outbound_transfer_fulfil_response_count{cluster_name=~\"$dfsp\"})", "legendFormat": "{{cluster_name}} — transfer" }
+          ]
+        },
+        {
+          "title": "FX phases — p99 (DFSP-observed)",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 31 },
+          "datasource": { "uid": "thanos" },
+          "description": "FX quote and FX transfer latency. Empty on schemes without cross-currency flows, which is the normal case in a single-currency lab.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "histogram_quantile(0.99, sum by (cluster_name, le) (rate(mojaloop_connector_outbound_fx_quote_latency_bucket{cluster_name=~\"$dfsp\"}[$__rate_interval])))", "legendFormat": "{{cluster_name}} — fx quote" },
+            { "expr": "histogram_quantile(0.99, sum by (cluster_name, le) (rate(mojaloop_connector_outbound_fx_transfer_latency_bucket{cluster_name=~\"$dfsp\"}[$__rate_interval])))", "legendFormat": "{{cluster_name}} — fx transfer" }
+          ]
+        },
+        {
+          "title": "Hub time as a share of the payer's transfer wait",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 },
+          "datasource": { "uid": "thanos" },
+          "description": "Mean hub prepare + fulfil legs divided by the payer-observed mean transfer time. Near 1 means the switch owns the latency; near 0 means the DFSPs and network do. Only meaningful while a payer DFSP is reporting. Cross-cluster ratio of means, so treat it as a proportion, not a precise figure.",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 3, "min": 0, "max": 1, "custom": { "fillOpacity": 15 } } },
+          "targets": [
+            {
+              "expr": "((sum(rate(moja_tx_transfer_prepare_sum{cluster_name=\"$hub\"}[$__rate_interval])) / clamp_min(sum(rate(moja_tx_transfer_prepare_count{cluster_name=\"$hub\"}[$__rate_interval])), 0.0000001)) + (sum(rate(moja_tx_transfer_fulfil_sum{cluster_name=\"$hub\"}[$__rate_interval])) / clamp_min(sum(rate(moja_tx_transfer_fulfil_count{cluster_name=\"$hub\"}[$__rate_interval])), 0.0000001))) / clamp_min(sum(rate(mojaloop_connector_outbound_transfer_latency_sum{cluster_name=~\"$dfsp\"}[$__rate_interval])) / clamp_min(sum(rate(mojaloop_connector_outbound_transfer_latency_count{cluster_name=~\"$dfsp\"}[$__rate_interval])), 0.0000001), 0.0000001)",
+              "legendFormat": "hub share of payer wait"
+            }
+          ]
+        },
+        {
+          "title": "Drill-down",
+          "type": "text",
+          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 48 },
+          "options": {
+            "mode": "markdown",
+            "content": "Hub share high → [Hub Latency Breakdown](/d/perf-hub-stages?var-hub=$hub). Hub share low but delivery slow → [Edge & Network Path](/d/perf-edge?var-hub=$hub) for mTLS handshake and connection reuse. DFSP host or SDK runtime → the existing [DFSP Overview](/d/dfsp-overview) dashboard. Back to [Transfer SLO](/d/perf-slo?var-hub=$hub)."
+          }
+        }
+      ]
+    }

@@ -1,0 +1,233 @@
+# Data Layer Under Load — is the database the wall?
+#
+# Framed from the APPLICATION's point of view first. moja_model_* and
+# moja_getEndpoint are the hub's own measurements of how long its database and
+# cache calls took; every other panel exists to explain those two. If the
+# application-side latency is flat, the database is not your problem no matter
+# how interesting its internal counters look.
+#
+# THE MOJALOOP-SPECIFIC FAILURE MODE IS ROW LOCK CONTENTION, NOT THROUGHPUT.
+# Position updates serialise on the participant position row, so concurrent
+# transfers for the same participant queue on a lock. That appears as rising
+# innodb_row_lock_time_avg while CPU, buffer pool and query rate all look
+# healthy — the database is not busy, it is waiting on itself. Adding
+# replicas makes it worse, not better.
+#
+# GALERA/PXC FLOW CONTROL is the second one to know. When a node falls
+# behind, the cluster pauses writes cluster-wide (wsrep_flow_control_paused).
+# Every write stalls at once, which reads downstream as a total switch
+# freeze with no error anywhere.
+#
+# CONNECTION POOL SATURATION is measured as threads_connected against
+# max_connections. Exhaustion surfaces in the application as a timeout, never
+# as a database error, so it is routinely misattributed to the network.
+#
+# Redis is selected separately because it exists on BOTH sides — the hub's
+# cache and each DFSP's SDK cache — and the DFSP-side instance is often the
+# more interesting one during a transfer slowdown.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-perf-data-layer-load
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Performance"
+data:
+  data-layer-load.json: |
+    {
+      "uid": "perf-datalayer",
+      "title": "Data Layer Under Load",
+      "description": "Database and cache behaviour as it affects transfer latency: application-observed query time first, then row lock contention, Galera flow control, connection pool headroom, Redis and MongoDB.",
+      "tags": ["performance", "database", "mojaloop"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "1m",
+      "time": { "from": "now-6h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "hub",
+            "label": "Hub cluster",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(moja_nodejs_eventloop_lag_seconds, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          },
+          {
+            "name": "redis_cluster",
+            "label": "Redis in",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(redis_up, cluster_name)",
+            "refresh": 2,
+            "includeAll": true,
+            "multi": true,
+            "current": {}
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Application-observed DB time p99",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "How long the hub's own model layer says its database calls took. This is the only number on this dashboard that directly affects transfer latency; everything else explains it.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 4, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.05 }, { "color": "red", "value": 0.2 } ] } } },
+          "targets": [
+            { "expr": "max(histogram_quantile(0.99, sum by (service, le) (rate(moja_model_transfer_bucket{cluster_name=\"$hub\"}[$__rate_interval]))))", "legendFormat": "p99" }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Row lock wait (avg)",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Average time a transaction spends blocked on a row lock. The signature of position contention: rises under concurrency for the same participant while every throughput counter stays flat.",
+          "fieldConfig": { "defaults": { "unit": "ms", "decimals": 1, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 10 }, { "color": "red", "value": 100 } ] } } },
+          "targets": [
+            { "expr": "max(mysql_global_status_innodb_row_lock_time_avg{cluster_name=\"$hub\"})", "legendFormat": "lock wait" }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Connection pool used",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Connections in use against max_connections. Exhaustion presents to the application as a timeout with no database-side error, so it is easy to misread as a network fault.",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 3, "max": 1, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.7 }, { "color": "red", "value": 0.9 } ] } } },
+          "targets": [
+            { "expr": "max(mysql_global_status_threads_connected{cluster_name=\"$hub\"}) / clamp_min(max(mysql_global_variables_max_connections{cluster_name=\"$hub\"}), 1)", "legendFormat": "pool used" }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Galera flow control",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Fraction of time the cluster paused writes because a node fell behind. Any sustained non-zero value stalls every write in the switch simultaneously — a total freeze with no error surfaced anywhere.",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 4, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.001 }, { "color": "red", "value": 0.01 } ] } } },
+          "targets": [
+            { "expr": "max(mysql_global_status_wsrep_flow_control_paused{cluster_name=\"$hub\"}) or vector(0)", "legendFormat": "paused" }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Application-observed data access — p99",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 5 },
+          "datasource": { "uid": "thanos" },
+          "description": "The hub's own histograms for its model and cache layers. Start here: if these are flat during a latency regression, the database is exonerated regardless of what its internal counters do.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 4, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_model_transfer_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "transfer model" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_model_participant_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "participant model" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_model_quote_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "quote model" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_getEndpoint_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "endpoint cache" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_fetchParticipants_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "fetch participants" }
+          ]
+        },
+        {
+          "title": "Row lock contention",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 5 },
+          "datasource": { "uid": "thanos" },
+          "description": "Lock waits per second and average wait time. In Mojaloop this is position-row contention. It scales with concurrency PER PARTICIPANT, not with total load, so a single busy DFSP can create it at low overall TPS — and adding handler replicas increases it.",
+          "fieldConfig": { "defaults": { "decimals": 2, "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            { "expr": "sum(rate(mysql_global_status_innodb_row_lock_waits{cluster_name=\"$hub\"}[$__rate_interval]))", "legendFormat": "lock waits/s" },
+            { "expr": "max(mysql_global_status_innodb_row_lock_time_avg{cluster_name=\"$hub\"}) / 1000", "legendFormat": "avg wait (s)" }
+          ]
+        },
+        {
+          "title": "MySQL threads and query rate",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 15 },
+          "datasource": { "uid": "thanos" },
+          "description": "Threads running is the real concurrency signal — a value that climbs while the query rate stays flat means queries are queueing, not arriving faster.",
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 1, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "max by (pod) (mysql_global_status_threads_running{cluster_name=\"$hub\"})", "legendFormat": "running — {{pod}}" },
+            { "expr": "max by (pod) (mysql_global_status_threads_connected{cluster_name=\"$hub\"})", "legendFormat": "connected — {{pod}}" },
+            { "expr": "sum(rate(mysql_global_status_questions{cluster_name=\"$hub\"}[$__rate_interval]))", "legendFormat": "queries/s" }
+          ]
+        },
+        {
+          "title": "Buffer pool hit rate and slow queries",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 15 },
+          "datasource": { "uid": "thanos" },
+          "description": "Buffer pool hit rate below ~0.99 means reads are hitting disk, which multiplies query latency. Slow queries are the direct evidence of it.",
+          "fieldConfig": { "defaults": { "decimals": 4, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "1 - (sum(rate(mysql_global_status_innodb_buffer_pool_reads{cluster_name=\"$hub\"}[$__rate_interval])) / clamp_min(sum(rate(mysql_global_status_innodb_buffer_pool_read_requests{cluster_name=\"$hub\"}[$__rate_interval])), 0.0000001))", "legendFormat": "buffer pool hit rate" },
+            { "expr": "sum(rate(mysql_global_status_slow_queries{cluster_name=\"$hub\"}[$__rate_interval]))", "legendFormat": "slow queries/s" }
+          ]
+        },
+        {
+          "title": "Galera replication health",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 24 },
+          "datasource": { "uid": "thanos" },
+          "description": "Receive queue depth, flow-control pauses and certification dependency distance. A growing receive queue precedes flow control; high cert_deps_distance means transactions are highly parallelisable, low means they are serialising — which is what position contention looks like at the cluster layer.",
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 3, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "max by (pod) (mysql_global_status_wsrep_local_recv_queue{cluster_name=\"$hub\"})", "legendFormat": "recv queue — {{pod}}" },
+            { "expr": "max by (pod) (mysql_global_status_wsrep_flow_control_paused{cluster_name=\"$hub\"})", "legendFormat": "flow control paused — {{pod}}" },
+            { "expr": "max by (pod) (mysql_global_status_wsrep_cert_deps_distance{cluster_name=\"$hub\"})", "legendFormat": "cert deps distance — {{pod}}" }
+          ]
+        },
+        {
+          "title": "Redis latency and throughput",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 24 },
+          "datasource": { "uid": "thanos" },
+          "description": "Mean command duration by command, and commands per second. Select the hub for its cache, or a DFSP for its SDK cache — the DFSP-side instance is frequently the more relevant one during a transfer slowdown.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 6, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "topk(8, sum by (cluster_name, cmd) (rate(redis_commands_duration_seconds_total{cluster_name=~\"$redis_cluster\"}[$__rate_interval])) / clamp_min(sum by (cluster_name, cmd) (rate(redis_commands_processed_total{cluster_name=~\"$redis_cluster\"}[$__rate_interval])), 0.0000001))", "legendFormat": "{{cluster_name}} — {{cmd}}" }
+          ]
+        },
+        {
+          "title": "Redis pressure",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 33 },
+          "datasource": { "uid": "thanos" },
+          "description": "Blocked clients, evictions and cache hit rate. Evictions mean the working set no longer fits, which turns cache hits into database round trips and moves latency into MySQL.",
+          "fieldConfig": { "defaults": { "decimals": 3, "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            { "expr": "sum by (cluster_name) (redis_blocked_clients{cluster_name=~\"$redis_cluster\"})", "legendFormat": "blocked clients — {{cluster_name}}" },
+            { "expr": "sum by (cluster_name) (rate(redis_evicted_keys_total{cluster_name=~\"$redis_cluster\"}[$__rate_interval]))", "legendFormat": "evictions/s — {{cluster_name}}" },
+            { "expr": "sum by (cluster_name) (rate(redis_keyspace_hits_total{cluster_name=~\"$redis_cluster\"}[$__rate_interval])) / clamp_min(sum by (cluster_name) (rate(redis_keyspace_hits_total{cluster_name=~\"$redis_cluster\"}[$__rate_interval])) + sum by (cluster_name) (rate(redis_keyspace_misses_total{cluster_name=~\"$redis_cluster\"}[$__rate_interval])), 0.0000001)", "legendFormat": "hit rate — {{cluster_name}}" }
+          ]
+        },
+        {
+          "title": "MongoDB operation latency and queueing",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 33 },
+          "datasource": { "uid": "thanos" },
+          "description": "MongoDB backs Finance Portal reporting, not the transfer hot path — but the reporting-events-processor consumes from the same Kafka cluster, so a Mongo stall can create consumer lag that does touch transfers. Current queue depth is the signal to watch.",
+          "fieldConfig": { "defaults": { "decimals": 2, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "sum by (op_type) (rate(mongodb_ss_opLatencies_latency{cluster_name=\"$hub\"}[$__rate_interval])) / clamp_min(sum by (op_type) (rate(mongodb_ss_opLatencies_ops{cluster_name=\"$hub\"}[$__rate_interval])), 0.0000001)", "legendFormat": "mean latency (us) — {{op_type}}" },
+            { "expr": "sum by (count_type) (mongodb_ss_globalLock_currentQueue{cluster_name=\"$hub\"}) > 0", "legendFormat": "queued — {{count_type}}" }
+          ]
+        },
+        {
+          "title": "Drill-down",
+          "type": "text",
+          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 42 },
+          "options": {
+            "mode": "markdown",
+            "content": "Row lock waits high → position contention. More handler replicas will make it worse; look at participant concurrency and batch sizing on [Async & Kafka Pipeline](/d/perf-async?var-hub=$hub). Application DB time flat but transfers slow → not the database: [Service Runtime Saturation](/d/perf-runtime?var-hub=$hub) or [Hub Latency Breakdown](/d/perf-hub-stages?var-hub=$hub). Deeper database internals live in the existing Data Layer folder. Back to [Transfer SLO](/d/perf-slo?var-hub=$hub)."
+          }
+        }
+      ]
+    }

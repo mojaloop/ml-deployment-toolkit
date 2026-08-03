@@ -1,0 +1,247 @@
+# Load Test Runs — characterise a run, and compare it against the last one.
+#
+# !! UNVERIFIED AGAINST LIVE DATA AT TIME OF WRITING !!
+# k6 only emits while a test is running, and no run had happened within the
+# retention window when this dashboard was authored. Every k6_* expression
+# here was taken from the working queries in
+# grafana/dashboards/mojaloop/load-test.yaml rather than confirmed against
+# Thanos. Everything NOT prefixed k6_ was verified live. If a k6 panel is
+# empty during a real run, check the metric name before assuming the run
+# failed — and once confirmed, delete this warning.
+#
+# k6 PERCENTILES CANNOT BE RE-AGGREGATED. k6 exports p50/p90/p99 as
+# PRE-COMPUTED GAUGES, not histogram buckets. There is no valid way to combine
+# them across instances or re-quantile them over a window: max() is a
+# convention, not mathematics. This is why the hub-side compliance panels on
+# this dashboard use the switch's own histograms — those are bucket-exact and
+# can be aggregated properly. Treat the k6 numbers as the client's report of
+# its own experience, and the hub numbers as measurement.
+#
+# WHY $testid IS MULTI-SELECT: the point of this dashboard is run-over-run
+# comparison. Select two testids to see whether a change helped. Runs are
+# labelled by testid at injection time — see perf/k6/README.md.
+#
+# DROPPED ITERATIONS IS THE HONEST SATURATION SIGNAL. When k6 cannot maintain
+# the target arrival rate it drops iterations rather than slowing down. A run
+# with a beautiful p99 and a rising dropped count did not pass — it quietly
+# stopped asking for the load it was supposed to apply.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-perf-load-test-runs
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Performance"
+data:
+  load-test-runs.json: |
+    {
+      "uid": "perf-loadtest",
+      "title": "Load Test Runs",
+      "description": "Characterise a k6 run and compare it against previous ones: client-reported latency and injected rate alongside hub-side bucket-exact compliance, stage latency, queue wait and event loop lag over the same window.",
+      "tags": ["performance", "k6", "loadtest", "mojaloop"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-3h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "hub",
+            "label": "Hub cluster",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(moja_nodejs_eventloop_lag_seconds, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          },
+          {
+            "name": "testid",
+            "label": "Run",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "description": "Select two or more runs to compare. k6 series carry no cluster_name label.",
+            "query": "label_values(k6_http_reqs_total, testid)",
+            "refresh": 2,
+            "includeAll": true,
+            "multi": true,
+            "current": {}
+          },
+          {
+            "name": "slo_latency",
+            "label": "Max latency",
+            "type": "custom",
+            "query": "10ms : 0\\.01, 50ms : 0\\.05, 100ms : 0\\.1, 500ms : 0\\.5, 1s : 1(\\.0+)?, 5s : 5(\\.0+)?",
+            "includeAll": false,
+            "current": { "text": "1s", "value": "1(\\.0+)?" }
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Client p99 (k6-reported)",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 5, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "k6's own p99, pre-computed by the client. max() across instances is a display convention, not a valid aggregation — see the hub-side compliance panel for a number that can be defended.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.8 }, { "color": "red", "value": 1 } ] } } },
+          "targets": [
+            { "expr": "max(k6_http_req_duration_p99{testid=~\"$testid\"})", "legendFormat": "p99" }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Hub compliance during run",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 5, "x": 5, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Bucket-exact share of hub fulfil legs within the selected max latency over the dashboard time range. Unlike the k6 percentile this is measured, aggregatable and comparable between runs.",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 4, "min": 0, "max": 1, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": 0.95 }, { "color": "green", "value": 0.99 } ] } } },
+          "targets": [
+            {
+              "expr": "sum(increase(moja_tx_transfer_fulfil_bucket{cluster_name=\"$hub\", le=~\"$slo_latency\"}[$__range])) / sum(increase(moja_tx_transfer_fulfil_count{cluster_name=\"$hub\"}[$__range]))",
+              "legendFormat": "within SLO",
+              "instant": true
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Injected rate",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 4, "x": 10, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Requests per second k6 actually issued. Compare against the run's target — a shortfall means the harness could not keep up, not that the switch was fast.",
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1 } },
+          "targets": [
+            { "expr": "sum(rate(k6_http_reqs_total{testid=~\"$testid\"}[$__rate_interval]))", "legendFormat": "req/s" }
+          ],
+          "options": { "colorMode": "none", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Dropped iterations",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 5, "x": 14, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Iterations k6 abandoned because it could not maintain the arrival rate. Non-zero invalidates the run as a latency measurement: the offered load was not what the test claimed. Check this before reading any other number here.",
+          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 2, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 0.001 } ] } } },
+          "targets": [
+            { "expr": "sum(rate(k6_dropped_iterations_total{testid=~\"$testid\"}[$__rate_interval])) or vector(0)", "legendFormat": "dropped/s" }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Worst hub queue wait during run",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 5, "x": 19, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Peak estimated Kafka queue wait while the run was in flight. If this rises with load, the switch is throughput-bound rather than latency-bound and more replicas may help.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.25 }, { "color": "red", "value": 1 } ] } } },
+          "targets": [
+            {
+              "expr": "max(sum by (topic, consumergroup) (kafka_consumergroup_lag_sum{cluster_name=\"$hub\", topic!~\"topic-event-.*\"}) / clamp_min(sum by (topic, consumergroup) (rate(kafka_consumergroup_current_offset_sum{cluster_name=\"$hub\", topic!~\"topic-event-.*\"}[$__rate_interval])), 0.001))",
+              "legendFormat": "worst wait"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Client latency by run (k6)",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 5 },
+          "datasource": { "uid": "thanos" },
+          "description": "Pre-computed percentiles per run. With two runs selected this is the before-and-after view. The threshold line is the p99 SLO.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "custom": { "fillOpacity": 5, "thresholdsStyle": { "mode": "line" } }, "thresholds": { "mode": "absolute", "steps": [ { "color": "transparent", "value": null }, { "color": "red", "value": 1 } ] } } },
+          "targets": [
+            { "expr": "max by (testid) (k6_http_req_duration_p50{testid=~\"$testid\"})", "legendFormat": "p50 — {{testid}}" },
+            { "expr": "max by (testid) (k6_http_req_duration_p90{testid=~\"$testid\"})", "legendFormat": "p90 — {{testid}}" },
+            { "expr": "max by (testid) (k6_http_req_duration_p99{testid=~\"$testid\"})", "legendFormat": "p99 — {{testid}}" }
+          ]
+        },
+        {
+          "title": "Offered load and concurrency",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 5 },
+          "datasource": { "uid": "thanos" },
+          "description": "Request rate, in-flight virtual users and dropped iterations together. VUs climbing while the request rate stays flat is the saturation knee — the system stopped absorbing more load at that point.",
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 2, "custom": { "fillOpacity": 5 } } },
+          "targets": [
+            { "expr": "sum by (testid) (rate(k6_http_reqs_total{testid=~\"$testid\"}[$__rate_interval]))", "legendFormat": "req/s — {{testid}}" },
+            { "expr": "max by (testid) (k6_vus{testid=~\"$testid\"})", "legendFormat": "VUs — {{testid}}" },
+            { "expr": "sum by (testid) (rate(k6_dropped_iterations_total{testid=~\"$testid\"}[$__rate_interval]))", "legendFormat": "dropped/s — {{testid}}" }
+          ]
+        },
+        {
+          "title": "Hub stage latency during run",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 15 },
+          "datasource": { "uid": "thanos" },
+          "description": "Which hop degraded as load was applied. A stage whose p99 climbs with offered load is the one that will cap throughput; stages that stay flat have headroom.",
+          "fieldConfig": { "defaults": { "unit": "ms", "decimals": 0, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$hub\", service_name=\"moja-ml-api-adapter-service\", span_name=\"POST /transfers\"}[$__rate_interval])))", "legendFormat": "edge — POST /transfers" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$hub\", span_name=\"RECEIVE:topic-transfer-prepare\"}[$__rate_interval])))", "legendFormat": "prepare handler" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$hub\", span_name=\"RECEIVE:topic-transfer-position-batch\"}[$__rate_interval])))", "legendFormat": "position batch handler" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$hub\", span_name=\"RECEIVE:topic-transfer-fulfil\"}[$__rate_interval])))", "legendFormat": "fulfil handler" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$hub\", span_name=\"RECEIVE:topic-notification-event\"}[$__rate_interval])))", "legendFormat": "notification handler" }
+          ]
+        },
+        {
+          "title": "Hub saturation during run",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 15 },
+          "datasource": { "uid": "thanos" },
+          "description": "Event loop lag, GC share and CPU throttling under load. Whichever crosses first is the resource the next tuning round should target.",
+          "fieldConfig": { "defaults": { "decimals": 4, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "max by (service) (moja_nodejs_eventloop_lag_p99_seconds{cluster_name=\"$hub\"})", "legendFormat": "loop lag p99 (s) — {{service}}" },
+            { "expr": "max(sum by (service) (rate(moja_nodejs_gc_duration_seconds_sum{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "worst GC share" },
+            { "expr": "max(sum by (pod) (rate(container_cpu_cfs_throttled_seconds_total{cluster_name=\"$hub\", namespace=\"mojaloop\", container!=\"\"}[$__rate_interval])))", "legendFormat": "worst CPU throttling" }
+          ]
+        },
+        {
+          "title": "Kafka queue wait during run",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 24 },
+          "datasource": { "uid": "thanos" },
+          "description": "Estimated wait per topic as load ramps. A topic whose wait grows without bound has passed its consumer capacity — that is a throughput limit, not a latency bug, and it is fixed with replicas or partitions.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (topic) (kafka_consumergroup_lag_sum{cluster_name=\"$hub\", topic!~\"topic-event-.*\"}) / clamp_min(sum by (topic) (rate(kafka_consumergroup_current_offset_sum{cluster_name=\"$hub\", topic!~\"topic-event-.*\"}[$__rate_interval])), 0.001) > 0",
+              "legendFormat": "{{topic}}"
+            }
+          ]
+        },
+        {
+          "title": "Run comparison",
+          "type": "table",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 24 },
+          "datasource": { "uid": "thanos" },
+          "description": "One row per run over the dashboard time range. Read the dropped column first — a run with drops is not comparable to one without, regardless of how its latencies look.",
+          "fieldConfig": { "defaults": { "decimals": 3 } },
+          "targets": [
+            { "expr": "max by (testid) (k6_http_req_duration_p50{testid=~\"$testid\"})", "instant": true, "format": "table", "refId": "A" },
+            { "expr": "max by (testid) (k6_http_req_duration_p90{testid=~\"$testid\"})", "instant": true, "format": "table", "refId": "B" },
+            { "expr": "max by (testid) (k6_http_req_duration_p99{testid=~\"$testid\"})", "instant": true, "format": "table", "refId": "C" },
+            { "expr": "sum by (testid) (rate(k6_http_reqs_total{testid=~\"$testid\"}[$__rate_interval]))", "instant": true, "format": "table", "refId": "D" },
+            { "expr": "sum by (testid) (rate(k6_dropped_iterations_total{testid=~\"$testid\"}[$__rate_interval]))", "instant": true, "format": "table", "refId": "E" }
+          ],
+          "transformations": [
+            { "id": "merge", "options": {} },
+            { "id": "organize", "options": { "excludeByName": { "Time": true, "Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "Time 5": true }, "renameByName": { "testid": "Run", "Value #A": "p50", "Value #B": "p90", "Value #C": "p99", "Value #D": "req/s", "Value #E": "dropped/s" } } }
+          ]
+        },
+        {
+          "title": "Reading this dashboard",
+          "type": "text",
+          "gridPos": { "h": 5, "w": 24, "x": 0, "y": 33 },
+          "options": {
+            "mode": "markdown",
+            "content": "**k6 panels are unverified against live data.** They were written from the queries in the existing Load Test (k6) dashboard because no run existed in the retention window at authoring time. If they are empty during a real run, check the metric names before concluding the run failed.\n\n**k6 percentiles are pre-computed gauges, not buckets.** They cannot be validly re-aggregated across instances or re-quantiled over a window — `max()` is a display convention. The hub-side compliance panel is the defensible number.\n\n**Check dropped iterations first.** A run that dropped iterations did not apply the load it claimed, and its latency figures describe a different test than the one you intended.\n\nDeeper: [Hub Latency Breakdown](/d/perf-hub-stages?var-hub=$hub) · [Async & Kafka Pipeline](/d/perf-async?var-hub=$hub) · [Service Runtime Saturation](/d/perf-runtime?var-hub=$hub) · [Capacity & Headroom](/d/perf-capacity?var-hub=$hub) · back to [Transfer SLO](/d/perf-slo?var-hub=$hub)"
+          }
+        }
+      ]
+    }

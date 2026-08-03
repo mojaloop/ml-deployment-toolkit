@@ -1,0 +1,293 @@
+# Hub Latency Breakdown — where inside the switch the time goes.
+#
+# Two independent measurement systems, deliberately side by side:
+#
+#   traces_span_metrics_*  OTel span metrics, emitted by Alloy's spanmetrics
+#                          connector. Teed off BEFORE tail sampling, so rates
+#                          and percentiles cover 100% of traffic even though
+#                          Tempo stores only a sample. Buckets are ours
+#                          (alloy-values.yaml) and include an exact 1000ms
+#                          boundary, so breach counts here are exact.
+#                          Unit is MILLISECONDS. Selector: $slo_ms.
+#
+#   moja_*                 The services' own Prometheus histograms. Coarser
+#                          buckets, but they cover code paths that carry no
+#                          span (duplicate checks, validators, model calls)
+#                          and they survive the OTel agent being turned off.
+#                          Unit is SECONDS.
+#
+# Span names are OTel names on purpose (POST /transfers, RECEIVE:topic-...),
+# never Event-SDK business span names (cl_transfer_prepare, QuotesPost), which
+# disappear when the Event SDK trace path is retired.
+#
+# WHAT THIS DASHBOARD CANNOT SEE: time spent waiting in Kafka between a SEND
+# and the matching RECEIVE. Span duration is execution, not queueing. If the
+# stage durations here sum to far less than the hub legs on Transfer SLO, the
+# difference is queue time — go to Async & Kafka Pipeline.
+#
+# GET /health and GET /metrics are excluded everywhere; at lab traffic they
+# dominate call counts and carry no signal.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-perf-hub-latency-breakdown
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Performance"
+data:
+  hub-latency-breakdown.json: |
+    {
+      "uid": "perf-hub-stages",
+      "title": "Hub Latency Breakdown",
+      "description": "Per-stage latency inside the switch, from OTel span metrics (pre-tail-sampling, millisecond buckets) cross-checked against the services' own histograms. Identifies which hop owns the latency; queue time between hops lives on Async & Kafka Pipeline.",
+      "tags": ["performance", "mojaloop", "tracing"],
+      "timezone": "utc",
+      "editable": true,
+      "refresh": "1m",
+      "time": { "from": "now-6h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "hub",
+            "label": "Hub cluster",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(traces_span_metrics_calls_total, cluster_name)",
+            "refresh": 2,
+            "includeAll": false,
+            "current": {}
+          },
+          {
+            "name": "service",
+            "label": "Service",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(traces_span_metrics_calls_total{cluster_name=\"$hub\"}, service_name)",
+            "refresh": 2,
+            "includeAll": true,
+            "multi": true,
+            "current": {}
+          },
+          {
+            "name": "slo_ms",
+            "label": "Max latency",
+            "type": "custom",
+            "description": "Exact bucket boundary on the spanmetrics histogram, in milliseconds.",
+            "query": "10ms : 10, 50ms : 50, 100ms : 100, 500ms : 500, 1s : 1000, 2s : 2000, 5s : 5000",
+            "includeAll": false,
+            "current": { "text": "1s", "value": "1000" }
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Slowest stage p99",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "The worst single hop across all instrumented hub services. If this is comfortably under the SLO but transfers are not, the latency is queueing or outside the hub.",
+          "fieldConfig": { "defaults": { "unit": "ms", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 250 }, { "color": "red", "value": 1000 } ] } } },
+          "targets": [
+            {
+              "expr": "max(histogram_quantile(0.99, sum by (service_name, span_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$hub\", service_name=~\"$service\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name!~\"GET /(health|metrics)\"}[$__rate_interval]))))",
+              "legendFormat": "worst hop p99"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Hop executions within SLO",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Share of individual hub hops completing within the selected max latency, over the dashboard time range. Exact — 1000ms is a real bucket boundary on this histogram.",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 4, "min": 0, "max": 1, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": 0.99 }, { "color": "green", "value": 0.999 } ] } } },
+          "targets": [
+            {
+              "expr": "sum(increase(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$hub\", service_name=~\"$service\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name!~\"GET /(health|metrics)\", le=\"$slo_ms\"}[$__range])) / sum(increase(traces_span_metrics_duration_milliseconds_count{cluster_name=\"$hub\", service_name=~\"$service\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name!~\"GET /(health|metrics)\"}[$__range]))",
+              "legendFormat": "within SLO",
+              "instant": true
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Hub prepare leg (mean)",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Payer POST /transfers received -> prepare callback dispatched to payee. Measured wholly inside the hub.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.25 }, { "color": "red", "value": 0.5 } ] } } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_tx_transfer_prepare_sum{cluster_name=\"$hub\"}[$__rate_interval])) / clamp_min(sum(rate(moja_tx_transfer_prepare_count{cluster_name=\"$hub\"}[$__rate_interval])), 0.0000001)",
+              "legendFormat": "prepare leg"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Hub fulfil leg (mean)",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "uid": "thanos" },
+          "description": "Payee PUT /transfers/{ID} received -> final notification dispatched to payer. Measured wholly inside the hub.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.25 }, { "color": "red", "value": 0.5 } ] } } },
+          "targets": [
+            {
+              "expr": "sum(rate(moja_tx_transfer_fulfil_sum{cluster_name=\"$hub\"}[$__rate_interval])) / clamp_min(sum(rate(moja_tx_transfer_fulfil_count{cluster_name=\"$hub\"}[$__rate_interval])), 0.0000001)",
+              "legendFormat": "fulfil leg"
+            }
+          ],
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "title": "Transfer path — p99 per stage",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 5 },
+          "datasource": { "uid": "thanos" },
+          "description": "The FSPIOP transfer hops in order: HTTP admission at the edge, then each Kafka consumer. Whichever line lifts owns the regression.",
+          "fieldConfig": { "defaults": { "unit": "ms", "decimals": 0, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$hub\", service_name=\"moja-ml-api-adapter-service\", span_name=\"POST /transfers\"}[$__rate_interval])))", "legendFormat": "1. edge — POST /transfers" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$hub\", span_name=\"RECEIVE:topic-transfer-prepare\"}[$__rate_interval])))", "legendFormat": "2. prepare handler" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$hub\", span_name=\"RECEIVE:topic-transfer-position-batch\"}[$__rate_interval])))", "legendFormat": "3. position batch handler" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$hub\", service_name=\"moja-ml-api-adapter-service\", span_name=\"PUT /transfers/{ID}\"}[$__rate_interval])))", "legendFormat": "4. edge — PUT /transfers/{ID}" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$hub\", span_name=\"RECEIVE:topic-transfer-fulfil\"}[$__rate_interval])))", "legendFormat": "5. fulfil handler" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$hub\", span_name=\"RECEIVE:topic-notification-event\"}[$__rate_interval])))", "legendFormat": "6. notification handler" }
+          ]
+        },
+        {
+          "title": "Transfer path — mean contribution per stage",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 5 },
+          "datasource": { "uid": "thanos" },
+          "description": "Same hops as means, stacked. Means are additive so the total is meaningful; the gap between this total and the hub legs on Transfer SLO is queue time between hops.",
+          "fieldConfig": { "defaults": { "unit": "ms", "decimals": 1, "custom": { "fillOpacity": 25, "stacking": { "mode": "normal" }, "lineWidth": 1 } } },
+          "targets": [
+            { "expr": "sum(rate(traces_span_metrics_duration_milliseconds_sum{cluster_name=\"$hub\", service_name=\"moja-ml-api-adapter-service\", span_name=\"POST /transfers\"}[$__rate_interval])) / clamp_min(sum(rate(traces_span_metrics_duration_milliseconds_count{cluster_name=\"$hub\", service_name=\"moja-ml-api-adapter-service\", span_name=\"POST /transfers\"}[$__rate_interval])), 0.0000001)", "legendFormat": "1. edge — POST /transfers" },
+            { "expr": "sum(rate(traces_span_metrics_duration_milliseconds_sum{cluster_name=\"$hub\", span_name=\"RECEIVE:topic-transfer-prepare\"}[$__rate_interval])) / clamp_min(sum(rate(traces_span_metrics_duration_milliseconds_count{cluster_name=\"$hub\", span_name=\"RECEIVE:topic-transfer-prepare\"}[$__rate_interval])), 0.0000001)", "legendFormat": "2. prepare handler" },
+            { "expr": "sum(rate(traces_span_metrics_duration_milliseconds_sum{cluster_name=\"$hub\", span_name=\"RECEIVE:topic-transfer-position-batch\"}[$__rate_interval])) / clamp_min(sum(rate(traces_span_metrics_duration_milliseconds_count{cluster_name=\"$hub\", span_name=\"RECEIVE:topic-transfer-position-batch\"}[$__rate_interval])), 0.0000001)", "legendFormat": "3. position batch handler" },
+            { "expr": "sum(rate(traces_span_metrics_duration_milliseconds_sum{cluster_name=\"$hub\", service_name=\"moja-ml-api-adapter-service\", span_name=\"PUT /transfers/{ID}\"}[$__rate_interval])) / clamp_min(sum(rate(traces_span_metrics_duration_milliseconds_count{cluster_name=\"$hub\", service_name=\"moja-ml-api-adapter-service\", span_name=\"PUT /transfers/{ID}\"}[$__rate_interval])), 0.0000001)", "legendFormat": "4. edge — PUT /transfers/{ID}" },
+            { "expr": "sum(rate(traces_span_metrics_duration_milliseconds_sum{cluster_name=\"$hub\", span_name=\"RECEIVE:topic-transfer-fulfil\"}[$__rate_interval])) / clamp_min(sum(rate(traces_span_metrics_duration_milliseconds_count{cluster_name=\"$hub\", span_name=\"RECEIVE:topic-transfer-fulfil\"}[$__rate_interval])), 0.0000001)", "legendFormat": "5. fulfil handler" },
+            { "expr": "sum(rate(traces_span_metrics_duration_milliseconds_sum{cluster_name=\"$hub\", span_name=\"RECEIVE:topic-notification-event\"}[$__rate_interval])) / clamp_min(sum(rate(traces_span_metrics_duration_milliseconds_count{cluster_name=\"$hub\", span_name=\"RECEIVE:topic-notification-event\"}[$__rate_interval])), 0.0000001)", "legendFormat": "6. notification handler" }
+          ]
+        },
+        {
+          "title": "SLO breaches by stage",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 15 },
+          "datasource": { "uid": "thanos" },
+          "description": "Exact count of hop executions exceeding the selected max latency — total minus the SLO bucket, no interpolation. Attributes error budget spend to a specific hop.",
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "custom": { "fillOpacity": 40, "drawStyle": "bars", "lineWidth": 0, "stacking": { "mode": "normal" } } } },
+          "targets": [
+            {
+              "expr": "clamp_min(sum by (service_name, span_name) (increase(traces_span_metrics_duration_milliseconds_count{cluster_name=\"$hub\", service_name=~\"$service\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name!~\"GET /(health|metrics)\"}[$__interval])) - sum by (service_name, span_name) (increase(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$hub\", service_name=~\"$service\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name!~\"GET /(health|metrics)\", le=\"$slo_ms\"}[$__interval])), 0) > 0",
+              "legendFormat": "{{service_name}} — {{span_name}}"
+            }
+          ]
+        },
+        {
+          "title": "Errors by stage",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 15 },
+          "datasource": { "uid": "thanos" },
+          "description": "Span error rate per hop. Errors and latency usually move together — a hop that starts erroring often starts timing out first.",
+          "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 4, "custom": { "fillOpacity": 10 } } },
+          "targets": [
+            {
+              "expr": "sum by (service_name, span_name) (rate(traces_span_metrics_calls_total{cluster_name=\"$hub\", service_name=~\"$service\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", status_code=\"STATUS_CODE_ERROR\", span_name!~\"GET /(health|metrics)\"}[$__rate_interval])) / clamp_min(sum by (service_name, span_name) (rate(traces_span_metrics_calls_total{cluster_name=\"$hub\", service_name=~\"$service\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name!~\"GET /(health|metrics)\"}[$__rate_interval])), 0.0000001) > 0",
+              "legendFormat": "{{service_name}} — {{span_name}}"
+            }
+          ]
+        },
+        {
+          "title": "Central Ledger handler internals — p99",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 24 },
+          "datasource": { "uid": "thanos" },
+          "description": "The services' own histograms, in seconds. These cover code paths that emit no span — duplicate checks, validators, domain and model calls — so they explain WHY a handler span is slow.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_transfer_prepare_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "transfer prepare" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_transfer_position_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "transfer position" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_transfer_position_batch_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "position batch" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_transfer_fulfil_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "transfer fulfil" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_handler_transfers_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "handler internals (dup check)" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_handlers_transfer_validator_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "validator" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_domain_transfer_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "domain" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_model_transfer_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "model (DB)" }
+          ]
+        },
+        {
+          "title": "Notification pipeline internals — p99",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 24 },
+          "datasource": { "uid": "thanos" },
+          "description": "The last hop before a DFSP hears anything. Endpoint lookup is cached; a rising getEndpoint line means cache misses are hitting central-ledger on the hot path. Delivery is the outbound HTTP call to the DFSP and is largely THEIR latency, not the hub's.",
+          "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_notification_event_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "notification event (total)" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_notification_event_process_msg_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "process message" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_notification_event_getEndpoint_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "get endpoint" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_notification_event_delivery_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "delivery to DFSP" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_getEndpoint_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "endpoint cache lookup" },
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(moja_sendRequest_bucket{cluster_name=\"$hub\"}[$__rate_interval])))", "legendFormat": "outbound sendRequest" }
+          ]
+        },
+        {
+          "title": "Slowest hops right now",
+          "type": "table",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 33 },
+          "datasource": { "uid": "thanos" },
+          "description": "Every instrumented hop ranked by p99. Sort by p99 to find the bottleneck, then check the call rate column — a slow hop nobody calls is not your problem.",
+          "fieldConfig": { "defaults": { "unit": "ms", "decimals": 1 } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (service_name, span_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$hub\", service_name=~\"$service\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name!~\"GET /(health|metrics)\"}[$__rate_interval])))",
+              "legendFormat": "",
+              "instant": true,
+              "format": "table",
+              "refId": "A"
+            },
+            {
+              "expr": "sum by (service_name, span_name) (rate(traces_span_metrics_calls_total{cluster_name=\"$hub\", service_name=~\"$service\", span_kind=~\"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER\", span_name!~\"GET /(health|metrics)\"}[$__rate_interval]))",
+              "legendFormat": "",
+              "instant": true,
+              "format": "table",
+              "refId": "B"
+            }
+          ],
+          "transformations": [
+            { "id": "merge", "options": {} },
+            { "id": "organize", "options": { "excludeByName": { "Time": true, "Time 1": true, "Time 2": true }, "renameByName": { "service_name": "Service", "span_name": "Hop", "Value #A": "p99", "Value #B": "calls/s" } } },
+            { "id": "sortBy", "options": { "fields": {}, "sort": [ { "field": "p99", "desc": true } ] } }
+          ]
+        },
+        {
+          "title": "Kafka produce latency (SEND spans)",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 33 },
+          "datasource": { "uid": "thanos" },
+          "description": "Time to hand a message to the broker, per topic. This is produce acknowledgement only, NOT the wait before a consumer picks it up. Audit and trace topics are excluded — they are off the transfer path and dominate volume.",
+          "fieldConfig": { "defaults": { "unit": "ms", "decimals": 1, "custom": { "fillOpacity": 6 } } },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (span_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{cluster_name=\"$hub\", span_kind=\"SPAN_KIND_PRODUCER\", span_name!~\"SEND:topic-event-.*\"}[$__rate_interval])))",
+              "legendFormat": "{{span_name}}"
+            }
+          ]
+        },
+        {
+          "title": "Drill-down",
+          "type": "text",
+          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 43 },
+          "options": {
+            "mode": "markdown",
+            "content": "Stage durations sum to much less than the hub legs on [Transfer SLO](/d/perf-slo?var-hub=$hub)? The difference is queue time → [Async & Kafka Pipeline](/d/perf-async?var-hub=$hub). A handler slow without its internals being slow is usually process-bound → [Service Runtime Saturation](/d/perf-runtime?var-hub=$hub). Model/DB lines lifting → [Data Layer Under Load](/d/perf-datalayer?var-hub=$hub)."
+          }
+        }
+      ]
+    }
