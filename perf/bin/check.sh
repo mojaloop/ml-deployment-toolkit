@@ -14,7 +14,7 @@
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-require_tools yq kubectl
+require_tools yq jq kubectl
 
 [ -n "${ENV:-}" ] || die "usage: make perf-check ENV=<name>
        Environments with a topology: $(list_envs)"
@@ -50,21 +50,21 @@ else report "pending pods" "FAIL" "$PENDING pending"; fi
 # Pod readiness precedes consumer-group stability. A container that started
 # seconds ago means its group is still rebalancing, and a run begun now
 # measures that, not the system.
-YOUNGEST="$(k -n "$NS" get pods -o json 2>/dev/null | python3 -c '
-import json,sys,datetime
-now = datetime.datetime.now(datetime.timezone.utc)
-ages = [(now - datetime.datetime.fromisoformat(cs["state"]["running"]["startedAt"].replace("Z","+00:00"))).total_seconds()
-        for p in json.load(sys.stdin)["items"]
-        for cs in p["status"].get("containerStatuses", [])
-        if "running" in cs.get("state", {})]
-print(int(min(ages)) if ages else 999999)')"
+# No running container at all means nothing to wait for; report an age large
+# enough to pass rather than blocking on an empty namespace.
+YOUNGEST="$(k -n "$NS" get pods -o json 2>/dev/null \
+  | jq '[.items[].status.containerStatuses[]?
+         | select(.state.running)
+         | .state.running.startedAt
+         | fromdateiso8601] as $started
+        | if ($started | length) == 0 then 999999
+          else (now - ($started | min) | floor) end')"
 if [ "$YOUNGEST" -ge "$SETTLE_MIN" ]; then report "settle since last start" "OK" "${YOUNGEST}s"
 else report "settle since last start" "FAIL" "${YOUNGEST}s (want >=${SETTLE_MIN}s)"; fi
 
 # --- recent restarts -------------------------------------------------------
-RESTARTS="$(k -n "$NS" get pods -o json 2>/dev/null | python3 -c '
-import json,sys
-print(sum(cs.get("restartCount",0) for p in json.load(sys.stdin)["items"] for cs in p["status"].get("containerStatuses",[])))')"
+RESTARTS="$(k -n "$NS" get pods -o json 2>/dev/null \
+  | jq '[.items[].status.containerStatuses[]?.restartCount] | add // 0')"
 report "restart count (informational)" "INFO" "$RESTARTS"
 
 # --- kafka lag on transfer-path topics only --------------------------------
@@ -75,14 +75,9 @@ if [ -z "$TOPICS" ]; then
   report "kafka lag" "SKIP" "no cluster.kafka.topics declared"
 else
   if [ -z "$KAFKA_SVC" ]; then
-    KAFKA_SVC="$(k -n "$KAFKA_NS" get svc -o json 2>/dev/null | python3 -c "
-import json,sys
-port = int('$KAFKA_PORT')
-for s in json.load(sys.stdin).get('items', []):
-    for p in s['spec'].get('ports', []):
-        if p.get('port') == port:
-            print(s['metadata']['name']); raise SystemExit
-" || true)"
+    KAFKA_SVC="$(k -n "$KAFKA_NS" get svc -o json 2>/dev/null \
+      | jq -r --argjson port "$KAFKA_PORT" \
+          'first(.items[] | select(.spec.ports[]?.port == $port) | .metadata.name) // empty' || true)"
   fi
 
   if [ -z "$KAFKA_SVC" ]; then

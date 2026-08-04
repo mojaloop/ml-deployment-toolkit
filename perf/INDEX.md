@@ -6,7 +6,13 @@ Compliance is counted exactly at the scenario's target threshold. A run
 marked `dropped` did not offer the load it asked for and is not
 comparable; a run marked `tainted` had pods restart underneath it.
 
-| run | scenario | topology | shape | completed | success | within target | verdict | notes |
-|---|---|---|---|---|---|---|---|---|
+`deployed` is the sizing profile and artifact version the run was
+measuring, from its `deployment/config.yaml`. A row where the numbers
+moved and this column did not is a result that needs explaining; the
+full inputs are in that run's `deployment/`.
 
-_No runs recorded yet._
+| run | scenario | topology | shape | deployed | completed | success | within target | verdict | notes |
+|---|---|---|---|---|---|---|---|---|---|
+| [20260804T221759Z](../perf-result/ml-lab0-sw/smoke/20260804T221759Z) | smoke | ml-lab0-sw | smoke 1 | tps-1 @ latest | 9 | 31.034% | 31.034% @ 5s | NOT MET |  |
+| [20260804T115110Z](../perf-result/ml-lab0-sw/baseline-1tps/20260804T115110Z) | baseline-1tps | ml-lab0-sw | soak 1 | n/a | 686 | 99.565% | 0% @ 1s | NOT MET |  |
+| [20260804T112959Z](../perf-result/ml-lab0-sw/baseline-1tps/20260804T112959Z) | baseline-1tps | ml-lab0-sw | soak 1 | n/a | 686 | 99.565% | 0% @ 1s | NOT MET |  |

@@ -289,24 +289,48 @@ perf-result/<env>/<scenario>/<timestamp>/
   summary.json            machine-readable results
   scenario-snapshot.yaml  the test as run, overrides applied
   health.json             taint, restart delta, OOM kills
+  deployment/             what was deployed while it ran
   notes.md                human analysis
 ```
 
-**9.3** **A result never embeds a config.** It records which environment and
-what test — never endpoints, hostnames or credentials. Those belong to the
-environment's configuration and are managed like any other deployment config.
+**9.3** **A result records what was running, never where it was.** These are
+two different things and conflating them costs either safety or meaning.
 
-**9.3.1** Consequently a result is reproducible only in combination with that
-environment's configuration — the same property `make plan-apply` has. This
-is what makes results safe to commit.
+**9.3.1** *Never where.* Endpoints, hostnames, VIPs, DNS names, registry and
+object-storage addresses, alerting targets and credentials stay out. Those
+belong to `perf-topology.yaml` and to the environment's own configuration,
+and are managed like any other deployment config. This is what makes a
+result safe to commit.
 
-**9.3.2** `scenario-snapshot.yaml` captures the test with overrides already
+**9.3.2** *Always what.* The deployment under test is captured with the
+result: the Helm value overrides, the kustomize patches, the sizing profile,
+the artifact version, the data-layer modes and the API flavour. Without it a
+result is a number with no subject — two runs a fortnight apart cannot be
+compared, and the change under test is unrecorded, which makes the
+verification job in 1.2 unfalsifiable from its own artefacts.
+
+**9.3.3** Captured by copying `environments/<env>/values/*.yaml`,
+`environments/<env>/patches/*.yaml`, and an allowlisted extract of
+`config.yaml` (`.version`, `.template`, `.infra`, `.artifact`, `.data`,
+`.app.api_type`). `environments/<env>/` is gitignored, so none of this is
+recoverable from the repository afterwards — referencing it would not do.
+
+**9.3.4** The capture reads only the environment's files, never the cluster.
+Provenance therefore costs nothing against 1.3, and cannot fail a run that
+has no kubeconfig. The accepted cost is in the limitations below.
+
+**9.3.5** Consequently a result is reproducible only in combination with that
+environment's configuration — the same property `make plan-apply` has.
+
+**9.3.6** `scenario-snapshot.yaml` captures the test with overrides already
 applied, so a run reproduces from its result rather than from shell history.
 
 **9.4** Headline results are extracted automatically from the run. The tool
 never writes a placeholder for a human to fill in later.
 
-**9.5** `perf/INDEX.md` is generated from every `summary.json`.
+**9.5** `perf/INDEX.md` is generated from every `summary.json`, carrying the
+sizing profile and artifact version from each run's `deployment/` beside its
+numbers so a change in the result lines up with a change in its inputs.
 
 **9.6** Run-over-run comparison is a first-class operation.
 
@@ -386,6 +410,19 @@ not rediscovered as surprises.
   reuse within a run, which produces cache-level contention and failures
   unrelated to the system under test. Range sizing is a scenario concern.
 
+- **Deployment capture records the files, not the cluster.** It is taken from
+  `environments/<env>/` (9.3.4), so editing a values file and running a test
+  without `make apply-config` records the new file while measuring the old
+  deployment. Reading the cluster back would catch it, at the cost of making
+  provenance depend on a kubeconfig; that trade was declined. Apply before you
+  measure.
+
+- **Values and patches are templated before deployment.** `templatefile()`
+  substitutes `${...}` from `config.yaml` and the sizing profile, so a file
+  containing template variables is captured in its authored form rather than
+  its deployed one. The inputs to that substitution are captured alongside it,
+  so the rendering is reconstructable.
+
 ---
 
 ## Decision log
@@ -402,3 +439,5 @@ not rediscovered as surprises.
 | 8 | Local execution only | Scope; accepted cost is the throughput ceiling |
 | 9 | `make perf-check` standalone; post-run taint in the report | Readiness is its own concern; health delta is part of the result |
 | 10 | Per-run reports, generated index | Results stay attached to the configuration that produced them |
+| 11 | Deployment captured with each result, copied from `environments/<env>/` | `environments/` is gitignored, so provenance is unrecoverable afterwards; copying from disk keeps 1.3 intact where reading the cluster would not |
+| 12 | Six-key allowlist from `config.yaml`, not the whole file | Splits 9.3 cleanly: the six are what ran, the remainder is where it was and must not be committed |

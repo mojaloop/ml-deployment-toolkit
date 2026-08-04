@@ -36,6 +36,11 @@ CONFIG="$WORK/config.json"
 build_config "$TOPO" "$SCEN" "$CONFIG"
 build_scenario_snapshot "$SCEN" "$OUT_DIR/scenario-snapshot.yaml"
 
+# WHAT was deployed, beside WHAT was run. Captured before load starts, from
+# the environment's own files — no cluster access, so this never weakens the
+# client-side-only guarantee.
+capture_deployment "$ENV" "$OUT_DIR/deployment"
+
 echo "== $SCENARIO on $ENV =="
 info "run id     $RUN_ID"
 info "shape      $(jq -r '.load.shape' "$CONFIG")"
@@ -50,9 +55,8 @@ KUBECONFIG_PATH="$(kubeconfig_from "$TOPO" || true)"
 NS="$(yq -r '.cluster.namespace // "mojaloop"' "$TOPO")"
 restarts_now() {
   [ -n "$KUBECONFIG_PATH" ] && [ -f "$KUBECONFIG_PATH" ] || return 1
-  kubectl --kubeconfig "$KUBECONFIG_PATH" -n "$NS" get pods -o json 2>/dev/null | python3 -c '
-import json,sys
-print(sum(cs.get("restartCount",0) for p in json.load(sys.stdin)["items"] for cs in p["status"].get("containerStatuses",[])))' 2>/dev/null
+  kubectl --kubeconfig "$KUBECONFIG_PATH" -n "$NS" get pods -o json 2>/dev/null \
+    | jq '[.items[].status.containerStatuses[]?.restartCount] | add // 0' 2>/dev/null
 }
 PRE_RESTARTS="$(restarts_now || echo "")"
 
@@ -114,15 +118,12 @@ ENDED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 POST_RESTARTS="$(restarts_now || echo "")"
 if [ -n "$PRE_RESTARTS" ] && [ -n "$POST_RESTARTS" ]; then
   DELTA=$((POST_RESTARTS - PRE_RESTARTS))
-  OOM="$(kubectl --kubeconfig "$KUBECONFIG_PATH" -n "$NS" get pods -o json 2>/dev/null | python3 -c '
-import json,sys
-out=[]
-for p in json.load(sys.stdin)["items"]:
-    for cs in p["status"].get("containerStatuses", []):
-        t = cs.get("lastState", {}).get("terminated", {})
-        if t.get("reason") == "OOMKilled":
-            out.append({"pod": p["metadata"]["name"], "finishedAt": t.get("finishedAt")})
-print(json.dumps(out))' 2>/dev/null || echo '[]')"
+  OOM="$(kubectl --kubeconfig "$KUBECONFIG_PATH" -n "$NS" get pods -o json 2>/dev/null \
+    | jq -c '[.items[]
+        | .metadata.name as $pod
+        | .status.containerStatuses[]?
+        | select(.lastState.terminated.reason == "OOMKilled")
+        | {pod: $pod, finishedAt: .lastState.terminated.finishedAt}]' 2>/dev/null || echo '[]')"
   jq -n --arg s "$STARTED" --arg e "$ENDED" --argjson d "$DELTA" --argjson oom "$OOM" \
     '{observed:true, started:$s, ended:$e, restart_delta:$d, oom_killed:$oom,
       tainted: ($d > 0 or ($oom|length) > 0)}' > "$OUT_DIR/health.json"

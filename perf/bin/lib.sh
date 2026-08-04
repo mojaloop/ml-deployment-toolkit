@@ -153,6 +153,51 @@ build_scenario_snapshot() {
   yq -o=json '.' "$scen" | apply_overrides | yq -P '.' > "$out"
 }
 
+# WHAT WAS DEPLOYED when this ran. Without it a result is a number with no
+# subject: two runs a fortnight apart are incomparable, and the change under
+# test — which is exactly what values/ and patches/ carry — is unrecorded.
+#
+# environments/<env>/ is gitignored, so NONE of this is recoverable from the
+# repository afterwards. That is why it is copied rather than referenced.
+#
+# Copied from disk rather than read back from the cluster. These files are the
+# deployment inputs, and a copy needs no kubeconfig, so provenance does not
+# cost the client-side-only property (1.3).
+capture_deployment() {
+  local env="$1" out="$2"
+  mkdir -p "$out"
+
+  # Six keys, never the whole file. The rest of config.yaml is WHERE things
+  # are — VIPs, DNS, registry, object storage, alerting targets — which a
+  # result must not carry (9.3). These six are WHAT ran: the sizing profile,
+  # the artifact tag, the data-layer modes, the API flavour, and the physical
+  # placement that decides which host's disks the run competed for.
+  local cfg="$ENV_ROOT/$env/config.yaml"
+  if [ -f "$cfg" ]; then
+    yq -P '{
+      "version":  .version,
+      "template": .template,
+      "infra":    .infra,
+      "artifact": .artifact,
+      "data":     .data,
+      "app":      {"api_type": .app.api_type}
+    }' "$cfg" > "$out/config.yaml"
+  fi
+
+  # Helm value overrides and kustomize patches, verbatim. The source layout is
+  # mirrored rather than flattened so `diff -r` between two results'
+  # deployment/ directories reads as the change between the runs.
+  #
+  # Both directories are optional: an environment that overrides nothing is
+  # not an error, and an absent directory must not abort a run.
+  local d
+  for d in values patches; do
+    compgen -G "$ENV_ROOT/$env/$d/*.yaml" >/dev/null 2>&1 || continue
+    mkdir -p "$out/$d"
+    cp "$ENV_ROOT/$env/$d"/*.yaml "$out/$d/"
+  done
+}
+
 # Where the generator ran belongs in the report: it is inside every latency
 # figure, and comparing runs from different vantage points is meaningless.
 generator_host() {

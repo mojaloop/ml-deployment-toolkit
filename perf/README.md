@@ -100,15 +100,45 @@ perf-result/<env>/<scenario>/<ts>/      RESULTS — committed
   summary.json                          machine-readable results
   scenario-snapshot.yaml                the test as run, overrides applied
   health.json                           restarts, OOM kills, taint
+  deployment/                           what was deployed while it ran
+    config.yaml                         sizing profile, artifact version, data modes
+    values/*.yaml                       Helm value overrides, verbatim
+    patches/*.yaml                      kustomize patches, verbatim
   notes.md                              yours to write
 ```
 
-**A result never contains a config.** It records which environment ran and
-what test ran — never the endpoints. Those belong to
-`environments/<env>/perf-topology.yaml` and are managed like any other
-deployment config. So a result is reproducible only if you also hold that
-config, which is the same property `make plan-apply` has, and it is why
-results can be committed without publishing your infrastructure.
+**A result records what was running, never where it was.** Endpoints,
+hostnames, VIPs, registry and storage addresses and credentials stay out —
+those belong to `environments/<env>/perf-topology.yaml` and `config.yaml`, and
+are managed like any other deployment config. So a result is reproducible only
+if you also hold that config, which is the same property `make plan-apply`
+has, and it is why results can be committed without publishing your
+infrastructure.
+
+## What was deployed
+
+Every run copies the deployment's inputs beside its numbers, because
+`environments/<env>/` is gitignored and none of it is recoverable afterwards.
+Without it a result is a number with no subject: two runs a fortnight apart
+cannot be compared, and the change you were testing went unrecorded.
+
+Captured from the environment's own files — never from the cluster, so this
+works with no kubeconfig and cannot fail a run:
+
+| Captured | From |
+|---|---|
+| `deployment/values/*.yaml` | `environments/<env>/values/*.yaml` |
+| `deployment/patches/*.yaml` | `environments/<env>/patches/*.yaml` |
+| `deployment/config.yaml` | `config.yaml`, six keys only: `.version` `.template` `.infra` `.artifact` `.data` `.app.api_type` |
+
+`diff -r` between two results' `deployment/` directories is the change
+between those two runs.
+
+Two things this does not do. It records the **files**, not the cluster — so
+`make apply-config` before you measure, or you will record a values file the
+deployment never saw. And it captures values and patches in their **authored**
+form; `${...}` template variables are substituted at deploy time from
+`config.yaml` and the sizing profile, both of which are captured alongside.
 
 ## Overrides
 

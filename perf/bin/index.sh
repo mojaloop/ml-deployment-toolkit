@@ -8,7 +8,7 @@
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-require_tools jq
+require_tools jq yq
 
 OUT="$PERF_DIR/INDEX.md"
 
@@ -21,8 +21,13 @@ OUT="$PERF_DIR/INDEX.md"
   echo "marked \`dropped\` did not offer the load it asked for and is not"
   echo "comparable; a run marked \`tainted\` had pods restart underneath it."
   echo
-  echo "| run | scenario | topology | shape | completed | success | within target | verdict | notes |"
-  echo "|---|---|---|---|---|---|---|---|---|"
+  echo "\`deployed\` is the sizing profile and artifact version the run was"
+  echo "measuring, from its \`deployment/config.yaml\`. A row where the numbers"
+  echo "moved and this column did not is a result that needs explaining; the"
+  echo "full inputs are in that run's \`deployment/\`."
+  echo
+  echo "| run | scenario | topology | shape | deployed | completed | success | within target | verdict | notes |"
+  echo "|---|---|---|---|---|---|---|---|---|---|"
 } > "$OUT"
 
 found=0
@@ -34,9 +39,20 @@ while IFS= read -r summary; do
   [ "$(jq -r '.results.dropped_iterations // 0' "$summary")" != "0" ] && flags="${flags:+$flags, }dropped"
   [ -f "$health" ] && [ "$(jq -r '.observed // true' "$health")" = "false" ] && flags="${flags:+$flags, }health n/a"
 
-  jq -r --arg flags "$flags" --arg rel "${dir#"$REPO_ROOT/"}" '
+  # Runs predating deployment capture have no deployment/, and results are
+  # never rewritten — so an older row legitimately reads "n/a" here.
+  dep="$dir/deployment/config.yaml"
+  deployed="n/a"
+  # yq has no \(...) interpolation — concatenate, and tostring so an unquoted
+  # version (artifact: {version: 3}) cannot abort the whole index.
+  [ -f "$dep" ] && deployed="$(yq -r \
+    '((.template // "?") | tostring) + " @ " + ((.artifact.version // "?") | tostring)' \
+    "$dep" 2>/dev/null || echo "n/a")"
+
+  jq -r --arg flags "$flags" --arg rel "${dir#"$REPO_ROOT/"}" --arg deployed "$deployed" '
     def pct(v): if v == null then "n/a" else ((v * 100 * 1000 | round) / 1000 | tostring) + "%" end;
     "| [\(.run_id)](../\($rel)) | \(.scenario) | \(.topology) | \(.load.shape) \(.load.tps // (.load.steps | tostring)) | " +
+    "\($deployed) | " +
     "\(.results.completed) | \(pct(.results.success_rate)) | " +
     "\(pct(.results.compliance_at_target)) @ \(.slo.target)s | " +
     "\(if .verdict.slo_met then "MET" else "NOT MET" end) | \($flags) |"
