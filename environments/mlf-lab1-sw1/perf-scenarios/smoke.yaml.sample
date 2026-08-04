@@ -1,0 +1,39 @@
+# ===========================================================================
+# PERF SCENARIO — smoke. Harness validation, NOT a measurement.
+#
+#   cp smoke.yaml.sample ../<your-env>/perf-scenarios/smoke.yaml
+#   make perf-run ENV=<env> SCENARIO=smoke
+#
+# Run this first after touching the topology, the environment or the tooling.
+# It proves the whole chain works — discovery, quote, transfer, all five URLs,
+# seeded identifiers — in 30 seconds, before you spend half an hour on a soak
+# that was never going to produce a number.
+#
+# Thresholds are deliberately loose. At this sample size the latency figures
+# mean nothing; the only question is whether transfers complete at all.
+# ===========================================================================
+
+version: 1
+
+workload:
+  currency: XTS
+  amount: "1"
+
+load:
+  shape: smoke
+  tps: 1
+  duration: 30s
+  warmup: 0s
+
+pairs:
+  - { source: CHANGEME-fsp-a, dest: CHANGEME-fsp-b, weight: 0.5 }
+  - { source: CHANGEME-fsp-b, dest: CHANGEME-fsp-a, weight: 0.5 }
+
+slo:
+  percentile: 99
+  thresholds: [0.01, 0.05, 0.1, 0.5, 1, 5]
+  # Loose on purpose — this is a liveness check, not a performance gate.
+  target: 5
+  success_rate: 0.9
+
+request_timeout: 30s

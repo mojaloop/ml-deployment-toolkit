@@ -54,3 +54,7 @@ environments/mlf-lab1-sw1/*
 !environments/mlf-lab1-cc1/.env.sample
 !environments/mlf-lab1-sw1/config.yaml.sample
 !environments/mlf-lab1-sw1/.env.sample
+!environments/mlf-lab1-sw1/perf-topology.yaml.sample
+!environments/mlf-lab1-sw1/perf-scenarios/
+!environments/mlf-lab1-cc1/perf-topology.yaml.sample
+!environments/mlf-lab1-cc1/perf-scenarios/

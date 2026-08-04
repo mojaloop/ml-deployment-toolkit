@@ -1,3 +1,14 @@
+> **FROZEN 2026-08-03 — historical archive, no longer appended to.**
+>
+> This log covers the campaign run with the previous harness. It is kept for
+> the analysis it contains: baselines, eliminated hypotheses, and the
+> confounders discovered along the way (settle time before a run, fresh-vs-
+> grown database state, restart counts invalidating per-process counters).
+>
+> New runs write self-contained reports under
+> `perf-result/<env>/<scenario>/<run-id>/`, indexed by
+> `make perf-index`. See `perf/REQUIREMENTS.md`.
+
 # Performance test log
 
 One entry per run, chronological. Convention: after every k6 run, append an entry

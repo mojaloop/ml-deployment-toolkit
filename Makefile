@@ -127,6 +127,12 @@ help:
 	@echo "  make release TAG=v0.3.0                   - Git tag + OCI artifact push"
 	@echo "  make list-artifacts                       - List published versions"
 	@echo ""
+	@echo "Performance testing:"
+	@echo "  make perf-seed ENV=<env>                   - Register + verify test parties"
+	@echo "  make perf-check ENV=<env>                  - Readiness gate (needs kubeconfig)"
+	@echo "  make perf-run ENV=<env> SCENARIO=<name>    - Run a load scenario"
+	@echo "  make perf-index                            - Regenerate perf/INDEX.md"
+	@echo ""
 	@echo "Rendering: make render | render-thanos | render-cilium"
 	@echo "Utilities: make fmt | clean | list | show"
 
@@ -349,3 +355,51 @@ list-artifacts:
 	@set -a && source $(ENV_FILE) && set +a && \
 	flux list artifacts oci://$(OCI_REPO) \
 		--creds="$$OCI_REPO_USERNAME:$$OCI_REPO_PASSWORD"
+
+# --------------------------------------------------------------------------
+# Performance testing (perf/)
+#
+# Config lives with the environment it belongs to and is gitignored by the
+# same rule as config.yaml:
+#   environments/<ENV>/perf-topology.yaml
+#   environments/<ENV>/perf-scenarios/<SCENARIO>.yaml
+# Results are committed, under perf-result/<ENV>/<SCENARIO>/<timestamp>/.
+# ENV is required by every target.
+#
+# Scenario values are overridable as make variables (TPS=, DURATION=, ...);
+# every override is recorded in the run's scenario-snapshot.yaml, so a result
+# is reproducible from its report rather than from the shell history.
+# --------------------------------------------------------------------------
+.PHONY: perf-seed perf-check perf-run perf-index
+
+# NOTE: deliberately NOT $(CHECK_ENV). That guard requires
+# environments/<ENV>/config.yaml, which would tie perf to the Terraform
+# environment layout. A topology name need not be a Terraform environment,
+# and adopters may have neither. The scripts validate the topology instead.
+define CHECK_PERF_ENV
+	@if [ -z "$(ENV)" ]; then \
+		echo "Usage: make $@ ENV=<name>   (reads environments/<name>/perf-topology.yaml)"; \
+		echo "Environments with a perf topology: $$(for d in environments/*/; do [ -f "$$d/perf-topology.yaml" ] && basename $$d; done | tr '\n' ' ')"; \
+		exit 1; \
+	fi
+endef
+
+perf-seed:
+	$(CHECK_PERF_ENV)
+	@ENV=$(ENV) perf/bin/seed.sh
+
+perf-check:
+	$(CHECK_PERF_ENV)
+	@ENV=$(ENV) perf/bin/check.sh
+
+perf-run:
+	$(CHECK_PERF_ENV)
+	@if [ -z "$(SCENARIO)" ]; then \
+		echo "Usage: make perf-run ENV=<env> SCENARIO=<name> [TPS=.. DURATION=..]"; \
+		echo "Available for $(ENV): $$(ls -1 environments/$(ENV)/perf-scenarios 2>/dev/null | sed 's/\.yaml$$//' | tr '\n' ' ')"; \
+		exit 1; \
+	fi
+	@ENV=$(ENV) perf/bin/run.sh
+
+perf-index:
+	@perf/bin/index.sh

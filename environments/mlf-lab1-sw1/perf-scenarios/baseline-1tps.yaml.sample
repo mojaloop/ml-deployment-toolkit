@@ -1,0 +1,78 @@
+# ===========================================================================
+# PERF SCENARIO — the regression reference.
+#
+#   mkdir -p ../<your-env>/perf-scenarios
+#   cp baseline-1tps.yaml.sample ../<your-env>/perf-scenarios/baseline-1tps.yaml
+#
+# Then change `pairs` to your participant ids. Everything else works as-is.
+#
+#   make perf-run ENV=<env> SCENARIO=baseline-1tps
+#
+# This is the run every other result is compared against, so change it as
+# rarely as possible. Need a different rate or mix? Add a scenario; do not
+# edit this one, or old results stop being comparable.
+# ===========================================================================
+
+version: 1
+
+workload:
+  # Must be a currency the hub and every participant in `pairs` are
+  # configured for, or every transfer fails at the quote.
+  currency: XTS
+  # A string, not a number — FSPIOP amounts are strings.
+  amount: "1"
+
+load:
+  # soak = constant rate. See ramp-to-slo.yaml.sample for stepped load.
+  shape: soak
+  tps: 1
+  duration: 30m
+  # Ramp in rather than jumping straight to the target rate. A cold start
+  # queues transfers behind connection and cache warm-up, and an open model
+  # never recovers that backlog — it shows up as a permanently worse tail.
+  warmup: 90s
+
+# ---------------------------------------------------------------------------
+# WHO SENDS TO WHOM, and in what proportion.
+#
+# Both ids must exist in this environment's perf-topology.yaml — the tool
+# checks before generating any load. Weights are relative, not percentages:
+# 0.5/0.5 and 50/50 behave identically.
+#
+# Symmetric below, so each participant both sends and receives. Skewing the
+# weights concentrates load on one participant, which is what surfaces
+# position-row contention — uniform traffic hides it.
+# ---------------------------------------------------------------------------
+pairs:
+  - { source: CHANGEME-fsp-a, dest: CHANGEME-fsp-b, weight: 0.5 }
+  - { source: CHANGEME-fsp-b, dest: CHANGEME-fsp-a, weight: 0.5 }
+
+slo:
+  # Reported for comparison with published Mojaloop figures. NOT the gate:
+  # a percentile sitting near a threshold is interpolated inside whatever
+  # bucket spans it, so it is an estimate, not a measurement.
+  percentile: 99
+
+  # THE GATE. Every transfer is counted, as it finishes, against each of these
+  # thresholds in seconds — so the resulting share is exact.
+  #
+  # These six values are the bucket boundaries shared by the hub's own
+  # histograms (moja_*), the DFSP SDK's (mojaloop_connector_*) and the
+  # trace-derived ones (traces_span_metrics_*). That shared set is what lets
+  # you compare client-side compliance against hub-side compliance at the same
+  # value. The families diverge above 1s — one uses 2.0 where another uses 2.5
+  # — so no higher shared boundary exists.
+  #
+  # Change these and cross-source comparison stops working.
+  thresholds: [0.01, 0.05, 0.1, 0.5, 1, 5]
+
+  # Which of the thresholds above the run is judged against, in seconds.
+  target: 1
+  # Share that must be within `target` for the run to pass. Also the minimum
+  # transfer success rate.
+  success_rate: 0.99
+
+# Well above the realistic worst case, on purpose. Too tight and ordinary
+# slowness is recorded as failure, which aborts runs for the wrong reason and
+# makes the system look broken when it is merely slow.
+request_timeout: 30s

@@ -1,0 +1,147 @@
+# ===========================================================================
+# PERF TOPOLOGY — where this environment's DFSPs are.
+#
+#   cp perf-topology.yaml.sample perf-topology.yaml
+#
+# Then replace every placeholder below. Gitignored once renamed, exactly like
+# config.yaml and .env beside it.
+#
+# Used by:  make perf-seed ENV=<env>
+#           make perf-check ENV=<env>
+#           make perf-run ENV=<env> SCENARIO=<name>
+#
+# ---------------------------------------------------------------------------
+# THE ONE RULE: EVERY URL IS COMPLETE AND WRITTEN BY YOU.
+#
+# The tool never builds a URL. It does not guess a hostname from a participant
+# id, assume a port, append a path prefix, or expect any naming convention.
+# Your DFSPs can sit behind anything — separate domains, an ingress, a proxy,
+# different ports per participant — and it does not care.
+#
+# The single exception, which is data rather than structure: `discovery` gets
+# /<idType>/<idValue> appended, because the identifier being looked up is a
+# value the tool already holds.
+# ===========================================================================
+
+version: 1
+
+participants:
+  # -------------------------------------------------------------------------
+  # One block per DFSP. Two or more are needed for transfers, since a transfer
+  # goes between participants. There is no upper limit.
+  # -------------------------------------------------------------------------
+  - # The participant id EXACTLY as the hub knows it. Used verbatim in
+    # FSPIOP-Source / FSPIOP-Destination headers and in scenario `pairs`.
+    # Not parsed. Not required to be numeric, to share a prefix with anything,
+    # or to appear in any of the URLs below.
+    id: CHANGEME-fsp-a
+
+    # The identifiers this participant owns, inclusive at both ends.
+    # `make perf-seed` registers this whole range; load runs pick from it.
+    #
+    # SIZE THIS ON PURPOSE. Too narrow and the same identifiers recur during a
+    # run, which produces cache contention and failures that have nothing to
+    # do with the system you are measuring. A few hundred is fine at low rates;
+    # use thousands above ~10 TPS.
+    #
+    # Ranges must not overlap between participants — two participants claiming
+    # one identifier makes a lookup ambiguous. The tool refuses to start if
+    # they do.
+    msisdn:
+      start: 10000000001
+      end: 10000001000
+
+    urls:
+      # POST — register ONE party in this participant's own party repository
+      # (its simulator, or whatever stands in for its core banking system).
+      # Body: {displayName, firstName, lastName, dateOfBirth, idType, idValue}
+      register_sim: http://CHANGEME/repository/parties
+
+      # POST — register a BATCH of identifiers in the scheme ALS, so other
+      # participants can discover them. Body: [{idType, idValue}, ...]
+      # On an SDK scheme adapter this is /accounts on the outbound API.
+      register_als: http://CHANGEME/accounts
+
+      # GET — party lookup. The tool appends /<idType>/<idValue>, so this
+      # value is the endpoint WITHOUT them:
+      #   declared:  http://host/parties
+      #   requested: http://host/parties/MSISDN/10000000001
+      discovery: http://CHANGEME/parties
+
+      # POST — quote request. Body: {fspId, quotesPostRequest: {...}}
+      quotes: http://CHANGEME/quotes
+
+      # POST — transfer, carrying the ilpPacket and condition returned by the
+      # quote. Body: {fspId, transfersPostRequest: {...}}
+      transfers: http://CHANGEME/simpleTransfers
+
+  - id: CHANGEME-fsp-b
+    msisdn:
+      start: 20000000001
+      end: 20000001000
+    urls:
+      register_sim: http://CHANGEME/repository/parties
+      register_als: http://CHANGEME/accounts
+      discovery: http://CHANGEME/parties
+      quotes: http://CHANGEME/quotes
+      transfers: http://CHANGEME/simpleTransfers
+
+# ===========================================================================
+# OPTIONAL — where this environment's telemetry goes.
+#
+# Delete the block if you have none. Runs still produce a complete result;
+# only the live dashboards go dark.
+#
+# These correspond to observability.mimir_url / loki_url / tempo_url in
+# config.yaml beside this file, and are declared separately so the perf suite
+# does not depend on that file existing.
+#
+# THE THREE SIGNALS BEHAVE DIFFERENTLY — this trips people up:
+#
+#   metrics  PUSHED. k6 sends its own metrics here, tagged testid=<run id>.
+#            This is what the Grafana Performance dashboards read.
+#
+#   logs     PUSHED, but only with SHIP_LOGS=1. k6 accepts one log destination,
+#            so shipping to Loki SILENCES YOUR TERMINAL. Off by default; turn
+#            it on for long unattended runs.
+#
+#   traces   NOT PUSHED. k6 emits no spans at all. It injects a traceparent
+#            header, and the spans are produced by the hub and DFSP services
+#            and collected by their own agents. This URL is recorded in the
+#            result purely so you can find where the traces went. Setting it
+#            exports nothing.
+# ===========================================================================
+# observability:
+#   metrics_url: https://CHANGEME/api/v1/receive
+#   logs_url: https://CHANGEME/loki/api/v1/push
+#   traces_url: https://CHANGEME/v1/traces
+#   # Only if the sink serves a certificate this machine does not trust.
+#   # Left false deliberately: skipping verification is not a default.
+#   insecure_skip_tls_verify: false
+
+# ===========================================================================
+# OPTIONAL — cluster access, used ONLY by `make perf-check` and to record
+# system health alongside a result.
+#
+# Delete the block if you have no kubeconfig. Seeding and load generation
+# never need it; a run without it simply records that health was not observed.
+# ===========================================================================
+# cluster:
+#   # Relative to the repository root, or absolute.
+#   kubeconfig: artifacts/CHANGEME/kubernetes/kubeconfig
+#   namespace: mojaloop
+#   kafka:
+#     namespace: data
+#     # Service exposing the Kafka exporter's Prometheus endpoint. Omit to
+#     # auto-discover a service publishing the port below.
+#     # service: my-kafka-exporter
+#     port: 9404
+#     # TRANSFER-PATH TOPICS ONLY. Audit topics carry their own steady-state
+#     # lag; including them makes the readiness check permanently unpassable.
+#     topics:
+#       - topic-transfer-prepare
+#       - topic-transfer-position-batch
+#       - topic-transfer-fulfil
+#       - topic-notification-event
+#       - topic-quotes-post
+#       - topic-quotes-put

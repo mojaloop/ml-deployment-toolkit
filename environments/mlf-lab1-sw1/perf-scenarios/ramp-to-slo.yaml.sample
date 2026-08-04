@@ -1,0 +1,42 @@
+# ===========================================================================
+# PERF SCENARIO — ramp. Find the rate at which the deployment stops meeting
+# its SLO.
+#
+#   cp ramp-to-slo.yaml.sample ../<your-env>/perf-scenarios/ramp-to-slo.yaml
+#   make perf-run ENV=<env> SCENARIO=ramp-to-slo
+#   make perf-run ENV=<env> SCENARIO=ramp-to-slo STEPS=1,5,10,20 STEP_DURATION=3m
+#
+# The answer you want is the last step whose compliance still clears the
+# target — NOT the step where things visibly collapse. By then you are
+# measuring a queue draining, not a system serving.
+#
+# CHECK DROPPED ITERATIONS FIRST. Past some rate the load generator itself
+# becomes the constraint, and a step it could not sustain says nothing about
+# the switch. The result flags this; do not skip past it.
+# ===========================================================================
+
+version: 1
+
+workload:
+  currency: XTS
+  amount: "1"
+
+load:
+  shape: ramp
+  # Each value is a target rate in transfers/second, held for step_duration.
+  steps: [1, 2, 4, 6, 8, 10, 12, 15]
+  step_duration: 2m
+  # Time taken to climb to each step's rate before the hold begins.
+  step_ramp: 30s
+
+pairs:
+  - { source: CHANGEME-fsp-a, dest: CHANGEME-fsp-b, weight: 0.5 }
+  - { source: CHANGEME-fsp-b, dest: CHANGEME-fsp-a, weight: 0.5 }
+
+slo:
+  percentile: 99
+  thresholds: [0.01, 0.05, 0.1, 0.5, 1, 5]
+  target: 1
+  success_rate: 0.99
+
+request_timeout: 30s

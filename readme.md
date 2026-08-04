@@ -52,14 +52,34 @@ make apply-config ENV=<env>   # push config changes in seconds, without touching
 
 | Path | Contents |
 |---|---|
-| `environments/<env>/` | Your deployment: `config.yaml`, `.env`, optional `values/<chart>.yaml` overrides |
+| `environments/<env>/` | Your deployment: `config.yaml`, `.env`, optional `values/<chart>.yaml` overrides, and the perf topology + scenarios |
 | `config/templates/` | Deployment templates (capacity + tuning) and per-provider machine mappings |
 | `config/schemas/` | JSON Schemas — editor autocomplete and `make validate` |
 | `src/infra/` | Terraform stack: cluster VMs / managed Kubernetes + Flux bootstrap |
 | `src/config/` | Terraform stack: everything Flux consumes (config, secrets, Kustomizations) |
 | `gitops/` | The distribution artifact — environment-neutral manifests |
+| `perf/` | Load generation and measurement — code only |
+| `perf-result/` | Performance results, one directory per run, committed |
 
 Configuration and infrastructure are separate Terraform stacks with separate state, so a config change is a fast, low-risk `make apply-config` that cannot touch running VMs.
+
+## Performance testing
+
+Load generation against the DFSP SDK outbound APIs, measuring what a payer
+actually experiences: discovery, quote and transfer timed separately.
+
+```bash
+make perf-seed  ENV=<env>                  # register + verify test parties
+make perf-run   ENV=<env> SCENARIO=smoke   # 30s, proves the chain works
+make perf-run   ENV=<env> SCENARIO=baseline-1tps
+make perf-index                            # regenerate perf/INDEX.md
+```
+
+Copy `environments/mlf-lab1-sw1/perf-topology.yaml.sample` and the scenarios
+beside it into your environment to get started. Results land in
+`perf-result/<env>/<scenario>/<timestamp>/` and are committed — they record
+which environment and what test ran, never your endpoints, so they are safe to
+share. See [perf/README.md](perf/README.md).
 
 ## Documentation
 
