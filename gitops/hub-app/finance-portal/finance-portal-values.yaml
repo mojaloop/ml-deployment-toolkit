@@ -276,23 +276,43 @@ reporting-legacy-api:
     tag: v12.4.2
   containerSecurityContext:
     enabled: false
-  install-templates: false
+  # Load-bearing: this is the Helm `condition` on the reporting-k8s-templates
+  # dependency, and those templates ARE the report routes. reporting-legacy-api
+  # registers no routes of its own — src/operator.js watches MojaloopReport CRs
+  # and builds its handler map from them. With this false the subchart is
+  # skipped, no CRs are created, and every /api/reports/* URL the finance-portal
+  # UIs link to returns a bare 404. The CRD itself still installs (Helm applies a
+  # subchart's crds/ even when its condition is false), so `kubectl get crd`
+  # looks healthy while `get mojaloopreports -A` is empty.
+  install-templates: true
   auth: false
   config:
     env:
       VALIDATION_RETRY_COUNT: "10"
       VALIDATION_RETRY_INTERVAL_MS: "5000"
   reporting-k8s-templates:
+    # Enumerated in full, matching the subchart's own defaults: an unlisted key
+    # falls through to the subchart default of true, so a partial list reads as
+    # a curated set while silently enabling everything. Turning a report off
+    # means setting it false here, not deleting the line. All 16 validate
+    # against the central_ledger schema this distribution ships.
     templates:
-      settlement: true
+      bilateralSettlement: true
+      bilateralSettlementExternalParticipants: true
       dfspSettlement: true
       dfspSettlementDetail: true
-      reconciliationAmount: true
-      settlementWindow: true
-      settlementInitiation: true
-      transactionReconciliation: true
+      dfspSettlementDetailExternalParticipant: true
+      dfspSettlementExternalParticipant: true
       dfspSettlementStatement: true
+      multilateralSettlement: true
+      reconciliationAmount: true
+      settlement: true
       settlementAudit: true
+      settlementInitiation: true
+      settlementWindow: true
+      transaction: true
+      transactionDetail: true
+      transactionReconciliation: true
 
 role-assignment-service:
   enabled: false
