@@ -200,8 +200,19 @@ locals {
   )
 
   # --- cert (ACME) ----------------------------------------------------------
+  # The directory URL is the provider identity — there is no provider enum, so
+  # any current or future ACME CA is reachable by setting cert.server alone.
+  # EAB credentials, where the CA requires them, arrive through .env.
+  # cert.server is schema-required and deliberately has no fallback: defaulting
+  # it would hide which authority the platform's certificates come from. The
+  # empty default here only exists so the precondition below can report it.
   acme_email  = try(local.config.cert.email, "admin@${local.config.dns.domain}")
-  acme_server = try(local.config.cert.server, "https://acme-v02.api.letsencrypt.org/directory")
+  acme_server = try(local.config.cert.server, "")
+
+  # The ACME account key caches the *registered account*, not just a keypair.
+  # Keeping one name across CAs makes cert-manager reuse the old account and
+  # silently ignore the new server and EAB, so the name tracks the directory URL.
+  acme_account_key_secret = "acme-account-key-${substr(sha256(local.acme_server), 0, 8)}"
 
   # --- email (transactional SMTP) ------------------------------------------
   smtp_host  = try(local.config.email.host, "")
@@ -262,6 +273,10 @@ resource "terraform_data" "validation" {
     precondition {
       condition     = try(local.config.version, 0) == 1
       error_message = "config.yaml must declare 'version: 1' (schema version)."
+    }
+    precondition {
+      condition     = local.acme_server != ""
+      error_message = "cert.server is required — it is the ACME directory URL, and it alone selects the certificate authority. Use https://acme-v02.api.letsencrypt.org/directory for Let's Encrypt; any other CA also needs ACME_EAB_KEY_ID and ACME_EAB_HMAC_ENCODED in .env."
     }
     precondition {
       condition     = contains(["tooling", "hub", "bare"], local.cluster_role)

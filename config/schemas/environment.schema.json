@@ -8,7 +8,8 @@
     "cluster",
     "template",
     "infra",
-    "dns"
+    "dns",
+    "cert"
   ],
   "additionalProperties": false,
   "properties": {
@@ -261,23 +262,19 @@
       }
     },
     "cert": {
-      "description": "Certificates (ACME). email is the ACME account contact.",
+      "description": "Certificates (ACME). email is the ACME account contact. The CA is selected by server alone; where it requires External Account Binding, set ACME_EAB_KEY_ID and ACME_EAB_HMAC_ENCODED in .env.",
       "type": "object",
       "additionalProperties": false,
+      "required": [
+        "server"
+      ],
       "properties": {
-        "provider": {
-          "type": "string",
-          "enum": [
-            "acme"
-          ],
-          "description": "Certificate issuance method. Only ACME is implemented; a private CA (Vault PKI) is not available yet."
-        },
         "email": {
           "type": "string"
         },
         "server": {
           "type": "string",
-          "description": "ACME directory URL (default: Let's Encrypt production)"
+          "description": "ACME directory URL — this alone selects the CA; there is no provider name to choose. Required rather than defaulted, so the authority every platform certificate is issued from is visible in the config. Examples: https://acme-v02.api.letsencrypt.org/directory, https://dv.acme-v02.api.pki.goog/directory (Google Trust Services), https://acme.zerossl.com/v2/DV90 (ZeroSSL). Any CA other than Let's Encrypt also needs EAB credentials in .env."
         }
       }
     },

@@ -18,11 +18,12 @@ locals {
   set_secrets = { for k, v in var.secrets : k => v if v != "" }
 
   has_oci_credentials = lookup(local.s, "OCI_REPO_USERNAME", "") != "" && lookup(local.s, "OCI_REPO_PASSWORD", "") != ""
-  is_talos            = contains(["proxmox", "openstack"], var.infra_provider)
-  has_vendor          = contains(["proxmox", "openstack", "aws", "gcp"], var.infra_provider)
-  is_hub              = var.cluster_role == "hub"
-  is_tooling          = var.cluster_role == "tooling"
-  vendor_name         = local.is_talos ? "talos" : var.infra_provider
+
+  is_talos    = contains(["proxmox", "openstack"], var.infra_provider)
+  has_vendor  = contains(["proxmox", "openstack", "aws", "gcp"], var.infra_provider)
+  is_hub      = var.cluster_role == "hub"
+  is_tooling  = var.cluster_role == "tooling"
+  vendor_name = local.is_talos ? "talos" : var.infra_provider
 
   # Extract registry host from artifact URL ("oci://ghcr.io/x/y" -> "ghcr.io")
   oci_registry = local.has_oci_credentials ? split("/", replace(var.artifact_url, "oci://", ""))[0] : ""
@@ -47,6 +48,21 @@ locals {
     powerdns_api_url         = lookup(local.s, "POWERDNS_API_URL", "")
     powerdns_api_key         = lookup(local.s, "POWERDNS_API_KEY", "")
     dns_provider_credentials = "${lookup(local.s, "DIGITALOCEAN_TOKEN", "")}${lookup(local.s, "CLOUDFLARE_API_TOKEN", "")}${lookup(local.s, "AWS_ACCESS_KEY_ID", "")}${lookup(local.s, "POWERDNS_API_KEY", "")}"
+  }
+
+  # ACME External Account Binding. Presence of the credentials is the switch —
+  # there is no toggle in config.yaml, matching how OCI credentials work above.
+  # Every public CA except Let's Encrypt (Google Trust Services, ZeroSSL,
+  # SSL.com) requires EAB, and its schema is identical for all of them: RFC 8555
+  # fixes it at keyID + HMAC key.
+  has_eab = lookup(local.s, "ACME_EAB_KEY_ID", "") != "" && lookup(local.s, "ACME_EAB_HMAC_ENCODED", "") != ""
+
+  # EAB credentials for gitops/dns/<provider>/clusterissuer.yaml substitution.
+  # Always present (empty when unused) so the Secret manifest still renders —
+  # it is inert until the EAB patch below makes the issuer reference it.
+  cert_credentials = {
+    acme_eab_key_id       = lookup(local.s, "ACME_EAB_KEY_ID", "")
+    acme_eab_hmac_encoded = lookup(local.s, "ACME_EAB_HMAC_ENCODED", "")
   }
 
   # ---------------------------------------------------------------------------
@@ -176,8 +192,9 @@ resource "kubernetes_config_map_v1" "cluster_config" {
       gw_ext_dns_target = try(var.lb_ipam_pools["gw-ext"].dns_target, "")
 
       # cert capability (ACME)
-      acme_email  = var.cert.acme_email
-      acme_server = var.cert.acme_server
+      acme_email              = var.cert.acme_email
+      acme_server             = var.cert.acme_server
+      acme_account_key_secret = var.cert.acme_account_key_secret
 
       # email + alerting capabilities (non-secret halves)
       smtp_host        = var.email.host
@@ -231,6 +248,7 @@ resource "kubernetes_secret_v1" "cluster_secrets" {
 
   data = merge(
     local.dns_credentials,
+    local.cert_credentials,
     {
       oci_repo_username = lookup(local.s, "OCI_REPO_USERNAME", "")
       oci_repo_password = lookup(local.s, "OCI_REPO_PASSWORD", "")
@@ -520,6 +538,53 @@ locals {
     } : k => v if !var.object_storage.active
   }
 
+  # ACME External Account Binding — required by every public CA except Let's
+  # Encrypt. The block must be *absent*, not empty, for CAs that do not use it:
+  # an empty keyID makes cert-manager attempt EAB registration and the CA
+  # answers "Invalid MAC on JWS request". postBuild substitution cannot omit a
+  # YAML block, so the conditional happens here and kustomize does the merge.
+  #
+  # One patch covers all three gitops/dns/<provider> directories: patches target
+  # by kind+name, not by path, so the issuer is matched wherever it came from.
+  #
+  # keyID stays a ${...} placeholder rather than the resolved value — patches
+  # are applied during kustomize build and substitution runs after, so it
+  # resolves from cluster-secrets instead of being written into the
+  # Kustomization resource stored in the cluster.
+  #
+  # Built as a for-expression rather than a conditional object constructor:
+  # `has_eab ? {"dns" = [...]} : {}` unifies to an object, whose per-attribute
+  # types give lookup() no single element type to match its default against.
+  # The filtered for yields a real map, exactly like backup_disabled_patches.
+  eab_patches = {
+    for k, v in {
+      "dns" = [{
+        patch = yamlencode({
+          apiVersion = "cert-manager.io/v1"
+          kind       = "ClusterIssuer"
+          metadata   = { name = "acme-prod" }
+          spec = {
+            acme = {
+              externalAccountBinding = {
+                keyID = "$${acme_eab_key_id}"
+                keySecretRef = {
+                  name = "acme-eab-credentials"
+                  key  = "hmac-encoded"
+                }
+              }
+            }
+          }
+        })
+        target = {
+          group   = "cert-manager.io"
+          version = "v1"
+          kind    = "ClusterIssuer"
+          name    = "acme-prod"
+        }
+      }]
+    } : k => v if local.has_eab
+  }
+
   all_kustomizations = merge(
     {
       "platform" = {
@@ -680,8 +745,20 @@ locals {
   effective_patches = {
     for k, _ in local.kustomizations : k => concat(
       lookup(local.backup_disabled_patches, k, []),
+      lookup(local.eab_patches, k, []),
       lookup(var.kustomize_patches, k, []),
     )
+  }
+}
+
+# Cross-field validation over .env credentials, which the config.yaml JSON
+# Schema cannot see — it is handed only config.yaml (see Makefile: validate).
+resource "terraform_data" "cert_validation" {
+  lifecycle {
+    precondition {
+      condition     = (lookup(local.s, "ACME_EAB_KEY_ID", "") != "") == (lookup(local.s, "ACME_EAB_HMAC_ENCODED", "") != "")
+      error_message = "ACME EAB needs both ACME_EAB_KEY_ID and ACME_EAB_HMAC_ENCODED in .env, or neither. Half-configured, the issuer registers without EAB and the CA rejects issuance with 'Invalid MAC on JWS request'."
+    }
   }
 }
 

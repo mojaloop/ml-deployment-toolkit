@@ -141,8 +141,9 @@ output "observability" {
 output "cert" {
   description = "ACME parameters (resolved)"
   value = {
-    acme_email  = local.acme_email
-    acme_server = local.acme_server
+    acme_email              = local.acme_email
+    acme_server             = local.acme_server
+    acme_account_key_secret = local.acme_account_key_secret
   }
 }
 

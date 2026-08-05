@@ -6,7 +6,7 @@ metadata:
   name: gw-ext
   namespace: platform-system
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    cert-manager.io/cluster-issuer: acme-prod
     # What external-dns publishes for every attached route: the wan side of the
     # border DNAT when cluster.lb_ipam.pools.gw-ext.wan is set, the lan IP otherwise.
     external-dns.alpha.kubernetes.io/target: "${gw_ext_dns_target}"

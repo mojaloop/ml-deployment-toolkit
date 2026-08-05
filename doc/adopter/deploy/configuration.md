@@ -120,8 +120,8 @@ dns:
   domain: "cc1.lab1.example.com"
 
 cert:
-  provider: "acme"
   email: "ops@example.com"            # the ACME account contact
+  server: "https://acme-v02.api.letsencrypt.org/directory"   # selects the CA
 
 artifact:
   url: "oci://ghcr.io/your-org/ml-deployment-toolkit"
@@ -154,14 +154,37 @@ One rotation caveat: the MinIO provisioning job creates users but never updates 
 
 **`cert.email` is the ACME account contact and nothing else.** It replaces the old `app.alert_email`, which despite its name only ever reached Let's Encrypt. Alert destinations are `alerting:`.
 
-**`cert.server` selects the ACME directory URL** and defaults to Let's Encrypt production. It sets the `server` of the `letsencrypt-prod` ClusterIssuer — the one the Gateways annotate, so it is the URL every platform certificate is actually issued from. Point it at the Let's Encrypt staging endpoint while working through rate-limited testing, or at any other ACME-compatible authority:
+**`cert.server` selects the certificate authority and is required.** It sets the `server` of the `acme-prod` ClusterIssuer — the one the Gateways annotate, so it is the URL every platform certificate is actually issued from. There is no provider name to choose: the directory URL is the CA's identity, and it is stated outright rather than defaulted so the issuing authority is always visible in the config.
 
 ```yaml
 cert:
-  provider: "acme"
   email: "ops@example.com"
-  server: "https://acme-staging-v02.api.letsencrypt.org/directory"
+  server: "https://dv.acme-v02.api.pki.goog/directory"
 ```
+
+| CA | `cert.server` | EAB |
+|----|---------------|-----|
+| Let's Encrypt | `https://acme-v02.api.letsencrypt.org/directory` | not used |
+| Google Trust Services | `https://dv.acme-v02.api.pki.goog/directory` | required |
+| ZeroSSL | `https://acme.zerossl.com/v2/DV90` | required |
+| SSL.com | `https://acme.ssl.com/sslcom-dv-rsa` | required |
+
+**Every public CA except Let's Encrypt requires External Account Binding** — a keyID and an HMAC key tying the ACME account to your account with that CA. Put both in `.env`; setting them is what switches EAB on, and there is no separate toggle:
+
+```bash
+ACME_EAB_KEY_ID="..."
+ACME_EAB_HMAC_ENCODED="..."
+```
+
+Obtain the pair from the CA: `gcloud publicca external-account-keys create` for Google Trust Services, the REST API for ZeroSSL, the web dashboard for SSL.com. **Paste the HMAC key exactly as given** — it is already base64url, and encoding it a second time produces `Invalid MAC on JWS request` at issuance. If your CA documents a different format, convert with:
+
+```bash
+echo -n '<key>' | base64 -w0 | tr '+/' '-_' | tr -d '='
+```
+
+Setting one of the two without the other fails at `make plan-config`, before anything reaches the cluster. Note that `make validate` will not catch it — the schema is handed only `config.yaml` and never sees `.env`.
+
+Two caveats when changing CA on a running cluster. The ACME account key is named after a hash of `cert.server`, so switching URL correctly forces re-registration rather than silently reusing the old account — but the previous account-key Secret is left behind and can be deleted by hand. And not every CA issues wildcards on its free tier: SSL.com's free DV covers a single domain plus `www`, which cannot serve the `*.int` / `*.ext` Gateway certificates this toolkit relies on.
 
 ## A Hub, annotated
 

@@ -70,7 +70,16 @@ All three DNS providers use **DNS-01** ACME challenges ([ADR-011](decisions/011-
 
 The ACME account contact is `cert.email` in the environment config — a real field with a real effect, unlike the `app.alert_email` it replaced, which despite its name only ever reached Let's Encrypt.
 
-**The ACME directory URL is configurable.** `cert.server` selects it and defaults to Let's Encrypt production, so any ACME-compatible certificate authority — or the Let's Encrypt staging endpoint, while working through rate-limited testing — can be used without touching the manifests. A private CA (Vault PKI) is not an option today: `cert.provider` accepts only `acme`.
+**The certificate authority is a configuration dimension, not a code path.** There is no CA enum to extend — the directory URL *is* the provider identity, exactly as in Traefik (`caServer`) and Caddy (`acme_ca`). Two knobs cover every ACME authority, current or future ([ADR-016](decisions/016-generic-acme-ca.md)):
+
+| Knob | Where | Notes |
+|------|-------|-------|
+| Directory URL | `cert.server` in `config.yaml` | defaults to Let's Encrypt production |
+| EAB credentials | `ACME_EAB_KEY_ID` + `ACME_EAB_HMAC_ENCODED` in `.env` | optional; required by every public CA except Let's Encrypt |
+
+External Account Binding is emitted only when both credentials are present — there is no toggle, credential presence is the switch. Its schema is fixed by RFC 8555 at keyID plus HMAC key and does not vary by CA, so adding a provider means changing two values, never a manifest.
+
+Adding Google Trust Services, ZeroSSL or SSL.com is therefore a config edit. `cert.server` is required rather than defaulted, so the authority every platform certificate comes from is always visible in the config rather than inherited from a hidden fallback. A private CA (Vault PKI) remains out of scope: only ACME issuance is implemented.
 
 The scheme's own CA is separate and unrelated — see [Security](security.md#certificate-authorities).
 

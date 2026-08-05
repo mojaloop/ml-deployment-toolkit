@@ -62,8 +62,8 @@ dns:
   provider: "cloudflare"
   domain: "cc1.example.com"
 cert:
-  provider: "acme"
   email: "ops@example.com"  # ACME account contact
+  server: "https://acme-v02.api.letsencrypt.org/directory"  # selects the CA
 artifact:
   url: "oci://ghcr.io/<org>/ml-deployment-toolkit"
   version: "latest"

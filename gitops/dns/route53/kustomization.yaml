@@ -3,4 +3,4 @@ kind: Kustomization
 resources:
   - dns-secret.yaml
   - external-dns-values.yaml
-  - letsencrypt.yaml
+  - clusterissuer.yaml

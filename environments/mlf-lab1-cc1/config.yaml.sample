@@ -50,8 +50,10 @@ dns:
 
 # Certificates (ACME). email is the ACME account contact.
 cert:
-  provider: "acme"
   email: "ops@example.com"
+  # The directory URL selects the CA. Any CA other than Let's Encrypt also needs
+  # ACME_EAB_* in .env — see doc/adopter/deploy/configuration.md
+  server: "https://acme-v02.api.letsencrypt.org/directory"
 
 # Distribution gitops artifact consumed by Flux (credentials OCI_REPO_* in .env)
 artifact:

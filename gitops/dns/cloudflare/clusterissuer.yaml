@@ -1,0 +1,45 @@
+# ACME ClusterIssuer. The CA is chosen entirely by cert.server in config.yaml —
+# there is no provider enum, the directory URL is the provider identity.
+#
+# The name is a static literal, not a substitution: Flux applies spec.patches
+# during kustomize build and postBuild substitution *after*, so the EAB patch
+# has to target a name that is already resolved at patch time.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: acme-prod
+spec:
+  acme:
+    server: ${acme_server}
+    email: ${acme_email}
+    # Name derives from a hash of the directory URL: pointing cert.server at a
+    # different CA changes it, which forces re-registration. Reusing one account
+    # key across CAs makes cert-manager silently keep the old account.
+    privateKeySecretRef:
+      name: ${acme_account_key_secret}
+    # externalAccountBinding is injected by the flux-config module when both
+    # ACME_EAB_KEY_ID and ACME_EAB_HMAC_ENCODED are set. It must be absent —
+    # not empty — for CAs that do not use EAB, which is why it is a patch and
+    # not a substitution: envsubst cannot omit a block.
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: dns-provider-credentials
+              key: api-token
+---
+# Always rendered, consumed only when the EAB patch above is applied. Kustomize
+# patches modify existing resources but cannot add new ones, so the Secret has
+# to exist in the base; it is inert on CAs that do not use EAB.
+#
+# stringData, not data: Kubernetes performs the single base64 encode, so the
+# adopter pastes the CA-provided key verbatim into .env. Encoding it again is
+# the usual cause of "Invalid MAC on JWS request".
+apiVersion: v1
+kind: Secret
+metadata:
+  name: acme-eab-credentials
+  namespace: cert-manager
+type: Opaque
+stringData:
+  hmac-encoded: "${acme_eab_hmac_encoded}"

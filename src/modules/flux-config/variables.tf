@@ -66,10 +66,11 @@ variable "artifact_version" {
 # --- Capability resolutions (from config-loader) ---------------------------
 
 variable "cert" {
-  description = "ACME parameters: acme_email, acme_server"
+  description = "ACME parameters: acme_email, acme_server, acme_account_key_secret"
   type = object({
-    acme_email  = string
-    acme_server = string
+    acme_email              = string
+    acme_server             = string
+    acme_account_key_secret = string
   })
 }
 
