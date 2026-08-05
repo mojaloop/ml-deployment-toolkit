@@ -5,14 +5,31 @@
 releaseNamespace: false
 namespaces: ""
 
-# Resource limits
+# Resource limits.
+# No CPU limit: KSM bursts hard on cold start (full LIST of every resource
+# below plus CRD discovery), and a CFS quota stalls it mid-probe, so the
+# kubelet kills it for a failed liveness check and it never converges. The
+# request still reserves capacity and sets the cgroup weight.
+# Memory sized off the Goldilocks/VPA recommendation (target 156Mi,
+# upperBound 235Mi) with headroom, since KSM's footprint scales with the
+# number of objects watched and adopter clusters are larger than the lab.
 resources:
   limits:
-    cpu: 100m
-    memory: 128Mi
+    memory: 384Mi
   requests:
-    cpu: 10m
-    memory: 64Mi
+    cpu: 100m
+    memory: 160Mi
+
+# Cold start LISTs every resource below across all namespaces; give the
+# probes room to ride that out instead of killing the pod mid-sync.
+livenessProbe:
+  initialDelaySeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 5
+readinessProbe:
+  initialDelaySeconds: 15
+  timeoutSeconds: 10
+  failureThreshold: 5
 
 # Enable all default collectors
 collectors:
