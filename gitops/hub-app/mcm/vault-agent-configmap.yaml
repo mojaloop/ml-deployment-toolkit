@@ -197,6 +197,19 @@ data:
     metadata:
       name: dfsp-callback-mtls
       namespace: mojaloop
+      annotations:
+        # Without this, Cilium applies the cluster-wide default
+        # (proxy-use-original-source-address: "true") and Envoy binds the upstream
+        # socket to the *calling pod's* IP. That bind intermittently fails with
+        # EADDRNOTAVAIL, which Envoy reports as an immediate 503/UF:
+        #   "Cannot assign requested address | remote address:<dfsp-ip>:443"
+        # The hub does not retry the callback, so the DFSP SDK only recovers via
+        # GET /transfers/{id} ~15s later — a huge p99 outlier for one lost packet.
+        # Every Gateway-generated CEC sets this to "false"; this hand-written one
+        # was the only CEC in the cluster still in original-source mode.
+        # The DFSP is unaffected: it authenticates by mTLS client cert, and egress
+        # masquerading already presents the node IP either way.
+        cec.cilium.io/use-original-source-address: "false"
       labels:
         app.kubernetes.io/managed-by: vault-agent
         vault-agent/template: callback
