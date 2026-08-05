@@ -144,16 +144,15 @@ locals {
   # =========================================================================
   # Capability resolution
   # =========================================================================
-  tooling_domain = try(local.config.tooling.domain, "")
+  # Every capability endpoint is stated outright in config.yaml. Nothing is
+  # derived from a domain and nothing falls back to a default, so what the
+  # adopter reads in the file is what the cluster is pointed at. The empty
+  # defaults below exist only so the preconditions can report a missing value
+  # by name; a blank value never reaches an apply.
 
   # --- registry (image pull-through cache) ---------------------------------
-  registry_provider = try(local.config.registry.provider, "none")
-  registry_url = (
-    local.registry_provider == "tooling" ? "harbor.int.${local.tooling_domain}" :
-    local.registry_provider == "harbor" ? try(local.config.registry.url, "") :
-    ""
-  )
-  registry_active = local.registry_url != ""
+  registry_active = try(local.config.registry.enabled, false)
+  registry_url    = local.registry_active ? try(local.config.registry.url, "") : ""
 
   # tooling role only: pull-only robot accounts provisioned in the toolkit Harbor,
   # one per consuming hub (it authenticates as robot-<name>; the secret is
@@ -162,19 +161,18 @@ locals {
   registry_robots = [for r in try(local.config.registry.robots, []) : r.name]
 
   # --- object_storage (backup target) --------------------------------------
-  object_storage_provider = try(local.config.object_storage.provider, "none")
-  backup_s3_endpoint = (
-    local.object_storage_provider == "tooling" ? "https://s3.int.${local.tooling_domain}" :
-    local.object_storage_provider == "s3" ? try(local.config.object_storage.endpoint, "") :
-    ""
-  )
-  backup_s3_bucket = try(local.config.object_storage.bucket, "backups")
-  backup_s3_region = try(local.config.object_storage.region, "us-east-1")
-  # 'none' must translate into backups being structurally disabled downstream:
-  # PSMDB >=1.22 refuses to mark the cluster ready (and to create app users)
-  # while PBM's storage is unconfigured or unreachable, so an empty endpoint
-  # must never reach the data-layer CRs.
-  object_storage_active = local.object_storage_provider != "none"
+  # 'enabled = false' must translate into backups being structurally disabled
+  # downstream: PSMDB >=1.22 refuses to mark the cluster ready (and to create
+  # app users) while PBM's storage is unconfigured or unreachable, so an empty
+  # endpoint must never reach the data-layer CRs. That is why this is an
+  # explicit switch rather than "endpoint absent means off".
+  object_storage_active = try(local.config.object_storage.enabled, false)
+  backup_s3_endpoint    = try(local.config.object_storage.endpoint, "")
+  # No defaults for bucket/region. 'backups' and 'us-east-1' used to be filled
+  # in silently, which sent a cluster's backups to an unnamed bucket and signed
+  # them for the wrong region — both failing at backup time, not at plan time.
+  backup_s3_bucket = try(local.config.object_storage.bucket, "")
+  backup_s3_region = try(local.config.object_storage.region, "")
 
   # tooling role only: extra buckets served by the toolkit MinIO, each backed by a
   # generated scoped user (access key = bucket name). Creation is additive —
@@ -185,19 +183,10 @@ locals {
   minio_system_buckets = ["harbor", "backups", "thanos", "loki", "tempo"]
 
   # --- observability (telemetry push sink) ---------------------------------
-  observability_provider = try(local.config.observability.provider, "none")
-  loki_url = (
-    local.observability_provider == "tooling" ? "https://loki.int.${local.tooling_domain}/loki/api/v1/push" :
-    try(local.config.observability.loki_url, "")
-  )
-  mimir_url = (
-    local.observability_provider == "tooling" ? "https://thanos.int.${local.tooling_domain}/api/v1/receive" :
-    try(local.config.observability.mimir_url, "")
-  )
-  tempo_url = (
-    local.observability_provider == "tooling" ? "https://tempo.int.${local.tooling_domain}/v1/traces" :
-    try(local.config.observability.tempo_url, "")
-  )
+  observability_active = try(local.config.observability.enabled, false)
+  loki_url             = local.observability_active ? try(local.config.observability.loki_url, "") : ""
+  mimir_url            = local.observability_active ? try(local.config.observability.mimir_url, "") : ""
+  tempo_url            = local.observability_active ? try(local.config.observability.tempo_url, "") : ""
 
   # --- cert (ACME) ----------------------------------------------------------
   # The directory URL is the provider identity — there is no provider enum, so
@@ -206,7 +195,10 @@ locals {
   # cert.server is schema-required and deliberately has no fallback: defaulting
   # it would hide which authority the platform's certificates come from. The
   # empty default here only exists so the precondition below can report it.
-  acme_email  = try(local.config.cert.email, "admin@${local.config.dns.domain}")
+  # cert.email is required for the same reason — it used to default to
+  # admin@<dns.domain>, a mailbox the toolkit invented and nobody necessarily
+  # reads, so CA expiry and revocation notices could arrive nowhere.
+  acme_email  = try(local.config.cert.email, "")
   acme_server = try(local.config.cert.server, "")
 
   # The ACME account key caches the *registered account*, not just a keypair.
@@ -287,11 +279,21 @@ resource "terraform_data" "validation" {
       error_message = "cluster.name resolved to an empty string — set it, or name the environment directory."
     }
     precondition {
-      condition = alltrue([
-        for p in [local.registry_provider, local.object_storage_provider, local.observability_provider] :
-        p != "tooling"
-      ]) || local.tooling_domain != ""
-      error_message = "A capability uses provider 'tooling' but tooling.domain is not set."
+      condition     = local.acme_email != ""
+      error_message = "cert.email is required — it is the ACME account contact the CA sends expiry and revocation notices to. It is no longer defaulted to admin@<dns.domain>, because that named a mailbox nobody necessarily reads."
+    }
+    # Endpoints are stated, never derived, so 'enabled with nothing to point at'
+    # is the failure these three catch — at plan time, rather than midway
+    # through a Flux reconcile.
+    precondition {
+      condition     = !local.registry_active || local.registry_url != ""
+      error_message = "registry.enabled is true but registry.url is not set. State the mirror URL outright (no oci:// prefix), or set registry.enabled to false."
+    }
+    precondition {
+      condition = !local.observability_active || alltrue([
+        for u in [local.loki_url, local.mimir_url, local.tempo_url] : u != ""
+      ])
+      error_message = "observability.enabled is true but loki_url, mimir_url and tempo_url are not all set. State all three outright, or set observability.enabled to false."
     }
     precondition {
       condition = alltrue([
@@ -372,15 +374,15 @@ resource "terraform_data" "validation" {
       error_message = "template '${local.config.template}' has duplicate node_group names."
     }
 
-    # Capabilities bound to an explicit provider must carry their parameters,
-    # or the value silently reaches the cluster empty and fails at runtime.
+    # An enabled backup target must carry every parameter it signs with. bucket
+    # and region are checked alongside the endpoint because neither is defaulted
+    # any more: an unset bucket used to become 'backups' and an unset region
+    # 'us-east-1', both of which fail at backup time rather than here.
     precondition {
-      condition     = local.registry_provider != "harbor" || local.registry_url != ""
-      error_message = "registry.provider is 'harbor' but registry.url is not set."
-    }
-    precondition {
-      condition     = local.object_storage_provider != "s3" || local.backup_s3_endpoint != ""
-      error_message = "object_storage.provider is 's3' but object_storage.endpoint is not set."
+      condition = !local.object_storage_active || alltrue([
+        for v in [local.backup_s3_endpoint, local.backup_s3_bucket, local.backup_s3_region] : v != ""
+      ])
+      error_message = "object_storage.enabled is true but endpoint, bucket and region are not all set. State all three outright, or set object_storage.enabled to false."
     }
     precondition {
       condition     = length(local.object_storage_buckets) == 0 || local.cluster_role == "tooling"
@@ -418,13 +420,6 @@ resource "terraform_data" "validation" {
     precondition {
       condition     = length(local.registry_robots) == length(distinct(local.registry_robots))
       error_message = "registry.robots contains duplicate names."
-    }
-    precondition {
-      condition = (
-        local.observability_provider != "urls" ||
-        (local.loki_url != "" || local.mimir_url != "" || local.tempo_url != "")
-      )
-      error_message = "observability.provider is 'urls' but no loki_url/mimir_url/tempo_url is set."
     }
   }
 }

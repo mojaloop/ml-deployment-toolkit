@@ -68,12 +68,16 @@ artifact:
   url: "oci://ghcr.io/<org>/ml-deployment-toolkit"
   version: "latest"
 registry:
-  provider: "none"          # Harbor lives here; nothing to proxy through
+  enabled: false            # Harbor lives here; nothing to proxy through
+object_storage:
+  enabled: false            # MinIO lives here; this cluster is the backup target
+observability:
+  enabled: false            # the telemetry backend lives here too
 ```
 
 **A Tooling Cluster needs two LB addresses** — `gw-int` and `gw-ext`. It has no FSPIOP endpoint, so no third.
 
-A Tooling Cluster has no `tooling`, no `data`, and no `app` section — it is the cluster others point at. Start from `environments/mlf-lab1-cc1/config.yaml.sample`.
+A Tooling Cluster has no `data` and no `app` section — it is the cluster others point at. It still declares `registry`, `object_storage` and `observability` with `enabled: false`: all three are required, and off is stated rather than left to an omitted section. Start from `environments/mlf-lab1-cc1/config.yaml.sample`.
 
 Full schema and secrets: [Configuration](configuration.md). Alerting matters here specifically — the observability backend lives on this cluster, so the `alerting:` section and its `.env` credentials are what decide whether alerts leave it. See [Prerequisites](prerequisites.md#credentials-checklist).
 
@@ -151,7 +155,7 @@ A Hub reaches this cluster through three endpoints it names in its own config �
 | Logs | `https://loki.int.<domain>/loki/api/v1/push` |
 | Traces | `https://tempo.int.<domain>/v1/traces` |
 
-Write them into the Hub's `registry`, `object_storage`, and `observability` sections — see [Hub → Supporting services](hub.md#supporting-services). If this cluster backs all three, they can instead be derived from its domain alone with the [tooling shorthand](configuration.md#the-tooling-shorthand).
+Write them into the Hub's `registry`, `object_storage`, and `observability` sections — see [Hub → Supporting services](hub.md#supporting-services). Each endpoint is stated outright; there is no shorthand that derives them from this cluster's domain ([ADR-017](../../architecture/decisions/017-explicit-capability-endpoints.md)).
 
 Give each Hub its own registry account and backup bucket by declaring them here, named after the Hub's `cluster.name`:
 

@@ -80,43 +80,31 @@ A Hub needs three supporting services: an image pull-through cache, a backup tar
 
 ```yaml
 registry:
-  provider: "harbor"
+  enabled: true
   url: "harbor.int.cc1.example.com"          # no oci:// prefix
 object_storage:
-  provider: "s3"
+  enabled: true
   endpoint: "https://s3.int.cc1.example.com"
   bucket: "my-switch-backups"                # declared on the Tooling Cluster
+  region: "us-east-1"
 observability:
-  provider: "urls"
+  enabled: true
   loki_url: "https://loki.int.cc1.example.com/loki/api/v1/push"
   mimir_url: "https://thanos.int.cc1.example.com/api/v1/receive"
   tempo_url: "https://tempo.int.cc1.example.com/v1/traces"
 ```
 
-Set any of the three to `provider: "none"` to disable it. Credentials stay in `.env` — `OCI_PROXY_*` for the registry, `BACKUP_S3_*` for object storage. When the target is a Tooling Cluster, both accounts are declared there and scoped to this Hub: a pull-only robot under `registry.robots` (convention: this `cluster.name`; `OCI_PROXY_USERNAME` is `robot-<name>`) and a bucket under `object_storage.buckets` (convention: `<this cluster.name>-backups`; `BACKUP_S3_ACCESS_KEY` is the bucket name). Both passwords come from `make secrets ENV=<cc-env>` — see the [hand-off](tooling-cluster.md#hand-off-to-the-hub). The telemetry sink has no credential field yet, so those URLs must be reachable without authentication (a private network, or mTLS terminated at the gateway); managed backends that require a token are not supported today.
+All three sections are required, and so is `enabled` in each — set it to `false` to switch a service off. Nothing here is derived or defaulted ([ADR-017](../../architecture/decisions/017-explicit-capability-endpoints.md)): when a capability is enabled its endpoints must be written out in full, and `make plan-config` fails naming the missing field if they are not. That includes `object_storage.region`, which is part of the S3 signature rather than a formality.
+
+Credentials stay in `.env` — `OCI_PROXY_*` for the registry, `BACKUP_S3_*` for object storage. When the target is a Tooling Cluster, both accounts are declared there and scoped to this Hub: a pull-only robot under `registry.robots` (convention: this `cluster.name`; `OCI_PROXY_USERNAME` is `robot-<name>`) and a bucket under `object_storage.buckets` (convention: `<this cluster.name>-backups`; `BACKUP_S3_ACCESS_KEY` is the bucket name). Both passwords come from `make secrets ENV=<cc-env>` — see the [hand-off](tooling-cluster.md#hand-off-to-the-hub). The telemetry sink has no credential field yet, so those URLs must be reachable without authentication (a private network, or mTLS terminated at the gateway); managed backends that require a token are not supported today.
 
 The Harbor proxy is a Talos-level registry mirror, transparent to the workloads.
 
-#### Shorthand when a Tooling Cluster provides all three
+The backup target is not restricted to a Tooling Cluster's MinIO. Any S3-compatible endpoint works, provided it speaks SigV4 with a static access key and presents a publicly-trusted certificate — a native cloud endpoint such as `https://s3.eu-west-2.amazonaws.com` is configured the same way. Endpoints behind a private CA, or stores that need path-style addressing, are not reachable by configuration today.
 
-If a Tooling Cluster deployed by this toolkit backs all three services, name it once instead:
+Turning `object_storage.enabled` from `false` to `true` on a running cluster restarts the mongod pods, because PBM sidecars are added.
 
-```yaml
-tooling:
-  domain: "cc1.example.com"
-
-registry:
-  provider: "tooling"    # -> harbor.int.<domain>
-object_storage:
-  provider: "tooling"    # -> https://s3.int.<domain>
-  bucket: "my-switch-backups"
-observability:
-  provider: "tooling"    # -> loki/thanos/tempo push URLs
-```
-
-This derives the same five endpoints from the one domain, so changing it later is a single edit rather than five. The resulting configuration is identical to writing them out — the shorthand only saves transcription. It relies on the URL layout this distribution gives its Tooling Cluster routes, so prefer the explicit form when the Hub and Tooling Cluster are upgraded independently, or when anything other than a toolkit-deployed Tooling Cluster provides a service.
-
-Either way, the two credentials that must be carried over are in the [hand-off](tooling-cluster.md#hand-off-to-the-hub).
+The two credentials that must be carried over are in the [hand-off](tooling-cluster.md#hand-off-to-the-hub).
 
 ### Data layer
 
@@ -237,7 +225,7 @@ DFSP_CURRENCIES=<currency>
 
 ## Harbor pull-through cache
 
-When `registry.provider` is set, image pulls route through the Tooling Cluster's Harbor as a transparent cache — fetched from upstream on first pull, served locally after.
+When `registry.enabled` is true, image pulls route through the Tooling Cluster's Harbor as a transparent cache — fetched from upstream on first pull, served locally after.
 
 Confirm the mirror is configured on the nodes:
 

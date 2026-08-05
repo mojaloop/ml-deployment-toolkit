@@ -28,6 +28,7 @@ Records are **append-only**. A decision the system has moved past is marked supe
 | [014](014-ory-identity-stack.md) | Ory as the complete identity and access stack | accepted |
 | [015](015-two-stack-capability-config.md) | Two Terraform stacks and a capability-bound config model | accepted |
 | [016](016-generic-acme-ca.md) | Certificate authority as configuration, not a provider enum | accepted |
+| [017](017-explicit-capability-endpoints.md) | Capability endpoints stated, not derived | accepted |
 
 ## Writing a new record
 

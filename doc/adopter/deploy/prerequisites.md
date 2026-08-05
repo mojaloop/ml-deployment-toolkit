@@ -67,7 +67,7 @@ gh auth token
 
 Use the GitHub username and the token output.
 
-**Harbor pull-through cache** — only when a Hub pulls through a Tooling Cluster's Harbor (`registry.provider` set). Set `OCI_PROXY_USERNAME` and `OCI_PROXY_PASSWORD`.
+**Harbor pull-through cache** — only when a Hub pulls through a Tooling Cluster's Harbor (`registry.enabled: true`). Set `OCI_PROXY_USERNAME` and `OCI_PROXY_PASSWORD`.
 
 ## Credentials checklist
 

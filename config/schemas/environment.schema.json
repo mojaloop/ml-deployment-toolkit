@@ -9,7 +9,10 @@
     "template",
     "infra",
     "dns",
-    "cert"
+    "cert",
+    "registry",
+    "object_storage",
+    "observability"
   ],
   "additionalProperties": false,
   "properties": {
@@ -262,15 +265,17 @@
       }
     },
     "cert": {
-      "description": "Certificates (ACME). email is the ACME account contact. The CA is selected by server alone; where it requires External Account Binding, set ACME_EAB_KEY_ID and ACME_EAB_HMAC_ENCODED in .env.",
+      "description": "Certificates (ACME). The CA is selected by server alone; where it requires External Account Binding, set ACME_EAB_KEY_ID and ACME_EAB_HMAC_ENCODED in .env.",
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "server"
+        "server",
+        "email"
       ],
       "properties": {
         "email": {
-          "type": "string"
+          "type": "string",
+          "description": "ACME account contact — where the CA sends expiry and revocation notices. Required rather than defaulted: the old admin@<dns.domain> fallback named a mailbox the toolkit invented and nobody necessarily reads, so expiry warnings could arrive nowhere."
         },
         "server": {
           "type": "string",
@@ -297,31 +302,20 @@
         }
       }
     },
-    "tooling": {
-      "description": "Backing Tooling Cluster \u2014 one value drives every tooling preset",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "domain": {
-          "type": "string"
-        }
-      }
-    },
     "registry": {
       "description": "Container image pull-through cache. Credentials OCI_PROXY_* in .env.",
       "type": "object",
       "additionalProperties": false,
+      "required": [
+        "enabled"
+      ],
       "properties": {
-        "provider": {
-          "description": "tooling derives harbor.int.<tooling.domain>; harbor uses an explicit url",
-          "enum": [
-            "tooling",
-            "harbor",
-            "none"
-          ]
+        "enabled": {
+          "description": "Whether this cluster pulls images through a registry mirror. When true, url is required (enforced as a Terraform precondition, not by this schema). Independent of robots, which is tooling-role provisioning and applies regardless.",
+          "type": "boolean"
         },
         "url": {
-          "description": "Registry URL (harbor provider only; no oci:// prefix)",
+          "description": "Registry URL, stated outright \u2014 no oci:// prefix (this becomes a Talos registry mirror endpoint). Required when enabled is true.",
           "type": "string"
         },
         "robots": {
@@ -348,23 +342,24 @@
       "description": "Backup target. Credentials BACKUP_S3_ACCESS_KEY/SECRET_KEY in .env.",
       "type": "object",
       "additionalProperties": false,
+      "required": [
+        "enabled"
+      ],
       "properties": {
-        "provider": {
-          "description": "tooling derives https://s3.int.<tooling.domain>; s3 uses an explicit endpoint; none disables backups entirely (PSMDB/PXC backup+PITR off, vault-backup suspended). Enabling backups later restarts the mongod pods (PBM sidecars are added).",
-          "enum": [
-            "tooling",
-            "s3",
-            "none"
-          ]
+        "enabled": {
+          "description": "Whether backups run at all. false disables them structurally (PSMDB/PXC backup+PITR off, vault-backup suspended) — PSMDB >=1.22 refuses to mark the cluster ready while PBM storage is unconfigured, so this must be a real switch and not an empty endpoint. Turning it on later restarts the mongod pods (PBM sidecars are added). When true, endpoint/bucket/region are required (enforced as a Terraform precondition, not by this schema). Independent of buckets, which is tooling-role provisioning.",
+          "type": "boolean"
         },
         "endpoint": {
-          "description": "S3 endpoint URL (s3 provider only)",
+          "description": "S3 endpoint URL, stated outright. Any S3-compatible service that speaks SigV4 with a static keypair and presents a publicly-trusted certificate — e.g. https://s3.eu-west-2.amazonaws.com, or a MinIO endpoint. Required when enabled is true.",
           "type": "string"
         },
         "bucket": {
+          "description": "Bucket name. Required when enabled is true — previously defaulted to 'backups', which silently sent this cluster's backups to a bucket nobody named.",
           "type": "string"
         },
         "region": {
+          "description": "S3 region, part of the SigV4 signature. Required when enabled is true — previously defaulted to 'us-east-1', which is wrong for most endpoints and fails at backup time rather than at plan time.",
           "type": "string"
         },
         "buckets": {
@@ -388,25 +383,27 @@
       }
     },
     "observability": {
-      "description": "Telemetry push sink",
+      "description": "Telemetry push sink. No credential field exists yet, so these URLs must be reachable without authentication — a private network, or mTLS terminated at the gateway.",
       "type": "object",
       "additionalProperties": false,
+      "required": [
+        "enabled"
+      ],
       "properties": {
-        "provider": {
-          "description": "tooling derives loki/thanos/tempo push URLs; urls uses the explicit *_url fields",
-          "enum": [
-            "tooling",
-            "urls",
-            "none"
-          ]
+        "enabled": {
+          "description": "Whether this cluster pushes logs, metrics and traces to an external sink. When true, all three URLs are required (enforced as a Terraform precondition, not by this schema).",
+          "type": "boolean"
         },
         "loki_url": {
+          "description": "Loki push URL, stated outright — e.g. https://loki.example.com/loki/api/v1/push. Required when enabled is true.",
           "type": "string"
         },
         "mimir_url": {
+          "description": "Prometheus remote-write URL, stated outright — e.g. https://thanos.example.com/api/v1/receive. Required when enabled is true.",
           "type": "string"
         },
         "tempo_url": {
+          "description": "OTLP trace push URL, stated outright — e.g. https://tempo.example.com/v1/traces. Required when enabled is true.",
           "type": "string"
         }
       }

@@ -487,7 +487,7 @@ locals {
     },
   )
 
-  # object_storage 'none' — switch the backup machinery off structurally.
+  # object_storage.enabled = false — switch the backup machinery off structurally.
   # postBuild substitution can only swap scalars inside manifests; removing
   # the PXC schedule or flipping booleans needs kustomize patches, attached
   # here to the Kustomizations that own each consumer. PSMDB >=1.22 gates

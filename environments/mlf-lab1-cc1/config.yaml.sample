@@ -66,18 +66,28 @@ artifact:
 # per Hub, named after the Hub's cluster.name. Creation only — removing an
 # entry stops managing the robot but never deletes it.
 registry:
-  provider: "none"
+  enabled: false
+  # robots is independent of enabled — this cluster serves the mirror rather
+  # than consuming one.
   # robots:
   #   - name: "my-switch"
 
-# Extra MinIO buckets to serve, on top of the system buckets (harbor, backups,
-# thanos, loki, tempo). Each gets a generated user scoped to that one bucket —
-# the access key is the bucket name, the secret key comes from `make secrets`.
-# Convention: one bucket per Hub, named <hub cluster.name>-backups. Creation
-# only — removing an entry stops managing the bucket but never deletes data.
-# object_storage:
-#   buckets:
-#     - name: "my-switch-backups"
+# Backup target. This cluster serves MinIO rather than backing itself up to
+# one, so enabled is false — it is a switch, never inferred from a missing
+# endpoint. buckets is independent of it: extra buckets to serve on top of the
+# system buckets (harbor, backups, thanos, loki, tempo). Each gets a generated
+# user scoped to that one bucket — the access key is the bucket name, the
+# secret key comes from `make secrets`. Convention: one bucket per Hub, named
+# <hub cluster.name>-backups. Creation only — removing an entry stops managing
+# the bucket but never deletes data.
+object_storage:
+  enabled: false
+  # buckets:
+  #   - name: "my-switch-backups"
+
+# Telemetry push sink — this cluster is the sink, so it ships nowhere else.
+observability:
+  enabled: false
 
 # Transactional email (SMTP). Credentials SMTP_USER/SMTP_PASSWORD in .env.
 email:

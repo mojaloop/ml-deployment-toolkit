@@ -13,7 +13,7 @@ Two files describe an environment: `config.yaml` for what the deployment is, and
 - [A Hub, annotated](#a-hub-annotated)
 - [Deployment templates](#deployment-templates)
 - [Data modes](#data-modes)
-- [The tooling shorthand](#the-tooling-shorthand)
+- [Supporting services](#supporting-services)
 - [Secrets](#secrets)
 - [Helm value overrides](#helm-value-overrides)
 - [Manifest patches](#manifest-patches)
@@ -128,11 +128,15 @@ artifact:
   version: "latest"                   # "latest" or a pinned tag
 
 registry:
-  provider: "none"                    # Harbor lives on this cluster; nothing to proxy through
+  enabled: false                      # Harbor lives on this cluster; nothing to proxy through
 
-object_storage:                       # extra MinIO buckets to serve — see below
-  buckets:
+object_storage:
+  enabled: false                      # MinIO lives here; this cluster is the backup target
+  buckets:                            # extra buckets to serve — see below
     - name: "my-switch-backups"
+
+observability:
+  enabled: false                      # the telemetry backend lives here too
 
 email:                                # transactional SMTP; credentials in .env
   host: "smtp.example.com"
@@ -146,7 +150,7 @@ alerting:                             # Grafana contact points
     chat_id: "0"                      # token in .env
 ```
 
-A Tooling Cluster carries no `data`, no `app`, and no `tooling` — it is the thing other clusters point at.
+A Tooling Cluster carries no `data` and no `app` — it is the thing other clusters point at. It still declares all three supporting-service sections with `enabled: false`, since each is required and off is stated rather than implied by omission.
 
 **`object_storage.buckets` declares what this cluster serves** — the reverse of the section's meaning on a Hub, where it names the backup target to consume. Each declared bucket is created in MinIO alongside the system buckets (`harbor`, `backups`, `thanos`, `loki`, `tempo`, which always exist and cannot be re-declared) and gets a generated user scoped to that one bucket: the access key is the bucket name, the secret key is a generated secret named `minio_bucket_<name>_secret_key`. The convention is one bucket per Hub, named `<hub cluster.name>-backups`, so no Hub's credentials can touch another Hub's backups. Creation is additive and one-way — removing an entry stops managing the bucket but never deletes data.
 
@@ -212,19 +216,19 @@ cluster:
 template: "tps-10"                    # config/templates/hub/tps-10.yaml
 
 # Supporting services — each independent, each may point anywhere.
-# See "The tooling shorthand" below for the one-value alternative.
+# All three are required; endpoints are stated outright, never derived.
 registry:
-  provider: "harbor"
+  enabled: true
   url: "harbor.int.cc1.lab1.example.com"
 
 object_storage:
-  provider: "s3"
+  enabled: true
   endpoint: "https://s3.int.cc1.lab1.example.com"
   bucket: "my-switch-backups"         # declared on the Tooling Cluster, one per Hub
   region: "us-east-1"
 
 observability:
-  provider: "urls"
+  enabled: true
   loki_url: "https://loki.int.cc1.lab1.example.com/loki/api/v1/push"
   mimir_url: "https://thanos.int.cc1.lab1.example.com/api/v1/receive"
   tempo_url: "https://tempo.int.cc1.lab1.example.com/v1/traces"
@@ -320,46 +324,43 @@ Mixing is legitimate — external MySQL with in-cluster Kafka is a supported com
 
 Credentials for an external store come from `.env` under the same UPPER_CASE name the toolkit would otherwise generate (`MYSQL_ROOT_PASSWORD` and friends) — see [Secrets](#secrets). Backups of an external store are the adopter's responsibility; the toolkit's backup path covers in-cluster stores only.
 
-## The tooling shorthand
+## Supporting services
 
-The registry, object-storage, and observability endpoints are normally written out, as in the Hub example above — the values stay visible and independent of anything this distribution decides.
+`registry`, `object_storage` and `observability` are all required sections, and each takes `enabled`. When enabled, its endpoints are written out in full — nothing is derived from a domain and nothing is defaulted, so what the file says is what the cluster is pointed at ([ADR-017](../../architecture/decisions/017-explicit-capability-endpoints.md)).
 
-When a Tooling Cluster deployed by *this* toolkit backs all of them, the same five endpoints can be derived from its domain instead:
-
-```yaml
-tooling:
-  domain: "cc1.lab1.example.com"
-```
-
-Then set `provider: tooling` on whichever capabilities should use it. The toolkit owns that URL scheme, so it derives them:
-
-| Capability | Derived endpoint |
-|------------|------------------|
-| `registry` | `harbor.int.<domain>` |
-| `object_storage` | `https://s3.int.<domain>` |
-| `observability` (metrics) | `https://thanos.int.<domain>/api/v1/receive` |
-| `observability` (logs) | `https://loki.int.<domain>/loki/api/v1/push` |
-| `observability` (traces) | `https://tempo.int.<domain>/v1/traces` |
-
-Setting `provider: tooling` on any capability without also setting `tooling.domain` fails at plan time, saying exactly that.
-
-The shorthand saves transcription and makes a domain change one edit instead of five, but it is a convenience rather than a contract: it assumes the route layout this distribution currently gives a Tooling Cluster, and nothing validates that assumption at plan time. Prefer the explicit endpoints when the Hub and Tooling Cluster are upgraded on separate schedules, or when anything other than a toolkit-deployed Tooling Cluster provides a service. The resolved configuration is identical either way.
-
-The presets are per capability, not all-or-nothing — a Hub may pull images through the Tooling Cluster's Harbor while pushing telemetry to an external stack:
+The three are independent — a Hub may pull images through a Tooling Cluster's Harbor while pushing telemetry to an external stack, and back up to a third place entirely:
 
 ```yaml
 registry:
-  provider: "tooling"
+  enabled: true
+  url: "harbor.int.cc1.lab1.example.com"
+object_storage:
+  enabled: true
+  endpoint: "https://s3.eu-west-2.amazonaws.com"
+  bucket: "my-switch-backups"
+  region: "eu-west-2"
 observability:
-  provider: "urls"
+  enabled: true
   mimir_url: "https://metrics.example.com/api/v1/receive"
   loki_url: "https://logs.example.com/loki/api/v1/push"
   tempo_url: "https://traces.example.com/v1/traces"
 ```
 
-Likewise `object_storage.provider: s3` with an explicit `endpoint` points backups at any S3-compatible store.
+Enabling a capability without its endpoints fails at plan time, naming the section:
 
-**The Tooling Cluster must be reachable before the Hub deploys** — deriving a URL does not make it answer. See [Tooling Cluster → Hand-off to the Hub](tooling-cluster.md#hand-off-to-the-hub).
+| Capability | Required when `enabled: true` |
+|------------|-------------------------------|
+| `registry` | `url` (no `oci://` prefix — it becomes a Talos registry mirror) |
+| `object_storage` | `endpoint`, `bucket`, `region` |
+| `observability` | `loki_url`, `mimir_url`, `tempo_url` |
+
+`object_storage.bucket` and `region` are required rather than defaulted: the former used to fall back to `backups` and the latter to `us-east-1`, so a Hub could back up to a bucket nobody named, or sign requests for the wrong region — both failing at backup time rather than at plan time.
+
+Any S3-compatible endpoint works for `object_storage`, provided it speaks SigV4 with a static access key and presents a publicly-trusted certificate. A Tooling Cluster's MinIO and a native cloud endpoint are configured identically. Endpoints behind a private CA, and stores requiring path-style addressing, are not reachable by configuration today — the operators support both, but the toolkit does not yet expose the fields.
+
+Setting `object_storage.enabled: false` disables backups structurally: PSMDB and PXC backups and PITR are switched off and the Vault snapshot CronJob is suspended. This is deliberate rather than cosmetic — PSMDB refuses to mark a cluster ready, and to create its app users, while PBM cannot reach its storage. Turning it back on later restarts the mongod pods, since PBM sidecars are added.
+
+**A Tooling Cluster must be reachable before the Hub deploys** — writing its URL down does not make it answer. See [Tooling Cluster → Hand-off to the Hub](tooling-cluster.md#hand-off-to-the-hub).
 
 ## Secrets
 
@@ -382,8 +383,8 @@ That is also how a Hub's `.env` gets its Tooling Cluster credentials: `make secr
 | `PROXMOX_VE_ENDPOINT`, `PROXMOX_VE_API_TOKEN`, `PROXMOX_VE_SSH_USERNAME`, `PROXMOX_VE_SSH_PASSWORD` | `infra.provider: proxmox` |
 | `DIGITALOCEAN_TOKEN` / `CLOUDFLARE_API_TOKEN` / `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` + `AWS_REGION` | the chosen `dns.provider` |
 | `OCI_REPO_USERNAME`, `OCI_REPO_PASSWORD` | private artifact registry, or publishing one |
-| `OCI_PROXY_USERNAME`, `OCI_PROXY_PASSWORD` | `registry.provider` is `tooling` or `harbor` |
-| `BACKUP_S3_ACCESS_KEY`, `BACKUP_S3_SECRET_KEY` | `object_storage.provider` is `tooling` or `s3` |
+| `OCI_PROXY_USERNAME`, `OCI_PROXY_PASSWORD` | `registry.enabled` is true |
+| `BACKUP_S3_ACCESS_KEY`, `BACKUP_S3_SECRET_KEY` | `object_storage.enabled` is true |
 | `SMTP_USER`, `SMTP_PASSWORD` | `email:` is configured |
 | `TELEGRAM_BOT_TOKEN` | `alerting.telegram` is configured |
 
@@ -539,17 +540,17 @@ Cross-field rules the schema cannot express are Terraform preconditions on the c
 | `version` is not `1` | `config.yaml` must declare the schema version it is written against |
 | `cluster.role` is not `tooling`, `hub`, or `bare` | The role selects both the template directory and the Kustomization set |
 | `cluster.name` resolves to an empty string | Set it, or let it default by naming the environment directory |
-| A capability uses `provider: tooling` but `tooling.domain` is unset | Nothing to derive the endpoints from — see [The tooling shorthand](#the-tooling-shorthand) |
+| `cert.email` is unset | The ACME account contact the CA sends expiry notices to; no longer defaulted to `admin@<dns.domain>` |
 | Any `data.<store>.mode` is `external-managed` | Schema-reserved, not implemented — use `in-cluster-managed` or `external-unmanaged` |
 | An `external-unmanaged` store has no `host` | The endpoint cannot be derived for a store the toolkit does not deploy |
 | On `role: hub`, `app.api_type` is not `fspiop` or `iso20022` | The message dialect must be one the platform ships |
 | On `role: hub`, a non-Talos provider with any `in-cluster-managed` store | The in-cluster data layer is packaged for Talos providers only; on AWS or DigitalOcean every store must be `external-unmanaged`, or the cluster advertises hostnames that were never deployed |
 | The template references a placement group absent from `infra.<provider>.placement` | Unmapped groups reach the provider as literal node names and fail partway through apply, with VMs already created |
 | The template has duplicate `node_groups[].name` | Group names become VM name suffixes and `for_each` keys |
-| `registry.provider: harbor` without `registry.url` | An explicitly bound capability must carry its parameters |
-| `object_storage.provider: s3` without `object_storage.endpoint` | As above |
-| `observability.provider: urls` with no `loki_url`, `mimir_url`, or `tempo_url` | As above |
+| `registry.enabled: true` without `registry.url` | An enabled capability must carry its parameters |
+| `object_storage.enabled: true` without all of `endpoint`, `bucket`, `region` | As above — none of the three is defaulted |
+| `observability.enabled: true` without all of `loki_url`, `mimir_url`, `tempo_url` | As above |
 
-The last three exist because an empty value would otherwise reach the cluster intact and fail at runtime instead.
+The last three exist because an empty value would otherwise reach the cluster intact and fail at runtime instead. Since nothing is derived, these are the checks that catch a half-written section — see [ADR-017](../../architecture/decisions/017-explicit-capability-endpoints.md).
 
 Next: [Deployment](deployment.md).

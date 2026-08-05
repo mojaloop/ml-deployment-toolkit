@@ -6,7 +6,7 @@
 **Status:** accepted
 **Audiences:** architect, platform developer, adopter (deploy)
 
-Supersedes the profile mechanism of [ADR-012](012-tps-sizing-profiles.md); the TPS-tier naming it established is kept.
+Supersedes the profile mechanism of [ADR-012](012-tps-sizing-profiles.md); the TPS-tier naming it established is kept. Its own tooling-preset clause is in turn superseded by [ADR-017](017-explicit-capability-endpoints.md); the rest of this record stands.
 
 ## Context
 
@@ -47,6 +47,8 @@ It plans and applies the config stack alone. Flux re-reads `postBuild.substitute
 **Two-layer templates.** A generic capacity template per tier (`config/templates/<role>/<tier>.yaml`) declares node groups — `{name, class, count, cores, memory, disks[], placement[]}` — plus the `app`/`data`/`tooling` tuning sections. A thin per-provider mapping (`config/templates/mappings/<provider>.yaml`) translates workload classes into instance types or VM defaults. `placement` is index-aligned, so per-node placement stays deterministic.
 
 **The tooling preset.** `tooling.domain` plus `provider: tooling` on `registry`, `object_storage`, or `observability` derives all five endpoints from the one domain value.
+
+> **This clause alone is superseded by [ADR-017](017-explicit-capability-endpoints.md).** The preset, the `tooling:` block, and the `provider` enum on those three capabilities are gone; each now takes `enabled` plus its endpoints stated outright. No environment ever used the preset. Everything else in this record — the two stacks, the capability sections, the two-layer templates, the per-store data modes, the generated internal secrets, and schema validation — remains in force.
 
 **Per-store data modes.** `in-cluster-managed` (default), `external-unmanaged` (adopter-supplied endpoint; that store's `hub-data` Kustomization is not created), and `external-managed`, reserved in the schema and rejected with an explicit message until it exists.
 
