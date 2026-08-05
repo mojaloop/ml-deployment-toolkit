@@ -17,7 +17,7 @@ node_groups:
     cores: 8
     memory: 12288        # MB
     disks: [64, 64]      # GB, rendered as scsi0..scsiN (Proxmox) / root+extra (cloud)
-    placement: [pg-1]
+    placement: [pg-2]
 
 # --- Tooling services scaling ---
 tooling:
