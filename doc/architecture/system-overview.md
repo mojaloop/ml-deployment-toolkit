@@ -79,7 +79,7 @@ A Tooling Cluster is optional. A single Hub can pull artifacts from any external
 | Component | Namespace | Role |
 |-----------|-----------|------|
 | Mojaloop core | `mojaloop` | Central ledger, account lookup, quoting, settlements, transfers |
-| Finance Portal | `mojaloop` | Operational UI |
+| Finance Portal | `finance-portal` | Operational UI |
 | MCM | `mcm` | Connection manager — participant onboarding and certificates |
 | Kratos | `ory` | Identity and sessions |
 | Hydra | `ory` | OAuth2 / OIDC for machine clients |
@@ -92,7 +92,7 @@ A Tooling Cluster is optional. A single Hub can pull artifacts from any external
 
 Authentication and authorization are Ory end to end. Keycloak is not deployed. See [Security](security.md#identity-and-access) for the identity model.
 
-Note the namespace split: **the data layer lives in `data`, not `mojaloop`**, and **the auth stack lives in `ory`**. Commands that target the wrong namespace return nothing and look like a healthy empty result.
+Note the namespace split: **the data layer lives in `data`, not `mojaloop`**, **the auth stack lives in `ory`**, and **the Finance Portal has its own `finance-portal` namespace**. Commands that target the wrong namespace return nothing and look like a healthy empty result.
 
 ## Reconciliation order
 

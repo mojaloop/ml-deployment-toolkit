@@ -51,7 +51,7 @@ Each store is bound independently, in `data.<store>.mode`:
 
 Mixing modes is supported — external MySQL alongside in-cluster Kafka is a valid Hub. See [Configuration → Data modes](../adopter/deploy/configuration.md#data-modes).
 
-The database **operators** live elsewhere again, in `hub-system`. Three namespaces are therefore involved in a data-layer problem: `hub-system` for the operator, `data` for the cluster, and `mojaloop` for the client.
+The database **operators** live elsewhere again, in `hub-system`. Four namespaces are therefore involved in a data-layer problem: `hub-system` for the operator, `data` for the cluster, and `mojaloop` or `finance-portal` for the client — the Finance Portal's reporting APIs read `central_ledger` and MongoDB directly.
 
 ## MySQL
 

@@ -160,7 +160,7 @@ kubectl get pods -n ory
 kubectl get helmrelease -n flux-system mojaloop mcm finance-portal
 ```
 
-**Watch the namespaces.** The data layer is in `data`, the auth stack in `ory`, and the Mojaloop HelmRelease is in `flux-system` — not `mojaloop`. Commands against `mojaloop` for these return an empty list that looks like success. See [System overview](../../architecture/system-overview.md#what-a-hub-runs).
+**Watch the namespaces.** The data layer is in `data`, the auth stack in `ory`, the Finance Portal in `finance-portal`, and the Mojaloop HelmRelease is in `flux-system` — not `mojaloop`. Commands against `mojaloop` for these return an empty list that looks like success. See [System overview](../../architecture/system-overview.md#what-a-hub-runs).
 
 The FSPIOP endpoint is a standalone LoadBalancer service named `cilium-gateway-gw-extapi` in the `mojaloop` namespace — despite the name, it is not a Gateway and will not appear in `kubectl get gateways`. See [Networking](../../architecture/networking.md#the-fspiop-endpoint-is-not-a-gateway).
 

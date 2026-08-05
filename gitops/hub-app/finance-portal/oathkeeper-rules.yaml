@@ -39,7 +39,7 @@ spec:
     - handler: header
   upstream:
     preserveHost: false
-    url: http://fin-portal-reporting-hub-bop-api-svc.mojaloop.svc.cluster.local:80
+    url: http://fin-portal-reporting-hub-bop-api-svc.finance-portal.svc.cluster.local:80
 ---
 # API: transfers/graphql
 apiVersion: oathkeeper.ory.sh/v1alpha1
@@ -74,7 +74,7 @@ spec:
     - handler: header
   upstream:
     preserveHost: false
-    url: http://fin-portal-reporting-hub-bop-api-svc.mojaloop.svc.cluster.local:80
+    url: http://fin-portal-reporting-hub-bop-api-svc.finance-portal.svc.cluster.local:80
 ---
 # API: IAM / role-assignment-service (strip /api/iam -> /)
 apiVersion: oathkeeper.ory.sh/v1alpha1
@@ -101,7 +101,7 @@ spec:
   upstream:
     preserveHost: false
     stripPath: /api/iam
-    url: http://fin-portal-role-assignment-service.mojaloop.svc.cluster.local:80
+    url: http://fin-portal-role-assignment-service.finance-portal.svc.cluster.local:80
 ---
 # API: central-admin (experience-api-svc, strip /api -> keeps /central-admin/)
 apiVersion: oathkeeper.ory.sh/v1alpha1
@@ -128,7 +128,7 @@ spec:
   upstream:
     preserveHost: false
     stripPath: /api
-    url: http://fin-portal-reporting-hub-bop-experience-api-svc.mojaloop.svc.cluster.local:80
+    url: http://fin-portal-reporting-hub-bop-experience-api-svc.finance-portal.svc.cluster.local:80
 ---
 # API: central-settlements (strip /api/central-settlements -> /v2/)
 apiVersion: oathkeeper.ory.sh/v1alpha1
@@ -186,7 +186,7 @@ spec:
     - handler: header
   upstream:
     preserveHost: false
-    url: http://fin-portal-reporting-legacy-api.mojaloop.svc.cluster.local:80
+    url: http://fin-portal-reporting-legacy-api.finance-portal.svc.cluster.local:80
 ---
 # Central-admin participants — participantView (GET)
 apiVersion: oathkeeper.ory.sh/v1alpha1
@@ -217,7 +217,7 @@ spec:
     - handler: header
   upstream:
     preserveHost: false
-    url: http://fin-portal-reporting-hub-bop-experience-api-svc.mojaloop.svc.cluster.local:80
+    url: http://fin-portal-reporting-hub-bop-experience-api-svc.finance-portal.svc.cluster.local:80
 ---
 # Position funds in/out — positionFundsInOut (POST to accounts)
 apiVersion: oathkeeper.ory.sh/v1alpha1
@@ -248,7 +248,7 @@ spec:
     - handler: header
   upstream:
     preserveHost: false
-    url: http://fin-portal-reporting-hub-bop-experience-api-svc.mojaloop.svc.cluster.local:80
+    url: http://fin-portal-reporting-hub-bop-experience-api-svc.finance-portal.svc.cluster.local:80
 ---
 # Position NDC edit — positionNDCEdit (PUT to limits)
 apiVersion: oathkeeper.ory.sh/v1alpha1
@@ -279,7 +279,7 @@ spec:
     - handler: header
   upstream:
     preserveHost: false
-    url: http://fin-portal-reporting-hub-bop-experience-api-svc.mojaloop.svc.cluster.local:80
+    url: http://fin-portal-reporting-hub-bop-experience-api-svc.finance-portal.svc.cluster.local:80
 ---
 # Participant disable/enable — participantDisableEnable (PUT to accounts)
 apiVersion: oathkeeper.ory.sh/v1alpha1
@@ -310,7 +310,7 @@ spec:
     - handler: header
   upstream:
     preserveHost: false
-    url: http://fin-portal-reporting-hub-bop-experience-api-svc.mojaloop.svc.cluster.local:80
+    url: http://fin-portal-reporting-hub-bop-experience-api-svc.finance-portal.svc.cluster.local:80
 ---
 # Settlement model view — settlementView (GET /central-admin/settlementModels)
 apiVersion: oathkeeper.ory.sh/v1alpha1
@@ -341,7 +341,7 @@ spec:
     - handler: header
   upstream:
     preserveHost: false
-    url: http://fin-portal-reporting-hub-bop-experience-api-svc.mojaloop.svc.cluster.local:80
+    url: http://fin-portal-reporting-hub-bop-experience-api-svc.finance-portal.svc.cluster.local:80
 ---
 # IAM view — iamView (GET /users|participants|roles)
 apiVersion: oathkeeper.ory.sh/v1alpha1
@@ -372,7 +372,7 @@ spec:
     - handler: header
   upstream:
     preserveHost: false
-    url: http://fin-portal-role-assignment-service.mojaloop.svc.cluster.local:80
+    url: http://fin-portal-role-assignment-service.finance-portal.svc.cluster.local:80
 ---
 # IAM edit — iamEdit (POST/PUT/DELETE/PATCH /users|participants|roles)
 apiVersion: oathkeeper.ory.sh/v1alpha1
@@ -406,7 +406,7 @@ spec:
     - handler: header
   upstream:
     preserveHost: false
-    url: http://fin-portal-role-assignment-service.mojaloop.svc.cluster.local:80
+    url: http://fin-portal-role-assignment-service.finance-portal.svc.cluster.local:80
 ---
 # Settlement view — settlementView (GET /settlement*)
 apiVersion: oathkeeper.ory.sh/v1alpha1

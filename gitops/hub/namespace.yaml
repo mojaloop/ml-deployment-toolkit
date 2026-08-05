@@ -56,3 +56,11 @@ metadata:
   labels:
     app.kubernetes.io/part-of: mojaloop
     mojaloop.io/layer: hub
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: finance-portal
+  labels:
+    app.kubernetes.io/part-of: mojaloop
+    mojaloop.io/layer: hub

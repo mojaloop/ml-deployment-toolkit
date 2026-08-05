@@ -62,7 +62,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"mojaloop\", cluster_name=\"$cluster_name\"}[15m]))",
+              "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=~\"mojaloop|finance-portal\", cluster_name=\"$cluster_name\"}[15m]))",
               "legendFormat": "restarts"
             }
           ],
@@ -95,7 +95,7 @@ data:
           "options": { "colorMode": "value", "graphMode": "area" }
         },
         {
-          "title": "Pods Not Ready (mojaloop+data)",
+          "title": "Pods Not Ready (mojaloop+finance-portal+data)",
           "type": "stat",
           "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
           "datasource": { "uid": "thanos" },
@@ -114,7 +114,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(kube_pod_status_ready{condition=\"false\", namespace=~\"mojaloop|data\", cluster_name=\"$cluster_name\"})",
+              "expr": "sum(kube_pod_status_ready{condition=\"false\", namespace=~\"mojaloop|finance-portal|data\", cluster_name=\"$cluster_name\"})",
               "legendFormat": "not ready"
             }
           ],
@@ -155,7 +155,7 @@ data:
           "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "custom": { "fillOpacity": 15 } } },
           "targets": [
             {
-              "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=~\"mojaloop|data|mcm|ory\", cluster_name=\"$cluster_name\"}[15m])) by (namespace, pod) > 0",
+              "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=~\"mojaloop|finance-portal|data|mcm|ory\", cluster_name=\"$cluster_name\"}[15m])) by (namespace, pod) > 0",
               "legendFormat": "{{namespace}}/{{pod}}"
             }
           ]
@@ -168,7 +168,7 @@ data:
           "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "custom": { "fillOpacity": 15 } } },
           "targets": [
             {
-              "expr": "sum(kube_pod_container_status_last_terminated_reason{reason=\"OOMKilled\", namespace=~\"mojaloop|data|mcm|ory\", cluster_name=\"$cluster_name\"}) by (namespace, pod)",
+              "expr": "sum(kube_pod_container_status_last_terminated_reason{reason=\"OOMKilled\", namespace=~\"mojaloop|finance-portal|data|mcm|ory\", cluster_name=\"$cluster_name\"}) by (namespace, pod)",
               "legendFormat": "{{namespace}}/{{pod}}"
             }
           ]
@@ -181,7 +181,7 @@ data:
           "fieldConfig": { "defaults": { "unit": "none", "decimals": 2, "custom": { "fillOpacity": 5 } } },
           "targets": [
             {
-              "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"mojaloop\", image!=\"\", cluster_name=\"$cluster_name\"}[$__rate_interval])) by (pod)",
+              "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"mojaloop|finance-portal\", image!=\"\", cluster_name=\"$cluster_name\"}[$__rate_interval])) by (pod)",
               "legendFormat": "{{pod}}"
             }
           ]
@@ -194,7 +194,7 @@ data:
           "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 5 } } },
           "targets": [
             {
-              "expr": "sum(container_memory_working_set_bytes{namespace=\"mojaloop\", image!=\"\", cluster_name=\"$cluster_name\"}) by (pod)",
+              "expr": "sum(container_memory_working_set_bytes{namespace=~\"mojaloop|finance-portal\", image!=\"\", cluster_name=\"$cluster_name\"}) by (pod)",
               "legendFormat": "{{pod}}"
             }
           ]
@@ -233,11 +233,11 @@ data:
           "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 5 } } },
           "targets": [
             {
-              "expr": "sum(rate(container_network_receive_bytes_total{namespace=\"mojaloop\", cluster_name=\"$cluster_name\"}[$__rate_interval])) by (pod)",
+              "expr": "sum(rate(container_network_receive_bytes_total{namespace=~\"mojaloop|finance-portal\", cluster_name=\"$cluster_name\"}[$__rate_interval])) by (pod)",
               "legendFormat": "rx {{pod}}"
             },
             {
-              "expr": "sum(rate(container_network_transmit_bytes_total{namespace=\"mojaloop\", cluster_name=\"$cluster_name\"}[$__rate_interval])) by (pod)",
+              "expr": "sum(rate(container_network_transmit_bytes_total{namespace=~\"mojaloop|finance-portal\", cluster_name=\"$cluster_name\"}[$__rate_interval])) by (pod)",
               "legendFormat": "tx {{pod}}"
             }
           ]

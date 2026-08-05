@@ -136,8 +136,9 @@ More time is lost to this than to any real fault. Kubernetes returns an empty li
 | Database operators | `hub-system` |
 | Kratos, Hydra, Keto, Oathkeeper | `ory` |
 | MCM, its Vault Agent | `mcm` |
-| Mojaloop pods, Finance Portal, the FSPIOP Envoy | `mojaloop` |
-| Mojaloop / MCM HelmReleases | `flux-system` |
+| Finance Portal (shell, UIs, reporting APIs) | `finance-portal` |
+| Mojaloop pods, the FSPIOP Envoy | `mojaloop` |
+| Mojaloop / MCM / Finance Portal HelmReleases | `flux-system` |
 | Gateways | `platform-system` |
 
 When a `get` unexpectedly returns nothing, confirm the namespace before concluding the resource is missing.

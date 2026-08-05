@@ -2,11 +2,15 @@
 # Adopter overrides go in environments/<env>/values/finance-portal.yaml,
 # which is merged after this file and therefore wins.
 global:
+  # FQDNs, not bare service names: this release runs in the finance-portal namespace and
+  # these two services live in mojaloop. The chart interpolates these verbatim into
+  # CENTRAL_ADMIN_URL / CENTRAL_SETTLEMENTS_URL on experience-api-svc, so a bare name
+  # resolves only in-namespace and every Positions and Settlements call fails.
   adminApiSvc:
-    host: moja-centralledger-service
+    host: moja-centralledger-service.mojaloop.svc.cluster.local
     port: 80
   settlementSvc:
-    host: moja-centralsettlement-service
+    host: moja-centralsettlement-service.mojaloop.svc.cluster.local
     port: 80
   keto:
     readURL: "http://keto-read.ory.svc.cluster.local:80"

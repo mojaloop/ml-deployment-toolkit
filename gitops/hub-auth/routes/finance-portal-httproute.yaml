@@ -1,11 +1,17 @@
 # Finance-portal routing — replicates sw002 Istio VirtualService pattern.
 # Shell, UIs, and Kratos proxy go directly to backend services.
 # API routes go through Oathkeeper proxy for auth enforcement.
+#
+# The route lives in finance-portal, beside the workloads it fronts, exactly as the MCM
+# route lives in mcm. UI and shell backendRefs are therefore local and need no grant; the
+# refs that now cross a namespace boundary point INTO ory (kratos-public, oathkeeper-proxy)
+# and are covered by allow-finance-portal-httproute-ref there. Attaching to gw-int across
+# namespaces needs no grant — that listener is allowedRoutes.namespaces.from: All.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: finance-portal
-  namespace: ory
+  namespace: finance-portal
 spec:
   parentRefs:
     - name: gw-int
@@ -27,6 +33,7 @@ spec:
               replacePrefixMatch: /self-service/logout/browser
       backendRefs:
         - name: kratos-public
+          namespace: ory
           port: 80
     # Sessions whoami
     - matches:
@@ -41,6 +48,7 @@ spec:
               replacePrefixMatch: /sessions/whoami
       backendRefs:
         - name: kratos-public
+          namespace: ory
           port: 80
 
     # --- API routes through Oathkeeper (auth required) ---
@@ -50,6 +58,7 @@ spec:
             value: /api/
       backendRefs:
         - name: oathkeeper-proxy
+          namespace: ory
           port: 4455
     - matches:
         - path:
@@ -57,6 +66,7 @@ spec:
             value: /central-admin/
       backendRefs:
         - name: oathkeeper-proxy
+          namespace: ory
           port: 4455
     - matches:
         - path:
@@ -64,6 +74,7 @@ spec:
             value: /settlementWindows
       backendRefs:
         - name: oathkeeper-proxy
+          namespace: ory
           port: 4455
     - matches:
         - path:
@@ -71,6 +82,7 @@ spec:
             value: /settlements
       backendRefs:
         - name: oathkeeper-proxy
+          namespace: ory
           port: 4455
     - matches:
         - path:
@@ -78,6 +90,7 @@ spec:
             value: /users
       backendRefs:
         - name: oathkeeper-proxy
+          namespace: ory
           port: 4455
     - matches:
         - path:
@@ -85,6 +98,7 @@ spec:
             value: /participants
       backendRefs:
         - name: oathkeeper-proxy
+          namespace: ory
           port: 4455
     - matches:
         - path:
@@ -92,6 +106,7 @@ spec:
             value: /roles
       backendRefs:
         - name: oathkeeper-proxy
+          namespace: ory
           port: 4455
 
     # --- UI micro-frontends (direct, no auth, strip prefix) ---
@@ -107,7 +122,6 @@ spec:
               replacePrefixMatch: /
       backendRefs:
         - name: fin-portal-reporting-hub-bop-role-ui
-          namespace: mojaloop
           port: 80
     - matches:
         - path:
@@ -121,7 +135,6 @@ spec:
               replacePrefixMatch: /
       backendRefs:
         - name: fin-portal-reporting-hub-bop-trx-ui
-          namespace: mojaloop
           port: 80
     - matches:
         - path:
@@ -135,7 +148,6 @@ spec:
               replacePrefixMatch: /
       backendRefs:
         - name: fin-portal-reporting-hub-bop-settlements-ui
-          namespace: mojaloop
           port: 80
     - matches:
         - path:
@@ -149,7 +161,6 @@ spec:
               replacePrefixMatch: /
       backendRefs:
         - name: fin-portal-reporting-hub-bop-positions-ui
-          namespace: mojaloop
           port: 80
 
     # --- Shell catch-all (direct, no auth) ---
@@ -161,5 +172,4 @@ spec:
                 value: "default-src 'self'; form-action 'self' https://auth.int.${domain}/kratos/ https://keycloak.int.${domain}/realms/hub-operators/; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://auth.int.${domain}; img-src 'self' data: https://mojaloop.io"
       backendRefs:
         - name: fin-portal-reporting-hub-bop-shell
-          namespace: mojaloop
           port: 80

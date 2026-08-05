@@ -15,7 +15,12 @@ spec:
         name: mojaloop-charts
       interval: 12h
   releaseName: fin-portal
-  targetNamespace: mojaloop
+  # Dedicated namespace, as MCM has. releaseName is pinned above and must stay pinned:
+  # without it helm-controller derives the release name from targetNamespace, so moving
+  # namespaces would silently rename the release too. Changing targetNamespace on an
+  # installed release does not move it — helm-controller uninstalls and reinstalls. That
+  # is safe here because the chart carries no PVCs; all state is in MySQL, Mongo and Kafka.
+  targetNamespace: finance-portal
   install:
     createNamespace: false
     remediation:
