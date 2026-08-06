@@ -113,10 +113,10 @@ spec:
             periodSeconds: 5
           resources:
             limits:
-              memory: 2Gi
+              memory: 4Gi
             requests:
               cpu: 271m
-              memory: 443Mi
+              memory: 2867Mi
           terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
             - mountPath: /var/thanos/receive
