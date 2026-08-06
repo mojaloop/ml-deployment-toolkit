@@ -70,13 +70,6 @@ resource "proxmox_virtual_environment_vm" "instance" {
     }
   }
 
-  # Cloud-init disk
-  disk {
-    datastore_id = each.value.storage_config[0].storage_pool
-    interface    = "ide2"
-    file_format  = "raw"
-  }
-
   # Network device
   network_device {
     bridge   = var.network_bridge_override != "" ? var.network_bridge_override : local.provider_config.vm_defaults.network.bridge
