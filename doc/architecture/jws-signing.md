@@ -28,7 +28,7 @@ Both directions rely on it:
 | Participant → Hub | The participant's JWS key | Mojaloop services |
 | Hub → Participant | The Hub's JWS key | The participant's SDK |
 
-Because verification is over **exact bytes**, anything that re-serializes a payload between signing and verification breaks it. That is the cause of most JWS failures — see [When validation fails](#when-validation-fails).
+Verification is over **exact bytes** — anything that re-serializes a payload between signing and verification breaks it, so components in the message path preserve bodies rather than reconstructing them.
 
 ## The Hub signs as one identity
 
@@ -40,9 +40,9 @@ The Hub signs callbacks with `fspiop-source` set to its participant name. Three 
 | `SWITCH_ID` | MCM | The `dfspId` the Hub's public key is stored under |
 | `HUB_NAME` | Onboarding | The participant name created in the central ledger |
 
-All three derive from a **single** Terraform variable, `hub_participant_name` (default `Hub`). That single source is deliberate: when these three drifted apart, participants received a public key filed under one name and callbacks signed with another, and validation failed with no obvious cause.
+Two of the three — `SWITCH_ID` and `HUB_NAME` — are substituted from one configuration value, `app.hub.participant_name` (default `Hub`). The third, `HUB_PARTICIPANT.NAME`, comes from the upstream Mojaloop chart's own default, which is also `Hub`. The three agree today because both defaults carry the same string — nothing enforces the alignment.
 
-**Do not set these independently.** Renaming the Hub means changing that one variable.
+**Renaming the Hub therefore means two edits in the same change**: `app.hub.participant_name` in `config.yaml`, and `HUB_PARTICIPANT.NAME` through a Mojaloop values override. Changing only the first files the public key under one name while callbacks stay signed as another, and validation fails with no obvious cause.
 
 The Hub also signs with **one shared key across all services**. Upstream Mojaloop charts generate a separate keypair per service when none is supplied — which would mean a participant needing a different public key per service, with no way to know which was which. A single `switch-jws` Secret is mounted by every signing service instead.
 
@@ -131,12 +131,4 @@ Work outward from the Hub:
 
 A name mismatch is the most common cause, and the most confusing: the key is present and correct, but filed under a different string than the one signing the callbacks, so the SDK never finds it.
 
-### A different failure that looks the same
-
-An `Invalid signature` error at the **transfer prepare** step, on the payee side, is a separate problem and is not fixed by anything above.
-
-The Hub's notification handler consumes a transfer from Kafka, deserializes the payload, and re-serializes it when forwarding to the payee. The re-serialized bytes differ from the payer-signed original — key order or whitespace — so a signature computed over exact bytes no longer verifies, even though the key is correct.
-
-The tell is that **quotes validate and transfers do not**: the quoting service proxies HTTP directly and preserves the body, while the transfer path reconstructs it.
-
-Distinguish the two before investigating. Missing-key errors name the key; byte-mismatch errors report an invalid signature with the key present.
+One more variable sits on the participant's side: JWS signature format has varied across SDK scheme-adapter releases, and older builds have produced signatures the Hub rejects. A participant seeing rejections that no key check explains should confirm the SDK version against the Integration Toolkit's pin before investigating the Hub.

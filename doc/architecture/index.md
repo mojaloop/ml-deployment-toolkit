@@ -4,7 +4,7 @@
 
 **Audiences:** all
 
-Why the system is built this way. Every other guide references these pages rather than restating them — if a procedure explains *why*, the explanation belongs here.
+What the system is and how it works, stated once. Every other guide references these pages rather than restating them. The *why* behind each non-obvious choice lives in [decision records](decisions/index.md); these pages cite them by number.
 
 ## Where to start
 
@@ -43,31 +43,31 @@ flowchart TD
 | [System overview](system-overview.md) | Delivery chain, cluster roles, reconciliation order, configuration tiers |
 | [Provider model](provider-model.md) | Infrastructure and DNS providers, what is supported, deployment templates |
 | [GitOps structure](gitops-structure.md) | OCI artifact layout, Flux consumption, substitution, versioning |
-| [Networking](networking.md) | Three entry points, gateways, load balancer addresses, DNS, certificates |
+| [Networking](networking.md) | Four entry points, gateways, load balancer addresses, DNS, certificates |
 | [Security](security.md) | Secret isolation, Ory identity, authorization model, encryption, hardening |
-| [Data layer](data-layer.md) | The four stores, backup and PITR coverage, what is not recoverable |
+| [Data layer](data-layer.md) | The four stores, data modes, backup and PITR coverage, what is not recoverable |
 | [Observability](observability.md) | Metrics, logs, tracing, dashboards, alerting, retention |
-| [Participant integration](participant-integration.md) | Onboarding choreography and the two-party interface contract |
+| [Participant integration](participant-integration.md) | The integration contract — onboarding choreography and both interface tables |
 | [Participant mTLS](participant-mtls.md) | Scheme PKI, certificate lifecycle across components, rotation, planned edge controls |
 | [JWS message signing](jws-signing.md) | Message-level signing, Hub key distribution and rotation |
 
 ## Decision records
 
-Non-obvious design choices are recorded in [decisions/](decisions/). Each captures the context, the alternatives weighed, and the consequences.
+Non-obvious design choices are recorded in [decisions](decisions/index.md). Each captures the context, the alternatives weighed, and the consequences.
 
 Records are **append-only**. A decision the system has moved past is marked superseded and points at its replacement — it is never deleted, because the reasoning stays useful even when the conclusion changes.
 
 ## Reading these against a running system
 
-One thing in these pages is stated as **target** rather than current behaviour: participants reach MCM and Kratos self-service through `gw-ext`. Tracked in `discrepancies.md` item 1.
+Two things in these pages are stated as **target** rather than current behaviour, each marked where it appears: participants reach MCM and Kratos self-service through `gw-ext` ([Networking](networking.md#gw-ext--external-parties)), and the planned FSPIOP edge controls ([Participant mTLS](participant-mtls.md)).
 
-Everything else describes what the code does today, including where a capability is designed but not yet wired — [Data layer](data-layer.md) on external database endpoints, for instance.
+Everything else describes what the code does today.
 
 ## Looking for procedures?
 
-This section explains. The guides instruct:
+This section describes. The guides instruct:
 
 - [Adopter](../adopter/index.md) — deploy, recover, operate a Hub
-- [Participant](../participant/index.md) — connect to a Hub
+- [Participant](../participant/index.md) — signpost to the Integration Toolkit documentation
 - [Platform](../platform/index.md) — build and extend the distribution
 - [Integrator](../integrator/index.md) — customize and republish

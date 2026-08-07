@@ -29,7 +29,7 @@ Everything `make plan-apply` leaves running, in one picture:
 
 ![ML Deployment Toolkit — deployed system view](../diagrams/deployed-system.svg)
 
-The Hub carries the switch; the Tooling Cluster is the management plane serving every Hub — and is optional, as covered in [Cluster roles](#cluster-roles). The three entry points on the left of the Hub are separate load balancers by design ([Networking](networking.md#three-entry-points)); the arrows into the Tooling Cluster are the three standing relationships between the clusters — artifact pulls, backups, and telemetry.
+The Hub carries the switch; the Tooling Cluster hosts the supporting services a Hub points at — and is optional, as covered in [Cluster roles](#cluster-roles). The four entry points on the left of the Hub are separate load balancers by design ([Networking](networking.md#four-entry-points)); the arrows into the Tooling Cluster are the three standing relationships between the clusters — artifact pulls, backups, and telemetry.
 
 ## Delivery chain
 
@@ -56,11 +56,11 @@ A cluster's role determines which Flux Kustomizations are created. The value is 
 
 | Role | Reader-facing name | Purpose |
 |------|-------------------|---------|
-| `tooling` | **Tooling Cluster** | Management plane — registry, secrets, object storage, observability backend |
+| `tooling` | **Tooling Cluster** | Supporting services — registry, secrets, object storage, observability backend |
 | `hub` | **Hub** | The Mojaloop switch and its data layer |
 | `bare` | — | Platform layer only; no role-specific workloads |
 
-A Tooling Cluster is optional. A single Hub can pull artifacts from any external OCI registry. The Tooling Cluster earns its place in multi-environment and air-gapped operation, where it provides a pull-through cache, shared object storage, and aggregated observability.
+A Tooling Cluster is optional, and it is a reference implementation rather than a requirement: the three supporting-service endpoints a Hub consumes — image registry, backup target, telemetry sink — are bound independently in configuration and may point anywhere, including the adopter's own hosts ([ADR-017](decisions/017-explicit-capability-endpoints.md)). A single Hub can pull artifacts from any external OCI registry. The Tooling Cluster earns its place in multi-environment and air-gapped operation, where it provides a pull-through cache, shared object storage, and aggregated observability.
 
 ## What a Tooling Cluster runs
 
@@ -68,7 +68,7 @@ A Tooling Cluster is optional. A single Hub can pull artifacts from any external
 |-----------|-----------|------|
 | Vault | `vault` | Secrets and PKI |
 | Harbor | `harbor` | OCI registry and pull-through proxy cache |
-| MinIO | `minio` | S3-compatible object storage — backups, metrics, logs |
+| MinIO | `minio` | S3-compatible object storage — backups, metrics, logs, traces, and Harbor's registry storage |
 | Thanos | `observability` | Long-term metrics (receive, query, store, compact) |
 | Loki | `observability` | Log aggregation |
 | Tempo | `observability` | Trace storage |
@@ -104,11 +104,11 @@ Every role shares the same four-stage prefix — `platform` → `dns` → `platf
 
 The **Tooling Cluster** adds five stages. `tooling-config` gates on Harbor and MinIO. `tooling-observability` gates on Thanos receive and query, plus Loki, Tempo, and Grafana.
 
-The **Hub** adds a gated chain at every step: `hub` waits for the PXC, PSMDB, and Strimzi operators; `hub-data-common` fans out into one Kustomization per in-cluster store, each with its own health gate — `hub-data-mysql` waits for the MySQL cluster to report `ready`, Kafka and MongoDB for their custom resources to be healthy; `hub-auth` waits for Vault, Kratos, Keto, and Hydra; `hub-app` waits for Mojaloop, MCM, and Finance Portal.
+The **Hub** adds a gated chain at every step: `hub` waits for the PXC, PSMDB, and Strimzi operators; `hub-data-common` fans out into one Kustomization per in-cluster store — `hub-data-mysql` waits for the MySQL cluster to report `ready`, Kafka and MongoDB for their custom resources to be healthy, while Redis has no status worth gating on and applies ungated; `hub-auth` waits for Vault, Kratos, Keto, and Hydra; `hub-app` waits for Mojaloop, MCM, and Finance Portal.
 
 A store bound to `external-unmanaged` gets no Kustomization at all — the fan-out is built from the stores that are actually in-cluster, so `hub-auth` and `hub-app` gate only on what this deployment runs. See [Configuration → Data modes](../adopter/deploy/configuration.md#data-modes).
 
-This is why a Hub takes time to converge and why an early failure blocks everything downstream — the ordering is deliberate, because migrations run against databases that must already exist. `hub-observability-agent` is a parallel branch off `platform-config` and does not block the application chain.
+Each link gates on the *health* of what the previous one produced, not on its application ([ADR-019](decisions/019-health-gated-reconciliation.md)) — so a Hub converges serially, and an early failure blocks everything downstream. `hub-observability-agent` is a parallel branch off `platform-config` and does not block the application chain.
 
 ## Configuration tiers
 
@@ -116,7 +116,7 @@ Configuration merges from three tiers at plan time.
 
 | Tier | Owner | Contents | Location |
 |------|-------|----------|----------|
-| Environment | Adopter | Capability bindings, cluster name, domain, template name, external credentials | `environments/<env>/config.yaml` + `.env` |
+| Environment | Adopter | Capability bindings, cluster name, domain, template name, external credentials, optional Helm value overrides and manifest patches | `environments/<env>/` — `config.yaml`, `.env`, `values/`, `patches/` |
 | Platform definitions | Distribution team | Talos and Kubernetes versions, capacity templates, provider mappings, patches, schemas | `config/definitions/`, `config/templates/`, `config/patches/`, `config/schemas/` |
 | Distribution artifact | Distribution team | GitOps manifests and Terraform modules | `gitops/`, `src/` |
 
@@ -132,7 +132,7 @@ Values that must reach a running workload are injected two ways — a `cluster-c
 
 The tiers above say who *owns* each input. This says how an input *reaches* a running workload, and which layer wins when more than one speaks to the same setting.
 
-A value takes one of two routes.
+A value takes one of three routes.
 
 **Route 1 — substitution, for anything the distribution templated.** The artifact's manifests carry `${...}` placeholders. Terraform resolves the environment config into `cluster-config` and `cluster-secrets`, and every Flux Kustomization substitutes from that pair, so the placeholder becomes this environment's value at reconcile time:
 
@@ -155,9 +155,11 @@ Two things follow. A value only reaches a workload here if the distribution left
 | 2 | `<release>-values` ConfigMap, generated from `<release>-values.yaml` beside the HelmRelease (itself substituted by route 1) | Distribution |
 | 3 | `environments/<env>/values/<release>.yaml` → `<release>-values-override` ConfigMap | Adopter |
 
-**Later wins, so the adopter's file beats the distribution's values.** Flux merges `valuesFrom` entries in the order listed, later overwriting earlier, and no HelmRelease uses inline `spec.values` — which would otherwise be merged after everything and take precedence over both. That constraint is what makes the layering work, so a new chart must follow the same pattern. See [Configuration → Helm value overrides](../adopter/deploy/configuration.md#helm-value-overrides).
+**Later wins, so the adopter's file beats the distribution's values.** Flux merges `valuesFrom` entries in the order listed, later overwriting earlier, and no HelmRelease uses inline `spec.values` ([ADR-022](decisions/022-helm-values-layering.md)). See [Configuration → Helm value overrides](../adopter/deploy/configuration.md#helm-value-overrides).
 
-Everything a workload consumes therefore arrives from one of: a chart default, a distribution decision in `gitops/`, a capacity template, the environment's config, a credential, or an adopter values file — in that order of increasing specificity, with the most specific winning.
+**Route 3 — manifest patches, for anything the other two cannot reach.** `environments/<env>/patches/<kustomization>.yaml` is appended to that Flux Kustomization's `spec.patches`, after the distribution's own patches, so the adopter's patch wins. Patches apply during kustomize build — before substitution — so a patch may introduce a new `${...}` placeholder but cannot read an already-substituted value. See [Configuration → Manifest patches](../adopter/deploy/configuration.md#manifest-patches).
+
+Everything a workload consumes therefore arrives from one of: a chart default, a distribution decision in `gitops/`, a capacity template, the environment's config, a credential, an adopter values file, or an adopter patch — in that order of increasing specificity, with the most specific winning.
 
 See [Configuration](../adopter/deploy/configuration.md) for the schema, and [GitOps structure](gitops-structure.md) for how substitution works.
 
@@ -165,7 +167,7 @@ See [Configuration](../adopter/deploy/configuration.md) for the schema, and [Git
 
 Infrastructure provider and DNS provider are independent choices — Proxmox compute with Cloudflare DNS, or with Route53, are equally valid.
 
-This holds because provider-specific behaviour is confined to two places: the Terraform module that provisions infrastructure, and a vendor Kustomization for provider-specific cluster resources. Everything above that layer is identical.
+Provider-specific behaviour is confined to two places — the Terraform module that provisions infrastructure, and a vendor Kustomization for provider-specific cluster resources ([ADR-024](decisions/024-narrow-provider-boundary.md)). Everything above that layer is identical.
 
 Proxmox with Talos is the supported deployment infrastructure today; the abstraction is what makes adding others contained work. See [Provider model](provider-model.md).
 

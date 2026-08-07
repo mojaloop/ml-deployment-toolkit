@@ -29,7 +29,7 @@ Secrets reach workloads by two paths, and the distinction matters when debugging
 
 A secret that looks stale is almost always the first kind being read where the second was expected.
 
-**The KV engine is version 1, deliberately.** MCM's Vault client writes to `secret/mcm/...` without the `data/` path segment that KV v2 requires. Running v2 produces a 403 on participant creation. This is load-bearing — do not "upgrade" the mount.
+**The KV engine is version 1** ([ADR-020](decisions/020-vault-kv-v1.md)). The mount version is part of the contract with the MCM image — an upgrade to KV v2 breaks participant creation with a 403 on the next enrolment. Do not "upgrade" the mount.
 
 ## Identity and access
 
@@ -44,7 +44,7 @@ Authentication and authorization are **Ory end to end**. Keycloak is not deploye
 
 Every protected request traverses Oathkeeper, which accepts either a Kratos session cookie (humans) or a Hydra JWT (machines), consults Keto for the authorization decision, and forwards the request with identity headers attached: `X-User`, `X-Email`, `X-DFSP-ID`, `X-Roles`.
 
-Two details are non-obvious and both are deliberate:
+Two details are non-obvious:
 
 **Sessions resolve to the Kratos identity UUID, not the email address.** Email is mutable; the identity ID is not. Authorization tuples are written against the UUID, so changing a user's email does not silently revoke their access.
 
@@ -52,7 +52,7 @@ Two details are non-obvious and both are deliberate:
 
 ## Authorization model
 
-Permissions are relationship tuples in Keto, defined as code rather than configured per deployment. Roles are shipped as `MojaloopRole` resources: `operator`, `manager`, `clerk`, `financemanager`, `dfspreconciliationreports`, `audit`, `mta`.
+Permissions are relationship tuples in Keto, defined as code rather than configured per deployment. Twelve roles ship as `MojaloopRole` resources: `operator`, `manager`, `clerk`, `financemanager`, `dfspreconciliationreports`, `audit`, `mta`, `pta`, `everyone`, `dfsp`, `mcmadmin`, and `techops-admin`.
 
 The Hub itself is an object in the permission graph, named by `hub_participant_name` (default `Hub`). That single value is simultaneously the scheme ID, the Keto Hub object, and the onboarding participant name — they must agree.
 
@@ -79,12 +79,12 @@ Two separate PKIs operate side by side, and confusing them is the most common so
 
 | PKI | Issues | Trusted by |
 |-----|--------|-----------|
-| **Let's Encrypt** | Web UI and API certificates on `*.int` and `*.ext` | Public trust store — browsers work without configuration |
+| **The configured ACME CA** ([ADR-016](decisions/016-generic-acme-ca.md)) | Web UI and API certificates on `*.int` and `*.ext` | Public trust store — browsers work without configuration |
 | **Vault — `Mojaloop Hub CA`** | Participant client certificates and the FSPIOP endpoint certificate | Scheme members only |
 
 The scheme root is RSA 4096 with a 10-year lifetime, generated inside Vault and never exported. Two issuing roles sit under it: one constrained to the Hub's own domain for server certificates, one unconstrained for participant client certificates. Both issue RSA 4096 with a five-year ceiling.
 
-**The FSPIOP endpoint is the trap.** `extapi.${domain}` presents a certificate signed by the scheme CA, not by Let's Encrypt — so it fails validation against the public trust store by design. It also rotates on a 30-day cycle, renewed at 15 days, while participant certificates are long-lived.
+**The FSPIOP endpoint is the trap.** `extapi.${domain}` presents a certificate signed by the scheme CA, not by the public ACME CA — so it fails validation against the public trust store by design. It also rotates on a 30-day cycle, renewed at 15 days, while participant certificates are long-lived.
 
 See [Participant mTLS](participant-mtls.md) for the full certificate lifecycle.
 
@@ -94,7 +94,7 @@ See [Participant mTLS](participant-mtls.md) for the full certificate lifecycle.
 |------|-----------|
 | Participant → Hub FSPIOP | Mutual TLS, client certificate required on every connection |
 | Hub → Participant callbacks | Mutual TLS, originated by an in-cluster Envoy listener |
-| Public web endpoints | TLS 1.2+, Let's Encrypt, terminated at the Gateway |
+| Public web endpoints | TLS 1.2+, ACME CA certificate, terminated at the Gateway |
 | **Pod to pod, inside the cluster** | **WireGuard, enabled** |
 
 Cilium transparent WireGuard encryption is **on by default on all clusters** ([ADR-013](decisions/013-cilium-wireguard-internal-encryption.md)). Node-to-node traffic is encrypted without application awareness.
@@ -103,7 +103,7 @@ Traffic inside the cluster past the mTLS boundary is plain HTTP at the applicati
 
 ## Cluster hardening
 
-**Pod Security Admission.** Most namespaces run under default restrictions. Four are explicitly `privileged` because their workloads require it: `platform-system`, `tooling-system`, `vault`, and `openebs-system`.
+**Pod Security Admission.** Most namespaces run under default restrictions. Six are explicitly `privileged` because their workloads require it: `platform-system`, `observability`, `openebs-system`, `vault`, `cilium` (labelled by the Cilium install rather than the artifact), and — on a Tooling Cluster — `tooling-system`.
 
 **Network policy is narrow, not comprehensive.** Only two policies ship:
 
@@ -112,6 +112,6 @@ Traffic inside the cluster past the mTLS boundary is plain HTTP at the applicati
 
 There is **no default-deny posture and no per-namespace segmentation.** Traffic between namespaces is unrestricted. If the adopter's threat model requires east-west segmentation, that is additional work, not a configuration toggle.
 
-The callback policy is deliberately scoped to the four services that make outbound calls rather than applying namespace-wide. An unscoped version would capture all TCP 80/443 egress and force it through a plain-HTTP listener, breaking unrelated outbound TLS — database backups to object storage, for instance.
+The callback policy selects exactly the four services that make outbound calls to participants, not the whole namespace ([ADR-021](decisions/021-scoped-callback-egress.md)). A new service that starts calling participants must be added to that selector, or its callbacks bypass the mTLS listener and fail at the participant's door.
 
 **Gateway exposure.** `*.int` hosts are intended for in-house operations and `*.ext` for external parties, but that separation is a naming convention enforced at the adopter's network edge. No NetworkPolicy, load-balancer source range, or annotation in the manifests restricts `gw-int` — both Gateways use the same class and certificate issuer. The boundary holds only where the network edge enforces it.

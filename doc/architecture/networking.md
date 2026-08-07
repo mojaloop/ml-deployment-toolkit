@@ -4,9 +4,9 @@
 
 **Audiences:** architect, platform developer, adopter
 
-Ingress topology, the three load balancers, and how DNS and certificates are issued.
+Ingress topology, the four load balancers, and how DNS and certificates are issued.
 
-- [Three entry points](#three-entry-points)
+- [Four entry points](#four-entry-points)
 - [What is on each gateway](#what-is-on-each-gateway)
 - [The FSPIOP endpoint is not a gateway](#the-fspiop-endpoint-is-not-a-gateway)
 - [Load balancer addresses](#load-balancer-addresses)
@@ -15,14 +15,14 @@ Ingress topology, the three load balancers, and how DNS and certificates are iss
 
 ## Four entry points
 
-A Hub exposes four independent load-balanced addresses. Each has a different audience and a different trust model — which is why they are separate rather than one gateway with routing rules ([ADR-008](decisions/008-three-lb-architecture.md)).
+A Hub exposes four independent load-balanced addresses. Each has a different audience and a different trust model, so each gets its own load balancer rather than a slot on a shared gateway ([ADR-008](decisions/008-three-lb-architecture.md), [ADR-018](decisions/018-per-gateway-lb-pools.md)).
 
 | Entry point | Hostname pattern | Audience | TLS |
 |-------------|-----------------|----------|-----|
-| `gw-int` | `*.int.${domain}` | In-house operations | Server TLS, Let's Encrypt |
-| `gw-ext` | `*.ext.${domain}` | External parties | Server TLS, Let's Encrypt |
+| `gw-int` | `*.int.${domain}` | In-house operations — web UIs | Server TLS, ACME CA |
+| `gw-ext` | `*.ext.${domain}` | External parties | Server TLS, ACME CA |
 | `gw-extapi` | `extapi.${domain}` | Participant FSPIOP traffic | **Mutual TLS**, scheme CA |
-| `gw-intapi` | `intapi.int.${domain}` | FSPIOP mirror without mTLS — internal testing only | Server TLS, Let's Encrypt |
+| `gw-intapi` | `intapi.int.${domain}` | Machine APIs for scheme and participant tooling, without mTLS | Server TLS, ACME CA |
 
 `gw-int`, `gw-ext`, and `gw-intapi` are Gateway API Gateways in `platform-system`. The FSPIOP mTLS endpoint is not — see [below](#the-fspiop-endpoint-is-not-a-gateway).
 
@@ -42,15 +42,16 @@ A Tooling Cluster uses only `gw-int` and `gw-ext`, hosting its own services rath
 | `hubble.int` | Cilium Hubble network observability |
 | `goldilocks.int` | Resource recommendations |
 | `ttk.int`, `ttk-backend.int` | Testing Toolkit |
-| `simulator.int` | Simulator |
 | `settlement.int` | Settlement API |
 | `tx-requests.int` | Transaction requests API |
 
 On a Tooling Cluster: `harbor.int`, `minio.int`, `s3.int`, `grafana.int`, `loki.int`, `tempo.int`, `thanos.int`.
 
-### `gw-intapi` — FSPIOP mirror, internal testing only
+### `gw-intapi` — machine APIs without mTLS
 
-A single host, `intapi.int`, exposing the same FSPIOP paths as the participant endpoint with **no client certificate requirement**. Anything that can reach it can transact as any participant — which is exactly why it sits on its own gateway with its own dedicated address rather than riding on `gw-int`: it can (and should) be firewalled independently of the ops UIs. It shares `gw-int`'s wildcard certificate.
+`gw-intapi` carries cluster APIs consumed by the scheme's and participants' own tooling — test harnesses, provisioning scripts, back-office integrations — over server TLS without a client certificate. Today that is a single host, `intapi.int`, exposing the same FSPIOP paths as the participant endpoint.
+
+Anything that can reach it can transact as any participant — which is exactly why it sits on its own gateway with its own dedicated address rather than riding on `gw-int`: it can (and should) be firewalled independently of the ops UIs. It shares `gw-int`'s wildcard certificate.
 
 ### `gw-ext` — external parties
 
@@ -63,11 +64,11 @@ Exactly two hosts:
 
 Participants authenticate at `hydra.ext` and manage their enrolment through `mcm.ext`.
 
-> **Target state.** Participants — human and machine — reach MCM through `gw-ext`; `gw-int` is for in-house HubOps only. The MCM UI and Kratos self-service currently resolve to `.int` hosts. Tracked in `discrepancies.md`.
+> **Target state.** Participants — human and machine — reach MCM through `gw-ext`; `gw-int` is for in-house HubOps only. The MCM UI and Kratos self-service currently resolve to `.int` hosts, so account activation is performed on the Hub side today.
 
 ## The FSPIOP endpoint is not a gateway
 
-`extapi.${domain}` is a standalone Envoy deployment behind its own LoadBalancer service. It does not use Gateway API, and no HTTPRoute points at it.
+`extapi.${domain}` is a standalone Envoy deployment behind its own LoadBalancer service. It does not use Gateway API, and no HTTPRoute points at it. Cilium's Gateway cannot terminate mTLS for traffic originating outside the cluster, so this endpoint runs its own Envoy ([ADR-004](decisions/004-standalone-envoy-inbound-mtls.md)).
 
 ```mermaid
 flowchart LR
@@ -76,15 +77,13 @@ flowchart LR
     e -->|"HTTP :80"| svc["Mojaloop<br/>services"]
 ```
 
-**Why.** Cilium's L7 load balancing runs on an east-west BPF path that requires pod identities. North-south traffic originating outside the cluster has none, so CiliumEnvoyConfig cannot terminate it ([ADR-004](decisions/004-standalone-envoy-inbound-mtls.md)).
-
 The service is named `cilium-gateway-gw-extapi`, which is misleading — it is a plain LoadBalancer service, not a Cilium-managed gateway. The name is historical.
 
 Envoy requires a client certificate on every connection and routes by path prefix to account lookup, quoting, the ML API adapter, the bulk adapter, and transaction requests. Certificates and the trust bundle are hot-reloaded from watched directories, so enrolling a participant neither restarts Envoy nor drops connections.
 
 ## Load balancer addresses
 
-On self-hosted infrastructure, Cilium LB-IPAM assigns addresses the adopter defines, announced on the local network via L2. Each gateway owns a dedicated single-IP pool, so every endpoint's address is known before the cluster exists — firewall rules can be written up front.
+On self-hosted infrastructure, Cilium LB-IPAM assigns addresses the adopter defines, announced on the local network via L2. Each gateway owns a dedicated single-IP pool, so every endpoint's address is known before the cluster exists ([ADR-018](decisions/018-per-gateway-lb-pools.md)).
 
 ```yaml
 cluster:
@@ -111,14 +110,11 @@ Setting `wan` on a pool declares that the border firewall 1:1-DNATs that outside
 
 ## DNS
 
-`external-dns` watches Gateways and Services and reconciles records automatically. The operator never pre-creates records for Hub services — hand-created records cause ownership conflicts.
+`external-dns` watches HTTPRoutes and Services and reconciles records automatically. The operator never pre-creates records for Hub services — hand-created records cause ownership conflicts.
 
-Two record shapes are produced:
+Every record is a **per-host A record**: one for each HTTPRoute hostname (`mcm.int.${domain}`, `settlement.int.${domain}`, …) pointing at its gateway's address, and one for the FSPIOP endpoint from the annotation on its Service. There are no wildcard DNS records — the wildcards exist only as certificate names.
 
-- **Wildcards** for the gateways — `*.int.${domain}` and `*.ext.${domain}`
-- **A single A record** for the FSPIOP endpoint, from an annotation on its service
-
-Note that `extapi.${domain}` sits at the apex level, not under `.int` or `.ext`. It is not covered by either wildcard.
+Note that `extapi.${domain}` sits at the apex level, not under `.int` or `.ext`.
 
 Participant FQDNs are the participant's own responsibility, in their own zone. The Hub never creates records for them, and each participant needs an individual record — there is no wildcard on that side.
 
@@ -126,8 +122,6 @@ Supported DNS providers: Route53, Cloudflare, DigitalOcean. The choice is indepe
 
 ## Certificates
 
-Public-facing certificates come from Let's Encrypt via cert-manager, using **DNS-01** challenges ([ADR-011](decisions/011-dns01-over-http01.md)).
+Public-facing certificates come from the configured ACME CA (`cert.server`, [ADR-016](decisions/016-generic-acme-ca.md)) via cert-manager, using **DNS-01** challenges ([ADR-011](decisions/011-dns01-over-http01.md)). DNS-01 is what allows wildcard certificates and issuance before any ingress path is reachable.
 
-DNS-01 rather than HTTP-01 because wildcard certificates require it, and because it works before any ingress path is reachable — which matters during bootstrap, when the cluster is not yet serving traffic.
-
-The FSPIOP endpoint certificate is the exception: issued by Vault against the scheme CA, 30-day lifetime, renewed at 15 days. See [Security](security.md#certificate-authorities) for why the two PKIs are separate and [Participant mTLS](participant-mtls.md) for the participant certificate lifecycle.
+The FSPIOP endpoint certificate is the exception: issued by Vault against the scheme CA, 30-day lifetime, renewed at 15 days. See [Security](security.md#certificate-authorities) for the two PKIs and [Participant mTLS](participant-mtls.md) for the participant certificate lifecycle.

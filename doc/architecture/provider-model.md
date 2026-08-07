@@ -24,7 +24,7 @@ dns:
   provider: cloudflare
 ```
 
-The separation holds because provider-specific behaviour is confined to a Terraform module and an optional vendor Kustomization. Everything above that is identical.
+Provider-specific behaviour is confined to a Terraform module and an optional vendor Kustomization ([ADR-024](decisions/024-narrow-provider-boundary.md)). Everything above that is identical.
 
 ## Infrastructure providers
 
@@ -68,13 +68,13 @@ The DNS provider is an independent choice — Route53 with Proxmox is a normal c
 
 All three DNS providers use **DNS-01** ACME challenges ([ADR-011](decisions/011-dns01-over-http01.md)), which is what allows wildcard certificates and works before any ingress path is reachable.
 
-The ACME account contact is `cert.email` in the environment config — a real field with a real effect, unlike the `app.alert_email` it replaced, which despite its name only ever reached Let's Encrypt.
+The ACME account contact is `cert.email` in the environment config — required, not defaulted ([ADR-017](decisions/017-explicit-capability-endpoints.md)).
 
 **The certificate authority is a configuration dimension, not a code path.** There is no CA enum to extend — the directory URL *is* the provider identity, exactly as in Traefik (`caServer`) and Caddy (`acme_ca`). Two knobs cover every ACME authority, current or future ([ADR-016](decisions/016-generic-acme-ca.md)):
 
 | Knob | Where | Notes |
 |------|-------|-------|
-| Directory URL | `cert.server` in `config.yaml` | defaults to Let's Encrypt production |
+| Directory URL | `cert.server` in `config.yaml` | required — the issuing authority is always stated, never inherited |
 | EAB credentials | `ACME_EAB_KEY_ID` + `ACME_EAB_HMAC_ENCODED` in `.env` | optional; required by every public CA except Let's Encrypt |
 
 External Account Binding is emitted only when both credentials are present — there is no toggle, credential presence is the switch. Its schema is fixed by RFC 8555 at keyID plus HMAC key and does not vary by CA, so adding a provider means changing two values, never a manifest.
@@ -97,7 +97,7 @@ flowchart LR
 
 Read the arrows as actions — each module is the actor performing the step to its right.
 
-The boundary is deliberately narrow. Adding a provider means implementing cluster creation and returning a kubeconfig; it means touching no DNS, TLS, observability, or application code. See [Platform → Adding providers](../platform/index.md).
+The boundary is narrow ([ADR-024](decisions/024-narrow-provider-boundary.md)): adding a provider means implementing cluster creation and returning a kubeconfig, and touching no DNS, TLS, observability, or application code. The full list of registration edits lives in [Platform → Adding providers](../platform/index.md).
 
 ## Deployment templates
 
@@ -105,11 +105,11 @@ Node counts and machine sizes come from named templates per role, not from hand-
 
 | Role | Available templates |
 |------|--------------------|
-| Tooling Cluster (`tooling`) | `small`, `medium` |
-| Hub (`hub`) | `tps-1`, `tps-10` |
+| Tooling Cluster (`tooling`) | `dev`, `small`, `medium` |
+| Hub (`hub`) | `dev`, `tps-1`, `tps-10` |
 | Platform-only (`bare`) | `small` |
 
-Hub templates are named for the transaction rate they are sized to sustain. `tps-1` is a functional lab; `tps-10` is the larger validated tier.
+Hub templates are named for the transaction rate they are sized to sustain. `dev` is the smallest footprint for development clusters; `tps-1` is a functional lab; `tps-10` is the larger validated tier.
 
 ```yaml
 template: "tps-10"

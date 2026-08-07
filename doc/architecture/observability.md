@@ -62,7 +62,7 @@ flowchart LR
 
 **The OTel path.** Mojaloop v17.x images already ship OpenTelemetry instrumentation in `@mojaloop/central-services-stream`, but no SDK — so every span is silently discarded. The OpenTelemetry Operator (platform layer) injects a Node.js SDK into any pod annotated `instrumentation.opentelemetry.io/inject-nodejs`, activating that dormant instrumentation with no image change. The transfer path is annotated — central-ledger and its handlers, quoting, ml-api-adapter, account-lookup — and spans are sent directly to Alloy over OTLP. Trace context still crosses Kafka, but only as a `traceparent` message header: the consuming service continues the producer's trace, which is what joins one transfer into a single end-to-end trace.
 
-Alloy enriches spans with Kubernetes metadata, then splits the stream. **Spanmetrics and servicegraph see 100% of spans** — RED metrics per service/operation (under the `traces_span_metrics` prefix, shipped to Thanos with everything else) and a who-calls-whom topology, computed before sampling so counts and percentiles are not distorted. Only the branch bound for Tempo is **tail-sampled**: every error trace is kept, every trace slower than 1 s (deliberately the p99 SLO) is kept, and 10% of the rest.
+Alloy enriches spans with Kubernetes metadata, then splits the stream. **Spanmetrics and servicegraph see 100% of spans** — RED metrics per service/operation (under the `traces_span_metrics` prefix, shipped to Thanos with everything else) and a who-calls-whom topology, computed before sampling so counts and percentiles are not distorted. Only the branch bound for Tempo is **tail-sampled** ([ADR-023](decisions/023-tail-based-trace-sampling.md)): every error trace is kept, every trace slower than 1 s — the p99 SLO — is kept, and 10% of the rest.
 
 Two operational consequences:
 
@@ -84,7 +84,7 @@ This is what makes a single transfer traceable end to end — find it in the log
 
 ## Dashboards
 
-Thirty-two dashboards ship pre-provisioned, in five folders.
+Forty-three dashboards ship pre-provisioned, in six folders.
 
 | Folder | Count | Covers |
 |--------|:---:|--------|
@@ -92,11 +92,12 @@ Thirty-two dashboards ship pre-provisioned, in five folders.
 | **Infrastructure** | 10 | Nodes, cluster, pods, CoreDNS, Cilium, API server, kubelet, volumes, namespaces, Proxmox hosts |
 | **Data Layer** | 5 | MySQL, PXC/Galera, Redis, Kafka, MongoDB |
 | **Platform** | 7 | cert-manager, external-dns, Vault, Ory Auth, Oathkeeper, Flux, Keycloak |
-| **Mojaloop** | 9 | Transfer pipeline, account lookup, Node.js runtime, quoting, participant mTLS gateway, load test, participant overview, central-services characterization, performance troubleshooting |
+| **Mojaloop** | 11 | Transfer pipeline, transfer journey, account lookup, Node.js runtime, quoting, participant mTLS gateway, load test, participant overview, central-services characterization, performance troubleshooting, slow/failed traces |
+| **Performance** | 9 | Transfer SLO, hub latency breakdown, capacity headroom, per-participant latency, async Kafka pipeline, edge network path, data-layer load, runtime saturation, load-test runs |
 
 Start at **Switch Overview**. It is built as the entry point, with drill-downs into the rest.
 
-One caveat: the **Keycloak** dashboard in the Platform folder queries a namespace that no longer has workloads and will always render empty. Keycloak was replaced by Ory. Its removal is tracked in `discrepancies.md`.
+One caveat: the **Keycloak** dashboard in the Platform folder queries a namespace that no longer has workloads and will always render empty. Keycloak was replaced by Ory ([ADR-014](decisions/014-ory-identity-stack.md)); the dashboard is a remnant pending removal.
 
 ## Alerting
 
@@ -117,6 +118,6 @@ This is the most common way a deployment ends up believing it has no alerting wh
 
 ## Retention
 
-Metrics, logs, and traces are retained for **7 days** each by default, backed by object storage on the Tooling Cluster.
+Logs, traces, and raw-resolution metrics are retained for **7 days** each by default, backed by object storage on the Tooling Cluster. The downsampled metric resolutions Thanos compact produces (5-minute and 1-hour) carry no retention limit — they accumulate until deleted, so long-range queries keep working past the raw window while object storage grows slowly over time.
 
 Seven days suits a lab. Production schemes with audit obligations will want longer, which means both a retention change and enough object storage to hold it.

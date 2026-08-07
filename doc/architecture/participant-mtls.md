@@ -36,7 +36,7 @@ Two issuing roles sit beneath it:
 | `server-cert-role` | Restricted to the Hub's domain and subdomains | Server | 5 years |
 | `client-cert-role` | Any name — participants use their own domains | Client only | 5 years |
 
-The client role permits any subject name deliberately: participants present certificates for their own FQDNs, which the Hub cannot enumerate in advance. Constraint comes from the enrolment process, not from the certificate profile.
+The client role permits any subject name: participants present certificates for their own FQDNs, which the Hub cannot enumerate in advance. Constraint comes from the enrolment process, not from the certificate profile.
 
 ## Certificate inventory
 
@@ -48,7 +48,7 @@ Three distinct certificates are in play, with very different lifetimes:
 | Hub FSPIOP endpoint (`extapi-tls`) | `extapi.${domain}` | Scheme CA | **30 days** |
 | Participant client certificates | Each participant | Scheme CA | Up to 5 years |
 
-The 30-day endpoint certificate is issued by cert-manager through a Vault issuer and renewed automatically at 15 days. The long-lived participant certificates rotate only at enrolment.
+The 30-day endpoint certificate is issued by cert-manager through a Vault issuer and renewed automatically at 15 days. Participant certificates rotate through the enrolment machinery: the participant's agent submits a fresh CSR on its own — at enrolment, and again whenever the current certificate comes within its expiry threshold (30 days by default) — and each CSR waits for a HubOps signature in MCM before the agent picks up the new certificate and rotates without downtime.
 
 **Participants must trust the scheme CA explicitly.** The FSPIOP endpoint does not present a publicly-trusted certificate, so validating it against the system trust store fails by design.
 
@@ -136,8 +136,10 @@ This is why the mTLS boundary can absorb onboarding during live traffic.
 | What | Cadence | Triggered by |
 |------|---------|-------------|
 | Hub FSPIOP endpoint certificate | 30 days, renewed at 15 | cert-manager, automatic |
-| Participant client certificates | Up to 5 years | Re-enrolment |
+| Participant client certificates | Up to 5 years | The participant's agent submits a new CSR at ~30 days to expiry; a HubOps signature completes it |
 | Scheme root | 10 years | Manual — no automation exists |
+
+A renewal CSR appears in MCM exactly like an enrolment CSR and waits for the same signature. An agent that is down cannot initiate renewal, and an unsigned renewal CSR expires the certificate on schedule — both halves have to act.
 
 The root is the one to plan for. Rotating it means re-issuing every participant certificate and coordinating trust across every connected institution. Nothing in the toolkit automates this, and a ten-year horizon makes it easy to defer past the point where anyone remembers the procedure. Record the expiry somewhere durable.
 
@@ -162,13 +164,13 @@ Blocking is a membership action, not a certificate action. Stopping a participan
 
 Removing a participant's record from Vault does not remove what was generated from it. The trust bundle is applied without pruning, so the departed participant's CA remains in it, and its client certificate Secret and Envoy upstream persist.
 
-The participant cannot transact once disabled, but its certificate is still accepted at the TLS layer until those artifacts are cleaned up. Tracked in `discrepancies.md` item 5.
+The participant cannot transact once disabled, but its certificate is still accepted at the TLS layer until those artifacts are cleaned up by hand.
 
 Vault publishes a CRL, but neither Envoy consults it, so revoking a certificate has no effect on connections. Treat certificate cleanup as a follow-up housekeeping step after disabling — not as the mechanism for stopping a participant.
 
 ## Additional edge controls (work in progress)
 
-> **Not implemented.** This section describes intended design so the current security posture is legible. Neither control is active today. Tracked in `discrepancies.md` item 5c.
+> **Not implemented.** This section describes intended design so the current security posture is legible. Neither control is active today.
 
 The FSPIOP endpoint currently authenticates with **one factor**: the client certificate. A valid certificate reaches every FSPIOP service, from any source address, with no second check. Two controls are planned to change that.
 
@@ -188,7 +190,7 @@ The intent is to enforce those registered ranges on inbound connections, rejecti
 
 One caveat governs whether this works at all: if the load balancer replaces the source address, every connection appears to originate from the same place and the filter silently passes everything. Address preservation has to be verified first, not after.
 
-### Why this matters now
+### The posture until then
 
-These are defence in depth, and the depth is currently thin. With no CRL enforcement and participant certificates valid for up to five years, the client certificate is a long-lived single factor protecting the highest-value surface in the system. Treat the certificate as the only thing standing between an attacker and the FSPIOP API when reasoning about risk today.
+With no CRL enforcement and participant certificates valid for up to five years, the client certificate is a long-lived single factor protecting the highest-value surface in the system. Treat the certificate as the only thing standing between an attacker and the FSPIOP API when reasoning about risk today.
 
