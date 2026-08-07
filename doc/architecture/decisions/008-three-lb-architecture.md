@@ -1,10 +1,12 @@
 # 008 — Three LoadBalancer IPs per Hub
 
-[doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 008 — Three LoadBalancer IPs per Hub
+[doc](../../index.md) / [architecture](../index.md) / [decisions](index.md) / 008 — Three LoadBalancer IPs per Hub
 
 **Date:** 2026-03-31
-**Status:** accepted
+**Status:** superseded by [018](018-per-gateway-lb-pools.md)
 **Audiences:** architect, platform developer, network engineer
+
+> **Superseded in count and mechanism, kept in principle.** [ADR-018](018-per-gateway-lb-pools.md) promoted the FSPIOP mirror to its own gateway (`gw-intapi`) — a Hub now needs **four** addresses — and replaced the shared LB-IPAM range with one single-address, label-selected pool per gateway, so every address is known before the cluster exists. The DNS consequence below is also outdated: records are published per host, and `extapi.${domain}` is a single apex record, not a wildcard. What this record decided — that traffic classes with different trust models get separate load balancers rather than one gateway with routing rules — still holds. Read it for the reasoning; read ADR-018 for the current layout.
 
 ## Context
 

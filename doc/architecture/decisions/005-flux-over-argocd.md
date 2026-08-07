@@ -1,6 +1,6 @@
 # 005 — FluxCD over ArgoCD for GitOps reconciliation
 
-[doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 005 — FluxCD over ArgoCD for GitOps reconciliation
+[doc](../../index.md) / [architecture](../index.md) / [decisions](index.md) / 005 — FluxCD over ArgoCD for GitOps reconciliation
 
 **Date:** 2026-03-31
 **Status:** accepted

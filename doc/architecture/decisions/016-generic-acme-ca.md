@@ -1,10 +1,12 @@
 # 016 — Certificate authority as configuration, not a provider enum
 
-[doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 016 — Certificate authority as configuration
+[doc](../../index.md) / [architecture](../index.md) / [decisions](index.md) / 016 — Certificate authority as configuration
 
 **Date:** 2026-08-05
-**Status:** accepted
+**Status:** accepted — amended by [017](017-explicit-capability-endpoints.md)
 **Audiences:** architect, platform developer, adopter
+
+> **Amended.** [ADR-017](017-explicit-capability-endpoints.md) made `cert.email` required unconditionally alongside `cert.server`; this record made only `cert.server` mandatory.
 
 ## Context
 

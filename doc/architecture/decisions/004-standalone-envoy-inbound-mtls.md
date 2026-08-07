@@ -1,6 +1,6 @@
 # 004 — Standalone Envoy Deployment for inbound DFSP mTLS
 
-[doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 004 — Standalone Envoy Deployment for inbound DFSP mTLS
+[doc](../../index.md) / [architecture](../index.md) / [decisions](index.md) / 004 — Standalone Envoy Deployment for inbound DFSP mTLS
 
 **Date:** 2026-03-31
 **Status:** accepted

@@ -1,6 +1,6 @@
 # 010 — Dual-realm Keycloak with Kratos OIDC
 
-[doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 010 — Dual-realm Keycloak
+[doc](../../index.md) / [architecture](../index.md) / [decisions](index.md) / 010 — Dual-realm Keycloak
 
 **Date:** 2026-03-31
 **Status:** superseded by [014](014-ory-identity-stack.md)

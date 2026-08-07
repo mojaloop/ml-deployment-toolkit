@@ -1,6 +1,6 @@
 # 001 — OCI-based distribution over Git-based GitOps
 
-[doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 001 — OCI-based distribution over Git-based GitOps
+[doc](../../index.md) / [architecture](../index.md) / [decisions](index.md) / 001 — OCI-based distribution over Git-based GitOps
 
 **Date:** 2026-03-31
 **Status:** accepted

@@ -1,6 +1,6 @@
 # 017 — Capability endpoints stated, not derived
 
-[doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 017 — Capability endpoints stated
+[doc](../../index.md) / [architecture](../index.md) / [decisions](index.md) / 017 — Capability endpoints stated
 
 **Date:** 2026-08-05
 **Status:** accepted

@@ -1,6 +1,6 @@
 # 007 — Single OCI artifact with multiple kustomization paths
 
-[doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 007 — Single OCI artifact with multiple kustomization paths
+[doc](../../index.md) / [architecture](../index.md) / [decisions](index.md) / 007 — Single OCI artifact with multiple kustomization paths
 
 **Date:** 2026-03-31
 **Status:** accepted

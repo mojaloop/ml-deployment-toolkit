@@ -1,10 +1,12 @@
 # 011 — DNS-01 challenges for ACME TLS over HTTP-01
 
-[doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 011 — DNS-01 challenges for ACME TLS over HTTP-01
+[doc](../../index.md) / [architecture](../index.md) / [decisions](index.md) / 011 — DNS-01 challenges for ACME TLS over HTTP-01
 
 **Date:** 2026-03-31
-**Status:** accepted
+**Status:** accepted — amended by [016](016-generic-acme-ca.md)
 **Audiences:** architect, platform developer, network engineer
+
+> **Amended.** [ADR-016](016-generic-acme-ca.md) generalized the certificate authority: the CA is selected by directory URL (`cert.server`, required), the issuer is named `acme-prod` in `clusterissuer.yaml`, and "Let's Encrypt" below reads as "the configured ACME CA". The DNS-01 decision itself is unchanged and still holds on all three DNS providers.
 
 ## Context
 

@@ -1,6 +1,6 @@
 # 002 — Cilium for all networking over Istio service mesh
 
-[doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 002 — Cilium for all networking over Istio service mesh
+[doc](../../index.md) / [architecture](../index.md) / [decisions](index.md) / 002 — Cilium for all networking over Istio service mesh
 
 **Date:** 2026-03-31
 **Status:** accepted

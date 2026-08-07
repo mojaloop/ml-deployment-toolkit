@@ -1,6 +1,6 @@
 # 003 — Thanos for metrics backend over Mimir and alternatives
 
-[doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 003 — Thanos for metrics backend over Mimir and alternatives
+[doc](../../index.md) / [architecture](../index.md) / [decisions](index.md) / 003 — Thanos for metrics backend over Mimir and alternatives
 
 **Date:** 2026-03-31
 **Status:** accepted

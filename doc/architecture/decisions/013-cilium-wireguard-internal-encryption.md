@@ -1,6 +1,6 @@
 # 013 — Cilium WireGuard for internal traffic encryption
 
-[doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 013 — Cilium WireGuard for internal traffic encryption
+[doc](../../index.md) / [architecture](../index.md) / [decisions](index.md) / 013 — Cilium WireGuard for internal traffic encryption
 
 **Date:** 2026-07-10
 **Status:** accepted

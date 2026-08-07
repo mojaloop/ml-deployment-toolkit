@@ -1,6 +1,6 @@
 # 014 — Ory as the complete identity and access stack
 
-[doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 014 — Ory identity stack
+[doc](../../index.md) / [architecture](../index.md) / [decisions](index.md) / 014 — Ory identity stack
 
 **Date:** 2026-07-21
 **Status:** accepted
@@ -67,4 +67,4 @@ Three choices within that are load-bearing:
 
 **Token audience is not validated.** The Mojaloop MCM client omits the `audience` parameter, so requiring it would reject every machine call. Trust rests on issuer and signature. Worth revisiting if the client changes.
 
-**Migration was one-way.** Keycloak realms were not exported, and no rollback path exists. Remnants of the previous design survive in the repository — an empty namespace, a stale dashboard, unused Terraform variables — tracked for cleanup in `discrepancies.md`.
+**Migration was one-way.** Keycloak realms were not exported, and no rollback path exists. Remnants of the previous design survive in the repository — an empty namespace, a stale dashboard, unused Terraform variables — pending cleanup.

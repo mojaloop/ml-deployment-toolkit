@@ -1,6 +1,6 @@
 # 012 — TPS-based sizing profiles
 
-[doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 012 — TPS-based sizing profiles
+[doc](../../index.md) / [architecture](../index.md) / [decisions](index.md) / 012 — TPS-based sizing profiles
 
 **Date:** 2026-04-02
 **Status:** superseded by [015](015-two-stack-capability-config.md)

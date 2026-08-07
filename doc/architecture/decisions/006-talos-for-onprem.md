@@ -1,6 +1,6 @@
 # 006 — Talos Linux for on-prem Kubernetes
 
-[doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 006 — Talos Linux for on-prem Kubernetes
+[doc](../../index.md) / [architecture](../index.md) / [decisions](index.md) / 006 — Talos Linux for on-prem Kubernetes
 
 **Date:** 2026-03-31
 **Status:** accepted

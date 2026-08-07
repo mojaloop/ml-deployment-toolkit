@@ -1,6 +1,6 @@
 # 009 — Single PXC cluster for all MySQL databases
 
-[doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 009 — Single PXC cluster for all MySQL databases
+[doc](../../index.md) / [architecture](../index.md) / [decisions](index.md) / 009 — Single PXC cluster for all MySQL databases
 
 **Date:** 2026-03-31
 **Status:** accepted

@@ -1,6 +1,6 @@
 # 015 — Two Terraform stacks and a capability-bound config model
 
-[doc](../../index.md) / [architecture](../index.md) / [decisions](./) / 015 — Two stacks and capability config
+[doc](../../index.md) / [architecture](../index.md) / [decisions](index.md) / 015 — Two stacks and capability config
 
 **Date:** 2026-07-28
 **Status:** accepted
@@ -20,7 +20,7 @@ The configuration surface had grown to roughly seventy unvalidated parameters an
 
 **Most secrets were not secrets from anywhere.** Around twenty of the forty `.env` entries were internal service passwords — MySQL accounts, Ory databases, Grafana admin — invented by the adopter, typed once, and thereafter meaningful only inside the cluster. Alongside them sat variables nothing read at all (`KEYCLOAK_*`, `HUBOP_OIDC_SECRET`, `PROXMOX_VE_INSECURE`, `ONBOARDING_COLLECTION_VERSION`, `OBSERVABILITY_MINIO_*`).
 
-The design work is recorded in `_/configuration/` — the adopter journey and decisions D1–D9.
+The design work behind this record traced the full adopter journey before any key was named; the decisions it produced are the ones below.
 
 ## Alternatives considered
 
@@ -48,7 +48,7 @@ It plans and applies the config stack alone. Flux re-reads `postBuild.substitute
 
 **The tooling preset.** `tooling.domain` plus `provider: tooling` on `registry`, `object_storage`, or `observability` derives all five endpoints from the one domain value.
 
-> **This clause alone is superseded by [ADR-017](017-explicit-capability-endpoints.md).** The preset, the `tooling:` block, and the `provider` enum on those three capabilities are gone; each now takes `enabled` plus its endpoints stated outright. No environment ever used the preset. Everything else in this record — the two stacks, the capability sections, the two-layer templates, the per-store data modes, the generated internal secrets, and schema validation — remains in force.
+> **This clause alone is superseded by [ADR-017](017-explicit-capability-endpoints.md).** The preset, the `tooling:` block, and the `provider` enum on those three capabilities are gone; each now takes `enabled` plus its endpoints stated outright. No environment ever used the preset. The required list above is also amended: [ADR-016](016-generic-acme-ca.md) and [ADR-017](017-explicit-capability-endpoints.md) added `cert`, `registry`, `object_storage`, and `observability` to the top-level `required` set, so "only `infra` and `dns` are required" no longer holds. Everything else in this record — the two stacks, the capability sections, the two-layer templates, the per-store data modes, the generated internal secrets, and schema validation — remains in force.
 
 **Per-store data modes.** `in-cluster-managed` (default), `external-unmanaged` (adopter-supplied endpoint; that store's `hub-data` Kustomization is not created), and `external-managed`, reserved in the schema and rejected with an explicit message until it exists.
 
