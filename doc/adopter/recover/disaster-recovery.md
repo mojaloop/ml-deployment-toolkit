@@ -19,7 +19,7 @@ A cluster can be rebuilt from the artifact and the configuration — but only if
 | Keep | Why | Without it |
 |------|-----|-----------|
 | **Vault unseal keys / root token** | The Secret in the `vault` namespace, which dies with the cluster | The raft snapshots are encrypted and unopenable — the PKI is lost |
-| **Terraform state** (`artifacts/<env>/`) | **Both** state files — `terraform/infra.tfstate` is Terraform's record of the infrastructure (and, on Talos environments, the machine secrets, also written to `artifacts/<env>/talos-secrets/secrets.yaml`); `terraform/config.tfstate` holds every **generated** internal service password | Terraform cannot manage or cleanly rebuild what it no longer knows exists; on Talos, expired client certs become a [permanent lockout](../operate/known-issues.md#lost-or-expired-cluster-access-kubeconfig-and-talosconfig) — the API is mTLS-only with no fallback. Losing the config state loses the database, Vault-backed, and admin passwords unless the cluster is still up to read them from |
+| **Terraform state** (`artifacts/<env>/`) | **Both** state files — `terraform/infra.tfstate` is Terraform's record of the infrastructure (and, on Talos environments, the machine secrets, also written to `artifacts/<env>/talos-secrets/secrets.yaml`); `terraform/config.tfstate` holds every **generated** internal service password | Terraform cannot manage or cleanly rebuild what it no longer knows exists; on Talos, expired client certs become a [permanent lockout](../operate/known-issues.md#lost-or-expired-cluster-access--kubeconfig-and-talosconfig-talos) — the API is mTLS-only with no fallback. Losing the config state loses the database, Vault-backed, and admin passwords unless the cluster is still up to read them from |
 | **`config.yaml` and `.env`** | The environment's identity and its external credentials | No way to reproduce the same cluster |
 
 Back the first two up explicitly — see [Backups → What the adopter must back up](backup.md#what-the-adopter-must-back-up). The third is the adopter's to keep safe from the moment it is created; `.env` is git-ignored and exists nowhere but the adopter's disk.
@@ -56,7 +56,7 @@ When Hubs run without a Tooling Cluster, each is independent and the order does 
 6. **Restore the databases** to the target point in time — see [Restore](restore.md).
 7. **Re-verify participants.** The trust bundle and certificates must line up after a Vault restore. Participants enrolled after the restored snapshot will need to re-enrol.
 
-The sequence is deliberate: infrastructure, then secrets/PKI, then data. Restoring data before Vault leaves services unable to authenticate; restoring before the cluster exists has nowhere to land.
+The order is infrastructure, then secrets/PKI, then data: restoring data before Vault leaves services unable to authenticate, and restoring before the cluster exists has nowhere to land.
 
 ## Rebuilding a Tooling Cluster
 
@@ -65,7 +65,7 @@ The same shape, and simpler — a Tooling Cluster holds no scheme PKI and no led
 1. Restore `config.yaml` and `.env` under `environments/<env>/`, plus both state files.
 2. `make init ENV=<env> && make plan ENV=<env> && make apply ENV=<env>`.
 3. Let Flux bring up Harbor, MinIO, and the observability stack.
-4. **Restore its Vault** if lost — it holds registry and storage credentials, not the scheme CA, so the blast radius is smaller, but services still need it.
+4. **Its Vault rebuilds fresh** — a Tooling Cluster's Vault has no scheduled snapshot ([Backups](backup.md#what-runs-automatically)), and it holds no scheme CA. Its secrets are seeded from the config stack on deploy, so with the state restored in step 2 the rebuilt Vault converges to the same credentials.
 5. Confirm Harbor, MinIO, and Grafana respond before rebuilding any Hub against it.
 
 Object storage is the subtle one: if MinIO's backing volumes were lost, the **backups themselves are gone** — a Tooling Cluster rebuild does not restore data it was the store for. For anything critical, replicate the S3 bucket off the Tooling Cluster.
@@ -76,7 +76,7 @@ Some loss is permanent regardless of preparation. Knowing which is which prevent
 
 - **In-flight Kafka events** — no backup exists; settled state is in MySQL and MongoDB, in-flight is not.
 - **Data written after the restore point** — a point-in-time restore is a deliberate rollback; everything after the target time is discarded by choice.
-- **The Vault snapshot gap** — up to ~1h45m between the last snapshot and the loss.
+- **The Vault snapshot gap** — the retained history spans 90 minutes, and a Tooling Cluster has no snapshots at all.
 - **Anything issued in a restore gap** — a participant enrolled between the snapshot and the restore is unknown to the restored Hub and must re-enrol.
 
-The honest summary: with the three items in [What the adopter must keep](#what-the-adopter-must-keep), the adopter can rebuild to a recent point. Without them, the same cluster cannot be rebuilt at all. That gap sits entirely on the side of preparation the adopter controls — which is why the unseal-key and state backups are worth doing the day of the deploy, not the day they are needed.
+The summary: with the three items in [What the adopter must keep](#what-the-adopter-must-keep), the adopter can rebuild to a recent point. Without them, the same cluster cannot be rebuilt at all. That gap sits entirely on the side of preparation the adopter controls — do the unseal-key and state backups the day of the deploy, not the day they are needed.

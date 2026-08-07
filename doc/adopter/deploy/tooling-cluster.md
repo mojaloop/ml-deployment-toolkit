@@ -4,7 +4,7 @@
 
 **Audiences:** adopter (deploy)
 
-The Tooling Cluster (`role: tooling`) is the management plane — OCI registry, secrets, object storage, and the observability backend that Hubs report into. Deploy it first if using one.
+The Tooling Cluster (`role: tooling`) hosts the supporting services a Hub points at — OCI registry and pull-through cache, object storage for backups, and the observability backend Hubs report into. It is a reference implementation: each of those endpoints may equally point anywhere else ([ADR-017](../../architecture/decisions/017-explicit-capability-endpoints.md)). Deploy it first if using one.
 
 For the shared workflow and commands, see [Deployment](deployment.md). This page is the `tooling`-specific configuration and checks.
 
@@ -47,9 +47,9 @@ The distinguishing settings in `config.yaml`:
 
 ```yaml
 version: 1
-template: "small"           # small | medium
+template: "small"           # dev | small | medium
 cluster:
-  name: "my-cc"             # must equal the environment directory name
+  name: "my-cc"             # optional — defaults to the environment directory name
   role: "tooling"                # routes Flux to the Tooling Cluster paths
   vip: "192.168.0.210"
   lb_ipam:
@@ -96,7 +96,7 @@ make validate ENV=<tooling-env>
 make plan-apply ENV=<tooling-env>
 ```
 
-Expect ~15–20 minutes for Terraform, then ~10–15 for Flux to converge.
+Expect about five minutes for Terraform, then ~10–15 for Flux to converge.
 
 ## Verify
 
@@ -139,7 +139,7 @@ make secrets ENV=<tooling-env>
 
 That prints `harbor_admin_password`, `grafana_admin_password`, and `minio_root_password`, plus one entry per Hub credential declared here (`harbor_robot_<name>_secret`, `minio_bucket_<name>_secret_key`). The MinIO user name is `minioadmin` unless `MINIO_ROOT_USER` was set in `.env`; Harbor and Grafana log in as `admin`.
 
-Vault is auto-unsealed by its operator, which stores the unseal keys as a Secret in the `vault` namespace.
+Vault is auto-unsealed by its operator, which stores the unseal keys as the `vault-unseal-keys` Secret in the `vault` namespace.
 
 ## Hand-off to the Hub
 
@@ -187,11 +187,10 @@ Carry those into [Deploy a Hub → Configuration](hub.md#configuration).
 
 ## After deploying
 
-**Back up the Vault unseal keys before anything else.** They live only in cluster state and are covered by no automatic backup. Without them, a rebuilt cluster cannot open its own Vault.
+**Back up the Vault unseal keys before anything else.** They live only in cluster state and are covered by no automatic backup — and a Tooling Cluster's Vault has no scheduled snapshot at all ([Data layer → Backup coverage](../../architecture/data-layer.md#backup-coverage)). Without the keys, a rebuilt cluster cannot open its own Vault.
 
 ```bash
-kubectl -n vault get secrets
-kubectl -n vault get secret <unseal-secret> -o yaml > vault-unseal-<tooling-env>.yaml
+kubectl -n vault get secret vault-unseal-keys -o yaml > vault-unseal-<tooling-env>.yaml
 ```
 
 Store that file offline. Full rationale and the disaster-recovery procedure: [Recover → Disaster recovery](../recover/disaster-recovery.md#what-the-adopter-must-keep).

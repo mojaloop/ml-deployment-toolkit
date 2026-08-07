@@ -6,7 +6,7 @@
 
 The adopter runs a Hub. This guide takes an adopter from an empty Proxmox cluster to a running Mojaloop switch, keeps it recoverable, and keeps it healthy.
 
-The adopter configures two files per environment and runs Terraform through Make — never forking the distribution or editing the bundle. Everything specific to a deployment lives in the adopter's own configuration. Changing the distribution itself is the [Integrator](../integrator/index.md) guide.
+The adopter configures one environment directory — `config.yaml`, `.env`, and optional `values/` and `patches/` — and runs Terraform through Make, never forking the distribution or editing the bundle. Everything specific to a deployment lives in the adopter's own configuration. Changing the distribution itself is the [Integrator](../integrator/index.md) guide.
 
 ## Three journeys
 
@@ -65,6 +65,6 @@ Restoring data and rebuilding after loss. Read this **before** it is needed — 
 
 Knowing two things about this toolkit going in saves time:
 
-**Namespaces do not match intuition.** The data layer is in `data`, not `mojaloop`. The auth stack is in `ory`. The Finance Portal is in `finance-portal`. A `kubectl` command against the wrong namespace returns an empty list that looks like success. See [System overview](../architecture/system-overview.md#what-a-hub-runs).
+**Namespaces do not match intuition.** A `kubectl` command against the wrong namespace returns an empty list that looks like success — the namespace map is in [System overview](../architecture/system-overview.md#what-a-hub-runs).
 
-**A Hub takes time to converge, on purpose.** The reconciliation chain waits for each layer to be healthy before starting the next, because database migrations must run against databases that already exist. "Looks stuck" for several minutes after `make apply` is usually normal. See [Reconciliation order](../architecture/system-overview.md#reconciliation-order).
+**A Hub takes time to converge.** The reconciliation chain waits for each layer to be healthy before starting the next ([ADR-019](../architecture/decisions/019-health-gated-reconciliation.md)). "Looks stuck" for several minutes after `make apply` is usually normal. See [Reconciliation order](../architecture/system-overview.md#reconciliation-order).

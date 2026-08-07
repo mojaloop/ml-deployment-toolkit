@@ -23,11 +23,11 @@ For the shared workflow and commands, see [Deployment](deployment.md). This page
 |-------|---------|-------|
 | Proxmox nodes | `worker1`, `worker2`, `worker3` | A Hub is multi-node |
 | Kubernetes API VIP | `192.168.0.214` | Floating IP |
-| LB-IPAM range | `192.168.0.215-217` | **Three** addresses |
+| LB-IPAM addresses | `192.168.0.215-218` | **Four** addresses, one per gateway |
 | DNS zone | `sw1.example.com` | Delegated before deploying |
 | Artifact version | `v0.9.0` or `latest` | Same artifact as the Tooling Cluster |
 | SMTP | **required** | MCM sends participant activation emails — a Hub without SMTP cannot onboard |
-| Tooling Cluster domain | `cc1.example.com` | One value; endpoints are derived — see [hand-off](tooling-cluster.md#hand-off-to-the-hub) |
+| Supporting-service endpoints | `harbor.int.cc1.example.com`, … | Stated in full, one per capability — see [hand-off](tooling-cluster.md#hand-off-to-the-hub) |
 
 ## Configuration
 
@@ -35,9 +35,9 @@ The distinguishing settings in `config.yaml`:
 
 ```yaml
 version: 1
-template: "tps-10"          # tps-1 | tps-10
+template: "tps-10"          # dev | tps-1 | tps-10
 cluster:
-  name: "my-hub"            # must equal the environment directory name
+  name: "my-hub"            # optional — defaults to the environment directory name
   role: "hub"
   vip: "192.168.0.214"
   lb_ipam:
@@ -64,7 +64,7 @@ app:
     admin_email: "hub-admin@example.com"
 ```
 
-**A Hub needs three LB addresses** — `gw-int`, `gw-ext`, and the FSPIOP `extapi` endpoint.
+**A Hub needs four LB addresses** — `gw-int`, `gw-ext`, the FSPIOP `extapi` endpoint, and the machine-API gateway `gw-intapi` ([Networking](../../architecture/networking.md#load-balancer-addresses)).
 
 **`app.api_type` is set once.** It selects the FSPIOP message dialect. Switching it on a running Hub breaks in-progress transfers — decide it before the first deploy.
 
@@ -76,7 +76,7 @@ A Hub runs far more internal services than a Tooling Cluster — the databases a
 
 ### Supporting services
 
-A Hub needs three supporting services: an image pull-through cache, a backup target, and a telemetry sink. Each is chosen independently and may point anywhere — a Tooling Cluster, a cloud service, or your own hosts. Write the endpoints out:
+A Hub needs three supporting services: an image pull-through cache, a backup target, and a telemetry sink. Each is chosen independently and may point anywhere — a Tooling Cluster, a cloud service, or the adopter's own hosts. Write the endpoints out:
 
 ```yaml
 registry:
@@ -100,7 +100,7 @@ Credentials stay in `.env` — `OCI_PROXY_*` for the registry, `BACKUP_S3_*` for
 
 The Harbor proxy is a Talos-level registry mirror, transparent to the workloads.
 
-The backup target is not restricted to a Tooling Cluster's MinIO. Any S3-compatible endpoint works, provided it speaks SigV4 with a static access key and presents a publicly-trusted certificate — a native cloud endpoint such as `https://s3.eu-west-2.amazonaws.com` is configured the same way. Endpoints behind a private CA, or stores that need path-style addressing, are not reachable by configuration today.
+The backup target is not restricted to a Tooling Cluster's MinIO — any S3-compatible endpoint meeting the requirements in [Configuration → Supporting services](configuration.md#supporting-services) works, and is configured the same way.
 
 Turning `object_storage.enabled` from `false` to `true` on a running cluster restarts the mongod pods, because PBM sidecars are added.
 
@@ -135,7 +135,7 @@ make validate ENV=<hub-env>
 make plan-apply ENV=<hub-env>
 ```
 
-Expect ~20–30 minutes for Terraform, then ~20–30 for Flux to converge the full stack — data layer, auth, then Mojaloop. The chain waits for the data layer to be healthy before the application layer starts, because migrations run against databases that must already exist. Apparent inactivity after `hub-data` goes Ready is normal — see [Reconciliation order](../../architecture/system-overview.md#reconciliation-order).
+Expect about five minutes for Terraform, then ~20–30 for Flux to converge the full stack — data layer, auth, then Mojaloop. The chain waits for the data layer to be healthy before the application layer starts ([ADR-019](../../architecture/decisions/019-health-gated-reconciliation.md)). Apparent inactivity after `hub-data` goes Ready is normal — see [Reconciliation order](../../architecture/system-overview.md#reconciliation-order).
 
 ## Verify the cluster
 
@@ -212,7 +212,7 @@ Confirm it took effect: the currency and the hub's ledger accounts appear in the
 
 ## Collect integration details
 
-These are the values every participant needs, identical for all of them. This is the hand-off to the [Participant guide](../../participant/index.md).
+These are the values every participant needs, identical for all of them — the hub side of the [integration contract](../../architecture/participant-integration.md#interface-contract), which the participant consumes through the Integration Toolkit's documentation.
 
 ```bash
 MCM_SERVER_ENDPOINT=https://mcm.ext.<domain>/pm4mlapi
@@ -220,6 +220,8 @@ HUB_IAM_PROVIDER_URL=https://hydra.ext.<domain>
 HUB_EXTAPI_FQDN=extapi.<domain>
 DFSP_CURRENCIES=<currency>
 ```
+
+Hand over one more value with these: the **callback source address** — the address Hub-originated callbacks present, which the participant's firewall must admit. It is not necessarily the `extapi` address; confirm what the Hub's egress path presents on this deployment.
 
 > A participant's ID and OAuth2 client credentials are **not** part of this hand-off. They exist only once HubOps creates the participant in MCM, and the participant generates its own secret — the Hub never holds it. See [Onboarding participants](../operate/onboarding-participants.md) and the [choreography](../../architecture/participant-integration.md#the-choreography).
 
@@ -240,8 +242,7 @@ Cached images appear in Harbor's proxy-cache projects with their upstream source
 **Back up the Hub's Vault unseal keys.** A Hub's Vault holds the scheme PKI — the CA that signs every participant certificate. Losing the unseal keys means losing the ability to open it.
 
 ```bash
-kubectl -n vault get secrets
-kubectl -n vault get secret <unseal-secret> -o yaml > vault-unseal-<hub-env>.yaml
+kubectl -n vault get secret vault-unseal-keys -o yaml > vault-unseal-<hub-env>.yaml
 ```
 
 Store it offline. See [Recover → Disaster recovery](../recover/disaster-recovery.md#what-the-adopter-must-keep).

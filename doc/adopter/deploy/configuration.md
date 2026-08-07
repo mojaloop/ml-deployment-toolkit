@@ -4,7 +4,7 @@
 
 **Audiences:** adopter (deploy)
 
-Two files describe an environment: `config.yaml` for what the deployment is, and `.env` for the credentials it needs from the outside world. Everything specific to a deployment lives in these; the adopter never edits the distribution.
+Four surfaces describe an environment: `config.yaml` for what the deployment is, `.env` for the credentials it needs from the outside world, and the optional `values/` and `patches/` directories for reaching past both. Everything specific to a deployment lives in these; the adopter never edits the distribution.
 
 - [Vocabulary](#vocabulary)
 - [Environment layout](#environment-layout)
@@ -32,7 +32,7 @@ Each environment is a directory under `environments/` at the repository root. `E
 ```
 environments/
   my-cc/
-    config.yaml        # what the deployment is
+    config.yaml        # what the deployment is (git-ignored)
     .env               # external credentials (git-ignored)
     values/            # optional Helm overrides (git-ignored)
     patches/           # optional manifest patches (git-ignored)
@@ -44,29 +44,28 @@ Environments are fully independent — their own config, secrets, and Terraform 
 
 State and generated artifacts land under `artifacts/<env>/` — see [System overview](../../architecture/system-overview.md#configuration-tiers).
 
-> **`environments/` is git-ignored, with two exceptions.** A fresh clone carries tracked samples at `environments/mlf-lab1-cc1/` (Tooling Cluster) and `environments/mlf-lab1-sw1/` (Hub), each holding a `config.yaml.sample` and a `.env.sample`. Copy a pair into a new directory and edit. Nothing else under `environments/` is ever tracked.
+> **`environments/` is git-ignored, except the tracked samples.** A fresh clone carries `environments/mlf-lab1-cc1/` (Tooling Cluster) and `environments/mlf-lab1-sw1/` (Hub), each holding a `config.yaml.sample` and a `.env.sample` — the Hub sample also ships performance-test samples (`perf-topology.yaml.sample`, `perf-scenarios/`). Copy a pair into a new directory and edit. Everything the adopter writes — `config.yaml` included — stays untracked.
 
 ## config.yaml
 
-`config.yaml` is a flat list of sections, one per **capability** — one dimension of the deployment, bound to a provider. Only `infra` and `dns` must be chosen; everything else defaults or is off.
+`config.yaml` is a flat list of sections, one per **capability** — one dimension of the deployment. Nine sections are required: `version`, `cluster`, `template`, `infra`, `dns`, `cert`, `registry`, `object_storage`, and `observability`. The three supporting-service sections are required even when off — `enabled: false` is stated, never implied by omission.
 
-| Section | Required | Choices | Default |
+| Section | Required | Keys | Default |
 |---------|:---:|---------|---------|
 | `version` | yes | `1` | — |
-| `cluster` | yes | `name`, `role`, `vip`, `lb_ipam.pools` (per-gateway `lan`/`wan`), `flux.version`, `gateway_class_name` | Flux `2.7.2`, GatewayClass `cilium` |
+| `cluster` | yes | `name`, `role`, `vip`, `lb_ipam.pools` (per-gateway `lan`/`wan`), `flux.version`, `gateway_class_name` | Flux `2.9.3`, GatewayClass `cilium` |
 | `template` | yes | a name under `config/templates/<role>/` | — |
-| `infra` | yes | `proxmox`, `aws`, `digitalocean` | — |
-| `dns` | yes | `digitalocean`, `cloudflare`, `route53` | — |
-| `cert` | no | `email` (ACME contact), `server` (ACME directory URL) | `admin@<dns.domain>`, Let's Encrypt production |
+| `infra` | yes | `provider` (`proxmox` \| `aws` \| `digitalocean`) plus its block — `proxmox.{placement, network_bridge, storage}`, `talos.{nameservers, ntp_servers}`, `aws.region`, `digitalocean` | — |
+| `dns` | yes | `provider` (`digitalocean` \| `cloudflare` \| `route53`), `domain` | — |
+| `cert` | yes | `email` (ACME contact), `server` (ACME directory URL) — both required, neither defaulted | — |
 | `artifact` | no | `url`, `version`, `active` — the gitops OCI artifact Flux reconciles | none — no Kustomizations created; `active` defaults to true once `url` is set |
-| `tooling` | no | the backing Tooling Cluster's domain | — |
-| `registry` | no | `tooling`, `harbor`, `none` | `none` (pull direct from upstream) |
-| `object_storage` | no | `tooling`, `s3`, `none` | `none` |
-| `observability` | no | `tooling`, `urls`, `none` | `none` |
-| `data` | no (Hub only) | per store: `in-cluster-managed`, `external-unmanaged` | `in-cluster-managed` |
-| `email` | no | SMTP relay for transactional mail | off |
-| `alerting` | no | Grafana contact points — email, Telegram | off |
-| `app` | no (Hub only) | `api_type`, hub identity, onboarding amounts | `fspiop`, `Hub` |
+| `registry` | yes | `enabled` + `url`; on a Tooling Cluster also `robots[]` | — |
+| `object_storage` | yes | `enabled` + `endpoint`, `bucket`, `region`; on a Tooling Cluster also `buckets[]` | — |
+| `observability` | yes | `enabled` + `loki_url`, `mimir_url`, `tempo_url` | — |
+| `data` | no (Hub only) | per store: `in-cluster-managed`, `external-unmanaged`, `external-managed` (reserved) + `host`/`port` for external modes | `in-cluster-managed` |
+| `email` | no | SMTP relay for transactional mail — `host`, `port`, `from` | off |
+| `alerting` | no | Grafana contact points — `email.to`, `telegram.chat_id` | off |
+| `app` | no (Hub only) | `api_type`, `hub.{participant_name, admin_email, onboarding.{funds_in, net_debit_cap}}` | `fspiop`, `Hub` |
 
 Three fields decide the shape of everything else:
 
@@ -78,7 +77,7 @@ Three fields decide the shape of everything else:
 
 Sample files carry a `# yaml-language-server: $schema=` header on the first line. An editor with the YAML language server gives autocomplete and inline errors against the real schema — keep that line when copying.
 
-**Address counts differ by role.** A Tooling Cluster needs two LB addresses; a Hub needs three, because it also has the FSPIOP endpoint. See [Networking](../../architecture/networking.md#load-balancer-addresses).
+**Address counts differ by role.** A Tooling Cluster needs two LB addresses; a Hub needs four, adding the FSPIOP endpoint and the machine-API gateway. See [Networking](../../architecture/networking.md#load-balancer-addresses).
 
 ## A Tooling Cluster, annotated
 
@@ -152,13 +151,13 @@ alerting:                             # Grafana contact points
 
 A Tooling Cluster carries no `data` and no `app` — it is the thing other clusters point at. It still declares all three supporting-service sections with `enabled: false`, since each is required and off is stated rather than implied by omission.
 
-**`object_storage.buckets` declares what this cluster serves** — the reverse of the section's meaning on a Hub, where it names the backup target to consume. Each declared bucket is created in MinIO alongside the system buckets (`harbor`, `backups`, `thanos`, `loki`, `tempo`, which always exist and cannot be re-declared) and gets a generated user scoped to that one bucket: the access key is the bucket name, the secret key is a generated secret named `minio_bucket_<name>_secret_key`. The convention is one bucket per Hub, named `<hub cluster.name>-backups`, so no Hub's credentials can touch another Hub's backups. Creation is additive and one-way — removing an entry stops managing the bucket but never deletes data.
+**`object_storage.buckets` declares what this cluster serves** — the reverse of the section's meaning on a Hub, where it names the backup target to consume. Each declared bucket is created in MinIO alongside the system buckets (`harbor`, `backups`, `thanos`, `loki`, `tempo`, which always exist and cannot be re-declared) and gets a generated user scoped to that one bucket: the access key is the bucket name, the secret key is a generated secret named `minio_bucket_<name>_secret_key` — with hyphens and dots in `<name>` becoming underscores, so bucket `my-switch-backups` yields `minio_bucket_my_switch_backups_secret_key`. The convention is one bucket per Hub, named `<hub cluster.name>-backups`, so no Hub's credentials can touch another Hub's backups. Creation is additive and one-way — removing an entry stops managing the bucket but never deletes data.
 
 One rotation caveat: the MinIO provisioning job creates users but never updates an existing user's secret key. Pinning a new `MINIO_BUCKET_<NAME>_SECRET_KEY` in `.env` after the user exists — or removing a bucket entry and re-declaring it later, which regenerates its key while the MinIO user survives with the old one — leaves `make secrets` printing a key MinIO does not have. To rotate, delete the user in MinIO first; the next reconcile recreates it with the current key.
 
-**`cert.email` is the ACME account contact and nothing else.** It replaces the old `app.alert_email`, which despite its name only ever reached Let's Encrypt. Alert destinations are `alerting:`.
+**`cert.email` is the ACME account contact and nothing else.** Alert destinations are `alerting:`.
 
-**`cert.server` selects the certificate authority and is required.** It sets the `server` of the `acme-prod` ClusterIssuer — the one the Gateways annotate, so it is the URL every platform certificate is actually issued from. There is no provider name to choose: the directory URL is the CA's identity, and it is stated outright rather than defaulted so the issuing authority is always visible in the config.
+**`cert.server` selects the certificate authority and is required.** It sets the `server` of the `acme-prod` ClusterIssuer — the one the Gateways annotate, so it is the URL every platform certificate is actually issued from. There is no provider name to choose: the directory URL is the CA's identity, stated outright rather than defaulted ([ADR-016](../../architecture/decisions/016-generic-acme-ca.md)).
 
 ```yaml
 cert:
@@ -173,14 +172,14 @@ cert:
 | ZeroSSL | `https://acme.zerossl.com/v2/DV90` | required |
 | SSL.com | `https://acme.ssl.com/sslcom-dv-rsa` | required |
 
-**Every public CA except Let's Encrypt requires External Account Binding** — a keyID and an HMAC key tying the ACME account to your account with that CA. Put both in `.env`; setting them is what switches EAB on, and there is no separate toggle:
+**Every public CA except Let's Encrypt requires External Account Binding** — a keyID and an HMAC key tying the ACME account to the adopter's existing account with that CA. Put both in `.env`; setting them is what switches EAB on, and there is no separate toggle:
 
 ```bash
 ACME_EAB_KEY_ID="..."
 ACME_EAB_HMAC_ENCODED="..."
 ```
 
-Obtain the pair from the CA: `gcloud publicca external-account-keys create` for Google Trust Services, the REST API for ZeroSSL, the web dashboard for SSL.com. **Paste the HMAC key exactly as given** — it is already base64url, and encoding it a second time produces `Invalid MAC on JWS request` at issuance. If your CA documents a different format, convert with:
+Obtain the pair from the CA: `gcloud publicca external-account-keys create` for Google Trust Services, the REST API for ZeroSSL, the web dashboard for SSL.com. **Paste the HMAC key exactly as given** — it is already base64url, and encoding it a second time produces `Invalid MAC on JWS request` at issuance. Should a CA document a different format, convert with:
 
 ```bash
 echo -n '<key>' | base64 -w0 | tr '+/' '-_' | tr -d '='
@@ -268,7 +267,7 @@ app:
 
 **`app.hub.admin_email` is the HubOps login for MCM and the Finance Portal.** The matching password is generated — read it with `make secrets` ([Secrets](#secrets)).
 
-Without `tooling`, a Hub is standalone: it pulls the artifact straight from a public registry, keeps no off-cluster backups, and ships no telemetry. That is a valid deployment, not a broken one.
+With all three supporting-service sections at `enabled: false`, a Hub is standalone: it pulls the artifact straight from a public registry, keeps no off-cluster backups, and ships no telemetry. That is a valid deployment, not a broken one.
 
 ## Deployment templates
 
@@ -276,8 +275,8 @@ Without `tooling`, a Hub is standalone: it pulls the artifact straight from a pu
 
 | Role | Templates |
 |------|-----------|
-| Tooling Cluster (`tooling`) | `small`, `medium` |
-| Hub (`hub`) | `tps-1`, `tps-10` |
+| Tooling Cluster (`tooling`) | `dev`, `small`, `medium` |
+| Hub (`hub`) | `dev`, `tps-1`, `tps-10` |
 | Platform-only (`bare`) | `small` |
 
 Hub templates are named for the transactions-per-second they are sized to sustain. Rationale in [ADR-012](../../architecture/decisions/012-tps-sizing-profiles.md); the current two-layer shape in [ADR-015](../../architecture/decisions/015-two-stack-capability-config.md).
@@ -354,11 +353,11 @@ Enabling a capability without its endpoints fails at plan time, naming the secti
 | `object_storage` | `endpoint`, `bucket`, `region` |
 | `observability` | `loki_url`, `mimir_url`, `tempo_url` |
 
-`object_storage.bucket` and `region` are required rather than defaulted: the former used to fall back to `backups` and the latter to `us-east-1`, so a Hub could back up to a bucket nobody named, or sign requests for the wrong region — both failing at backup time rather than at plan time.
+`object_storage.bucket` and `region` are required rather than defaulted ([ADR-017](../../architecture/decisions/017-explicit-capability-endpoints.md)) — a missing value fails at plan time instead of at backup time.
 
 Any S3-compatible endpoint works for `object_storage`, provided it speaks SigV4 with a static access key and presents a publicly-trusted certificate. A Tooling Cluster's MinIO and a native cloud endpoint are configured identically. Endpoints behind a private CA, and stores requiring path-style addressing, are not reachable by configuration today — the operators support both, but the toolkit does not yet expose the fields.
 
-Setting `object_storage.enabled: false` disables backups structurally: PSMDB and PXC backups and PITR are switched off and the Vault snapshot CronJob is suspended. This is deliberate rather than cosmetic — PSMDB refuses to mark a cluster ready, and to create its app users, while PBM cannot reach its storage. Turning it back on later restarts the mongod pods, since PBM sidecars are added.
+Setting `object_storage.enabled: false` disables backups structurally: PSMDB and PXC backups and PITR are switched off and the Vault snapshot CronJob is suspended. The switch-off is structural because PSMDB refuses to mark a cluster ready, and to create its app users, while PBM cannot reach its storage. Turning it back on later restarts the mongod pods, since PBM sidecars are added.
 
 **A Tooling Cluster must be reachable before the Hub deploys** — writing its URL down does not make it answer. See [Tooling Cluster → Hand-off to the Hub](tooling-cluster.md#hand-off-to-the-hub).
 
@@ -374,7 +373,7 @@ Read them back on demand:
 make secrets ENV=<env>
 ```
 
-That is also how a Hub's `.env` gets its Tooling Cluster credentials: `make secrets ENV=<tooling-env>` prints one `harbor_robot_<name>_secret` per robot declared under `registry.robots`, which becomes the Hub's `OCI_PROXY_PASSWORD` (its `OCI_PROXY_USERNAME` is `robot-<name>`), and one `minio_bucket_<name>_secret_key` per bucket declared under `object_storage.buckets`, which becomes the Hub's `BACKUP_S3_SECRET_KEY` (its `BACKUP_S3_ACCESS_KEY` is the bucket name). A Tooling Cluster with nothing declared falls back to the shared credentials — `admin` / `harbor_admin_password` and `minioadmin` / `minio_root_password` — workable, but admin credentials in a Hub's `.env` are exactly what the scoped accounts exist to avoid.
+That is also how a Hub's `.env` gets its Tooling Cluster credentials: `make secrets ENV=<tooling-env>` prints one `harbor_robot_<name>_secret` per robot declared under `registry.robots`, which becomes the Hub's `OCI_PROXY_PASSWORD` (its `OCI_PROXY_USERNAME` is `robot-<name>`), and one `minio_bucket_<name>_secret_key` per bucket declared under `object_storage.buckets`, which becomes the Hub's `BACKUP_S3_SECRET_KEY` (its `BACKUP_S3_ACCESS_KEY` is the bucket name). In both generated names, hyphens and dots in `<name>` become underscores. A Tooling Cluster with nothing declared falls back to the shared credentials — `admin` / `harbor_admin_password` and `minioadmin` / `minio_root_password` — workable, but admin credentials in a Hub's `.env` are exactly what the scoped accounts exist to avoid.
 
 **Supplied in `.env`.** Only credentials that exist outside the deployment:
 
@@ -414,7 +413,7 @@ environments/<env>/values/
 
 Each file becomes a `<name>-values-override` ConfigMap, referenced by the HelmRelease's `valuesFrom` as an optional entry — a missing file changes nothing. The name must match the HelmRelease, not the chart's upstream name: `psmdb-operator.yaml`, not `percona-mongodb.yaml`.
 
-**Your file is merged last, so it wins.** No HelmRelease uses inline `spec.values`; the distribution's own values ship as a `<name>-values` ConfigMap listed *first* in `valuesFrom`, and yours is listed last. Flux merges `valuesFrom` entries in order, later overwriting earlier, so the effective precedence is chart defaults → distribution values → your file. Setting a key the distribution also sets is the normal case, and it takes effect.
+**The adopter's file is merged last, so it wins** ([ADR-022](../../architecture/decisions/022-helm-values-layering.md)). No HelmRelease uses inline `spec.values`; the distribution's own values ship as a `<name>-values` ConfigMap listed *first* in `valuesFrom`, and the override is listed last. Flux merges `valuesFrom` entries in order, later overwriting earlier, so the effective precedence is chart defaults → distribution values → the adopter's file. Setting a key the distribution also sets is the normal case, and it takes effect.
 
 **Override files are templated**, with the same `${...}` syntax the artifact's manifests use — the config stack expands them before writing the ConfigMap, because Flux does not substitute inside a ConfigMap it did not render:
 
@@ -425,7 +424,7 @@ ingress:
 replicas: ${cl_service_replicas}
 ```
 
-Available variables are the cluster identity (`cluster_name`, `domain`), the resolved telemetry sinks (`loki_url`, `mimir_url`, `tempo_url`), and every key from the template's `app:`, `data:`, and `tooling:` sections. **Credentials are deliberately not available** — override files are for values, not secrets.
+Available variables are the cluster identity (`cluster_name`, `domain`), the resolved telemetry sinks (`loki_url`, `mimir_url`, `tempo_url`), and every key from the template's `app:`, `data:`, and `tooling:` sections. **Credentials are not available** — override files are for values, not secrets.
 
 Two consequences of real templating:
 
@@ -500,12 +499,12 @@ A YAML **list**. Each element is either a partial resource, where kustomize infe
 
 **Patches are templated**, exactly like values files: `${domain}`, `${cluster_name}`, the telemetry URLs, and every `app:` / `data:` / `tooling:` template key expand at apply time, an unknown `${name}` fails the apply, and a literal `${` must be written `$${`.
 
-**The distribution's own patches apply first, so yours win.** When `object_storage` is `none` the toolkit already patches the backup machinery off; a file of yours is appended after that list, and kustomize applies patches in order.
+**The distribution's own patches apply first, so the adopter's win.** When `object_storage` is disabled the toolkit already patches the backup machinery off; the adopter's file is appended after that list, and kustomize applies patches in order.
 
 ### Semantics worth knowing
 
 - **Maps merge, lists replace.** Adding `log.retention.hours` to `spec.kafka.config` leaves the other keys alone. Patching `spec.kafka.listeners` or a `tolerations` array replaces that array wholesale — kustomize has no schema for a CRD's lists and cannot merge them by key. To change one element, restate the whole list.
-- **Patches run before substitution.** The order is kustomize build → your patch → `${...}` substitution from `cluster-config`. A patch can therefore introduce a new `$${var}` hole for Flux to fill, but it cannot read an already-substituted value.
+- **Patches run before substitution.** The order is kustomize build → the adopter's patch → `${...}` substitution from `cluster-config`. A patch can therefore introduce a new `$${var}` hole for Flux to fill, but it cannot read an already-substituted value.
 - **A filename matching no Kustomization is ignored**, silently. Check the spelling against the list above if a patch appears to do nothing.
 - **A patch matching no resource fails the whole Kustomization.** kustomize errors with `no matches for target`, that Kustomization goes NotReady, and because `hub-app` depends on every `hub-data-<store>`, the applications stop reconciling until it is fixed. This is the one way a patch is more dangerous than a values file, which can only break its own release. Nothing validates the target ahead of time — expect this error from a typo in a resource name, or after an upgrade renames a resource.
 - **Operators reconcile their own fields.** Patching something Strimzi or Percona actively manages produces a drift loop rather than an error: the patch applies, the operator reverts it, Flux re-applies. Tune the fields the CR exposes as configuration, not the ones the operator computes.
@@ -528,8 +527,8 @@ This checks, in order: `config.yaml` against the JSON Schema, the selected templ
 
 Two properties of the schema checker are worth knowing:
 
-- **The validator refuses to ignore a constraint.** `tools/validate.py` implements a deliberate subset of JSON Schema, and any keyword outside that subset is reported as a schema error rather than skipped. A constraint added to a schema therefore either takes effect or fails loudly — it can never be silently ignored.
-- **The schemas have their own self-check.** `tools/test-validation.sh` runs 19 cases against the tracked samples — 2 that must be accepted and 17 that must be rejected — and is the place to add a case when a rule changes.
+- **The validator refuses to ignore a constraint.** `tools/validate.py` implements a subset of JSON Schema, and any keyword outside that subset is reported as a schema error rather than skipped. A constraint added to a schema therefore either takes effect or fails loudly — it can never be silently ignored.
+- **The schemas have their own self-check.** `tools/test-validation.sh` runs 27 cases against the tracked samples — 2 that must be accepted and 25 that must be rejected — and is the place to add a case when a rule changes.
 
 ### Rules that fail at plan time
 
@@ -540,7 +539,12 @@ Cross-field rules the schema cannot express are Terraform preconditions on the c
 | `version` is not `1` | `config.yaml` must declare the schema version it is written against |
 | `cluster.role` is not `tooling`, `hub`, or `bare` | The role selects both the template directory and the Kustomization set |
 | `cluster.name` resolves to an empty string | Set it, or let it default by naming the environment directory |
-| `cert.email` is unset | The ACME account contact the CA sends expiry notices to; no longer defaulted to `admin@<dns.domain>` |
+| `cert.email` is unset | The ACME account contact the CA sends expiry notices to; not defaulted |
+| `cert.server` is unset | The certificate authority is always stated, never inherited |
+| Self-managed infrastructure without `cluster.lb_ipam.pools` | On-prem clusters have no cloud load balancer; the pools are the address supply |
+| `gw-extapi` / `gw-intapi` pools missing on a Hub, or present on another role | The FSPIOP gateways exist only on `role: hub` — four pools there, two elsewhere |
+| Duplicate `lan` addresses, or a `lan` equal to `cluster.vip` | Every pool address and the API VIP must be distinct |
+| Duplicate `wan` addresses across pools | Each published outside address maps to one gateway |
 | Any `data.<store>.mode` is `external-managed` | Schema-reserved, not implemented — use `in-cluster-managed` or `external-unmanaged` |
 | An `external-unmanaged` store has no `host` | The endpoint cannot be derived for a store the toolkit does not deploy |
 | On `role: hub`, `app.api_type` is not `fspiop` or `iso20022` | The message dialect must be one the platform ships |
@@ -550,7 +554,11 @@ Cross-field rules the schema cannot express are Terraform preconditions on the c
 | `registry.enabled: true` without `registry.url` | An enabled capability must carry its parameters |
 | `object_storage.enabled: true` without all of `endpoint`, `bucket`, `region` | As above — none of the three is defaulted |
 | `observability.enabled: true` without all of `loki_url`, `mimir_url`, `tempo_url` | As above |
+| `object_storage.buckets` or `registry.robots` outside `role: tooling` | Serving buckets and robot accounts is what a Tooling Cluster does; a Hub consumes them |
+| A declared bucket re-states a system bucket, breaks S3 naming rules, or repeats | The system buckets (`harbor`, `backups`, `thanos`, `loki`, `tempo`) always exist; names must be valid and unique |
+| A declared robot name breaks the naming pattern or repeats | Robot names become Harbor accounts (`robot-<name>`) and secret names |
+| One of `ACME_EAB_KEY_ID` / `ACME_EAB_HMAC_ENCODED` without the other | EAB is both-or-neither; this one fails at `make plan-config`, in the config stack |
 
-The last three exist because an empty value would otherwise reach the cluster intact and fail at runtime instead. Since nothing is derived, these are the checks that catch a half-written section — see [ADR-017](../../architecture/decisions/017-explicit-capability-endpoints.md).
+The endpoint checks exist because an empty value would otherwise reach the cluster intact and fail at runtime instead. Since nothing is derived, these are the checks that catch a half-written section — see [ADR-017](../../architecture/decisions/017-explicit-capability-endpoints.md).
 
 Next: [Deployment](deployment.md).

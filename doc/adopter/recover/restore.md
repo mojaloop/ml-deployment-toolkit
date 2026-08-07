@@ -6,7 +6,7 @@
 
 Restoring MySQL, MongoDB, and Vault from backup. For rebuilding a whole cluster, see [Disaster recovery](disaster-recovery.md).
 
-> **There is no `make restore`.** Restore is driven by the database operators' own custom resources and by Vault's snapshot command. This page describes those mechanisms. The exact field names on a restore resource depend on the deployed operator version — **check the schema against the deployed operator's CRD before applying**, and rehearse in a lab before relying on it in production. The steps below are the shape, not a byte-for-byte script.
+> **There is no `make restore`.** Restore is driven by the database operators' own custom resources and by Vault's snapshot command. The manifests below match the deployed operators' CRDs — confirm with `kubectl explain pxc-restore.spec` / `kubectl explain psmdb-restore.spec` after an operator upgrade, and rehearse in a lab before relying on any of this in production.
 
 - [Before restoring](#before-restoring)
 - [MySQL](#mysql)
@@ -28,15 +28,35 @@ Everything data-layer is in the `data` namespace.
 
 Percona XtraDB Cluster restores through a `PerconaXtraDBClusterRestore` resource that the operator reconciles. It references the cluster and the backup storage — the storage name configured on the cluster is `s3-backup`.
 
-**Restore from a specific backup.** List what the operator has:
+**Restore from a specific backup.** List what the operator has, then apply a restore resource naming the cluster and the chosen backup:
 
 ```bash
 kubectl -n data get pxc-backup
 ```
 
-Then create a restore resource naming the cluster (`mojaloop-db`) and the chosen backup. Apply it in `data`, and the operator pauses the cluster, restores, and brings it back.
+```yaml
+apiVersion: pxc.percona.com/v1
+kind: PerconaXtraDBClusterRestore
+metadata:
+  name: restore-<date>
+  namespace: data
+spec:
+  pxcCluster: mojaloop-db
+  backupName: <name from pxc-backup>
+```
 
-**Point-in-time restore** uses the streamed binlogs to roll forward to a target time rather than restoring to a backup boundary. The restore resource takes a PITR section with the target — confirm its exact shape against the deployed operator version.
+The operator pauses the cluster, restores, and brings it back.
+
+**Point-in-time restore** uses the streamed binlogs to roll forward to a target time rather than restoring to a backup boundary — add a `pitr` section:
+
+```yaml
+spec:
+  pxcCluster: mojaloop-db
+  backupName: <the last full backup before the target time>
+  pitr:
+    type: date
+    date: "2026-08-07 12:00:00"
+```
 
 Watch the restore:
 
@@ -53,11 +73,26 @@ Percona Server for MongoDB restores through a `PerconaServerMongoDBRestore` reso
 
 ```bash
 kubectl -n data get psmdb-backup          # available backups
-# create a PerconaServerMongoDBRestore referencing bulk-mongodb + the backup
-kubectl -n data get psmdb-restore -w      # watch it
 ```
 
-Point-in-time restore uses the streamed oplog to a target time. As with MySQL, confirm the field layout against the deployed operator version before applying.
+```yaml
+apiVersion: psmdb.percona.com/v1
+kind: PerconaServerMongoDBRestore
+metadata:
+  name: restore-<date>
+  namespace: data
+spec:
+  clusterName: bulk-mongodb
+  backupName: <name from psmdb-backup>
+  # point-in-time — roll the oplog forward to a target:
+  # pitr:
+  #   type: date
+  #   date: "2026-08-07 12:00:00"
+```
+
+```bash
+kubectl -n data get psmdb-restore -w      # watch it
+```
 
 ## Vault
 
@@ -77,7 +112,7 @@ The outline:
 
 Restoring Vault rolls back **everything** it holds — the PKI, service credentials, participant certificate records — to the snapshot moment. Anything issued in the gap between the snapshot and the restore is gone. For the PKI specifically, that can mean a participant enrolled in that window is no longer known to the Hub and must re-enrol.
 
-Because Vault's window is short (about 1h45m of snapshots) and the blast radius is wide, a Vault restore is close to a rebuild. If the situation is that bad, read [Disaster recovery](disaster-recovery.md) first.
+Because Vault's window is short (90 minutes of snapshots) and the blast radius is wide, a Vault restore is close to a rebuild. If the situation is that bad, read [Disaster recovery](disaster-recovery.md) first.
 
 ## After restoring
 

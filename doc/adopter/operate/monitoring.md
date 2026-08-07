@@ -26,7 +26,7 @@ Open the **Switch Overview** dashboard first. It is the intended landing page �
 
 ## Dashboards
 
-Thirty-two dashboards ship pre-provisioned, in five folders:
+Forty-three dashboards ship pre-provisioned, in six folders:
 
 | Folder | Use it for |
 |--------|-----------|
@@ -34,7 +34,8 @@ Thirty-two dashboards ship pre-provisioned, in five folders:
 | **Infrastructure** | Nodes, cluster, pods, CoreDNS, Cilium, API server, storage, Proxmox hosts |
 | **Data Layer** | MySQL, PXC/Galera, Kafka, MongoDB, Redis |
 | **Platform** | cert-manager, external-dns, Vault, Ory, Oathkeeper, Flux |
-| **Mojaloop** | Transfer pipeline, account lookup, quoting, participant mTLS gateway, participant overview; for load tests and incidents, Performance Troubleshooting and Central Services Characterization |
+| **Mojaloop** | Transfer pipeline and journey, account lookup, quoting, participant mTLS gateway, participant overview; for incidents, Performance Troubleshooting, Central Services Characterization, and Slow/Failed Traces |
+| **Performance** | Transfer SLO, latency breakdown, capacity headroom, per-participant latency, the Kafka pipeline, the edge network path, and load-test runs |
 
 The full list and folder breakdown is in [Observability → Dashboards](../../architecture/observability.md#dashboards).
 
@@ -58,8 +59,8 @@ Use Grafana's **Explore** tab with the Loki datasource. Note the real namespaces
 # Errors across the Mojaloop app namespace
 {namespace="mojaloop"} |= "error" | logfmt
 
-# A specific service
-{namespace="mojaloop", pod=~"moja-central-ledger.*"}
+# A specific service — note the pod prefix has no hyphen in the service name
+{namespace="mojaloop", pod=~"moja-centralledger.*"}
 
 # Data layer
 {namespace="data"} |= "error"
@@ -71,9 +72,9 @@ Use Grafana's **Explore** tab with the Loki datasource. Note the real namespaces
 {namespace="flux-system"} |= "error"
 ```
 
-Logs are correlated with traces: a trace ID in a log line links straight into Tempo, and a span links back to its logs. Following a single transfer end to end usually starts from a log line, not a dashboard.
+When one Tooling Cluster aggregates several Hubs, add `cluster_name="<hub>"` to the selector — every stream is stamped with it, and `{namespace="mojaloop"}` alone interleaves every Hub's logs.
 
-One caveat when searching Tempo: traces are tail-sampled. Every error trace and every trace slower than 1 s is kept, but only 10% of healthy fast ones are. A missing trace for an unremarkable transfer is sampling, not an outage — the traces you actually need to debug (errors, SLO breaches) are always retained. See [Observability → Tracing](../../architecture/observability.md#tracing).
+Two things a Loki search will not show: Mojaloop's audit events (`audit: LOG_EVENT_TYPE` lines are dropped by the agent before shipping — their absence is filtering, not an outage), and every trace. Traces are tail-sampled ([ADR-023](../../architecture/decisions/023-tail-based-trace-sampling.md)): errors and traces slower than 1 s are always kept, healthy fast ones at 10% — a missing trace for an unremarkable transfer is sampling. Logs are correlated with the traces that exist: a trace ID in a log line links straight into Tempo, and a span links back to its logs. See [Observability → Tracing](../../architecture/observability.md#tracing).
 
 ## Node and OS health
 
@@ -111,4 +112,4 @@ Everything routes to one policy, grouped by alert name and cluster, repeating ev
 
 ## Retention
 
-Metrics, logs, and traces are kept **7 days** each. Adequate for a lab; production schemes with audit obligations will want longer, which is a retention and storage change — see [Observability → Retention](../../architecture/observability.md#retention).
+Logs, traces, and raw metrics are kept **7 days**; downsampled metrics persist longer. Adequate for a lab; production schemes with audit obligations will want longer, which is a retention and storage change — see [Observability → Retention](../../architecture/observability.md#retention).

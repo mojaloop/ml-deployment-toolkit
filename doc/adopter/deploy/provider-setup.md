@@ -91,7 +91,7 @@ Plan addresses before deploying:
 | Purpose | Count | Notes |
 |---------|-------|-------|
 | Kubernetes API VIP | 1 | `cluster.vip` — floating IP, same L2 as the nodes |
-| Node IPs | 1 per VM | Assigned by Talos; the deployment template sets the count |
+| Node IPs | 1 per VM | Leased over DHCP on the configured bridge; the deployment template sets the count |
 | LB-IPAM pools | 2 or 4 | `cluster.lb_ipam.pools` — one address per gateway |
 
 **The pool count differs by role.** A Tooling Cluster needs 2 addresses (`gw-int`, `gw-ext`). A Hub needs 4 — it adds the FSPIOP endpoints (`gw-extapi`, `gw-intapi`). Every address must sit outside the DHCP scope; overlap causes intermittent failures as addresses are handed out twice. Because each gateway's address is fixed in config, firewall rules can be written before the cluster exists.
@@ -121,7 +121,7 @@ Set the credential for the chosen provider in `.env`:
 
 | Provider | Variable(s) |
 |----------|-------------|
-| Route53 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` |
+| Route53 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` |
 | Cloudflare | `CLOUDFLARE_API_TOKEN` (scope `Zone:DNS:Edit`) |
 | DigitalOcean | `DIGITALOCEAN_TOKEN` |
 

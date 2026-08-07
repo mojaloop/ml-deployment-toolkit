@@ -18,12 +18,12 @@ Install these on the machine the adopter deploys from.
 
 | Tool | Version | Used for |
 |------|---------|----------|
-| Terraform | ≥ 1.0 | Provisioning — Make wraps it |
-| kubectl | ≥ 1.28 | Cluster access and verification |
+| Terraform | ≥ 1.5 | Provisioning — Make wraps it |
+| kubectl | ≥ 1.35 | Cluster access and verification — the shipped Kubernetes is 1.36, and kubectl supports one minor of skew |
 | Flux CLI | ≥ 2.0 | Inspecting and forcing reconciliation |
-| talosctl | latest | Talos node access and health (self-managed clusters) |
+| talosctl | matching the shipped Talos (v1.13) | Talos node access and health (self-managed clusters) |
 | make | any | Runs the workflow; pre-installed on macOS and Linux |
-| jq | any | Every target uses it to build the secrets map |
+| jq | any | Builds the secrets map for every target that loads `.env` |
 | yq | ≥ 4 | Reads `config.yaml` in `make validate` and `make push-gitops` |
 | python3 | ≥ 3.8 | Runs the JSON Schema check in `make validate` |
 
@@ -46,7 +46,7 @@ The DNS provider is independent of the infrastructure — any of the three works
 
 | Provider | Credential | Env variable |
 |----------|-----------|--------------|
-| Route53 | Access key with Route53 permissions | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` |
+| Route53 | Access key with Route53 permissions | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` |
 | Cloudflare | Token scoped to `Zone:DNS:Edit` | `CLOUDFLARE_API_TOKEN` |
 | DigitalOcean | Token with DNS write scope | `DIGITALOCEAN_TOKEN` |
 

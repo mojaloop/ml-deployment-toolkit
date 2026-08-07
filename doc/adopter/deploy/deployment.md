@@ -6,7 +6,7 @@
 
 The workflow that turns configuration into a running cluster. It is the same for a Tooling Cluster and a Hub — only `config.yaml` differs. Role-specific inputs and checks are in [Tooling Cluster](tooling-cluster.md) and [Hub](hub.md).
 
-- [The four phases](#the-four-phases)
+- [The five phases](#the-five-phases)
 - [Two stacks](#two-stacks)
 - [State is bound per environment](#state-is-bound-per-environment)
 - [Pre-deploy checks](#pre-deploy-checks)
@@ -16,16 +16,17 @@ The workflow that turns configuration into a running cluster. It is the same for
 - [Commands](#commands)
 - [Destroying](#destroying)
 
-## The four phases
+## The five phases
 
 ```mermaid
 flowchart LR
-    pre["Pre-checks<br/>DNS, config"] --> tf["Terraform<br/>VMs, Talos, Flux"]
-    tf --> flux["Flux<br/>reconciles workloads"]
+    pre["Pre-checks<br/>DNS, config"] --> tfi["Terraform infra<br/>VMs, Talos, Flux"]
+    tfi --> tfc["Terraform config<br/>Flux inputs"]
+    tfc --> flux["Flux<br/>reconciles workloads"]
     flux --> v["Verify"]
 ```
 
-**The adopter** runs the pre-checks and `make`. **Terraform** provisions VMs, boots Talos, forms the cluster, installs Flux, and writes the configuration Flux consumes — then exits. **Flux** keeps working after Terraform returns, pulling the artifact and reconciling everything else.
+**The adopter** runs the pre-checks and `make`. **The infra stack** provisions VMs, boots Talos, forms the cluster, and installs Flux. **The config stack** then writes everything Flux consumes — the `OCIRepository`, the Kustomization graph, `cluster-config` and `cluster-secrets` — in seconds. **Flux** keeps working after Terraform returns, pulling the artifact and reconciling everything else.
 
 That last point is the one to internalise: **the cluster is not finished when `make` returns.** Terraform hands off to Flux, and Flux takes several more minutes. A workload that never appears is a Flux question, not a Terraform one — re-running `make apply` will not summon it. See [GitOps structure](../../architecture/gitops-structure.md#how-flux-consumes-it).
 
@@ -35,7 +36,7 @@ Terraform is split into two roots with separate state, and knowing which one a c
 
 | Stack | Owns | State | Applies in |
 |-------|------|-------|-----------|
-| **infra** (`src/infra`) | VMs or managed cluster, Talos, Flux controllers | `artifacts/<env>/terraform/infra.tfstate` | minutes to tens of minutes |
+| **infra** (`src/infra`) | VMs or managed cluster, Talos, Flux controllers | `artifacts/<env>/terraform/infra.tfstate` | about five minutes |
 | **config** (`src/config`) | `OCIRepository`, Kustomizations, `cluster-config`, `cluster-secrets`, values overrides | `artifacts/<env>/terraform/config.tfstate` | seconds |
 
 The config stack has no provider that can address a VM, so a config-only change physically cannot disturb the cluster. `make plan-apply` runs both in order — infra first, then config against the real cluster.
@@ -47,7 +48,7 @@ The two stack directories, `src/infra` and `src/config`, are shared by every env
 Every make target that runs Terraform rebinds the backend to `ENV=` immediately before doing so — `plan`, `apply`, `destroy`, `secrets`, `list`, `show`, all of them. Two consequences worth knowing:
 
 - **Environments cannot cross-contaminate.** A command run with `ENV=a` operates on environment `a`'s state, whatever was initialised in that directory last.
-- **`ENV=` must always be passed.** Every target requires it and errors out immediately when it is missing, so there is no default environment to fall back on.
+- **`ENV=` must always be passed.** Every target that touches an environment requires it and errors out immediately when it is missing, so there is no default environment to fall back on.
 
 ## Pre-deploy checks
 
@@ -80,29 +81,23 @@ This schema-checks `config.yaml`, the selected template, and the provider mappin
 `ENV=` selects the environment — there is no default, always pass it.
 
 ```bash
-make plan-apply ENV=<env>
-```
-
-That initialises both stacks, plans and applies infra, then plans and applies config against the new cluster. It is the safer default once the config is known good, because nothing goes stale between plan and apply.
-
-To read a plan before it executes — worth doing on a first deploy and on any infrastructure change — run the steps explicitly:
-
-```bash
 make init ENV=<env>      # download providers, configure both backends
-make plan ENV=<env>      # plan both stacks
-make apply ENV=<env>     # apply the saved infra plan, then config
+make plan ENV=<env>      # plan both stacks — read the plan
+make apply ENV=<env>     # apply the saved infra plan, then plan and apply config
+# make plan-apply ENV=<env> chains all of the above without a pause to read the plan
 ```
 
-`make init` downloads and upgrades the provider plugins and configures the state backend for each stack. `make plan` runs it for both stacks anyway, so the explicit form is mostly there to make the step readable — and it is the one command that picks up new provider versions. Switching `ENV` needs no special handling: every target rebinds the backend to the environment it was given ([State is bound per environment](#state-is-bound-per-environment)).
+Reading the plan before it executes is worth doing on a first deploy and on any infrastructure change. `make apply` re-plans the config stack after infra has applied, so the sequence is safe on a fresh deploy — the config plan is made against the real cluster. `make plan` runs `init` for both stacks itself, so the explicit `init` is mostly there to make the step visible. Switching `ENV` needs no special handling: every target rebinds the backend to the environment it was given ([State is bound per environment](#state-is-bound-per-environment)).
 
 Then wait. Terraform provisions and hands off to Flux:
 
 | Phase | Tooling Cluster | Hub |
 |-------|:---:|:---:|
-| Terraform — VMs, Talos, Flux | ~15–20 min | ~20–30 min |
+| Terraform infra — VMs, Talos, Flux | ~5 min | ~5 min |
+| Terraform config — Flux inputs | seconds | seconds |
 | Flux — reconcile workloads | ~10–15 min | ~20–30 min |
 
-A Hub takes longer because its chain waits for databases to come up before running migrations. Apparent inactivity during these windows is normal.
+A Hub takes longer to reconcile because its chain waits for databases to come up before running migrations ([ADR-019](../../architecture/decisions/019-health-gated-reconciliation.md)). Apparent inactivity during these windows is normal.
 
 ## Changing configuration afterwards
 
@@ -172,7 +167,7 @@ All commands run from the repository root. `ENV=` selects the environment.
 
 | Command | Does |
 |---------|------|
-| `make init ENV=<env>` | Download and **upgrade** providers, configure both state backends. `plan` and `plan-apply` run it for you |
+| `make init ENV=<env>` | Download and **upgrade** providers, configure both state backends. `plan` and `plan-apply` run it first |
 | `make plan ENV=<env>` | Plan both stacks and save the plans |
 | `make apply ENV=<env>` | Apply the saved infra plan, then plan and apply config |
 | `make plan-apply ENV=<env>` | Plan and apply both stacks in order — avoids stale-plan errors |
@@ -196,7 +191,7 @@ These load the environment's `.env`, so they need `ENV=` like everything else.
 | Command | Does |
 |---------|------|
 | `make destroy ENV=<env>` | Destroy config then infra — 5-second cancel window |
-| `make destroy-fast ENV=<env>` | Destroy without refreshing state — 3-second window |
+| `make destroy-fast ENV=<env>` | Destroy skipping the state refresh on both stacks — 3-second window |
 | `make clean ENV=<env>` | Delete one environment's generated artifacts — kubeconfig, Talos config and secrets, saved plans. **Terraform state is preserved** |
 
 ## Destroying
@@ -205,6 +200,6 @@ These load the environment's `.env`, so they need `ENV=` like everything else.
 
 Across clusters, **destroy Hubs before the Tooling Cluster** they depend on — otherwise the Hubs lose their registry and secrets mid-teardown and the destroy can stall.
 
-**`make clean ENV=<env>` keeps the state.** It is scoped to one environment and removes only that environment's generated artifacts — `artifacts/<env>/kubernetes`, `talos`, `talos-config`, `talos-secrets`, and the two saved plan files. `artifacts/<env>/terraform/` is left untouched, deliberately: deleting state orphans running VMs and managed clusters, and loses the generated passwords held in `config.tfstate`. `ENV=` is required, as everywhere else.
+**`make clean ENV=<env>` keeps the state.** It is scoped to one environment and removes only that environment's generated artifacts — `artifacts/<env>/kubernetes`, `talos-config`, `talos-secrets`, and the two saved plan files. `artifacts/<env>/terraform/` is left untouched: deleting state orphans running VMs and managed clusters, and loses the generated passwords held in `config.tfstate`. `ENV=` is required, as everywhere else.
 
 The removed files are Terraform-managed copies — `kubeconfig`, `talosconfig`, the per-node machine configs, and `talos-secrets/secrets.yaml` are all written from infra state, so the next apply writes them back. The state is the authoritative copy, which is why it is the thing to back up. See [Recover → What the adopter must keep](../recover/disaster-recovery.md#what-the-adopter-must-keep).
