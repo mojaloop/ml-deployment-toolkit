@@ -2,8 +2,6 @@
 
 How documentation in `doc/` is written, structured, and maintained.
 
-`doc/` is the active documentation root. The older `docs/` tree is retained for reference and is **not maintained** — content is being verified and migrated here. Nothing in `doc/` should link into `docs/`.
-
 ## The rule that overrides every other rule
 
 **If a reader cannot execute it today, it does not ship.**
@@ -18,6 +16,22 @@ Two exceptions, both narrow and both explicit:
 
 This applies to architecture only. A *procedure* never contains an unimplemented step, and a WIP section never appears in a guide a reader is following to get something done.
 
+## What, why, how
+
+Every statement in `doc/` is one of three kinds, and each kind has exactly one home:
+
+| Kind | Home | Register |
+|------|------|----------|
+| **What** — the system as built: components, topology, mechanisms, interfaces, constraints, and their observable consequences | `architecture/` | Impersonal, present tense |
+| **Why** — the justification for a choice: context, alternatives considered, what was rejected and what that costs | `architecture/decisions/` | Historical record |
+| **How** — a procedure a named audience follows, plus the reference tables and known issues that serve it | `platform/`, `integrator/`, `adopter/`, and the [Integration Toolkit](https://github.com/mojaloop/integration-toolkit) for participants | Imperative |
+
+This file is the meta-how: the rules for writing the other three. Process rationale — why records are append-only, why forks stay narrow — belongs here or in the guide that applies it, never in an ADR.
+
+**The boundary test between what and why.** A sentence that could change because the project changed its mind — without the running system changing — is a *why* and belongs in a decision record. A sentence that describes what the running system does, and what follows from that, is a *what* — even when it is phrased with "because". *"`hub-auth` waits for the MySQL cluster to report ready, so a Hub takes longer to converge"* is a what. *"Gating on cluster health rather than object existence was chosen over retry loops because…"* is a why. Architecture states the mechanism and links the decision; it does not argue for it.
+
+**Reference placement.** Design facts live in `architecture/`; guides link to them. Interface facts — configuration keys, command tables, port lists, plan-time rules — live in the guide that serves them; architecture links to those. Both directions, one owner per fact.
+
 ## Audiences
 
 Five audiences, each with one core question. Every document declares its audience explicitly.
@@ -30,12 +44,7 @@ Five audiences, each with one core question. Every document declares its audienc
 | **Adopter** | *How do I run a Hub?* | Deploying and operating Mojaloop |
 | **Participant** | *How do I connect to a Hub?* | An institution joining an existing scheme |
 
-Adopter and Participant have distinct lifecycle phases and are split into journeys. Architect, Platform developer, and System integrator do not.
-
-| Audience | Journeys |
-|----------|----------|
-| Adopter | Deploy · Recover · Operate |
-| Participant | Integrate · Operate |
+Adopter journeys (Deploy · Recover · Operate) live in `adopter/`. **The participant journey lives in the [Integration Toolkit repository](https://github.com/mojaloop/integration-toolkit)** — a participant reads that documentation and nothing else. This repository keeps the hub side of the relationship: the [integration contract](architecture/participant-integration.md) and the adopter's onboarding procedure. `participant/index.md` is a signpost, nothing more.
 
 **Platform developer vs System integrator.** Both change code. The difference is where it lands: a platform developer contributes to this repository; a system integrator maintains a derivative and publishes their own OCI artifact. Configuration-level customization requires neither — it needs no fork and no code change, so it belongs to the Adopter (deploy) journey.
 
@@ -45,9 +54,11 @@ Reader-facing terms are fixed. Code identifiers are not renamed — they are map
 
 | Concept | Use | Never use | Code identifier |
 |---------|-----|-----------|-----------------|
-| Management-plane cluster | **Tooling Cluster** | Control Center, CC | `role: tooling` |
+| Optional cluster hosting the supporting services a Hub points at — registry and pull-through cache, backup target, telemetry sink | **Tooling Cluster** | Control Center, CC, management plane | `role: tooling` |
 | Mojaloop switch cluster | **Hub** | Switch, App Environment, env cluster, SW | `role: hub` |
 | Connecting institution | **Participant** | DFSP (in prose) | `dfsp`, `DFSP_ID` |
+
+A Tooling Cluster is a reference implementation of the three supporting-service endpoints, not a control plane: each endpoint may point anywhere — a Tooling Cluster, a cloud service, or the adopter's own hosts.
 
 `DFSP` remains correct when naming a code identifier, an environment variable, or a Mojaloop API field.
 
@@ -55,10 +66,10 @@ Reader-facing terms are fixed. Code identifiers are not renamed — they are map
 
 ```
 doc/
-  DOCUMENTATION.md            # This file — governance
+  DOCUMENTATION.md            # This file — governance (the meta-how)
   index.md                    # Entry point — routes by audience
 
-  architecture/               # Owns every design fact and rationale
+  architecture/               # What: every design fact, stated impersonally
     index.md
     system-overview.md
     provider-model.md
@@ -66,14 +77,14 @@ doc/
     networking.md
     security.md
     participant-mtls.md
-    participant-integration.md  # Onboarding choreography + interface contract
+    participant-integration.md  # The participant integration contract (versioned)
     observability.md
     data-layer.md
-    decisions/
+    decisions/                # Why: append-only records
       NNN-short-title.md
 
-  platform/                   # Contributors to this codebase
-  integrator/                 # Fork, customize, publish, rebase
+  platform/                   # How: contributors to this codebase
+  integrator/                 # How: fork, customize, publish, rebase
 
   adopter/
     index.md
@@ -82,16 +93,16 @@ doc/
     operate/                  # Monitoring, troubleshooting, day-2
 
   participant/
-    index.md
-    integrate/                # Connect to a Hub
-    operate/                  # Run the connection
+    index.md                  # Signpost to the Integration Toolkit
 ```
 
 ### Single source of truth
 
 Every fact lives in exactly one place. Other documents **link**. This is enforced strictly:
 
-- **Architecture owns all design facts.** Platform, integrator, adopter, and participant docs reference architecture; they never restate it.
+- **Architecture owns design facts** — mechanisms, topology, constraints. Guides reference them; they never restate them.
+- **Guides own their reference and known issues** — configuration keys, commands, ports, plan-time rules. Architecture links to them.
+- **Decision records own rationale.** A what-page states the mechanism and cites the ADR by number; it does not repeat the argument.
 - **Platform owns the internals reference** — module pipeline, adding providers and services, building artifacts. Integrator references it.
 - **Integrator owns only what is unique to maintaining a derivative** — what to fork, publishing the derivative artifact, version pinning, rebasing on upstream. It is thin by design.
 
@@ -103,24 +114,20 @@ see [Participant mTLS](architecture/participant-mtls.md#inbound-participant-to-h
 <!-- Bad: restating the architecture in a guide -->
 ```
 
-An explanation of *why* inside a procedure belongs in `architecture/`; the procedure links to it.
+### The integration contract and its mirrors
 
-### The one permitted duplication
+`architecture/participant-integration.md` is the **contract** between the Hub and the Integration Toolkit: the onboarding choreography, both interface tables — what the hub hands the participant, what the participant returns — and the protocol semantics both sides implement. It carries a revision number and a changelog.
 
-The participant onboarding choreography is a two-party sequence. Its diagram may appear in both the adopter and participant guides, because a reader on either side must see the whole exchange to know where they are.
+Because a participant reads only the Integration Toolkit's documentation, the contract material a participant needs day-to-day is **mirrored** there. Mirrors are the only sanctioned duplication, and each one:
 
-`architecture/participant-integration.md` is the canonical source. Copies carry a note saying so. The *procedures* are never duplicated — only the sequence diagram.
+- names its canonical source and section,
+- cites the contract revision it was written against.
 
-Each side of the choreography declares its interface explicitly:
-
-- **What the actor needs from the other party** (inbound)
-- **What the actor must hand back** (outbound)
-
-These two tables are what make the guides independently readable, and what will allow the participant half to move to the Integration Toolkit repository later as a clean cut rather than a rewrite.
+The contract page lists every mirror in a registry. A change to the hub side of the boundary bumps the contract revision **in the same PR**; a mirror citing an older revision is visibly stale on read.
 
 ## Decision tracing
 
-Every non-obvious design choice gets a record in `architecture/decisions/`. Records are **append-only**. A decision that no longer reflects the system gets a status update and a pointer to its successor — never deletion. This is the sole exception to the executability rule.
+Every non-obvious design choice gets a record in `architecture/decisions/`. Records are **append-only**. A decision that no longer reflects the system gets a status update and a pointer to its successor — never deletion. This is the sole exception to the executability rule. Append-only serves the reader: the reasoning stays useful even when the conclusion changes.
 
 ```markdown
 # NNN — Short title
@@ -220,16 +227,19 @@ Documentation is updated in the **same PR** as the code when:
 - A known issue appears or is fixed
 - A deployment or recovery procedure changes
 - A component is replaced
+- **Anything crossing the participant boundary changes** — the contract revision is bumped in the same PR
 
-That last one is not hypothetical. The auth stack was replaced without the documentation following, and the guides described a system the code could no longer run.
+That last group is not hypothetical. The auth stack was replaced without the documentation following, and the guides described a system the code could no longer run.
 
 ### Review checklist
 
 - [ ] Every command, path, and file referenced exists and runs today
 - [ ] Namespaces in `kubectl` commands match the manifests
 - [ ] Facts live in one place; other docs link
+- [ ] Rationale lives only in `architecture/decisions/`; what-pages cite ADRs by number
 - [ ] Links point to sections, not just pages
 - [ ] No planned or aspirational content
 - [ ] Audience declared, breadcrumb present
 - [ ] Mermaid diagrams use `<br/>` and no hardcoded fills; SVGs carry their own background
+- [ ] Mirrors of contract material name their canonical source and revision
 - [ ] Nothing added to `doc/` is orphaned
