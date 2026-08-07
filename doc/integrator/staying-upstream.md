@@ -19,14 +19,14 @@ This is the whole reason [the customization surface](customization-surface.md) p
 
 ## Rebasing on a release
 
-Upstream publishes tagged releases. Rebase onto a release tag, not onto a moving branch — a tag is a fixed, tested point; a branch keeps moving.
+Rebase onto a **fixed upstream point**, never onto a moving branch. Once upstream publishes release tags, that point is a tag; until then, it is a specific upstream commit, recorded in the derivative's version tag so the base stays identifiable.
 
 The shape of a rebase:
 
-1. **Pick the upstream release** to move to — a tag, not `main`.
+1. **Pick the upstream point** to move to — a release tag or a recorded commit, not `main`.
 2. **Rebase or merge the fork's changes onto it.** Narrow, additive changes should apply cleanly; edits to files upstream also changed are where conflicts land.
 3. **Re-render** anything derived — Thanos and the Cilium bootstrap manifest — if their upstream versions moved. See [Building artifacts → rendering](../platform/building-artifacts.md#rendering).
-4. **Verify.** This is the weak point — there is no test suite (see below), so verification is a real deployment to a lab environment and a walk through the [adopter verification](../adopter/deploy/deployment.md#verify-up-the-stack) and a test transaction.
+4. **Verify.** There is no CI, so verification is a real deployment to a lab environment and a walk through the [adopter verification](../adopter/deploy/deployment.md#verify-up-the-stack) and a test transaction. One automated check does exist: a fork that touches the config schemas runs `tools/test-validation.sh`, the schema self-check, before anything else.
 5. **Publish** the new derivative version, encoding the upstream base in the tag.
 
 ## What breaks, and where to look
@@ -51,6 +51,6 @@ Everything here reduces to a few habits:
 - **Prefer additions over edits.** A new file or module conflicts far less than a changed line in a shared one.
 - **Contribute genuinely general improvements upstream.** If a change would help more than the one client — a value-override wiring, a provider, a fix — [upstreaming it](../platform/index.md) removes it from the fork permanently. The best rebase is the one the integrator deleted the need for.
 - **Rebase often, in small steps.** Skipping several releases compounds conflicts; adopting each one keeps every rebase small.
-- **Verify against a lab every time.** With no automated safety net (`discrepancies.md` item D3 — no CI or tests), a real deployment is the only proof the rebase held. Do not skip it because the diff looked clean.
+- **Verify against a lab every time.** With no CI, a real deployment is the only proof the rebase held. Do not skip it because the diff looked clean.
 
 The through-line: the cheapest divergence is the one that is not in the fork. Spend effort at customization time finding the no-fork path, and every upgrade for the life of the client relationship costs far less.

@@ -18,7 +18,7 @@ Which Kustomization a service belongs in follows from which clusters need it and
 
 | Kustomization | For services that... |
 |---------------|----------------------|
-| `platform/` | Every cluster needs — cert-manager, ESO, external-dns, metrics-server |
+| `platform/` | Every cluster needs — cert-manager, ESO, external-dns, metrics-server, VPA, Goldilocks, reloader, the OpenTelemetry operator |
 | `talos/` | Only self-managed clusters need — CNI, storage, LB-IPAM |
 | `tooling*/` | Only the Tooling Cluster runs — registry, storage, observability backend |
 | `hub*/` | Only a Hub runs — data layer, auth, Mojaloop |
@@ -27,11 +27,11 @@ Match the reconciliation stage to the dependency. A service needing the database
 
 ## Adding a platform service
 
-A service is a HelmRelease (or raw manifests) added to the right Kustomization directory:
+Each service lives in its own subdirectory of the Kustomization root — `platform/cert-manager/`, `hub-auth/vault/` — holding its HelmRelease and its values file:
 
-1. **Add the manifest** — a `HelmRelease` referencing a `HelmRepository`, or plain YAML, in the chosen Kustomization directory.
-2. **Put the chart's values in `<release>-values.yaml`** beside the HelmRelease — never in `spec.values`. See the rule below.
-3. **Register both in that directory's `kustomization.yaml`** — the manifest under `resources:`, and the values file as a `configMapGenerator` entry. A resource not listed there is silently not applied. This is the most common omission.
+1. **Create `<root>/<service>/`** with the manifest — a `HelmRelease` referencing a `HelmRepository`, or plain YAML — as `<service>/helmrelease.yaml`.
+2. **Put the chart's values in `<service>/<service>-values.yaml`** beside it — never in `spec.values`. See the rule below.
+3. **Register both in the root's `kustomization.yaml`** — the manifest under `resources:` (`- <service>/helmrelease.yaml`), and the values file as a `configMapGenerator` entry. A resource not listed there is silently not applied. This is the most common omission.
 4. **Add a namespace** if the service needs its own — either a `Namespace` manifest or `install.createNamespace` on the HelmRelease, consistent with the neighbours.
 5. **Add a route** if it needs external access — an `HTTPRoute` attaching to `gw-int` or `gw-ext`, in the appropriate routes Kustomization. See [Networking](../architecture/networking.md).
 
@@ -42,7 +42,7 @@ Keep it provider-agnostic. If the service needs a value that varies by environme
 Flux merges a HelmRelease's inline `spec.values` *after* everything in `spec.valuesFrom`, so any value set inline cannot be overridden by an adopter. Every chart therefore ships its values in a ConfigMap listed first, with the adopter's override last:
 
 ```yaml
-# <release>-values.yaml, beside the HelmRelease — plain chart values, no wrapper
+# <service>/<service>-values.yaml, beside the HelmRelease — plain chart values, no wrapper
 replicaCount: ${some_template_key}
 ```
 
@@ -59,19 +59,19 @@ replicaCount: ${some_template_key}
 ```
 
 ```yaml
-# in the directory's kustomization.yaml
+# in the root's kustomization.yaml
 configMapGenerator:
   - name: <release>-values
     namespace: flux-system
     files:
-      - values.yaml=<release>-values.yaml
+      - values.yaml=<service>/<service>-values.yaml
 generatorOptions:
   disableNameSuffixHash: true
 ```
 
 Three details matter. The generated ConfigMap must be in `flux-system`, where the HelmReleases live, because `valuesFrom` resolves in the HelmRelease's namespace. `disableNameSuffixHash: true` is required rather than stylistic — Kustomize does not rewrite name references inside a CRD, so a hashed name would leave `valuesFrom` pointing at a ConfigMap that does not exist, and the chart would quietly deploy on bare defaults. And `${...}` substitution works normally inside the values file, because Flux renders it as part of the Kustomization.
 
-A chart that puts values inline still works, so nothing fails to alert you — it just silently removes that chart from the adopter's reach. `grep -rn '^  values:' gitops/` should return nothing.
+A chart that puts values inline still works, so nothing fails loudly — it just silently removes that chart from the adopter's reach ([ADR-022](../architecture/decisions/022-helm-values-layering.md)). `grep -rn '^  values:' gitops/` should return nothing.
 
 ## Wiring substitution values
 
@@ -92,7 +92,11 @@ The three existing providers — `route53`, `cloudflare`, `digitalocean` — are
 1. Create `gitops/dns/<provider>/` mirroring an existing provider's structure
 2. Configure the cert-manager `ClusterIssuer` DNS-01 solver for the provider
 3. Configure `external-dns` for the provider
-4. Document the credential and its environment variable
+4. **Register the name in the `dns.provider` enum** in `config/schemas/environment.schema.json` — the enum is closed, and `make validate` rejects an unlisted provider
+5. **Carry the credential through**: add its variable to `SECRET_KEYS` in the `Makefile` (or it never enters the secrets map) and to `dns_credentials` in `flux-config` (or it never reaches `cluster-secrets` for the manifests to substitute)
+6. Document the credential and its environment variable
+
+Steps 4–5 are the ones a half-added provider is missing — the manifests exist but the name fails validation, or the credential silently never arrives.
 
 The `dns` Kustomization deploys `gitops/dns/${dns_provider}/`, so the directory name must match the value adopters put in `dns.provider`. A DNS provider touches nothing in the infrastructure or application layers — that independence is the point.
 

@@ -38,7 +38,7 @@ The integrator can override the platform's Helm values for **any** chart the dis
 
 This covers a large amount of application-level tailoring — resource sizing, feature flags, chart-exposed settings — with zero maintenance burden, because the override lives in the client's environment. It reaches every value the distribution sets, not just the ones it leaves blank: no HelmRelease uses inline `spec.values`, the distribution's own values arrive as a `<name>-values` ConfigMap listed first in `valuesFrom`, and the client's file is listed last, so it wins.
 
-The files are templated: `${domain}`, `${cluster_name}`, the resolved telemetry URLs, and the template's tuning keys expand at apply time, so a client's override does not re-hardcode values the cluster already knows. Secrets are deliberately not exposed, and an unknown `${name}` fails the apply rather than passing through. See [Configuration → Helm value overrides](../adopter/deploy/configuration.md#helm-value-overrides).
+The files are templated: `${domain}`, `${cluster_name}`, the resolved telemetry URLs, and the template's tuning keys expand at apply time, so a client's override does not re-hardcode values the cluster already knows. Secrets are not exposed, and an unknown `${name}` fails the apply rather than passing through. See [Configuration → Helm value overrides](../adopter/deploy/configuration.md#helm-value-overrides).
 
 ## Manifest patches: no fork
 

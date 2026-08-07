@@ -22,13 +22,12 @@ The publishing mechanics are the [Platform guide → Building artifacts](../plat
 
 ## Fork and set the registry
 
-Fork the repository, make the [narrowest necessary changes](customization-surface.md#forking-carried-forever), and point publishing at the integrator's own registry. The client's `config.yaml` will reference this URL:
+Fork the repository, make the [narrowest necessary changes](customization-surface.md#forking-carried-forever), and point publishing at the integrator's own registry. The client's `config.yaml` will reference this URL in its `artifact` section:
 
 ```yaml
-oci:
-  repo:
-    url: "oci://<registry>/<distribution>"
-    version: "v1.0.0-acme"
+artifact:
+  url: "oci://<registry>/<distribution>"
+  version: "v1.0.0-acme"
 ```
 
 Use a versioning scheme that makes the derivative and its upstream base legible — encoding the upstream base version into the tag saves effort at rebase time, when the integrator needs to know which upstream release a published artifact corresponds to.
@@ -36,15 +35,15 @@ Use a versioning scheme that makes the derivative and its upstream base legible 
 ## Publish
 
 ```bash
-make release TAG=<version>
+make release ENV=<env> TAG=<version>
 ```
 
-`release` tags the commit, publishes the artifact to the integrator's registry, and moves `latest`. The fork inherits the whole publishing pipeline unchanged, so this works exactly as it does upstream — see [Building artifacts → versioning and promotion](../platform/building-artifacts.md#versioning-and-promotion).
+`release` tags the commit, publishes the artifact to the registry in that environment's `artifact.url`, and moves `latest`. The fork inherits the whole publishing pipeline unchanged, so this works exactly as it does upstream — see [Building artifacts → versioning and promotion](../platform/building-artifacts.md#versioning-and-promotion).
 
 Promote tested builds by moving tags rather than rebuilding:
 
 ```bash
-make tag-gitops TAG=stable
+make tag-gitops ENV=<env> GITOPS_VERSION=<version> TAG=stable
 ```
 
 Because artifacts are immutable and content-addressed, promoting a tested version to a client's channel points at the exact bytes the integrator verified — nothing changes between the integrator's testing and the client's deployment.

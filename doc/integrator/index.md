@@ -37,6 +37,6 @@ Most needs land on the left. The [customization surface](customization-surface.m
 
 Two things worth knowing before committing to maintaining a derivative:
 
-**There is no CI, no test suite, and no contribution tooling in the repository.** "Staying rebaseable" currently rests on discipline and manual verification, not on an automated safety net. That weighs on how far to diverge — the more the integrator changes, the more the integrator verifies by hand at each upgrade.
+**There is no CI in the repository.** The automated checks that exist are narrow — the schema self-check (`tools/test-validation.sh`) and `make validate` — so "staying rebaseable" rests mostly on discipline and manual verification. That weighs on how far to diverge — the more the integrator changes, the more the integrator verifies by hand at each upgrade.
 
 **`make release` already stamps provenance.** A published artifact carries its git source and revision, so the derivative is traceable to the exact commit that built it. That is the one piece of derivative-maintenance infrastructure that already works well, and [publishing](publishing.md) builds on it.

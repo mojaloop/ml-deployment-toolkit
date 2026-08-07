@@ -25,7 +25,14 @@ There are two Terraform roots, each with its own state ([ADR-015](../architectur
 
 Both instantiate `config-loader` from the same `environments/<env>/config.yaml`, so the resolved configuration is identical on either side. The config root declares no infrastructure provider, which is what makes `make apply-config` incapable of touching a VM.
 
-Adding a value that only Flux consumes is a config-stack change; adding one that shapes machines is an infra-stack change. A value both need is read from the same `config-loader` output twice, not passed between stacks — there is no cross-stack `terraform_remote_state` dependency, deliberately.
+Adding a value that only Flux consumes is a config-stack change; adding one that shapes machines is an infra-stack change. A value both need is read from the same `config-loader` output twice, not passed between stacks — there is no cross-stack `terraform_remote_state` dependency ([ADR-015](../architecture/decisions/015-two-stack-capability-config.md)).
+
+### The kubeconfig hand-off, and how state stays per-environment
+
+Two Makefile mechanisms carry the pipeline and are invisible in the module code:
+
+- **The placeholder kubeconfig.** The config stack's providers read `artifacts/<env>/kubernetes/kubeconfig` at plan time — before any cluster exists. The Makefile seeds a placeholder pointing at `https://127.0.0.1:1` whenever the file is absent, which is the only reason a fresh `make plan` can evaluate the config stack at all. The real file, written by the provider module, replaces it during apply. A stray placeholder later shows up as `kubectl` dialing `127.0.0.1:1`.
+- **Backend rebinding.** Both roots are shared by every environment; what separates environments is the state backend, and every Terraform-running target re-runs `terraform init -reconfigure` against `artifacts/<env>/terraform/` immediately before acting. Removing that rebinding makes `make destroy ENV=a` operate on whichever environment was initialised last — the mechanism is load-bearing, not ceremony.
 
 ## The chain
 
@@ -56,15 +63,13 @@ The first module in both stacks. It reads the environment's `config.yaml`, loads
 
 This is where the three configuration tiers collapse into one — see [Configuration tiers](../architecture/system-overview.md#configuration-tiers). Downstream modules never read `config.yaml` directly; they read config-loader's output. When the platform developer adds a configuration field, it flows through here.
 
-It also carries the cross-field validation JSON Schema cannot express, as `terraform_data` preconditions: the config version, `cluster.name` matching the environment directory, a `tooling` binding without a domain, an `external-unmanaged` store without a host, and `external-managed` being rejected outright. Add a new invariant here, next to the others, rather than in a consuming module.
+It also carries the cross-field validation JSON Schema cannot express, as `terraform_data` preconditions — the config version, the required `cert` fields, the LB-pool shape per role, the data-mode rules, the bucket and robot constraints, and more. The adopter-facing list is [Configuration → Rules that fail at plan time](../adopter/deploy/configuration.md#rules-that-fail-at-plan-time). Add a new invariant here, next to the others, rather than in a consuming module.
 
 ## Provider modules
 
-Each provider module has one contract: **provision a cluster and return a kubeconfig.** Nothing downstream knows or cares which provider ran.
+Each provider module has one contract: provision a cluster and return a kubeconfig at the agreed path ([ADR-024](../architecture/decisions/024-narrow-provider-boundary.md), [Provider model](../architecture/provider-model.md#what-the-provider-layer-owns)).
 
 The Proxmox path is composite — it provisions VMs (`proxmox-vm`), generates Talos machine configuration (`talos-gen-config`), and bootstraps the cluster (`talos-bootstrap`). The managed paths are single modules that create a managed cluster and write its kubeconfig.
-
-This narrow contract is the whole reason the toolkit is provider-agnostic. Everything above the kubeconfig is identical across providers, so a provider module never reaches up into DNS, TLS, or application concerns.
 
 ## flux-bootstrap
 
@@ -77,8 +82,9 @@ The largest module, the whole of the config stack, and the one that encodes the 
 - The **OCIRepository** pointing at the artifact
 - The **`cluster-config` ConfigMap** and **`cluster-secrets` Secret** — the substitution inputs
 - The **generated internal passwords** (`random_password`), one per name in the role's set, overridable by a matching UPPER_CASE entry in the supplied secrets map
-- One **values-override ConfigMap** per `environments/<env>/values/<name>.yaml`, named `<name>-values-override`. The config root templates the file before passing it in, so `${...}` in an override expands against the same non-secret variable set Flux substitutes with
-- The **Kustomization dependency graph** for the cluster's role, with `dependsOn` and health gates
+- One **values-override ConfigMap** per `environments/<env>/values/<name>.yaml`, named `<name>-values-override`. The config root templates the file before passing it in — against the deliberately small override variable set (cluster identity, telemetry URLs, and the template's tuning keys), not the full substitution map; an unknown `${name}` fails the apply
+- The **adopter's manifest patches** — each `environments/<env>/patches/<kustomization>.yaml` is appended to that Kustomization's `spec.patches`, after the distribution's own patch list
+- The **Kustomization dependency graph** for the cluster's role, with `dependsOn` and health gates ([ADR-019](../architecture/decisions/019-health-gated-reconciliation.md))
 
 The role (`tooling`, `hub`, `bare`) determines which Kustomizations exist and how they are chained; the data modes determine how many `hub-data-<store>` Kustomizations the fan-out has. The health gates — waiting on operators, on database readiness, on the Ory stack — live here. This is the module that makes a Hub converge in the right order; see [Reconciliation order](../architecture/system-overview.md#reconciliation-order).
 
