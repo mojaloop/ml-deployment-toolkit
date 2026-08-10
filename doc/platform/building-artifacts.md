@@ -30,7 +30,7 @@ make render-cilium   # Cilium bootstrap manifest from the Helm chart
 
 **Cilium** is rendered because it is fetched by Talos as an extra manifest at boot, before Flux exists. `make render-cilium` templates a minimal bootstrap manifest into `config/manifests/`. It carries a safety guard: if the render produces any `Secret` (which would mean private keys committed to git), the freshly written file is deleted and the target fails. Keep Hubble disabled in the render values so no TLS secrets are generated — the guard enforces this, and a render failure here usually means Hubble was enabled.
 
-Thanos rendering needs `jsonnet`, `jb`, and `yq`; the Cilium render needs `helm`.
+Thanos rendering needs `jsonnet`, `jb`, and `yq` — mikefarah/yq v4, not the Python `yq` from `apt` or `pip` ([Prerequisites → Tools](../adopter/deploy/prerequisites.md#tools)); the Cilium render needs `helm`.
 
 ## Publishing
 

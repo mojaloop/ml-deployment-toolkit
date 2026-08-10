@@ -11,8 +11,12 @@ make perf-run   ENV=<env> SCENARIO=<name>     run a scenario
 make perf-index                               regenerate INDEX.md
 ```
 
-Needs `k6`, `yq` and `jq`. Cluster access is optional and used only by
-`perf-check` and post-run health recording — load generation never needs it.
+Needs `k6`, `jq`, and [mikefarah/yq](https://github.com/mikefarah/yq) v4 — not
+the Python `yq` that `apt` and `pip` install, which is a `jq` wrapper and fails
+on the syntax these scripts use ([Prerequisites →
+Tools](../doc/adopter/deploy/prerequisites.md#tools)). Cluster access is
+optional and used only by `perf-check` and post-run health recording — load
+generation never needs it.
 
 ## Getting started
 

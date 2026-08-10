@@ -24,8 +24,25 @@ Install these on the machine the adopter deploys from.
 | talosctl | matching the shipped Talos (v1.13) | Talos node access and health (self-managed clusters) |
 | make | any | Runs the workflow; pre-installed on macOS and Linux |
 | jq | any | Builds the secrets map for every target that loads `.env` |
-| yq | ≥ 4 | Reads `config.yaml` in `make validate` and `make push-gitops` |
+| yq (mikefarah/yq) | v4 | Reads `config.yaml` in `make validate` and `make push-gitops` |
 | python3 | ≥ 3.8 | Runs the JSON Schema check in `make validate` |
+
+**`yq` must be [mikefarah/yq](https://github.com/mikefarah/yq).** Two different programs are called `yq`, and `apt install yq`, `dnf install yq` and `pip install yq` all give the other one — a Python wrapper around `jq` that reports its version as `3.x` and does not understand the `-o=json` and `eval-all` syntax this toolkit uses. It fails four layers downstream, in `jq`, with an error about multiplying `null`, so verify rather than assume:
+
+```bash
+yq --version                      # must print the mikefarah URL and v4.x
+printf 'a: 1\n' | yq -o=json '.'  # must print {"a": 1}
+```
+
+Install it with `brew install yq` (macOS) or `snap install yq` (Linux). Without snap, take the static binary — remove the apt package first, or two `yq`s coexist and PATH order decides which one runs:
+
+```bash
+sudo apt-get remove -y yq
+VER=v4.53.3; ARCH=$(dpkg --print-architecture)
+sudo curl -fsSL -o /usr/local/bin/yq \
+  "https://github.com/mikefarah/yq/releases/download/${VER}/yq_linux_${ARCH}"
+sudo chmod 0755 /usr/local/bin/yq
+```
 
 Working on the distribution itself — building artifacts, rendering manifests — also takes `helm`, `jsonnet`, and `jb`. Those belong to the [Platform](../../platform/index.md) guide, not to deploying.
 
