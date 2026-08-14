@@ -3,8 +3,8 @@
 # the config stack (src/config), which applies fast and cannot touch VMs.
 
 locals {
-  env_config_path = "../../environments/${var.env_name}/config.yaml"
-  artifacts_path  = "../../artifacts/${var.env_name}"
+  env_config_path = "${var.environments_dir}/${var.env_name}/config.yaml"
+  artifacts_path  = "${var.artifacts_dir}/${var.env_name}"
 
   # Read raw config for provider selection (before module.config expands it)
   config_raw    = yamldecode(file(local.env_config_path))

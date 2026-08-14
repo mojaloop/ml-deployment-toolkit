@@ -30,7 +30,7 @@ variable "cluster_name" {
 }
 
 variable "artifacts_folder" {
-  description = "Path to artifacts folder where kubeconfig will be written"
+  description = "Path to artifacts folder where kubeconfig will be written. Always passed explicitly by callers; the default matches the sibling project layout relative to a stack root."
   type        = string
-  default     = "../../artifacts"
+  default     = "../../../artifacts"
 }

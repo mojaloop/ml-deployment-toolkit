@@ -6,7 +6,8 @@
 # Run alone with: make apply-config ENV=<env>
 
 locals {
-  env_config_path = "../../environments/${var.env_name}/config.yaml"
+  env_dir         = "${var.environments_dir}/${var.env_name}"
+  env_config_path = "${local.env_dir}/config.yaml"
 
   # Non-secret variables an override file may reference as ${var}.
   # Flux cannot substitute inside a ConfigMap it does not render, so overrides
@@ -25,8 +26,8 @@ locals {
     { for k, v in module.config.template_tooling : k => tostring(v) },
   )
 
-  # Deployer Helm value overrides — environments/<env>/values/<chart>.yaml
-  values_dir = "../../environments/${var.env_name}/values"
+  # Deployer Helm value overrides — <env>/values/<chart>.yaml
+  values_dir = "${local.env_dir}/values"
   helm_value_overrides = {
     for f in try(fileset(local.values_dir, "*.yaml"), []) :
     trimsuffix(f, ".yaml") => templatefile("${local.values_dir}/${f}", local.override_vars)
@@ -42,7 +43,7 @@ locals {
   # merge cannot express. The try() chain distinguishes them: a string `patch`
   # passes through, a structured one is encoded, and anything without a `patch`
   # key is the resource itself.
-  patches_dir = "../../environments/${var.env_name}/patches"
+  patches_dir = "${local.env_dir}/patches"
   kustomize_patches = {
     for f in try(fileset(local.patches_dir, "*.yaml"), []) :
     trimsuffix(f, ".yaml") => [

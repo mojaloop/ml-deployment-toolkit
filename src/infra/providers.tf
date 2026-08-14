@@ -29,7 +29,7 @@ provider "aws" {
 # `make init` seeds a placeholder file on fresh deploys; its content is never
 # dialed because the real kubeconfig replaces it before providers configure.
 locals {
-  static_kubeconfig = "../../artifacts/${var.env_name}/kubernetes/kubeconfig"
+  static_kubeconfig = "${var.artifacts_dir}/${var.env_name}/kubernetes/kubeconfig"
   kubeconfig        = local.kubeconfig_path != null ? local.kubeconfig_path : local.static_kubeconfig
 }
 

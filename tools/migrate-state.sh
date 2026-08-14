@@ -6,7 +6,7 @@
 #
 # Default is a dry run: it prints every state operation without executing it.
 # Pass --apply to perform the migration. A timestamped backup of the original
-# state is always written to artifacts/<env>/terraform/ before any change.
+# state is always written to <artifacts-root>/<env>/terraform/ before any change.
 #
 # What it does:
 #   1. Backs up the existing terraform.tfstate.
@@ -20,7 +20,7 @@
 #                    module.flux_bootstrap, module.config (data only)
 #   config.tfstate : module.flux_config, module.config (data only)
 #
-# After migrating, rewrite environments/<env>/config.yaml to the new schema
+# After migrating, rewrite <environments-root>/<env>/config.yaml to the new schema
 # (see _/configuration/adopter-journey.md), then run:
 #   make validate ENV=<env> && make plan ENV=<env>
 # and confirm the infra plan is a no-op before applying.
@@ -36,7 +36,7 @@ if [[ -z "$ENV_NAME" ]]; then
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-STATE_DIR="$REPO_ROOT/artifacts/$ENV_NAME/terraform"
+STATE_DIR="${ARTIFACTS_ROOT:-$REPO_ROOT/../artifacts}/$ENV_NAME/terraform"
 OLD_STATE="$STATE_DIR/terraform.tfstate"
 INFRA_STATE="$STATE_DIR/infra.tfstate"
 CONFIG_STATE="$STATE_DIR/config.tfstate"
@@ -122,7 +122,7 @@ if [[ "$MODE" == "--apply" ]]; then
 else
   echo "Dry run complete — re-run with --apply to perform it. Then:"
 fi
-OLD_CLUSTER_NAME="$(yq -r '.cluster.name // ""' "$REPO_ROOT/environments/$ENV_NAME/config.yaml" 2>/dev/null || true)"
+OLD_CLUSTER_NAME="$(yq -r '.cluster.name // ""' "${ENVIRONMENTS_ROOT:-$REPO_ROOT/../environments}/$ENV_NAME/config.yaml" 2>/dev/null || true)"
 if [[ -n "$OLD_CLUSTER_NAME" && "$OLD_CLUSTER_NAME" != "$ENV_NAME" ]]; then
   cat <<WARN
 
@@ -135,7 +135,7 @@ WARN
 fi
 
 cat <<EOF
-  1. Rewrite environments/$ENV_NAME/config.yaml to the new schema.
+  1. Rewrite the environment's config.yaml to the new schema.
      Carry cluster.name over verbatim (see warning above, if any).
   2. Move secrets: keep only external credentials in .env; existing internal
      passwords stay honored if their UPPER_CASE names remain in .env

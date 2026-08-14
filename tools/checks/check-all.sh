@@ -10,7 +10,7 @@ cd "$ROOT"
 
 # Environment config.yaml files feed check-interface (P_* keys are forbidden there).
 ENV_CONFIGS=""
-for c in environments/*/config.yaml; do
+for c in "${ENVIRONMENTS_ROOT:-../environments}"/*/config.yaml; do
   [ -f "$c" ] && ENV_CONFIGS="$ENV_CONFIGS $c"
 done
 

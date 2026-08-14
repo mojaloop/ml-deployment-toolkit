@@ -5,7 +5,7 @@
 # a real apply — the infra stack rewrites the file first).
 
 locals {
-  kubeconfig = "../../artifacts/${var.env_name}/kubernetes/kubeconfig"
+  kubeconfig = "${var.artifacts_dir}/${var.env_name}/kubernetes/kubeconfig"
 }
 
 provider "kubernetes" {

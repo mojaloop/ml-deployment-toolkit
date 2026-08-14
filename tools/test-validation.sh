@@ -7,7 +7,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 SCHEMA=config/schemas/environment.schema.json
-BASE=environments/mlf-lab1-cc1/config.yaml.sample
+BASE=examples/environments/tooling/config.yaml.sample
 PASS=0
 FAIL=0
 
@@ -46,8 +46,8 @@ expect_accept() {
 }
 
 echo "--- positive cases ---"
-expect_accept "tooling sample" environments/mlf-lab1-cc1/config.yaml.sample
-expect_accept "hub sample" environments/mlf-lab1-sw1/config.yaml.sample
+expect_accept "tooling sample" examples/environments/tooling/config.yaml.sample
+expect_accept "hub sample" examples/environments/hub/config.yaml.sample
 
 echo "--- negative cases ---"
 expect_reject "unknown top-level key"      '.bogus = "x"'
