@@ -6,6 +6,8 @@
 **Status:** accepted
 **Audiences:** architect, platform developer
 
+> **Amended 2026-08-14 (config-layering refactor).** Generated output moved out of the clone: the contract path is now `../artifacts/<env>/kubernetes/kubeconfig`, rooted at `ARTIFACTS_ROOT` (default `../artifacts`, made absolute by the Makefile). The contract itself — provision a cluster, write the kubeconfig to that exact path — is unchanged, as is the vendor-Kustomization escape hatch.
+
 ## Context
 
 Supporting more than one infrastructure provider invites sprawl: provider conditionals leaking into DNS, TLS, observability, and application layers until every feature is written N times. The distribution needed a rule for where provider-specific behaviour is allowed to live before a second and third provider made the question urgent.

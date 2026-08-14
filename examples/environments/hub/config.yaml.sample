@@ -7,6 +7,11 @@
 # ------------------------------------------------------------------
 version: 1
 
+# DTK release this environment is written against. Asserted against the
+# clone's actual git tag at plan time — a mismatch fails, it never warns.
+# Uncomment and keep in lockstep with the checked-out DTK tag:
+# dtk_version: "v0.19.0"
+
 cluster:
   name: "my-switch"
   role: "hub"                         # tooling | hub | bare
@@ -22,7 +27,7 @@ cluster:
       gw-intapi:
         lan: "192.168.0.218"
 
-# Deployment template — config/templates/{role}/{template}.yaml
+# Deployment template — config/templates/<provider>/<role>/<template>.yaml
 template: "tps-10"
 
 infra:
@@ -63,10 +68,9 @@ artifact:
 # service, or your own hosts. The endpoints are written out below so the
 # values are visible and under your control.
 #
-# If a Tooling Cluster deployed by this toolkit backs all three, the
-# 'tooling' shorthand at the bottom of this section derives the same
-# five endpoints from its domain alone. It is convenience only: the
-# resulting configuration is identical either way.
+# If a Tooling Cluster deployed by this toolkit backs all three, point
+# these endpoints at that cluster's domain — the values below show the
+# pattern (registry.<tooling-domain>, s3.<tooling-domain>, …).
 # ------------------------------------------------------------------
 
 # Image pull-through cache (credentials OCI_PROXY_* in .env)

@@ -19,10 +19,10 @@ A Hub exposes four independent load-balanced addresses. Each has a different aud
 
 | Entry point | Hostname pattern | Audience | TLS |
 |-------------|-----------------|----------|-----|
-| `gw-int` | `*.int.${domain}` | In-house operations — web UIs | Server TLS, ACME CA |
-| `gw-ext` | `*.ext.${domain}` | External parties | Server TLS, ACME CA |
-| `gw-extapi` | `extapi.${domain}` | Participant FSPIOP traffic | **Mutual TLS**, scheme CA |
-| `gw-intapi` | `intapi.int.${domain}` | Machine APIs for scheme and participant tooling, without mTLS | Server TLS, ACME CA |
+| `gw-int` | `*.int.${DOMAIN}` | In-house operations — web UIs | Server TLS, ACME CA |
+| `gw-ext` | `*.ext.${DOMAIN}` | External parties | Server TLS, ACME CA |
+| `gw-extapi` | `extapi.${DOMAIN}` | Participant FSPIOP traffic | **Mutual TLS**, scheme CA |
+| `gw-intapi` | `intapi.int.${DOMAIN}` | Machine APIs for scheme and participant tooling, without mTLS | Server TLS, ACME CA |
 
 `gw-int`, `gw-ext`, and `gw-intapi` are Gateway API Gateways in `platform-system`. The FSPIOP mTLS endpoint is not — see [below](#the-fspiop-endpoint-is-not-a-gateway).
 
@@ -68,7 +68,7 @@ Participants authenticate at `hydra.ext` and manage their enrolment through `mcm
 
 ## The FSPIOP endpoint is not a gateway
 
-`extapi.${domain}` is a standalone Envoy deployment behind its own LoadBalancer service. It does not use Gateway API, and no HTTPRoute points at it. Cilium's Gateway cannot terminate mTLS for traffic originating outside the cluster, so this endpoint runs its own Envoy ([ADR-004](decisions/004-standalone-envoy-inbound-mtls.md)).
+`extapi.${DOMAIN}` is a standalone Envoy deployment behind its own LoadBalancer service. It does not use Gateway API, and no HTTPRoute points at it. Cilium's Gateway cannot terminate mTLS for traffic originating outside the cluster, so this endpoint runs its own Envoy ([ADR-004](decisions/004-standalone-envoy-inbound-mtls.md)).
 
 ```mermaid
 flowchart LR
@@ -112,9 +112,9 @@ Setting `wan` on a pool declares that the border firewall 1:1-DNATs that outside
 
 `external-dns` watches HTTPRoutes and Services and reconciles records automatically. The operator never pre-creates records for Hub services — hand-created records cause ownership conflicts.
 
-Every record is a **per-host A record**: one for each HTTPRoute hostname (`mcm.int.${domain}`, `settlement.int.${domain}`, …) pointing at its gateway's address, and one for the FSPIOP endpoint from the annotation on its Service. There are no wildcard DNS records — the wildcards exist only as certificate names.
+Every record is a **per-host A record**: one for each HTTPRoute hostname (`mcm.int.${DOMAIN}`, `settlement.int.${DOMAIN}`, …) pointing at its gateway's address, and one for the FSPIOP endpoint from the annotation on its Service. There are no wildcard DNS records — the wildcards exist only as certificate names.
 
-Note that `extapi.${domain}` sits at the apex level, not under `.int` or `.ext`.
+Note that `extapi.${DOMAIN}` sits at the apex level, not under `.int` or `.ext`.
 
 Participant FQDNs are the participant's own responsibility, in their own zone. The Hub never creates records for them, and each participant needs an individual record — there is no wildcard on that side.
 

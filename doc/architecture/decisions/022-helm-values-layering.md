@@ -6,6 +6,8 @@
 **Status:** accepted
 **Audiences:** architect, platform developer, system integrator
 
+> **Amended 2026-08-14 (config-layering refactor).** The override file now lives at `../environments/<env>/values/<namespace>/<release>.yaml` — the `<namespace>/<release>` path *is* the binding, with no header inside the file. The chain now ends with override *twins*, in order: a ConfigMap then a Secret, both named `<targetNamespace>-<release>-values-override`, both `optional: true`. The "no secrets" clause is refined rather than dropped: a values file that references a `.env` key lands in the Secret twin, while ConfigMap-destined content is templated without secrets, so a stray secret reference fails at plan. Tokens are `${UPPER_SNAKE}`, undefined still fails, and chain completeness is CI-checked (`check-valuesfrom`). The no-inline rule and the later-wins precedence are unchanged.
+
 ## Context
 
 An adopter must be able to override any chart value without forking the distribution. Flux offers two places to put values on a HelmRelease: inline `spec.values`, and a `valuesFrom` list of ConfigMaps merged in order, later entries overwriting earlier ones — with inline `spec.values` merged **after** the whole list. Anything the distribution writes inline therefore beats anything an adopter can supply without editing the manifest itself.

@@ -4,7 +4,7 @@ An infrastructure-agnostic distribution of [Mojaloop](https://mojaloop.io/) — 
 
 ## What it deploys
 
-Two cluster kinds, each driven from its own environment config under `environments/<env>/`.
+Two cluster kinds, each driven from its own environment config under `../environments/<env>/` — a sibling of the clone, owned by the adopter as its own git repository.
 
 ### Tooling Cluster (`role: tooling`)
 
@@ -22,20 +22,26 @@ A cluster running Mojaloop itself: central ledger, account lookup, quoting, sett
 
 A first deployment needs a provider account, a delegated DNS zone, and a few CLI tools — see [prerequisites](doc/adopter/deploy/prerequisites.md) and [provider setup](doc/adopter/deploy/provider-setup.md).
 
+The clone stays pristine — environments and generated artifacts live *beside* it, never inside it. Upgrading the toolkit is a checkout of a newer tag, never a rebase.
+
 ```bash
-# 1. Create the environment from a sample
-#    mlf-lab1-cc1 is the Tooling Cluster sample; mlf-lab1-sw1 the Hub sample
-mkdir -p environments/<env>
-cp environments/mlf-lab1-cc1/config.yaml.sample environments/<env>/config.yaml
-cp environments/mlf-lab1-cc1/.env.sample       environments/<env>/.env
+# 1. Clone into a project root — environments/ and artifacts/ will be siblings
+mkdir -p <project-root> && cd <project-root>
+git clone https://github.com/mojaloop/ml-deployment-toolkit.git
+cd ml-deployment-toolkit
 
-# 2. Choose capabilities, template, and parameters
-$EDITOR environments/<env>/config.yaml
+# 2. Copy a reference environment out of the clone and strip the .sample suffixes
+#    examples/environments/tooling is the Tooling Cluster sample; examples/environments/hub the Hub sample
+cp -R examples/environments/hub ../environments/<env>
+(cd ../environments/<env> && for f in $(find . -name '*.sample'); do mv "$f" "${f%.sample}"; done && git init)
 
-# 3. Supply external credentials only — internal service passwords are generated
-$EDITOR environments/<env>/.env
+# 3. Choose capabilities, template, and parameters; map placement groups to nodes;
+#    supply external credentials only — internal service passwords are generated
+$EDITOR ../environments/<env>/config.yaml
+$EDITOR ../environments/<env>/placement.yaml
+$EDITOR ../environments/<env>/.env        # never committed — the .gitignore ships with the sample
 
-# 4. Check it before spending time on a deploy
+# 4. Check it before spending time on a deploy (run from the clone root)
 make validate ENV=<env>
 
 # 5. Deploy
@@ -53,17 +59,19 @@ make apply-config ENV=<env>   # push config changes in seconds, without touching
 
 | Path | Contents |
 |---|---|
-| `environments/<env>/` | The deployment: `config.yaml`, `.env`, optional `values/` overrides and `patches/`, and the perf topology + scenarios |
-| `config/` | Templates (capacity + per-provider mappings), JSON Schemas, platform definitions, Talos patches, rendered bootstrap manifests |
+| `../environments/<env>/` | Adopter-owned sibling of the clone, each environment its own git repo: `config.yaml`, `.env`, `placement.yaml`, `proxmox/proxmox.yaml`, optional `values/` and `patches/`, and the perf topology + scenarios |
+| `../artifacts/<env>/` | Generated output outside the clone: Terraform state, kubeconfig, Talos configs — the adopter's own backup |
+| `config/` | Provider-specific templates + `params.yaml` (the provider interface), JSON Schemas, platform definitions, Talos patches, rendered bootstrap manifests |
+| `examples/environments/` | Reference environments (`hub/`, `tooling/`) as `.sample` files — copied out to start a deployment |
 | `src/infra/` | Terraform stack: cluster VMs / managed Kubernetes + Flux bootstrap |
 | `src/config/` | Terraform stack: everything Flux consumes (config, secrets, Kustomizations) |
 | `gitops/` | The distribution artifact — environment-neutral manifests |
 | `rendering/` | Sources for the rendered manifests (Thanos Jsonnet, Cilium values) |
 | `tools/` | Validation, schema self-check, state migration |
+| `tools-versions.yaml` | Pinned CLI tool floors (Terraform, Flux, yq, …) — checked as a hard gate before every apply |
 | `ttk/` | Testing Toolkit collections — hub provisioning |
 | `doc/` | The documentation — routed by audience |
 | `perf/` | Load generation and measurement — code only |
-| `artifacts/<env>/` | Generated per environment: state, kubeconfig, Talos configs (git-ignored) |
 
 Configuration and infrastructure are separate Terraform stacks with separate state, so a config change is a fast, low-risk `make apply-config` that cannot touch running VMs.
 
@@ -80,7 +88,7 @@ make perf-run   ENV=<env> SCENARIO=baseline-1tps
 make perf-index                            # regenerate perf/INDEX.md
 ```
 
-Copy `environments/mlf-lab1-sw1/perf-topology.yaml.sample` and the scenarios
+Copy `examples/environments/hub/perf-topology.yaml.sample` and the scenarios
 beside it into the environment to get started. Results land in
 `perf-result/<env>/<scenario>/<timestamp>/`, git-ignored — they stay local to
 the machine that ran them. See [perf/README.md](perf/README.md).

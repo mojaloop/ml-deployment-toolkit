@@ -14,20 +14,31 @@ Everything the adopter needs in place before the first `make plan-apply`. For wh
 
 ## Tools
 
-Install these on the machine the adopter deploys from.
+The toolchain is declared in `tools-versions.yaml` at the clone root, and enforced by a gate:
 
-| Tool | Version | Used for |
+```bash
+make check
+```
+
+That runs `tools/checks/check-tools.sh` (with the other repo contract checks) against the manifest — a missing or too-old required tool **fails**, it never warns, and the same check is a hard pre-apply gate. Run it before the first deploy rather than discovering a version problem mid-apply. The versions below mirror the manifest; the manifest is authoritative, and each floor's reason is recorded in it.
+
+| Tool | Minimum | Used for |
 |------|---------|----------|
-| Terraform | ≥ 1.5 | Provisioning — Make wraps it |
-| kubectl | ≥ 1.35 | Cluster access and verification — the shipped Kubernetes is 1.36, and kubectl supports one minor of skew |
-| Flux CLI | ≥ 2.0 | Inspecting and forcing reconciliation |
-| talosctl | matching the shipped Talos (v1.13) | Talos node access and health (self-managed clusters) |
+| terraform | 1.9.0 | The IaC engine — Make wraps it. **`terraform`, not `tofu`**: the committed `.terraform.lock.hcl` files are registry-specific, so mixing OpenTofu against the same stack invalidates the locks |
+| flux | 2.7.0 | Inspecting and forcing reconciliation. **The floor is load-bearing**: strict post-build substitution — fail on an undefined `${VAR}` — ships default-on with Flux 2.7; below it, an undefined token silently renders as an empty string in-cluster |
+| helm | 3.14.0 | Offline rendering of values chains and the Cilium bootstrap manifest |
+| talosctl | 1.8.0 | Machine config generation and node access (self-managed clusters) |
+| kubectl | 1.29.0 | Cluster verification and troubleshooting commands |
+| yq (mikefarah) | 4.40.0 | Reads `config.yaml` in `make validate` and `make push-gitops` |
+| jq | 1.7 | Builds the secrets map for every target that loads `.env` |
+| python3 | 3.9.0 | Runs the JSON Schema check in `make validate` |
 | make | any | Runs the workflow; pre-installed on macOS and Linux |
-| jq | any | Builds the secrets map for every target that loads `.env` |
-| yq (mikefarah/yq) | v4 | Reads `config.yaml` in `make validate` and `make push-gitops` |
-| python3 | ≥ 3.8 | Runs the JSON Schema check in `make validate` |
 
-**`yq` must be [mikefarah/yq](https://github.com/mikefarah/yq).** Two different programs are called `yq`, and `apt install yq`, `dnf install yq` and `pip install yq` all give the other one — a Python wrapper around `jq` that reports its version as `3.x` and does not understand the `-o=json` and `eval-all` syntax this toolkit uses. It fails four layers downstream, in `jq`, with an error about multiplying `null`, so verify rather than assume:
+`jsonnet` and `jb` are optional — only re-rendering the Thanos manifests (`make render-thanos`) needs them, and the gate merely warns when they are absent.
+
+**Terraform is the engine, and the providers come pre-locked.** Both stacks commit their `.terraform.lock.hcl`, locked for macOS and Linux on amd64 and arm64 — the adopter never re-locks providers. That is also why the engine choice is fixed: lock entries name their registry, so running `tofu` against a stack the locks were written for breaks them.
+
+**`yq` must be [mikefarah/yq](https://github.com/mikefarah/yq).** Two different programs are called `yq`, and `apt install yq`, `dnf install yq` and `pip install yq` all give the other one — a Python wrapper around `jq` that reports its version as `3.x` and does not understand the `-o=json` and `eval-all` syntax this toolkit uses. The gate detects and rejects it explicitly; to verify by hand:
 
 ```bash
 yq --version                      # must print the mikefarah URL and v4.x
@@ -43,8 +54,6 @@ sudo curl -fsSL -o /usr/local/bin/yq \
   "https://github.com/mikefarah/yq/releases/download/${VER}/yq_linux_${ARCH}"
 sudo chmod 0755 /usr/local/bin/yq
 ```
-
-Working on the distribution itself — building artifacts, rendering manifests — also takes `helm`, `jsonnet`, and `jb`. Those belong to the [Platform](../../platform/index.md) guide, not to deploying.
 
 ## Proxmox
 

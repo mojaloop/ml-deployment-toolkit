@@ -4,7 +4,7 @@
 
 **Audiences:** adopter (deploy)
 
-Four surfaces describe an environment: `config.yaml` for what the deployment is, `.env` for the credentials it needs from the outside world, and the optional `values/` and `patches/` directories for reaching past both. Everything specific to a deployment lives in these; the adopter never edits the distribution.
+An environment is described by a handful of files in its own directory: `config.yaml` for what the deployment is, `.env` for the credentials it needs from the outside world, `placement.yaml` and `proxmox/proxmox.yaml` for the facts about the hardware it lands on, and the optional `values/` and `patches/` directories for reaching past all of them. Everything specific to a deployment lives in these; the adopter never edits the distribution.
 
 - [Vocabulary](#vocabulary)
 - [Environment layout](#environment-layout)
@@ -27,24 +27,60 @@ Configuration values match the documentation's names: `role: tooling` deploys a 
 
 ## Environment layout
 
-Each environment is a directory under `environments/` at the repository root. `ENV=` selects it.
+Each environment is a directory under `../environments/` — a **sibling of the toolkit clone**, not inside it — and each environment is its own private git repository. `ENV=` selects it: `make` runs from the clone root and reads `$(ENVIRONMENTS_ROOT)/<name>/`, where `ENVIRONMENTS_ROOT` defaults to `../environments` (override it, like `ARTIFACTS_ROOT`, for a non-standard layout).
 
 ```
-environments/
-  my-cc/
-    config.yaml        # what the deployment is (git-ignored)
-    .env               # external credentials (git-ignored)
-    values/            # optional Helm overrides (git-ignored)
-    patches/           # optional manifest patches (git-ignored)
+<project root>/
+  ml-deployment-toolkit/     # the clone — pristine, read-only, checked out at a release tag
+  environments/
+    my-cc/                   # adopter-owned, its own git repository
+      config.yaml            # what the deployment is
+      .env                   # external credentials — never committed anywhere
+      placement.yaml         # placement groups -> physical nodes
+      proxmox/
+        proxmox.yaml         # network bridge and storage pools
+      values/                # optional Helm overrides — <namespace>/<release>.yaml
+      patches/               # optional manifest patches — <kustomization>.yaml
+  artifacts/
+    my-cc/                   # generated output + Terraform state — the adopter's own backup
 ```
 
-Environments are fully independent — their own config, secrets, and Terraform state. One repository clone manages any number of them. A Tooling Cluster and its Hubs are separate environments, each deployed with its own `make plan-apply ENV=<name>`.
+Environments are fully independent — their own repository, config, secrets, and Terraform state. One clone manages any number of them. A Tooling Cluster and its Hubs are separate environments, each deployed with its own `make plan-apply ENV=<name>`.
+
+**The clone stays pristine.** The adopter never commits to it — editing it is forking public software, and `make check-pristine` reports a dirty tree or an untagged checkout ([Validating](#validating)). Upgrading the clone is a `git checkout` of the next release tag, never a rebase.
+
+**The environment repository holds everything except `.env`.** Commit `config.yaml`, `placement.yaml`, `proxmox/proxmox.yaml`, `values/`, and `patches/`; the `.gitignore` shipped with the sample environments excludes `.env`, and it must never be committed anywhere — it holds the external credentials.
+
+Beside `config.yaml`, two small files carry the facts about the adopter's hardware, each schema-validated by `make validate`:
+
+```yaml
+# placement.yaml — which physical node each template placement group lands on
+version: 1
+placement:
+  pg-1: "pve-node-1"
+```
+
+```yaml
+# proxmox/proxmox.yaml — single-consumer overrides of the provider defaults
+version: 1
+network_bridge: "vmbr0"
+storage:
+  disks: "local-lvm"
+  images: "local"
+  snippets: "local"
+```
 
 **`cluster.name` defaults to the directory name** and can be omitted for a new deployment, so identity is normally one value rather than two. Set it explicitly only to keep a name a cluster already has — it is durable identity, becoming the external-dns record owner, the Vault backup prefix, and the VM name prefix, so changing it on a live cluster orphans its DNS records and forces VM replacement.
 
-State and generated artifacts land under `artifacts/<env>/` — see [System overview](../../architecture/system-overview.md#configuration-tiers).
+State and generated artifacts land under `../artifacts/<env>/` — a sibling of both repositories, tracked by neither — see [System overview](../../architecture/system-overview.md#configuration-tiers) and [Backups](../recover/backup.md#terraform-state).
 
-> **`environments/` is git-ignored, except the tracked samples.** A fresh clone carries `environments/mlf-lab1-cc1/` (Tooling Cluster) and `environments/mlf-lab1-sw1/` (Hub), each holding a `config.yaml.sample` and a `.env.sample` — the Hub sample also ships performance-test samples (`perf-topology.yaml.sample`, `perf-scenarios/`). Copy a pair into a new directory and edit. Everything the adopter writes — `config.yaml` included — stays untracked.
+> **Start from the reference environments.** The clone carries `examples/environments/hub/` and `examples/environments/tooling/`, each holding `config.yaml.sample`, `.env.sample`, `placement.yaml.sample`, and `proxmox/proxmox.yaml.sample` — the Hub sample also ships performance-test samples (`perf-topology.yaml.sample`, `perf-scenarios/`). From the clone root:
+>
+> ```bash
+> cp -R examples/environments/hub ../environments/<env>
+> ```
+>
+> Strip the `.sample` suffixes, edit, then `git init` the new directory as its own repository.
 
 ## config.yaml
 
@@ -53,12 +89,13 @@ State and generated artifacts land under `artifacts/<env>/` — see [System over
 | Section | Required | Keys | Default |
 |---------|:---:|---------|---------|
 | `version` | yes | `1` | — |
-| `cluster` | yes | `name`, `role`, `vip`, `lb_ipam.pools` (per-gateway `lan`/`wan`), `flux.version`, `gateway_class_name` | Flux `2.9.3`, GatewayClass `cilium` |
-| `template` | yes | a name under `config/templates/<role>/` | — |
-| `infra` | yes | `provider` (`proxmox` \| `aws` \| `digitalocean`) plus its block — `proxmox.{placement, network_bridge, storage}`, `talos.{nameservers, ntp_servers}`, `aws.region`, `digitalocean` | — |
+| `dtk_version` | no | the exact DTK release tag this environment is written against, e.g. `v0.19.0` | none — when set, the plan fails unless the clone is checked out at that tag |
+| `cluster` | yes | `name`, `role`, `vip`, `lb_ipam.pools` (per-gateway `lan`/`wan`), `flux.version` | Flux `2.9.3` |
+| `template` | yes | a name under `config/templates/<provider>/<role>/` | — |
+| `infra` | yes | `provider` (`proxmox` \| `aws` \| `digitalocean`), `talos.{nameservers, ntp_servers}` on Talos providers, `aws.region`, `digitalocean` — placement, bridge, and storage live in the sidecar files `placement.yaml` and `proxmox/proxmox.yaml`, not here | — |
 | `dns` | yes | `provider` (`digitalocean` \| `cloudflare` \| `route53`), `domain` | — |
 | `cert` | yes | `email` (ACME contact), `server` (ACME directory URL) — both required, neither defaulted | — |
-| `artifact` | no | `url`, `version`, `active` — the gitops OCI artifact Flux reconciles | none — no Kustomizations created; `active` defaults to true once `url` is set |
+| `artifact` | no | `url`, `version` (a pinned `vX.Y.Z` tag — `latest` is rejected by the schema), `active` — the gitops OCI artifact Flux reconciles | none — no Kustomizations created; `active` defaults to true once `url` is set |
 | `registry` | yes | `enabled` + `url`; on a Tooling Cluster also `robots[]` | — |
 | `object_storage` | yes | `enabled` + `endpoint`, `bucket`, `region`; on a Tooling Cluster also `buckets[]` | — |
 | `observability` | yes | `enabled` + `loki_url`, `mimir_url`, `tempo_url` | — |
@@ -71,9 +108,9 @@ Three fields decide the shape of everything else:
 
 | Field | Effect |
 |-------|--------|
-| `cluster.role` | Which Kustomizations deploy — `tooling` or `hub` — and which template directory is read |
+| `cluster.role` | Which Kustomizations deploy — `tooling` or `hub` — and, with `infra.provider`, which template directory is read |
 | `template` | Node count, machine sizing, replica counts, data-layer tuning |
-| `artifact.version` | `latest` follows publishes; a tag pins |
+| `artifact.version` | The exact platform release the cluster runs — always a pinned tag, bumped deliberately ([Upgrading](upgrading.md)) |
 
 Sample files carry a `# yaml-language-server: $schema=` header on the first line. An editor with the YAML language server gives autocomplete and inline errors against the real schema — keep that line when copying.
 
@@ -81,7 +118,7 @@ Sample files carry a `# yaml-language-server: $schema=` header on the first line
 
 ## A Tooling Cluster, annotated
 
-From `environments/mlf-lab1-cc1/config.yaml.sample`:
+From `examples/environments/tooling/config.yaml.sample`:
 
 ```yaml
 # yaml-language-server: $schema=../../config/schemas/environment.schema.json
@@ -98,18 +135,13 @@ cluster:
       gw-ext:
         lan: "192.168.0.212"
 
-template: "medium"                    # config/templates/tooling/medium.yaml
+template: "medium"                    # config/templates/proxmox/tooling/medium.yaml
 
 infra:
   provider: "proxmox"                 # proxmox | aws | digitalocean
-  proxmox:
-    placement:                        # template placement groups -> physical nodes
-      pg-1: "pve-node-1"
-    network_bridge: "vmbr0"
-    storage:
-      disks: "local-lvm"
-      images: "local"
-      snippets: "local"
+  # Provider infra facts live beside this file, not here:
+  #   placement.yaml       — placement groups -> physical nodes
+  #   proxmox/proxmox.yaml — network bridge, storage pools
   talos:                              # optional node OS overrides
     nameservers: ["8.8.8.8", "1.1.1.1"]
     ntp_servers: ["time.cloudflare.com"]
@@ -124,7 +156,7 @@ cert:
 
 artifact:
   url: "oci://ghcr.io/your-org/ml-deployment-toolkit"
-  version: "latest"                   # "latest" or a pinned tag
+  version: "v0.19.0"                  # a pinned vX.Y.Z tag — "latest" is rejected
 
 registry:
   enabled: false                      # Harbor lives on this cluster; nothing to proxy through
@@ -151,7 +183,7 @@ alerting:                             # Grafana contact points
 
 A Tooling Cluster carries no `data` and no `app` — it is the thing other clusters point at. It still declares all three supporting-service sections with `enabled: false`, since each is required and off is stated rather than implied by omission.
 
-**`object_storage.buckets` declares what this cluster serves** — the reverse of the section's meaning on a Hub, where it names the backup target to consume. Each declared bucket is created in MinIO alongside the system buckets (`harbor`, `backups`, `thanos`, `loki`, `tempo`, which always exist and cannot be re-declared) and gets a generated user scoped to that one bucket: the access key is the bucket name, the secret key is a generated secret named `minio_bucket_<name>_secret_key` — with hyphens and dots in `<name>` becoming underscores, so bucket `my-switch-backups` yields `minio_bucket_my_switch_backups_secret_key`. The convention is one bucket per Hub, named `<hub cluster.name>-backups`, so no Hub's credentials can touch another Hub's backups. Creation is additive and one-way — removing an entry stops managing the bucket but never deletes data.
+**`object_storage.buckets` declares what this cluster serves** — the reverse of the section's meaning on a Hub, where it names the backup target to consume. Each declared bucket is created in MinIO alongside the system buckets (`harbor`, `backups`, `thanos`, `loki`, `tempo`, which always exist and cannot be re-declared) and gets a generated user scoped to that one bucket: the access key is the bucket name, the secret key is a generated secret named `MINIO_BUCKET_<NAME>_SECRET_KEY` — with hyphens and dots in `<name>` becoming underscores, so bucket `my-switch-backups` yields `MINIO_BUCKET_MY_SWITCH_BACKUPS_SECRET_KEY`. The convention is one bucket per Hub, named `<hub cluster.name>-backups`, so no Hub's credentials can touch another Hub's backups. Creation is additive and one-way — removing an entry stops managing the bucket but never deletes data.
 
 One rotation caveat: the MinIO provisioning job creates users but never updates an existing user's secret key. Pinning a new `MINIO_BUCKET_<NAME>_SECRET_KEY` in `.env` after the user exists — or removing a bucket entry and re-declaring it later, which regenerates its key while the MinIO user survives with the old one — leaves `make secrets` printing a key MinIO does not have. To rotate, delete the user in MinIO first; the next reconcile recreates it with the current key.
 
@@ -191,7 +223,7 @@ Two caveats when changing CA on a running cluster. The ACME account key is named
 
 ## A Hub, annotated
 
-From `environments/mlf-lab1-sw1/config.yaml.sample`. The `cluster`, `infra`, `dns`, `cert`, and `artifact` sections have the same shape as above; what a Hub adds:
+From `examples/environments/hub/config.yaml.sample`. The `cluster`, `infra`, `dns`, `cert`, and `artifact` sections have the same shape as above; what a Hub adds:
 
 ```yaml
 version: 1
@@ -212,7 +244,7 @@ cluster:
       gw-intapi:
         lan: "192.168.0.218"
 
-template: "tps-10"                    # config/templates/hub/tps-10.yaml
+template: "tps-10"                    # config/templates/proxmox/hub/tps-10.yaml
 
 # Supporting services — each independent, each may point anywhere.
 # All three are required; endpoints are stated outright, never derived.
@@ -271,7 +303,7 @@ With all three supporting-service sections at `enabled: false`, a Hub is standal
 
 ## Deployment templates
 
-`template` names a file under `config/templates/<role>/`. Templates are provider-independent: they declare **node groups** and the service tuning that must scale with them.
+`template` names a file under `config/templates/<provider>/<role>/` — the file read is `config/templates/<provider>/<role>/<name>.yaml`, selected by `infra.provider`, `cluster.role`, and `template` together. Each provider carries its own complete set: a template is a full overlay for that provider, with no knobs or conditionals inside it. Templates declare **node groups** and the service tuning that must scale with them.
 
 | Role | Templates |
 |------|-----------|
@@ -295,9 +327,16 @@ node_groups:
     tags: [lab1]               # optional — extra Proxmox/cloud tags on every node
 ```
 
-Every node carries the tags `ml` and the cluster name; `tags` on a group adds to that list. `placement` is index-aligned — node `i` lands on `placement[i]`, wrapping when the list is shorter than `count`. The `pg-N` names are abstract; `infra.<provider>.placement` in `config.yaml` maps them to physical Proxmox nodes. Provide a mapping for every group the template references.
+Every node carries the tags `ml` and the cluster name; `tags` on a group adds to that list. `placement` is index-aligned — node `i` lands on `placement[i]`, wrapping when the list is shorter than `count`. The `pg-N` names are abstract; the environment's `placement.yaml` maps them to physical Proxmox nodes ([Environment layout](#environment-layout)). Provide a mapping for every group the template references — an unmapped group fails the plan.
 
-The concrete machine behind a workload class comes from `config/templates/mappings/<provider>.yaml` — VM defaults on Proxmox, instance types on AWS and DigitalOcean. That file is distribution-maintained; adopters do not edit it.
+### The provider interface: `params.yaml`
+
+Beside each provider's templates sits `config/templates/<provider>/params.yaml`, in two parts:
+
+- **`params`** — the provider interface: the `P_*` symbols the shared gitops manifests may reference — `P_GATEWAY_CLASS`, `P_STORAGE_CLASS`, `P_NODE_ROLE_LABEL_KEY`, `P_L2_INTERFACE_REGEX`, `P_KUBE_API_HOST`, `P_KUBE_API_PORT`. They resolve from `params.yaml` **only**; `config.yaml` can neither define nor shadow a `P_*` symbol, and a check enforces it. The GatewayClass is one of them: the former `cluster.gateway_class_name` key is gone, replaced by the provider's `P_GATEWAY_CLASS`.
+- **`infra`** — Terraform-consumed provider configuration: VM defaults on Proxmox, instance types on AWS and DigitalOcean.
+
+The file is distribution-maintained. Editing it is forking the distribution, and `make check-pristine` reports it. The `aws` and `digitalocean` interface values are marked unvalidated in the files themselves — second-provider validation is pending.
 
 ## Data modes
 
@@ -373,7 +412,7 @@ Read them back on demand:
 make secrets ENV=<env>
 ```
 
-That is also how a Hub's `.env` gets its Tooling Cluster credentials: `make secrets ENV=<tooling-env>` prints one `harbor_robot_<name>_secret` per robot declared under `registry.robots`, which becomes the Hub's `OCI_PROXY_PASSWORD` (its `OCI_PROXY_USERNAME` is `robot-<name>`), and one `minio_bucket_<name>_secret_key` per bucket declared under `object_storage.buckets`, which becomes the Hub's `BACKUP_S3_SECRET_KEY` (its `BACKUP_S3_ACCESS_KEY` is the bucket name). In both generated names, hyphens and dots in `<name>` become underscores. A Tooling Cluster with nothing declared falls back to the shared credentials — `admin` / `harbor_admin_password` and `minioadmin` / `minio_root_password` — workable, but admin credentials in a Hub's `.env` are exactly what the scoped accounts exist to avoid.
+That is also how a Hub's `.env` gets its Tooling Cluster credentials: `make secrets ENV=<tooling-env>` prints one `HARBOR_ROBOT_<NAME>_SECRET` per robot declared under `registry.robots`, which becomes the Hub's `OCI_PROXY_PASSWORD` (its `OCI_PROXY_USERNAME` is `robot-<name>`), and one `MINIO_BUCKET_<NAME>_SECRET_KEY` per bucket declared under `object_storage.buckets`, which becomes the Hub's `BACKUP_S3_SECRET_KEY` (its `BACKUP_S3_ACCESS_KEY` is the bucket name). In both generated names, hyphens and dots in `<NAME>` become underscores. A Tooling Cluster with nothing declared falls back to the shared credentials — `admin` / `HARBOR_ADMIN_PASSWORD` and `minioadmin` / `MINIO_ROOT_PASSWORD` — workable, but admin credentials in a Hub's `.env` are exactly what the scoped accounts exist to avoid.
 
 **Supplied in `.env`.** Only credentials that exist outside the deployment:
 
@@ -390,46 +429,53 @@ That is also how a Hub's `.env` gets its Tooling Cluster credentials: `make secr
 The SMTP host, port, sender, alert recipient, and Telegram chat ID are **not** secrets — they live in `config.yaml` under `email:` and `alerting:`.
 
 ```bash
-$EDITOR environments/<env>/.env
+$EDITOR ../environments/<env>/.env
 ```
+
+**`.env` is never committed anywhere.** The environment directory is a git repository, but the `.gitignore` shipped with the sample environments excludes `.env` — credentials live on the adopter's disk and in the adopter's own secure copy, nowhere else ([Disaster recovery → What the adopter must keep](../recover/disaster-recovery.md#what-the-adopter-must-keep)).
 
 Four things worth knowing:
 
 - **Any generated secret can be pinned** by setting its UPPER_CASE name in `.env` — `MYSQL_ROOT_PASSWORD`, `HARBOR_ADMIN_PASSWORD`, and so on. A non-empty value there is used verbatim and nothing is generated for that name; generation only kicks in for names that are absent or empty. This is how an `external-unmanaged` data store receives its credentials, and it is the migration path for an existing environment whose passwords must not rotate — see [Upgrading → Migrating an existing environment](upgrading.md#migrating-an-existing-environment).
 - **The Ory signing secrets are pinnable too.** `KRATOS_SECRETS_CIPHER`, `KRATOS_SECRETS_COOKIE`, `KRATOS_SECRETS_CSRF_COOKIE`, `KRATOS_SECRETS_DEFAULT`, `HYDRA_SECRETS_SYSTEM`, and `HYDRA_SECRETS_COOKIE` behave like the passwords. They matter more than most: rotating `KRATOS_SECRETS_CIPHER` makes stored credential and recovery material undecryptable, and rotating `HYDRA_SECRETS_SYSTEM` invalidates every issued token and consent grant.
 - **Proxmox variables are read natively** by the provider. `PROXMOX_VE_*` are used as-is.
-- **Generated passwords live in the config stack's Terraform state** (`artifacts/<env>/terraform/config.tfstate`) as well as in the cluster. Losing both loses the passwords — see [Disaster recovery](../recover/disaster-recovery.md#what-the-adopter-must-keep).
+- **Generated passwords live in the config stack's Terraform state** (`../artifacts/<env>/terraform/config.tfstate`) as well as in the cluster. Losing both loses the passwords — see [Disaster recovery](../recover/disaster-recovery.md#what-the-adopter-must-keep).
 
 ## Helm value overrides
 
-The adopter can override the platform's Helm values for **any** chart the distribution ships, without forking anything. Drop a file named for the HelmRelease in `values/`:
+The adopter can override the platform's Helm values for **any** chart the distribution ships, without forking anything. Drop a file at `values/<namespace>/<release>.yaml`, where `<namespace>` is the HelmRelease's target namespace and `<release>` is its name — the path is the binding, and the file body is plain Helm values with no header:
 
 ```
-environments/<env>/values/
-  mojaloop.yaml
-  grafana.yaml
-  loki.yaml
+../environments/<env>/values/
+  mojaloop/mojaloop.yaml
+  observability/grafana.yaml
+  observability/loki.yaml
 ```
 
-Each file becomes a `<name>-values-override` ConfigMap, referenced by the HelmRelease's `valuesFrom` as an optional entry — a missing file changes nothing. The name must match the HelmRelease, not the chart's upstream name: `psmdb-operator.yaml`, not `percona-mongodb.yaml`.
+Every HelmRelease's `valuesFrom` chain ends with the same pair of optional entries — a ConfigMap and then a Secret, both named `<targetNamespace>-<release>-values-override` — and the chain's completeness is checked by `tools/checks/check-valuesfrom.sh` (`make check`). The adopter's file becomes one of those two objects, so a missing file changes nothing. The path must match the HelmRelease and its target namespace, not the chart's upstream name: `values/hub-system/psmdb-operator.yaml`, not `percona-mongodb.yaml`.
 
-**The adopter's file is merged last, so it wins** ([ADR-022](../../architecture/decisions/022-helm-values-layering.md)). No HelmRelease uses inline `spec.values`; the distribution's own values ship as a `<name>-values` ConfigMap listed *first* in `valuesFrom`, and the override is listed last. Flux merges `valuesFrom` entries in order, later overwriting earlier, so the effective precedence is chart defaults → distribution values → the adopter's file. Setting a key the distribution also sets is the normal case, and it takes effect.
+**The adopter's file is merged last, so it wins** ([ADR-022](../../architecture/decisions/022-helm-values-layering.md)). No HelmRelease uses inline `spec.values`; the distribution's own values ship as a ConfigMap listed *first* in `valuesFrom`, and the override twins are listed last. Flux merges `valuesFrom` entries in order, later overwriting earlier, so the effective precedence is chart defaults → distribution values → the adopter's file. Setting a key the distribution also sets is the normal case, and it takes effect. One merge rule to remember: maps merge, **lists replace** — overriding one element of a list means restating the whole list.
 
-**Override files are templated**, with the same `${...}` syntax the artifact's manifests use — the config stack expands them before writing the ConfigMap, because Flux does not substitute inside a ConfigMap it did not render:
+**Override files are templated**, with the same `${UPPER_SNAKE}` token syntax the artifact's manifests use — the config stack expands them at apply time, because Flux does not substitute inside a ConfigMap it did not render:
 
 ```yaml
 ingress:
   hosts:
-    - "example.${domain}"
-replicas: ${cl_service_replicas}
+    - "example.${DOMAIN}"
+replicas: ${CL_SERVICE_REPLICAS}
 ```
 
-Available variables are the cluster identity (`cluster_name`, `domain`), the resolved telemetry sinks (`loki_url`, `mimir_url`, `tempo_url`), and every key from the template's `app:`, `data:`, and `tooling:` sections. **Credentials are not available** — override files are for values, not secrets.
+Available tokens are the cluster identity (`${CLUSTER_NAME}`, `${DOMAIN}`), the resolved telemetry sinks (`${LOKI_URL}`, `${MIMIR_URL}`, `${TEMPO_URL}`), and every key from the template's `app:`, `data:`, and `tooling:` sections, uppercased — the template's `cl_service_replicas` is referenced as `${CL_SERVICE_REPLICAS}`.
 
-Two consequences of real templating:
+### Substitution rules
 
-- **An unknown `${name}` fails the apply**, it is not left alone. That is the error to expect from a typo.
-- **A literal `${` must be escaped as `$${`** — relevant when a chart value itself carries shell or Helm-adjacent syntax.
+The same rules hold everywhere a `${...}` token appears — in the artifact's manifests, which Flux substitutes in-cluster from `cluster-config` and `cluster-secrets`, and in the environment's `values/` and `patches/` files, which Terraform templates at apply time:
+
+- **Only bare `${UPPER_SNAKE}`.** No operators or inline defaults (`${VAR:-fallback}` is not supported by either engine), and no `%{ ... }` directives in environment-authored files.
+- **An undefined token fails**, in both engines — Terraform errors at plan time; Flux fails the Kustomization rather than substituting an empty string. That is the error to expect from a typo.
+- **A literal `${` is written `$${`** — the one escape that both engines honor.
+
+**Secrets choose the object.** A values file that references a key from `.env` — or any generated secret name, like `${MYSQL_ROOT_PASSWORD}` — is rendered as the **Secret** override, with the secret values available to it. A file with no secret reference becomes the ConfigMap and is templated **without** secrets, so a stray secret reference in a ConfigMap-destined file hard-fails at plan time instead of landing a credential in a ConfigMap. Patches never carry secrets — see [Manifest patches](#manifest-patches).
 
 Override files belong to the config stack, so applying them is the fast path:
 
@@ -441,7 +487,7 @@ Seconds, no infrastructure plan, and Flux picks the change up on its next reconc
 
 ## Manifest patches
 
-Helm value overrides reach every chart the distribution ships, which leaves out everything the distribution ships as a plain manifest — most importantly **the data layer**. Kafka, MySQL, MongoDB, and Redis are deployed as custom resources handed to their operators (`Kafka`, `PerconaXtraDBCluster`, `PerconaServerMongoDB`, `Redis`), not as charts. A `values/kafka.yaml` has nothing to attach to.
+Helm value overrides reach every chart the distribution ships, which leaves out everything the distribution ships as a plain manifest — most importantly **the data layer**. Kafka, MySQL, MongoDB, and Redis are deployed as custom resources handed to their operators (`Kafka`, `PerconaXtraDBCluster`, `PerconaServerMongoDB`, `Redis`), not as charts. A `values/data/kafka.yaml` has nothing to attach to.
 
 The tuning those stores expose through `config.yaml` is the template's `data:` block, which substitutes six scalars:
 
@@ -452,10 +498,10 @@ The tuning those stores expose through `config.yaml` is the template's `data:` b
 | `mysql_innodb_buffer_pool_size`, `mysql_max_connections` | the PXC `[mysqld]` config |
 | `mysql_storage`, `mongodb_storage` | PXC / PSMDB volume sizes |
 
-Anything else — JVM heap, replica counts, resource requests, MongoDB cache sizing, every Redis setting — needs a patch. Drop a file named for the **Flux Kustomization** in `patches/`:
+Anything else — JVM heap, replica counts, resource requests, MongoDB cache sizing, every Redis setting — needs a patch. Drop a file named for the **Flux Kustomization** in `patches/` (flat, unlike the namespaced `values/` layout):
 
 ```
-environments/<env>/patches/
+../environments/<env>/patches/
   hub-data-kafka.yaml
   hub-data-mysql.yaml
   hub-data-mongodb.yaml
@@ -469,7 +515,7 @@ The name is the Kustomization, not the chart or the resource. The data layer's a
 A YAML **list**. Each element is either a partial resource, where kustomize infers the target from `apiVersion` / `kind` / `metadata.name`, or an explicit `{ target, patch }` entry carrying [JSON 6902](https://datatracker.ietf.org/doc/html/rfc6902) operations — the second form exists because a merge patch cannot remove a field:
 
 ```yaml
-# environments/<env>/patches/hub-data-kafka.yaml
+# ../environments/<env>/patches/hub-data-kafka.yaml
 
 # Partial resource — merged into the shipped Kafka
 - apiVersion: kafka.strimzi.io/v1
@@ -497,14 +543,14 @@ A YAML **list**. Each element is either a partial resource, where kustomize infe
       value: 5
 ```
 
-**Patches are templated**, exactly like values files: `${domain}`, `${cluster_name}`, the telemetry URLs, and every `app:` / `data:` / `tooling:` template key expand at apply time, an unknown `${name}` fails the apply, and a literal `${` must be written `$${`.
+**Patches are templated**, exactly like values files: `${DOMAIN}`, `${CLUSTER_NAME}`, the telemetry URLs, and every uppercased `app:` / `data:` / `tooling:` template key expand at apply time, an unknown `${NAME}` fails the apply, and a literal `${` must be written `$${` ([Substitution rules](#substitution-rules)). One difference: **patches never carry secrets** — they are templated without the secret values, so a secret reference in a patch fails at plan time by design.
 
 **The distribution's own patches apply first, so the adopter's win.** When `object_storage` is disabled the toolkit already patches the backup machinery off; the adopter's file is appended after that list, and kustomize applies patches in order.
 
 ### Semantics worth knowing
 
 - **Maps merge, lists replace.** Adding `log.retention.hours` to `spec.kafka.config` leaves the other keys alone. Patching `spec.kafka.listeners` or a `tolerations` array replaces that array wholesale — kustomize has no schema for a CRD's lists and cannot merge them by key. To change one element, restate the whole list.
-- **Patches run before substitution.** The order is kustomize build → the adopter's patch → `${...}` substitution from `cluster-config`. A patch can therefore introduce a new `$${var}` hole for Flux to fill, but it cannot read an already-substituted value.
+- **Patches run before substitution.** The order is kustomize build → the adopter's patch → `${...}` substitution from `cluster-config`. A patch can therefore introduce a new `$${VAR}` hole for Flux to fill, but it cannot read an already-substituted value.
 - **A filename matching no Kustomization is ignored**, silently. Check the spelling against the list above if a patch appears to do nothing.
 - **A patch matching no resource fails the whole Kustomization.** kustomize errors with `no matches for target`, that Kustomization goes NotReady, and because `hub-app` depends on every `hub-data-<store>`, the applications stop reconciling until it is fixed. This is the one way a patch is more dangerous than a values file, which can only break its own release. Nothing validates the target ahead of time — expect this error from a typo in a resource name, or after an upgrade renames a resource.
 - **Operators reconcile their own fields.** Patching something Strimzi or Percona actively manages produces a drift loop rather than an error: the patch applies, the operator reverts it, Flux re-applies. Tune the fields the CR exposes as configuration, not the ones the operator computes.
@@ -523,12 +569,17 @@ Deleting a patch file and re-applying reverts the field — the patch disappears
 make validate ENV=<env>
 ```
 
-This checks, in order: `config.yaml` against the JSON Schema, the selected template against the template schema, the provider mapping against the mapping schema, and then `terraform validate` on both stacks (skipped until `make init` has run).
+This checks, in order: `config.yaml` against the JSON Schema, the selected template (`config/templates/<provider>/<role>/<name>.yaml`) against the template schema, the provider's `params.yaml` against the params schema, the environment's `placement.yaml` and `proxmox/proxmox.yaml` (when present) against theirs, and then `terraform validate` on both stacks (skipped until `make init` has run).
+
+Two more gates sit beside it:
+
+- **`make check`** runs the repo contract checks in `tools/checks/` — substitution token syntax, the `valuesFrom` override twins, the `P_*` interface, secret placement, tool versions, and the rest. No `ENV=` needed.
+- **`make check-pristine ENV=<env>`** is the apply-time gate: a clean working tree, an exact release-tag checkout, and — when the environment pins `dtk_version` — that the clone's tag matches it.
 
 Two properties of the schema checker are worth knowing:
 
 - **The validator refuses to ignore a constraint.** `tools/validate.py` implements a subset of JSON Schema, and any keyword outside that subset is reported as a schema error rather than skipped. A constraint added to a schema therefore either takes effect or fails loudly — it can never be silently ignored.
-- **The schemas have their own self-check.** `tools/test-validation.sh` runs 27 cases against the tracked samples — 2 that must be accepted and 25 that must be rejected — and is the place to add a case when a rule changes.
+- **The schemas have their own self-check.** `tools/test-validation.sh` runs accept and reject cases against the tracked samples and is the place to add a case when a rule changes.
 
 ### Rules that fail at plan time
 
@@ -537,6 +588,7 @@ Cross-field rules the schema cannot express are Terraform preconditions on the c
 | Condition | What it means |
 |-----------|---------------|
 | `version` is not `1` | `config.yaml` must declare the schema version it is written against |
+| `dtk_version` is set and the clone is not checked out at that exact git tag | Environments and the clone version independently; the assert is what keeps "matched versions only" true — a mismatch fails, it does not warn |
 | `cluster.role` is not `tooling`, `hub`, or `bare` | The role selects both the template directory and the Kustomization set |
 | `cluster.name` resolves to an empty string | Set it, or let it default by naming the environment directory |
 | `cert.email` is unset | The ACME account contact the CA sends expiry notices to; not defaulted |
@@ -549,7 +601,7 @@ Cross-field rules the schema cannot express are Terraform preconditions on the c
 | An `external-unmanaged` store has no `host` | The endpoint cannot be derived for a store the toolkit does not deploy |
 | On `role: hub`, `app.api_type` is not `fspiop` or `iso20022` | The message dialect must be one the platform ships |
 | On `role: hub`, a non-Talos provider with any `in-cluster-managed` store | The in-cluster data layer is packaged for Talos providers only; on AWS or DigitalOcean every store must be `external-unmanaged`, or the cluster advertises hostnames that were never deployed |
-| The template references a placement group absent from `infra.<provider>.placement` | Unmapped groups reach the provider as literal node names and fail partway through apply, with VMs already created |
+| The template references a placement group absent from the environment's `placement.yaml` | Unmapped groups reach the provider as literal node names and fail partway through apply, with VMs already created |
 | The template has duplicate `node_groups[].name` | Group names become VM name suffixes and `for_each` keys |
 | `registry.enabled: true` without `registry.url` | An enabled capability must carry its parameters |
 | `object_storage.enabled: true` without all of `endpoint`, `bucket`, `region` | As above — none of the three is defaulted |

@@ -84,7 +84,7 @@ Two separate PKIs operate side by side, and confusing them is the most common so
 
 The scheme root is RSA 4096 with a 10-year lifetime, generated inside Vault and never exported. Two issuing roles sit under it: one constrained to the Hub's own domain for server certificates, one unconstrained for participant client certificates. Both issue RSA 4096 with a five-year ceiling.
 
-**The FSPIOP endpoint is the trap.** `extapi.${domain}` presents a certificate signed by the scheme CA, not by the public ACME CA — so it fails validation against the public trust store by design. It also rotates on a 30-day cycle, renewed at 15 days, while participant certificates are long-lived.
+**The FSPIOP endpoint is the trap.** `extapi.${DOMAIN}` presents a certificate signed by the scheme CA, not by the public ACME CA — so it fails validation against the public trust store by design. It also rotates on a 30-day cycle, renewed at 15 days, while participant certificates are long-lived.
 
 See [Participant mTLS](participant-mtls.md) for the full certificate lifecycle.
 

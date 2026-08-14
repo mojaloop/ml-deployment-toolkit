@@ -7,6 +7,11 @@
 # ------------------------------------------------------------------
 version: 1
 
+# DTK release this environment is written against. Asserted against the
+# clone's actual git tag at plan time — a mismatch fails, it never warns.
+# Uncomment and keep in lockstep with the checked-out DTK tag:
+# dtk_version: "v0.19.0"
+
 cluster:
   name: "my-cc"
   role: "tooling"                          # tooling | hub | bare
@@ -18,7 +23,7 @@ cluster:
       gw-ext:
         lan: "192.168.0.212"
 
-# Deployment template — config/templates/{role}/{template}.yaml
+# Deployment template — config/templates/<provider>/<role>/<template>.yaml
 template: "medium"
 
 infra:

@@ -20,7 +20,7 @@ The toolkit packages Terraform modules and FluxCD GitOps manifests into OCI arti
 
 ## What gets deployed
 
-Two cluster kinds, each driven from its own environment config under `environments/<env>/`. One picture of the whole thing: [the deployed system](architecture/system-overview.md#the-deployed-system).
+Two cluster kinds, each driven from its own environment directory under `../environments/<env>/` — a sibling of this clone, and its own git repository. One picture of the whole thing: [the deployed system](architecture/system-overview.md#the-deployed-system).
 
 **Tooling Cluster** — the optional supporting-services cluster. Harbor (OCI registry and pull-through cache), Vault, object storage, FluxCD, and the observability backend — a reference implementation of the endpoints a Hub points at, each of which may point anywhere. A single Hub can pull artifacts directly from a public OCI registry; the Tooling Cluster earns its place in multi-environment and air-gapped operation.
 
@@ -52,6 +52,7 @@ A system integrator sits between distribution and adoption, forking to customize
 ## Quick reference
 
 ```bash
+make check                   # Toolchain and repo contract checks — no ENV needed
 make validate ENV=<env>      # Schema-check the config before anything runs
 make plan-apply ENV=<env>    # Full deployment: infra stack, then config stack
 make apply-config ENV=<env>  # Fast path: config changes only, seconds
@@ -60,7 +61,7 @@ make push-gitops ENV=<env>          # Publish the gitops OCI artifact
 make release ENV=<env> TAG=<tag>    # Tag and publish a versioned artifact
 ```
 
-`ENV` selects the environment under `environments/`. There is no default environment in the repository — always pass `ENV=`.
+`ENV` selects the environment under `../environments/` — a sibling of the clone, created by copying a reference environment out of `examples/environments/` ([Configuration → Environment layout](adopter/deploy/configuration.md#environment-layout)). There is no default environment — always pass `ENV=`.
 
 Full command reference: [Deployment commands](adopter/deploy/deployment.md#commands)
 

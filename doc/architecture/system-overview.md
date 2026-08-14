@@ -112,17 +112,19 @@ Each link gates on the *health* of what the previous one produced, not on its ap
 
 ## Configuration tiers
 
-Configuration merges from three tiers at plan time.
+Configuration merges from three tiers at plan time, each tier layered over the one before it.
 
 | Tier | Owner | Contents | Location |
 |------|-------|----------|----------|
-| Environment | Adopter | Capability bindings, cluster name, domain, template name, external credentials, optional Helm value overrides and manifest patches | `environments/<env>/` — `config.yaml`, `.env`, `values/`, `patches/` |
-| Platform definitions | Distribution team | Talos and Kubernetes versions, capacity templates, provider mappings, patches, schemas | `config/definitions/`, `config/templates/`, `config/patches/`, `config/schemas/` |
-| Distribution artifact | Distribution team | GitOps manifests and Terraform modules | `gitops/`, `src/` |
+| Common gitops | Distribution team | Environment-neutral GitOps manifests and Terraform modules — the distribution artifact | `gitops/`, `src/` |
+| Provider template | Distribution team | A full overlay per provider — one file per role and tier, no knobs or conditionals — plus the provider interface and its Terraform-consumed `infra` block | `config/templates/<provider>/<role>/<name>.yaml`, `config/templates/<provider>/params.yaml` |
+| Environment | Adopter | Capability bindings, cluster name, domain, template name, placement, external credentials, optional Helm value overrides and manifest patches | `../environments/<env>/` — a sibling of the clone, each environment its own git repository: `config.yaml`, `.env`, `placement.yaml`, `values/`, `patches/` |
 
-The `config-loader` Terraform module merges them: it reads the environment config, loads the capacity template for the cluster's role and the mapping for its infrastructure provider, expands node groups into concrete machines, resolves each capability to concrete endpoints, and produces one unified configuration for downstream modules.
+Parameterization is **orthogonal to the tiers, not a tier of its own**: `config.yaml` and `.env` supply the values that `${UPPER_SNAKE}` tokens in any tier resolve to — they select and fill the layers rather than sitting between them.
 
-Adopters touch tier 1 only. Tiers 2 and 3 arrive in the artifact.
+The `config-loader` Terraform module merges the tiers: it reads the environment config, selects the template overlay from `config.yaml`'s `template` plus `cluster.role` and `infra.provider`, loads the provider's `params.yaml`, expands node groups into concrete machines, resolves each capability to concrete endpoints, and produces one unified configuration for downstream modules.
+
+Adopters touch the environment tier only. The other two arrive read-only in the clone; editing them is forking the distribution, and the pristine check reports it.
 
 Terraform itself is two stacks with separate state ([ADR-015](decisions/015-two-stack-capability-config.md)): **infra** (`src/infra`) builds the cluster and installs Flux; **config** (`src/config`) writes everything Flux consumes. Both load the same merged configuration; only the second can be applied on its own, with `make apply-config`.
 
@@ -134,18 +136,18 @@ The tiers above say who *owns* each input. This says how an input *reaches* a ru
 
 A value takes one of three routes.
 
-**Route 1 — substitution, for anything the distribution templated.** The artifact's manifests carry `${...}` placeholders. Terraform resolves the environment config into `cluster-config` and `cluster-secrets`, and every Flux Kustomization substitutes from that pair, so the placeholder becomes this environment's value at reconcile time:
+**Route 1 — substitution, for anything the distribution templated.** The artifact's manifests carry `${UPPER_SNAKE}` placeholders — bare names only, no operators or inline defaults. Terraform resolves the environment config into `cluster-config` and `cluster-secrets`, and every Flux Kustomization substitutes from that pair, so the placeholder becomes this environment's value at reconcile time:
 
 | Step | Where |
 |------|-------|
-| Capacity template tuning — replica counts, storage sizes, buffer pools | `config/templates/<role>/<name>.yaml`, sections `app:` / `data:` / `tooling:` |
-| Environment config — capability bindings, domain, cluster identity | `environments/<env>/config.yaml` |
-| Supplied credentials | `environments/<env>/.env` |
+| Template overlay tuning — replica counts, storage sizes, buffer pools | `config/templates/<provider>/<role>/<name>.yaml`, sections `app:` / `data:` / `tooling:` |
+| Environment config — capability bindings, domain, cluster identity | `../environments/<env>/config.yaml` |
+| Supplied credentials | `../environments/<env>/.env` |
 | Generated credentials — the ~20 internal service passwords | created by the config stack, never authored |
 | ↓ resolved by `config-loader`, written by the config stack | `cluster-config` ConfigMap + `cluster-secrets` Secret |
 | ↓ Flux `postBuild.substituteFrom` | the rendered manifest |
 
-Two things follow. A value only reaches a workload here if the distribution left a placeholder for it — substitution fills blanks, it does not introduce new settings. And because Flux re-reads both objects each reconcile, changing one is `make apply-config` (seconds, no infrastructure touched) rather than a redeploy.
+Substitution is **strict**: an undefined variable fails the reconcile rather than passing through, and a literal `${` is escaped as `$${...}`. Two things follow. A value only reaches a workload here if the distribution left a placeholder for it — substitution fills blanks, it does not introduce new settings. And because Flux re-reads both objects each reconcile, changing one is `make apply-config` (seconds, no infrastructure touched) rather than a redeploy.
 
 **Route 2 — Helm values, for chart settings.** Each HelmRelease composes its values from several sources, and the merge order decides the winner:
 
@@ -153,13 +155,15 @@ Two things follow. A value only reaches a workload here if the distribution left
 |:---:|--------|-------|
 | 1 | Upstream chart defaults | Chart author |
 | 2 | `<release>-values` ConfigMap, generated from `<release>-values.yaml` beside the HelmRelease (itself substituted by route 1) | Distribution |
-| 3 | `environments/<env>/values/<release>.yaml` → `<release>-values-override` ConfigMap | Adopter |
+| 3 | `../environments/<env>/values/<namespace>/<release>.yaml` → the override twins: a `<targetNamespace>-<release>-values-override` **ConfigMap**, then a **Secret** of the same name | Adopter |
+
+The override file's path *is* the binding — the `<namespace>/<release>` directory layout names the HelmRelease it targets, with no `target:` header inside the file. Every HelmRelease ends its `valuesFrom` chain with the two override twins, ConfigMap then Secret, both marked `optional`; a values file that references a `.env` key lands in the Secret twin, everything else in the ConfigMap.
 
 **Later wins, so the adopter's file beats the distribution's values.** Flux merges `valuesFrom` entries in the order listed, later overwriting earlier, and no HelmRelease uses inline `spec.values` ([ADR-022](decisions/022-helm-values-layering.md)). See [Configuration → Helm value overrides](../adopter/deploy/configuration.md#helm-value-overrides).
 
-**Route 3 — manifest patches, for anything the other two cannot reach.** `environments/<env>/patches/<kustomization>.yaml` is appended to that Flux Kustomization's `spec.patches`, after the distribution's own patches, so the adopter's patch wins. Patches apply during kustomize build — before substitution — so a patch may introduce a new `${...}` placeholder but cannot read an already-substituted value. See [Configuration → Manifest patches](../adopter/deploy/configuration.md#manifest-patches).
+**Route 3 — manifest patches, for anything the other two cannot reach.** `../environments/<env>/patches/<kustomization>.yaml` is appended to that Flux Kustomization's `spec.patches`, after the distribution's own patches, so the adopter's patch wins. Patches apply during kustomize build — before substitution — so a patch may introduce a new `${UPPER_SNAKE}` placeholder but cannot read an already-substituted value. Patches never carry secrets. See [Configuration → Manifest patches](../adopter/deploy/configuration.md#manifest-patches).
 
-Everything a workload consumes therefore arrives from one of: a chart default, a distribution decision in `gitops/`, a capacity template, the environment's config, a credential, an adopter values file, or an adopter patch — in that order of increasing specificity, with the most specific winning.
+Everything a workload consumes therefore arrives from one of: a chart default, a distribution decision in `gitops/`, a provider template overlay, the environment's config, a credential, an adopter values file, or an adopter patch — in that order of increasing specificity, with the most specific winning.
 
 See [Configuration](../adopter/deploy/configuration.md) for the schema, and [GitOps structure](gitops-structure.md) for how substitution works.
 

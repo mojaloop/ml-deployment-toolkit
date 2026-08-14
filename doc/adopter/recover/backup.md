@@ -27,7 +27,7 @@ Kafka and Redis have no backup — Kafka is a transport whose committed state la
 
 ## What the adopter must back up
 
-Two things sit outside every automatic backup, and both make a cluster unrecoverable if lost. Nothing in the toolkit backs them up.
+Three things sit outside every automatic backup, and each makes a cluster unrecoverable or unreproducible if lost. Nothing in the toolkit backs them up.
 
 ### Vault unseal keys
 
@@ -43,11 +43,17 @@ The operator derives the name from the Vault resource; with the shipped resource
 
 ### Terraform state
 
-State lives locally under `artifacts/<env>/terraform/`, in two files: `infra.tfstate` for the cluster and `config.tfstate` for everything Flux consumes. There is no remote backend, no locking, and no versioning; nothing but a copy protects them. (`make clean ENV=<env>` preserves `artifacts/<env>/terraform/` — it removes only the regenerable artifacts around it.) Losing the infra state means Terraform no longer knows about the infrastructure: the cluster keeps running, but the adopter can no longer plan, apply, or cleanly destroy it. Losing the config state loses Terraform's copy of the **generated internal service passwords**. While the cluster still runs they can be read back from the `cluster-secrets` Secret in `flux-system`; once both are gone they are gone. `make secrets ENV=<env>` reads the state file, not the cluster, so it stops working the moment that file does.
+State lives locally under `../artifacts/<env>/terraform/`, in two files: `infra.tfstate` for the cluster and `config.tfstate` for everything Flux consumes. The `../artifacts/` tree is a sibling of the clone and the environment repository, tracked by neither — there is no remote backend, no locking, and no versioning; nothing but a copy protects it. (`make clean ENV=<env>` preserves `../artifacts/<env>/terraform/` — it removes only the regenerable artifacts around it.) Losing the infra state means Terraform no longer knows about the infrastructure: the cluster keeps running, but the adopter can no longer plan, apply, or cleanly destroy it. Losing the config state loses Terraform's copy of the **generated internal service passwords**. While the cluster still runs they can be read back from the `cluster-secrets` Secret in `flux-system`; once both are gone they are gone. `make secrets ENV=<env>` reads the state file, not the cluster, so it stops working the moment that file does.
 
-Back up `artifacts/<env>/` — both state files — on every environment that matters. A copy after each successful `make apply` or `make apply-config` is enough.
+Back up `../artifacts/<env>/` — both state files — on every environment that matters. A copy after each successful `make apply` or `make apply-config` is enough.
 
-The toolkit does not discharge either of these on the adopter's behalf — treat them as standing operational tasks.
+### The environment repository and `.env`
+
+The environment directory `../environments/<env>/` is its own git repository, and its backup story is git's: give it a private remote and push. That covers `config.yaml`, `placement.yaml`, `proxmox/proxmox.yaml`, `values/`, and `patches/` — everything needed to reproduce the cluster's identity.
+
+**`.env` is the exception.** The shipped `.gitignore` keeps it out of the repository, and it must never be committed anywhere — so the remote does not protect it. Keep a secure copy out of band, with the same care as the Vault unseal keys: it holds every external credential the deployment uses.
+
+The toolkit does not discharge any of these on the adopter's behalf — treat them as standing operational tasks.
 
 ## Verifying backups
 

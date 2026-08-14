@@ -8,6 +8,8 @@
 
 Supersedes the profile mechanism of [ADR-012](012-tps-sizing-profiles.md); the TPS-tier naming it established is kept. Its own tooling-preset clause is in turn superseded by [ADR-017](017-explicit-capability-endpoints.md); the rest of this record stands.
 
+> **Amended 2026-08-14 (config-layering refactor).** Three mechanics below have moved on. Environments and generated output now live *outside* the clone, as siblings of it: `../environments/<env>/` (each environment its own private git repository) and `../artifacts/<env>/`, with state at `../artifacts/<env>/terraform/{infra,config}.tfstate`. Placement moved out of `config.yaml` into a `placement.yaml` sidecar per environment. And the two-layer template split — generic capacity template plus `config/templates/mappings/<provider>.yaml` — is replaced by provider-specific full overlays at `config/templates/<provider>/<role>/<name>.yaml`, with the mapping folded into `config/templates/<provider>/params.yaml`. The two stacks, the capability sections, the data modes, the generated internal secrets, and schema validation all stand.
+
 ## Context
 
 The configuration surface had grown to roughly seventy unvalidated parameters and forty secrets across two files per environment, and four separate problems had converged on it.

@@ -22,17 +22,19 @@ The publishing mechanics are the [Platform guide → Building artifacts](../plat
 
 ## Fork and set the registry
 
-Fork the repository, make the [narrowest necessary changes](customization-surface.md#forking-carried-forever), and point publishing at the integrator's own registry. The client's `config.yaml` will reference this URL in its `artifact` section:
+Fork the repository, make the [narrowest necessary changes](customization-surface.md#forking-carried-forever), and point publishing at the integrator's own registry. A derivative is forked *public* software, maintained visibly as such — the fork is the published thing, not a quietly patched clone; on an unmodified clone, `make check-pristine` is what verifies no accidental derivative has crept in. The client's `config.yaml` will reference the integrator's registry in its `artifact` section:
 
 ```yaml
 artifact:
   url: "oci://<registry>/<distribution>"
-  version: "v1.0.0-acme"
+  version: "v1.2.0"
 ```
 
-Use a versioning scheme that makes the derivative and its upstream base legible — encoding the upstream base version into the tag saves effort at rebase time, when the integrator needs to know which upstream release a published artifact corresponds to.
+`artifact.version` must be a pinned `vX.Y.Z` — the schema rejects `latest` — so every client deployment names the exact derivative release it runs. Keep the derivative's release tags legible against their upstream base — record which upstream release each derivative version was built on — because at rebase time the integrator needs to know which upstream release a published artifact corresponds to.
 
 ## Publish
+
+Run `make check` first — the local `tools/checks/` suite is the pre-release gate, and a derivative inherits it unchanged. Then:
 
 ```bash
 make release ENV=<env> TAG=<version>

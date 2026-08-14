@@ -37,7 +37,7 @@ The adopter cannot generate the participant's credentials for them — the autho
 - **SMTP is working.** The activation email is sent by the Hub's Kratos courier (`ory` namespace) using the `email:` configuration; without SMTP, the participant never receives it and cannot proceed. Confirm it before creating anyone — and when a mail goes missing, the courier's logs are the place to look, not MCM's.
 - Each participant needs a **distinct email address** — MCM keys account activation on it.
 
-The adopter works in MCM at `https://mcm.int.<domain>`, using the HubOps login — `app.hub.admin_email` from `config.yaml`, and the generated `hub_admin_password` from `make secrets ENV=<hub-env>`.
+The adopter works in MCM at `https://mcm.int.<domain>`, using the HubOps login — `app.hub.admin_email` from `config.yaml`, and the generated `HUB_ADMIN_PASSWORD` from `make secrets ENV=<hub-env>`.
 
 ## 1. Create the participant
 
@@ -86,7 +86,7 @@ Signing the certificate is **not** the same as onboarding. Signing issues the ce
 Trigger onboarding in MCM, then watch the provisioning job:
 
 ```bash
-export KUBECONFIG=$(pwd)/artifacts/<hub-env>/kubernetes/kubeconfig
+export KUBECONFIG=$(pwd)/../artifacts/<hub-env>/kubernetes/kubeconfig
 kubectl -n mojaloop get jobs -l vault-agent/template=onboarding
 kubectl -n mojaloop logs -f job/<onboard-job-name>
 ```

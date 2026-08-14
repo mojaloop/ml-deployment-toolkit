@@ -10,7 +10,7 @@ Adding an infrastructure provider. The contract is narrow — produce a cluster 
 - [1. Write the module](#1-write-the-module)
 - [2. Register the provider](#2-register-the-provider)
 - [3. Wire it into the infra stack](#3-wire-it-into-the-infra-stack)
-- [4. Add the provider mapping](#4-add-the-provider-mapping)
+- [4. Create the provider's template directory](#4-create-the-providers-template-directory)
 - [5. Vendor layer, if needed](#5-vendor-layer-if-needed)
 - [What not to touch](#what-not-to-touch)
 
@@ -26,7 +26,7 @@ Create `src/modules/<provider>/`. It must:
 
 - Accept the merged configuration from config-loader
 - Provision the cluster
-- Write a kubeconfig to **exactly** `${var.artifacts_path}/kubernetes/kubeconfig` — the config stack's providers read that literal path (`src/config/providers.tf`), so any other filename breaks the config stack silently
+- Write a kubeconfig to **exactly** `../artifacts/<env>/kubernetes/kubeconfig` (derived from the `artifacts_dir` entry-point variable, never hardcoded) — the config stack's providers read that exact path, so any other filename breaks the config stack silently
 - Output `kubeconfig_path` and `cluster_endpoint`
 
 A managed provider is usually one module. A self-managed one composes sub-modules the way `proxmox` does. Match the output names of the existing modules exactly — downstream wiring reads them by name.
@@ -60,18 +60,16 @@ There are **four** edit points in `src/infra/main.tf`, and missing the fourth is
 
 After all four, `local.kubeconfig_paths[<provider>]` resolves and `flux_bootstrap` receives a real path.
 
-## 4. Add the provider mapping
+## 4. Create the provider's template directory
 
-Create one file: `config/templates/mappings/<provider>.yaml`, validated against `config/schemas/mapping.schema.json`.
+Templates are provider-specific full overlays — there is no shared capacity tier and no mapping layer to bridge one. A new provider means creating `config/templates/<provider>/` complete:
 
-It translates the provider-independent capacity templates into concrete machines, and holds nothing else:
+- **`params.yaml`** — the provider interface, validated against `config/schemas/params.schema.json`. It must define **every required `P_*` symbol**: `P_GATEWAY_CLASS`, `P_STORAGE_CLASS`, `P_NODE_ROLE_LABEL_KEY`, `P_L2_INTERFACE_REGEX`, `P_KUBE_API_HOST`, `P_KUBE_API_PORT` — plus the `infra` section Terraform consumes (VM shapes, instance types, storage, and similar provider constants). `P_*` symbols resolve from `params.yaml` *only*; `config.yaml` cannot define or shadow them, and `check-interface` enforces both directions — a symbol the schema requires but the file omits, and a symbol the file invents that nothing consumes.
+- **The full set of role/capacity template files** — `<role>/<name>.yaml` for every role and size the provider supports: `bare/small`, `hub/{dev,tps-1,tps-10}`, `tooling/{dev,small,medium}`. Each is a complete overlay with no knobs or conditionals. Duplication across providers is accepted by design — copying another provider's role files and adjusting them is the intended workflow, not a shortcut.
 
-- `instance_types` — workload class → instance type or size, for managed services
-- `vm_defaults`, `storage`, `talos` — VM shape, datastores, and image platform, for self-managed providers
-- `vpc` and similar provider constants, where the managed service needs them
-- `talos-patches` — provider-specific machine-config patches, if any
+`config/templates/mappings/` no longer exists; selection is `config.yaml`'s `template` + the cluster's role + `infra.provider`, resolving to `config/templates/<provider>/<role>/<name>.yaml`. `make validate` validates `params.yaml` against its schema alongside the environment config.
 
-**No new tier files.** The capacity templates under `config/templates/{tooling,hub,bare}/` are provider-independent and already cover the new provider — a class the mapping does not list falls back to a built-in default, so the mapping should name every class the templates use. `make validate` schema-checks the mapping alongside the environment config; note the mapping schema is permissive, so the check is shape-level, not exhaustive.
+One honest caveat: the `aws` and `digitalocean` interface values are marked **UNVALIDATED** — the interface's shape is checked, but its values have only ever been proven against Proxmox. Interface validation truly lands with the first real second provider; whoever adds it should expect to correct interface values, not just fill them in.
 
 ## 5. Vendor layer, if needed
 
@@ -87,4 +85,4 @@ If adding a provider means editing any of these, reconsider the design:
 - DNS, cert-manager, or observability configuration
 - Application manifests
 
-A new provider is a new module, its registration entries, its mapping file, and possibly a vendor Kustomization. Nothing else. If a shared manifest would need to change, the provider-specific part of it belongs in a substituted variable or the vendor layer instead.
+A new provider is a new module, its registration entries (including the `infra.provider` enum addition in `config/schemas/environment.schema.json`), its `config/templates/<provider>/` directory — `params.yaml` plus the full role/capacity overlays — and possibly a vendor Kustomization. Nothing else. If a shared manifest would need to change, the provider-specific part of it belongs in a substituted variable or the vendor layer instead.

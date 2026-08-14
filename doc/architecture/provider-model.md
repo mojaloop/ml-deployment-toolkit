@@ -115,14 +115,20 @@ Hub templates are named for the transaction rate they are sized to sustain. `dev
 template: "tps-10"
 ```
 
-A template is **provider-independent**. It declares node groups in resource terms — workload class, count, cores, memory, disks, placement — plus the replica counts and data-layer tuning that must scale with them. Translating a workload class into a machine is the mapping layer's job:
+A template is a **provider-specific full overlay**. Each provider directory carries one complete file per role and tier — node groups with count, cores, memory, disks, and placement groups, plus the replica counts and data-layer tuning that must scale with them — with no knobs and no conditionals. Selection is `config.yaml`'s `template` value combined with `cluster.role` and `infra.provider`:
 
-| Layer | File | Owner |
-|-------|------|-------|
-| Capacity template | `config/templates/<role>/<tier>.yaml` | Distribution, one file per tier |
-| Provider mapping | `config/templates/mappings/<provider>.yaml` | Distribution, one file per provider |
+| File | Contents | Owner |
+|------|----------|-------|
+| `config/templates/<provider>/<role>/<name>.yaml` | Full overlay — topology plus `app`/`data`/`tooling` tuning | Distribution, one file per provider, role, and tier |
+| `config/templates/<provider>/params.yaml` | The provider interface: a `params` section (`P_*` values) and an `infra` section consumed by Terraform | Distribution, one file per provider |
 
-That split is why a new tier is one file rather than one per provider, and why adding a provider does not multiply the tier count. On Proxmox a node group expands into `count` individually-placed VMs; on a managed service it becomes a node group or pool of that size.
+On Proxmox a node group expands into `count` individually-placed VMs; on a managed service it becomes a node group or pool of that size.
+
+### The provider interface
+
+`params.yaml` is the contract between a provider and the shared layers above it. Its `params` section defines exactly the `P_*` variables the shared manifests substitute — `P_GATEWAY_CLASS`, `P_STORAGE_CLASS`, `P_NODE_ROLE_LABEL_KEY`, `P_L2_INTERFACE_REGEX`, `P_KUBE_API_HOST`, `P_KUBE_API_PORT` — validated against `config/schemas/params.schema.json` in both directions: a provider must supply every interface variable, and may supply nothing outside it. The `P_*` namespace is disjoint from `config.yaml`'s: `P_*` values resolve from `params.yaml` only, and a `config.yaml` that defines or shadows one fails validation. An adopter editing `params.yaml` is forking the distribution, and the pristine check reports it.
+
+The interface is proven by a second provider consuming it. The `aws` and `digitalocean` template directories exist and pass schema validation, but their interface values are marked **UNVALIDATED** until a second provider is brought up against them — Proxmox is the only validated set today.
 
 ## Where provider differences live
 
@@ -131,7 +137,7 @@ Four places, and nowhere else:
 | Location | Contains |
 |----------|----------|
 | `src/modules/<provider>/` | Cluster provisioning |
-| `config/templates/mappings/<provider>.yaml` | Instance types, VM defaults, provider constants |
+| `config/templates/<provider>/` | Full template overlays per role and tier, plus `params.yaml` — the `P_*` interface and Terraform-consumed infra constants |
 | `gitops/talos/` | Vendor layer — self-managed clusters only |
 | `gitops/dns/<provider>/` | cert-manager issuer and external-dns config |
 

@@ -8,6 +8,8 @@
 
 > **Superseded in mechanism, kept in principle.** [ADR-015](015-two-stack-capability-config.md) replaced the per-provider profile files described below with a provider-independent capacity template (`config/templates/{role}/{tier}.yaml`) plus a thin per-provider mapping, and renamed the `config.yaml` key from `profile:` to `template:`. What this record decided — that one named tier bundles infrastructure topology, application replicas, and data-layer tuning, and that Hub tiers are named for the transaction rate they sustain — still holds. Read it for the reasoning; read ADR-015 for the current layout.
 
+> **Amended 2026-08-14 (config-layering refactor).** The ADR-015 layout named above has itself moved on: templates are now provider-specific full overlays at `config/templates/<provider>/<role>/<name>.yaml`, and the per-provider mapping is folded into `config/templates/<provider>/params.yaml`. Tier naming and the one-tier-bundles-all principle are unchanged — see [Provider model → Deployment templates](../provider-model.md#deployment-templates) for the current layout.
+
 ## Context
 
 Deploying Mojaloop required the deployer to understand infrastructure topology names (e.g. `h2c1w3`) and had no connection between infrastructure sizing and application-level scaling. Application replicas, Kafka partitions, and MySQL tuning were hardcoded in gitops manifests. This meant deployers needed expert knowledge of both infrastructure and Mojaloop internals.

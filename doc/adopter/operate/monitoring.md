@@ -16,7 +16,7 @@ Where to look, in what order, and what "healthy" looks like. For how the observa
 
 ## Where monitoring lives
 
-Grafana runs on the **Tooling Cluster**, at `https://grafana.int.<tooling-domain>`. The user is `admin` and the password is generated — `make secrets ENV=<cc-env>` prints it as `grafana_admin_password`.
+Grafana runs on the **Tooling Cluster**, at `https://grafana.int.<tooling-domain>`. The user is `admin` and the password is generated — `make secrets ENV=<cc-env>` prints it as `GRAFANA_ADMIN_PASSWORD`.
 
 A Hub ships metrics, logs, and traces to the Tooling Cluster — it runs no Grafana of its own. A deployment without a Tooling Cluster has no aggregated dashboard; a Hub keeps running, but there is no central place to watch it.
 
@@ -81,8 +81,8 @@ Two things a Loki search will not show: Mojaloop's audit events (`audit: LOG_EVE
 Metrics stop at the Kubernetes boundary. For the Talos nodes underneath, use `talosctl`:
 
 ```bash
-talosctl --talosconfig artifacts/<env>/talos-config/talosconfig -n <vip> health
-talosctl --talosconfig artifacts/<env>/talos-config/talosconfig -n <vip> dashboard
+talosctl --talosconfig ../artifacts/<env>/talos-config/talosconfig -n <vip> health
+talosctl --talosconfig ../artifacts/<env>/talos-config/talosconfig -n <vip> dashboard
 ```
 
 The dashboard is a live per-node view of CPU, memory, network, and services. Reach for it when a node problem is suspected but Kubernetes still reports the node Ready — the layer below Kubernetes is invisible to Grafana.

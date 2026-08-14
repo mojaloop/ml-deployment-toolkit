@@ -4,7 +4,7 @@
 
 **Audiences:** adopter (deploy)
 
-What to prepare in Proxmox and DNS before deploying. The same setup serves a Tooling Cluster and a Hub — only `config.yaml` differs.
+What to prepare in Proxmox and DNS before deploying. The same setup serves a Tooling Cluster and a Hub — only the environment's configuration differs.
 
 - [Proxmox state](#proxmox-state)
 - [API token](#api-token)
@@ -59,15 +59,16 @@ Password authentication is what the provider uses. SSH-agent auth is not availab
 
 ## Storage pools
 
-The toolkit reads pool names from `config.yaml`:
+The toolkit reads pool names from the environment's `proxmox/proxmox.yaml` — the sidecar file holding the Proxmox facts, beside `config.yaml` ([Configuration → Environment layout](configuration.md#environment-layout)):
 
 ```yaml
-infra:
-  proxmox:
-    storage:
-      disks: "local-lvm"      # VM disks — must support raw images
-      images: "local"          # Talos image upload target
-      snippets: "local"        # cloud-init snippets
+# ../environments/<env>/proxmox/proxmox.yaml
+version: 1
+network_bridge: "vmbr0"
+storage:
+  disks: "local-lvm"          # VM disks — must support raw images
+  images: "local"             # Talos image upload target
+  snippets: "local"           # cloud-init snippets
 ```
 
 Confirm each pool exists with the right content type in **Datacenter → Storage**: `disks` needs `Disk image`, `images` needs `ISO image`, `snippets` needs `Snippets`.
@@ -96,22 +97,22 @@ Plan addresses before deploying:
 
 **The pool count differs by role.** A Tooling Cluster needs 2 addresses (`gw-int`, `gw-ext`). A Hub needs 4 — it adds the FSPIOP endpoints (`gw-extapi`, `gw-intapi`). Every address must sit outside the DHCP scope; overlap causes intermittent failures as addresses are handed out twice. Because each gateway's address is fixed in config, firewall rules can be written before the cluster exists.
 
-All addresses must be on the bridge in `infra.proxmox.network_bridge`.
+All addresses must be on the bridge named by `network_bridge` in the environment's `proxmox/proxmox.yaml`.
 
 ## Placement groups
 
-`infra.proxmox.placement` maps logical placement groups — used by the deployment template to spread VMs across failure domains — to physical node names:
+The environment's `placement.yaml` maps logical placement groups — used by the deployment template to spread VMs across failure domains — to physical node names:
 
 ```yaml
-infra:
-  proxmox:
-    placement:
-      pg-1: "node0"
-      pg-2: "node1"
-      pg-3: "node2"   # only if the template uses three
+# ../environments/<env>/placement.yaml
+version: 1
+placement:
+  pg-1: "node0"
+  pg-2: "node1"
+  pg-3: "node2"   # only if the template uses three
 ```
 
-Which groups a template references is in `config/templates/{tooling,hub,bare}/<template>.yaml`, in each node group's `placement:` list. Provide a node mapping for every group named there; an unmapped `pg-N` is passed through to Proxmox as a literal node name and fails.
+Which groups a template references is in `config/templates/proxmox/{tooling,hub,bare}/<template>.yaml`, in each node group's `placement:` list. Provide a node mapping for every group named there; an unmapped `pg-N` fails the plan before anything is created.
 
 ## DNS zone
 

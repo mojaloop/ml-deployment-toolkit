@@ -49,23 +49,23 @@ flux resume helmrelease kratos -n flux-system
 **Symptoms:** One of three shapes, all the same underlying story:
 
 - `kubectl` fails with connection refused dialing `127.0.0.1:1` — the kubeconfig is the Makefile-seeded placeholder.
-- `artifacts/<env>/kubernetes/kubeconfig` or `artifacts/<env>/talos-config/talosconfig` is missing entirely.
+- `../artifacts/<env>/kubernetes/kubeconfig` or `../artifacts/<env>/talos-config/talosconfig` is missing entirely.
 - `talosctl` or `kubectl` fails with `x509: certificate has expired`.
 
-**Root cause:** Two independent facts. First, both files live under `artifacts/`, which is gitignored, so a fresh clone or a cleanup loses them; and if any `make` target runs before the kubeconfig is restored, the Makefile seeds a placeholder pointing at `https://127.0.0.1:1` (so Terraform can plan) — valid YAML, so `kubectl` accepts it and dials a dead endpoint. Second, both client certificates are issued for **one year**, while the Talos CA is valid for ten; Talos auto-rotates everything cluster-internal, so only these two client credentials ever age. Check remaining validity anytime with `talosctl config info`.
+**Root cause:** Two independent facts. First, both files live under `../artifacts/<env>/` — outside both the clone and the environment repository, versioned by nothing — so a cleanup or a new workstation loses them; and if any `make` target runs before the kubeconfig is restored, the Makefile seeds a placeholder pointing at `https://127.0.0.1:1` (so Terraform can plan) — valid YAML, so `kubectl` accepts it and dials a dead endpoint. Second, both client certificates are issued for **one year**, while the Talos CA is valid for ten; Talos auto-rotates everything cluster-internal, so only these two client credentials ever age. Check remaining validity anytime with `talosctl config info`.
 **Fix/workaround:** Restore access from the bottom up. Each step is only needed if the layer below it is broken.
 
-*Terraform path (all providers):* `make plan-apply ENV=<env>` regenerates everything — the Talos provider re-issues expired client certificates on refresh and rewrites both files under `artifacts/`. It is the **infra** stack that does this, so `make apply-config` will not help here. On managed providers (AWS, DigitalOcean) this is the only path.
+*Terraform path (all providers):* `make plan-apply ENV=<env>` regenerates everything — the Talos provider re-issues expired client certificates on refresh and rewrites both files under `../artifacts/<env>/`. It is the **infra** stack that does this, so `make apply-config` will not help here. On managed providers (AWS, DigitalOcean) this is the only path.
 
 *Manual path (Talos environments)* — needs only the `talosctl` binary and reachability to the cluster, no working Terraform:
 
-1. **If the talosconfig is lost or expired**, mint a fresh one from the machine secrets bundle (written by every deploy to `artifacts/<env>/talos-secrets/secrets.yaml`). This step is offline — it does not touch the cluster:
+1. **If the talosconfig is lost or expired**, mint a fresh one from the machine secrets bundle (written by every deploy to `../artifacts/<env>/talos-secrets/secrets.yaml`). This step is offline — it does not touch the cluster:
 
    ```bash
    talosctl gen config <cluster-name> https://<vip>:6443 \
-     --with-secrets artifacts/<env>/talos-secrets/secrets.yaml \
+     --with-secrets ../artifacts/<env>/talos-secrets/secrets.yaml \
      --output-types talosconfig \
-     -o artifacts/<env>/talos-config/talosconfig --force
+     -o ../artifacts/<env>/talos-config/talosconfig --force
    ```
 
    Note that `make clean ENV=<env>` deletes `talos-secrets/` along with the other generated artifacts — after a clean, only the Terraform path remains until the next apply rewrites the bundle.
@@ -74,10 +74,10 @@ flux resume helmrelease kratos -n flux-system
 
    ```bash
    talosctl kubeconfig \
-     --talosconfig artifacts/<env>/talos-config/talosconfig \
+     --talosconfig ../artifacts/<env>/talos-config/talosconfig \
      -n <vip> -e <vip> \
      --merge=false -f \
-     artifacts/<env>/kubernetes/kubeconfig
+     ../artifacts/<env>/kubernetes/kubeconfig
    ```
 
 **The hard boundary:** every recovery above roots in the machine secrets, held in `secrets.yaml` and the Terraform state. If both are gone, there is no door: the Talos API is mTLS-only with no password or console fallback, and the only way forward is a rebuild per [Disaster recovery](../recover/disaster-recovery.md). The state backup there is not optional.

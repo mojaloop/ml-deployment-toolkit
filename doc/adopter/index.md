@@ -6,7 +6,7 @@
 
 The adopter runs a Hub. This guide takes an adopter from an empty Proxmox cluster to a running Mojaloop switch, keeps it recoverable, and keeps it healthy.
 
-The adopter configures one environment directory — `config.yaml`, `.env`, and optional `values/` and `patches/` — and runs Terraform through Make, never forking the distribution or editing the bundle. Everything specific to a deployment lives in the adopter's own configuration. Changing the distribution itself is the [Integrator](../integrator/index.md) guide.
+The adopter configures one environment directory — `config.yaml`, `.env`, `placement.yaml`, `proxmox/proxmox.yaml`, and optional `values/` and `patches/` — and runs Terraform through Make, never forking the distribution or editing the clone. The environment lives at `../environments/<env>/`, a sibling of the clone and its own git repository, created by copying a reference environment out of `examples/environments/` ([Configuration → Environment layout](deploy/configuration.md#environment-layout)). Everything specific to a deployment lives in the adopter's own configuration. Changing the distribution itself is the [Integrator](../integrator/index.md) guide.
 
 ## Three journeys
 
@@ -31,7 +31,7 @@ Getting from nothing to a running switch.
 |------|--------|
 | [Prerequisites](deploy/prerequisites.md) | Tools, accounts, and credentials needed first |
 | [Provider setup](deploy/provider-setup.md) | Preparing Proxmox and the DNS zone |
-| [Configuration](deploy/configuration.md) | `config.yaml`, `.env`, and the vocabulary mapping |
+| [Configuration](deploy/configuration.md) | The environment directory — `config.yaml`, `.env`, the provider sidecar files, overrides — and the vocabulary mapping |
 | [Deployment](deploy/deployment.md) | The deploy workflow, commands, and verification |
 | [Deploy a Tooling Cluster](deploy/tooling-cluster.md) | Role `tooling` — registry, secrets, observability backend |
 | [Deploy a Hub](deploy/hub.md) | Role `hub` — the Mojaloop switch |

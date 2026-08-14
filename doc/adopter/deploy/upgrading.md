@@ -10,6 +10,7 @@ Moving a running cluster to a new artifact version or a new infrastructure confi
 - [Platform version](#platform-version)
 - [Infrastructure](#infrastructure)
 - [Migrating an existing environment](#migrating-an-existing-environment)
+- [Migrating across the config-layering release](#migrating-across-the-config-layering-release)
 - [Rolling back](#rolling-back)
 
 ## Two kinds of upgrade
@@ -23,35 +24,45 @@ They are independent. A new artifact does not touch the nodes; a topology change
 
 ## Platform version
 
-The upgrade path depends on whether the artifact is pinned or follows `latest`.
+**`artifact.version` is always a pinned `vX.Y.Z` tag** — the schema rejects `latest`, so an upstream publish can never reach a cluster unbidden. Upgrading is a deliberate bump, made when the adopter decides.
 
-**Following `latest`** — nothing to do. Flux polls every 10 minutes and applies the new artifact when it appears. Watch it land:
+A DTK release pins the Terraform code, the gitops content, and the OCI artifact to each other, so the clone and the environment move together:
 
-```bash
-kubectl get kustomizations -n flux-system
-```
+1. **Check out the new release tag in the clone.** An upgrade is a checkout, never a rebase — the clone is pristine and holds no adopter changes:
 
-All should return to `Ready: True` within a few minutes.
+   ```bash
+   git checkout v0.19.0
+   ```
 
-**Pinned to a version** — bump the tag and apply:
+2. **Diff the reference environment across the hop.** The samples under `examples/environments/` are the reference an environment was copied from; the diff between two tags is exactly what changed in the environment surface — new keys, renamed files, changed conventions:
 
-```yaml
-artifact:
-  version: "v1.3.0"
-```
+   ```bash
+   git diff v0.18.0..v0.19.0 -- examples/environments/
+   ```
 
-```bash
-make apply-config ENV=<env>
-kubectl get kustomizations -n flux-system
-```
+   Apply what the diff shows to the environment's own files, and read the release notes for anything the samples cannot express.
 
-**Pin production.** Following `latest` means an upstream publish reaches the cluster with no warning and no window of the adopter's choosing. A pinned tag upgrades when the adopter decides.
+3. **Update the environment.** Bump `artifact.version` — and `dtk_version`, when the environment pins it — in `config.yaml`, then commit to the environment's repository.
 
-Whatever the mode, confirm afterward that the Kustomizations settle back to Ready. A stalled one after an upgrade points at the earliest failing Kustomization — see [Troubleshooting](../operate/troubleshooting.md).
+4. **Validate and apply:**
+
+   ```bash
+   make validate ENV=<env>
+   make apply-config ENV=<env>
+   kubectl get kustomizations -n flux-system
+   ```
+
+   Use `make plan-apply` instead when the release notes call out infrastructure changes ([Infrastructure](#infrastructure)).
+
+**One release at a time.** Walk through each intermediate release rather than jumping several at once: each hop's reference-environment diff is small enough to act on, and each release's migration steps apply exactly once. A multi-release jump compounds every change into one diff and one apply, with no way to tell which hop broke.
+
+**The `dtk_version` assert keeps the pair honest.** With `dtk_version` pinned, the plan fails when the clone is not checked out at that exact tag — a mismatch fails, it does not warn ([Configuration → Rules that fail at plan time](configuration.md#rules-that-fail-at-plan-time)). That is the guard against upgrading the environment and the clone separately.
+
+Confirm afterward that the Kustomizations settle back to Ready. A stalled one after an upgrade points at the earliest failing Kustomization — see [Troubleshooting](../operate/troubleshooting.md).
 
 ## Infrastructure
 
-Changing node counts, the `template`, VIPs, the placement map, or the Flux version is an infra-stack change.
+Changing node counts, the `template`, VIPs, the mapping in `placement.yaml`, or the Flux version is an infra-stack change.
 
 ```bash
 make plan-infra ENV=<env>      # review carefully — see below
@@ -65,7 +76,7 @@ Kubernetes and Talos versions are set centrally in the platform definitions, not
 
 ## Migrating an existing environment
 
-An environment deployed before the two-stack split holds a single `artifacts/<env>/terraform/terraform.tfstate`. Splitting it is a one-time state operation — no VM is recreated ([ADR-015](../../architecture/decisions/015-two-stack-capability-config.md)).
+An environment deployed before the two-stack split holds a single `terraform.tfstate` under its artifacts directory. Splitting it is a one-time state operation — no VM is recreated ([ADR-015](../../architecture/decisions/015-two-stack-capability-config.md)).
 
 ```bash
 tools/migrate-state.sh <env>            # dry run — prints every operation, changes nothing
@@ -75,7 +86,7 @@ tools/migrate-state.sh <env> --apply
 Dry run is the default; `--apply` performs it. The script writes a timestamped backup of the original state before touching anything, then:
 
 - copies the old state into `infra.tfstate` and `config.tfstate`, and `state rm`s each stack's resources from the other copy, so each stack owns exactly its own (nothing is destroyed — `state rm` only forgets);
-- `state mv`s the six Kratos and Hydra secrets from their old individual addresses to their new `for_each` addresses. Without this Terraform destroys the old addresses and generates fresh values, and these are the values that must not rotate: a new `kratos_secrets_cipher` makes stored credential and recovery material undecryptable, and a new `hydra_secrets_system` invalidates every issued token and consent grant;
+- `state mv`s the six Kratos and Hydra secrets from their old individual addresses to their new `for_each` addresses. Without this Terraform destroys the old addresses and generates fresh values, and these are the values that must not rotate: a new `KRATOS_SECRETS_CIPHER` makes stored credential and recovery material undecryptable, and a new `HYDRA_SECRETS_SYSTEM` invalidates every issued token and consent grant;
 - warns when the environment's `cluster.name` differs from its directory name. Carry that value over verbatim — it is the external-dns record owner, the Vault backup prefix, and the VM name prefix, so changing it orphans DNS records and forces VM replacement.
 
 Then rewrite `config.yaml` to the current schema and check the result before applying:
@@ -89,6 +100,40 @@ make plan ENV=<env>
 
 **Keep the existing passwords.** Any generated secret whose UPPER_CASE name is present and non-empty in `.env` is used as-is instead of being generated, so an environment that writes its current values into `.env` keeps them — see [Configuration → Secrets](configuration.md#secrets). While the old cluster is still running, the values can be read from the `cluster-secrets` Secret in `flux-system`.
 
+## Migrating across the config-layering release
+
+An environment deployed before the config-layering release lived *inside* the clone and used the old configuration surface. Bringing it forward is a one-time restructure:
+
+1. **Move the environment out of the clone.** Its home is `../environments/<env>/`, a sibling of the clone, as its own git repository ([Configuration → Environment layout](configuration.md#environment-layout)):
+
+   ```bash
+   mv environments/<env> ../environments/<env>
+   ```
+
+   Compare it against the current samples in `examples/environments/` — in particular, take the `.gitignore` that keeps `.env` out of the repository — then `git init` and commit.
+
+2. **Split the provider facts out of `config.yaml`.** The `infra.proxmox.placement`, `infra.proxmox.network_bridge`, and `infra.proxmox.storage` keys are gone: their values move to `placement.yaml` and `proxmox/proxmox.yaml` beside the config. Delete `cluster.gateway_class_name` — the GatewayClass is the provider's `P_GATEWAY_CLASS` now — and pin `artifact.version` to an exact `vX.Y.Z` tag, since `latest` is rejected.
+
+3. **Uppercase the substitution tokens** in any `values/` and `patches/` files — `${domain}` becomes `${DOMAIN}`, and so on — and move each values file to its `values/<namespace>/<release>.yaml` path ([Helm value overrides](configuration.md#helm-value-overrides)).
+
+4. **Migrate the state keys.** The generated internal passwords are keyed by UPPER_SNAKE names now; without a state move, the next apply would regenerate every one of them — rotating live database and service credentials:
+
+   ```bash
+   tools/migrate-uppercase-state.sh <env>            # dry run — prints every state mv, changes nothing
+   tools/migrate-uppercase-state.sh <env> --apply
+   ```
+
+   The values-override ConfigMaps also changed keys and are deliberately *not* moved — they are regenerable, and their destroy/create on the next apply is harmless.
+
+5. **Validate and plan:**
+
+   ```bash
+   make validate ENV=<env>
+   make plan ENV=<env>
+   ```
+
+   The infra plan must show no changes. The config plan shows the values-override recreations from step 4 and nothing that touches a password.
+
 ## Rolling back
 
 | What | How |
@@ -97,6 +142,6 @@ make plan ENV=<env>
 | Infrastructure | Revert the `config.yaml` change, `make plan-apply` |
 | Data | Not a rollback — see [Recover → Restore](../recover/restore.md) |
 
-Artifact rollback is clean because the artifact is immutable and content-addressed — the previous tag is the exact previous state. This is a reason to pin production: a rollback is just the tag the cluster was on before.
+Artifact rollback is clean because the artifact is immutable and content-addressed — the previous tag is the exact previous state, and pinning means the cluster always knows which tag that was. When rolling the artifact back, check out the matching clone tag too — a `dtk_version`-pinned environment enforces this on its own.
 
 Data is different. A bad migration that has already written to the database is not undone by reverting the artifact — that is a restore, not a rollback, and it is why point-in-time recovery exists. See [Recover](../recover/backup.md).

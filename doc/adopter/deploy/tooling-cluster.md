@@ -38,7 +38,7 @@ Decide these before starting — they are what `config.yaml` and the pre-checks 
 | Kubernetes API VIP | `192.168.0.210` | Floating IP, same L2 as the nodes |
 | LB-IPAM range | `192.168.0.211-212` | **Two** addresses |
 | DNS zone | `cc1.example.com` | Delegated before deploying |
-| Artifact version | `v0.9.0` or `latest` | The gitops artifact Flux reconciles |
+| Artifact version | `v0.19.0` | The gitops artifact Flux reconciles — always a pinned tag |
 | Alert delivery | SMTP and/or Telegram | Optional, but the only way alerts leave the cluster |
 
 ## Configuration
@@ -66,7 +66,7 @@ cert:
   server: "https://acme-v02.api.letsencrypt.org/directory"  # selects the CA
 artifact:
   url: "oci://ghcr.io/<org>/ml-deployment-toolkit"
-  version: "latest"
+  version: "v0.19.0"          # a pinned vX.Y.Z tag — "latest" is rejected
 registry:
   enabled: false            # Harbor lives here; nothing to proxy through
 object_storage:
@@ -77,7 +77,7 @@ observability:
 
 **A Tooling Cluster needs two LB addresses** — `gw-int` and `gw-ext`. It has no FSPIOP endpoint, so no third.
 
-A Tooling Cluster has no `data` and no `app` section — it is the cluster others point at. It still declares `registry`, `object_storage` and `observability` with `enabled: false`: all three are required, and off is stated rather than left to an omitted section. Start from `environments/mlf-lab1-cc1/config.yaml.sample`.
+A Tooling Cluster has no `data` and no `app` section — it is the cluster others point at. It still declares `registry`, `object_storage` and `observability` with `enabled: false`: all three are required, and off is stated rather than left to an omitted section. Start by copying `examples/environments/tooling/` out of the clone ([Configuration → Environment layout](configuration.md#environment-layout)).
 
 Full schema and secrets: [Configuration](configuration.md). Alerting matters here specifically — the observability backend lives on this cluster, so the `alerting:` section and its `.env` credentials are what decide whether alerts leave it. See [Prerequisites](prerequisites.md#credentials-checklist).
 
@@ -103,7 +103,7 @@ Expect about five minutes for Terraform, then ~10–15 for Flux to converge.
 Check up the stack — VMs, then Talos, then Kubernetes. The full commands are in [Deployment → Verify](deployment.md#verify-up-the-stack). The Tooling-Cluster-specific checks:
 
 ```bash
-export KUBECONFIG=$(pwd)/artifacts/<tooling-env>/kubernetes/kubeconfig
+export KUBECONFIG=$(pwd)/../artifacts/<tooling-env>/kubernetes/kubeconfig
 
 # Two gateways, each with a LoadBalancer address
 kubectl get gateways -n platform-system
@@ -137,7 +137,7 @@ Admin credentials are **generated**, not authored. Read them back from the confi
 make secrets ENV=<tooling-env>
 ```
 
-That prints `harbor_admin_password`, `grafana_admin_password`, and `minio_root_password`, plus one entry per Hub credential declared here (`harbor_robot_<name>_secret`, `minio_bucket_<name>_secret_key`). The MinIO user name is `minioadmin` unless `MINIO_ROOT_USER` was set in `.env`; Harbor and Grafana log in as `admin`.
+That prints `HARBOR_ADMIN_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`, and `MINIO_ROOT_PASSWORD`, plus one entry per Hub credential declared here (`HARBOR_ROBOT_<NAME>_SECRET`, `MINIO_BUCKET_<NAME>_SECRET_KEY`). The MinIO user name is `minioadmin` unless `MINIO_ROOT_USER` was set in `.env`; Harbor and Grafana log in as `admin`.
 
 Vault is auto-unsealed by its operator, which stores the unseal keys as the `vault-unseal-keys` Secret in the `vault` namespace.
 
@@ -178,10 +178,10 @@ make secrets ENV=<tooling-env>
 
 | Hub `.env` variable | Value from `make secrets` |
 |---------------------|---------------------------|
-| `OCI_PROXY_USERNAME` / `OCI_PROXY_PASSWORD` | `robot-<name>` / `harbor_robot_<name>_secret` |
-| `BACKUP_S3_ACCESS_KEY` / `BACKUP_S3_SECRET_KEY` | `<bucket name>` / `minio_bucket_<name>_secret_key` |
+| `OCI_PROXY_USERNAME` / `OCI_PROXY_PASSWORD` | `robot-<name>` / `HARBOR_ROBOT_<NAME>_SECRET` |
+| `BACKUP_S3_ACCESS_KEY` / `BACKUP_S3_SECRET_KEY` | `<bucket name>` / `MINIO_BUCKET_<NAME>_SECRET_KEY` |
 
-With no declared robots or buckets, the fallbacks are the shared credentials — `admin` / `harbor_admin_password` for the registry, and the `backups` system bucket with `minioadmin` / `minio_root_password` for S3. Workable for a single Hub, but admin credentials in a Hub's `.env` are exactly what the scoped accounts exist to avoid.
+With no declared robots or buckets, the fallbacks are the shared credentials — `admin` / `HARBOR_ADMIN_PASSWORD` for the registry, and the `backups` system bucket with `minioadmin` / `MINIO_ROOT_PASSWORD` for S3. Workable for a single Hub, but admin credentials in a Hub's `.env` are exactly what the scoped accounts exist to avoid.
 
 Carry those into [Deploy a Hub → Configuration](hub.md#configuration).
 

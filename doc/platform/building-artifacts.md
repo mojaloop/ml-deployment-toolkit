@@ -56,6 +56,10 @@ make release ENV=<env> TAG=v1.2.0
 
 `release` is the versioned-publish path: it creates and pushes a git tag, publishes the artifact under that tag, and also tags it `latest`. `ENV=` is required — it selects the registry through the environment's `artifact.url`, like every artifact target. Use `release` for anything a downstream consumer will pin to — a tagged release is a git commit and an artifact digest that agree.
 
+Run **`make check`** — the `tools/checks/` suite — before releasing. It is the pre-release gate: substitution tokens, `valuesFrom` chain completeness, secret placement, the provider interface, and tool versions all validate locally, and a release that skips it ships whatever the checks would have caught.
+
+Consumers cannot follow `latest`: an environment's `artifact.version` must be a **pinned `vX.Y.Z`** — the schema rejects `latest` — and pinned versions are asserted at plan time. Every deployed cluster therefore names the exact release it runs, which is why the tagged-release discipline above matters.
+
 To add a tag to an already-published artifact — promoting a tested build to a channel, for instance — name the published version explicitly:
 
 ```bash
@@ -83,4 +87,4 @@ flux pull artifact oci://<repo>:<tag> --output /tmp/artifact \
 
 This pulls and unpacks the artifact, exposing the `gitops/` tree that clusters will actually reconcile. Doing this against a release candidate before tagging it `stable` catches a mis-publish before it reaches a consumer following that tag.
 
-Which tag a cluster follows is the adopter's choice, in `artifact.version` — see [Upgrading](../adopter/deploy/upgrading.md). The platform developer's responsibility ends at publishing a correct, correctly-tagged artifact.
+Which release a cluster runs is the adopter's choice, pinned in `artifact.version` — see [Upgrading](../adopter/deploy/upgrading.md). The platform developer's responsibility ends at publishing a correct, correctly-tagged artifact.

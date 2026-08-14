@@ -25,7 +25,7 @@ For the shared workflow and commands, see [Deployment](deployment.md). This page
 | Kubernetes API VIP | `192.168.0.214` | Floating IP |
 | LB-IPAM addresses | `192.168.0.215-218` | **Four** addresses, one per gateway |
 | DNS zone | `sw1.example.com` | Delegated before deploying |
-| Artifact version | `v0.9.0` or `latest` | Same artifact as the Tooling Cluster |
+| Artifact version | `v0.19.0` | Same artifact as the Tooling Cluster — always a pinned tag |
 | SMTP | **required** | MCM sends participant activation emails — a Hub without SMTP cannot onboard |
 | Supporting-service endpoints | `harbor.int.cc1.example.com`, … | Stated in full, one per capability — see [hand-off](tooling-cluster.md#hand-off-to-the-hub) |
 
@@ -68,11 +68,11 @@ app:
 
 **`app.api_type` is set once.** It selects the FSPIOP message dialect. Switching it on a running Hub breaks in-progress transfers — decide it before the first deploy.
 
-Start from `environments/mlf-lab1-sw1/config.yaml.sample`, which carries the full Hub shape including the `data` section. The complete reference is [Configuration](configuration.md).
+Start by copying `examples/environments/hub/` out of the clone ([Configuration → Environment layout](configuration.md#environment-layout)) — its `config.yaml.sample` carries the full Hub shape including the `data` section. The complete reference is [Configuration](configuration.md).
 
 A Hub runs far more internal services than a Tooling Cluster — the databases and the Ory stack each need their own credentials — but the adopter authors none of them. They are generated at apply time and read back with `make secrets ENV=<hub-env>`. What `.env` still needs is in [Prerequisites](prerequisites.md#credentials-checklist). One value matters within minutes of deploying:
 
-- **`app.hub.admin_email` and the generated `hub_admin_password`** are the HubOps login for both MCM and the Finance Portal, used in [Configure the Hub](#configure-the-hub).
+- **`app.hub.admin_email` and the generated `HUB_ADMIN_PASSWORD`** are the HubOps login for both MCM and the Finance Portal, used in [Configure the Hub](#configure-the-hub).
 
 ### Supporting services
 
@@ -142,7 +142,7 @@ Expect about five minutes for Terraform, then ~20–30 for Flux to converge the 
 Check up the stack — VMs, Talos, Kubernetes — per [Deployment → Verify](deployment.md#verify-up-the-stack). The Hub-specific checks:
 
 ```bash
-export KUBECONFIG=$(pwd)/artifacts/<hub-env>/kubernetes/kubeconfig
+export KUBECONFIG=$(pwd)/../artifacts/<hub-env>/kubernetes/kubeconfig
 
 # Three gateways with addresses (extapi is a separate LoadBalancer service)
 kubectl get gateways -n platform-system
@@ -167,7 +167,7 @@ The FSPIOP endpoint is a standalone LoadBalancer service named `cilium-gateway-g
 Log in to the three operator UIs with the HubOps credentials to confirm they load — the user is `app.hub.admin_email` from `config.yaml`, and the password is generated:
 
 ```bash
-make secrets ENV=<hub-env>     # hub_admin_password
+make secrets ENV=<hub-env>     # HUB_ADMIN_PASSWORD
 ```
 
 | Service | URL |
@@ -232,7 +232,7 @@ When `registry.enabled` is true, image pulls route through the Tooling Cluster's
 Confirm the mirror is configured on the nodes:
 
 ```bash
-talosctl get registries.mirrors --talosconfig artifacts/<hub-env>/talos-config/talosconfig -n <vip>
+talosctl get registries.mirrors --talosconfig ../artifacts/<hub-env>/talos-config/talosconfig -n <vip>
 ```
 
 Cached images appear in Harbor's proxy-cache projects with their upstream source and pull count.

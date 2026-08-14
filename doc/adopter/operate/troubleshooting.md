@@ -19,7 +19,7 @@ Symptom-first diagnosis for a running Hub. Deployment-time issues are in [Deploy
 Whatever the symptom, orient before diving in:
 
 ```bash
-export KUBECONFIG=$(pwd)/artifacts/<env>/kubernetes/kubeconfig
+export KUBECONFIG=$(pwd)/../artifacts/<env>/kubernetes/kubeconfig
 kubectl get kustomizations -n flux-system
 ```
 

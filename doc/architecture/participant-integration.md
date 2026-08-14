@@ -32,7 +32,7 @@ Onboarding is a two-party exchange. Neither side can complete it alone, and each
 
 The Hub operator never touches the participant's cluster; the participant never touches the Hub's.
 
-**Access boundary.** The participant-facing surface is `mcm.ext`, `hydra.ext`, and `extapi.${domain}`. HubOps works on `*.int.${domain}` — internal, in-house. The MCM UI and Kratos self-service currently resolve to `.int` hosts, so the account-activation step is completed with Hub-side assistance today; the target state routes it through `gw-ext` ([Networking](networking.md#gw-ext--external-parties)).
+**Access boundary.** The participant-facing surface is `mcm.ext`, `hydra.ext`, and `extapi.${DOMAIN}`. HubOps works on `*.int.${DOMAIN}` — internal, in-house. The MCM UI and Kratos self-service currently resolve to `.int` hosts, so the account-activation step is completed with Hub-side assistance today; the target state routes it through `gw-ext` ([Networking](networking.md#gw-ext--external-parties)).
 
 ## The boundary at a glance
 
@@ -97,9 +97,9 @@ Handed over once, out of band, after the account is created.
 
 | Value | Form | What it is |
 |-------|------|-----------|
-| MCM endpoint | `https://mcm.ext.${domain}/pm4mlapi` | Connection Manager API. The `/pm4mlapi` prefix is rewritten to `/api` at the gateway |
-| IAM provider URL | `https://hydra.ext.${domain}` | OAuth2 **issuer** — a bare URL with no path; the client appends the token route itself |
-| Hub FSPIOP endpoint | `extapi.${domain}` | Where the participant sends FSPIOP traffic, mTLS required |
+| MCM endpoint | `https://mcm.ext.${DOMAIN}/pm4mlapi` | Connection Manager API. The `/pm4mlapi` prefix is rewritten to `/api` at the gateway |
+| IAM provider URL | `https://hydra.ext.${DOMAIN}` | OAuth2 **issuer** — a bare URL with no path; the client appends the token route itself |
+| Hub FSPIOP endpoint | `extapi.${DOMAIN}` | Where the participant sends FSPIOP traffic, mTLS required |
 | Hub callback source address | IP or range, stated by HubOps | The address Hub callbacks arrive **from** — not necessarily the `extapi` address; the participant's firewall must admit it |
 | Participant ID | e.g. `dfsp-201` | Scheme identifier. Also the OAuth2 `client_id` |
 | Currency | ISO 4217 | Must match the scheme's configured currency |
@@ -144,7 +144,7 @@ Two rotation cadences coexist. The Hub's endpoint certificate rotates monthly an
 
 ## Inbound: participant to Hub
 
-Participant FSPIOP traffic arrives at `extapi.${domain}` on port 443 and terminates at a **standalone Envoy deployment** ([ADR-004](decisions/004-standalone-envoy-inbound-mtls.md)) — not at a Gateway API route.
+Participant FSPIOP traffic arrives at `extapi.${DOMAIN}` on port 443 and terminates at a **standalone Envoy deployment** ([ADR-004](decisions/004-standalone-envoy-inbound-mtls.md)) — not at a Gateway API route.
 
 ```mermaid
 flowchart LR

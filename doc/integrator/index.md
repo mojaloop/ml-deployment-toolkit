@@ -22,7 +22,7 @@ The distinction from a platform developer: a platform developer contributes chan
 
 > Customize at the highest layer that meets the need. The lower the layer, the more the integrator carries.
 
-The toolkit is built to be personalized without forking — configuration and Helm value overrides cover a great deal, and neither requires touching the code. Reach for a fork only when configuration genuinely cannot express what the client needs.
+The toolkit is built to be personalized without forking — the adopter-owned environment layer (configuration, Helm value overrides, patches, placement) covers a great deal, and none of it touches the clone, which stays pristine at a release tag (`make check-pristine` verifies exactly that). Reach for a fork only when the environment layer genuinely cannot express what the client needs — and know that a fork is visible by design: editing the clone is forking public software, and the pristine check reports it.
 
 ```mermaid
 flowchart TD
@@ -37,6 +37,6 @@ Most needs land on the left. The [customization surface](customization-surface.m
 
 Two things worth knowing before committing to maintaining a derivative:
 
-**There is no CI in the repository.** The automated checks that exist are narrow — the schema self-check (`tools/test-validation.sh`) and `make validate` — so "staying rebaseable" rests mostly on discipline and manual verification. That weighs on how far to diverge — the more the integrator changes, the more the integrator verifies by hand at each upgrade.
+**There is no hosted CI, but there is a check suite.** The `tools/checks/` suite — wired as `make check` — validates substitution tokens, `valuesFrom` chains, secret placement, the provider interface, and tool versions, and `make validate` schema-checks configuration; `make check-pristine` verifies the clone is clean and at an exact tag. All of it runs locally, on the integrator's discipline — nothing runs it automatically on a push. "Staying rebaseable" therefore rests on running `make check` at every step, plus real deployment verification: the more the integrator changes, the more the integrator verifies by hand at each upgrade.
 
 **`make release` already stamps provenance.** A published artifact carries its git source and revision, so the derivative is traceable to the exact commit that built it. That is the one piece of derivative-maintenance infrastructure that already works well, and [publishing](publishing.md) builds on it.

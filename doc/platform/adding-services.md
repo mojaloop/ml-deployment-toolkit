@@ -43,20 +43,26 @@ Flux merges a HelmRelease's inline `spec.values` *after* everything in `spec.val
 
 ```yaml
 # <service>/<service>-values.yaml, beside the HelmRelease — plain chart values, no wrapper
-replicaCount: ${some_template_key}
+replicaCount: ${SOME_TEMPLATE_KEY}
 ```
 
 ```yaml
 # in the HelmRelease — no spec.values anywhere
   valuesFrom:
     - kind: ConfigMap
-      name: <release>-values            # distribution defaults
+      name: <release>-values                        # distribution defaults
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: <release>-values-override   # adopter — merged last, wins
+      name: <namespace>-<release>-values-override   # adopter override twin
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: <namespace>-<release>-values-override   # adopter override twin (secrets)
       valuesKey: values.yaml
       optional: true
 ```
+
+Every HelmRelease's chain must **end with the override twins, in that order** — ConfigMap then Secret, both named `<targetNamespace>-<release>-values-override`, both `optional: true`. `check-valuesfrom` (run by `make check`) enforces chain completeness, so an incomplete chain fails before it ships. The distribution's own `<release>-values` ConfigMap naming is otherwise unchanged.
 
 ```yaml
 # in the root's kustomization.yaml
@@ -69,7 +75,7 @@ generatorOptions:
   disableNameSuffixHash: true
 ```
 
-Three details matter. The generated ConfigMap must be in `flux-system`, where the HelmReleases live, because `valuesFrom` resolves in the HelmRelease's namespace. `disableNameSuffixHash: true` is required rather than stylistic — Kustomize does not rewrite name references inside a CRD, so a hashed name would leave `valuesFrom` pointing at a ConfigMap that does not exist, and the chart would quietly deploy on bare defaults. And `${...}` substitution works normally inside the values file, because Flux renders it as part of the Kustomization.
+Three details matter. The generated ConfigMap must be in `flux-system`, where the HelmReleases live, because `valuesFrom` resolves in the HelmRelease's namespace. `disableNameSuffixHash: true` is required rather than stylistic — Kustomize does not rewrite name references inside a CRD, so a hashed name would leave `valuesFrom` pointing at a ConfigMap that does not exist, and the chart would quietly deploy on bare defaults. And `${UPPER_SNAKE}` substitution works normally inside the values file, because Flux renders it as part of the Kustomization.
 
 A chart that puts values inline still works, so nothing fails loudly — it just silently removes that chart from the adopter's reach ([ADR-022](../architecture/decisions/022-helm-values-layering.md)). `grep -rn '^  values:' gitops/` should return nothing.
 
@@ -78,8 +84,12 @@ A chart that puts values inline still works, so nothing fails loudly — it just
 If the service needs an environment-specific value — a domain, an endpoint, a credential — it flows through the same path as everything else:
 
 1. Add the field to the configuration if it is adopter-set
-2. Carry it through `config-loader` and into `flux-config`, which writes it to `cluster-config` (non-secret) or `cluster-secrets` (secret)
-3. Reference it in the manifest with `${...}`
+2. Carry it through `config-loader` and into `flux-config`, which writes it to `cluster-config` (non-secret) or `cluster-secrets` (secret) — the key name is `UPPER_SNAKE`, like every key in both objects
+3. Reference it in the manifest with `${UPPER_SNAKE}`
+
+Substitution tokens are bare `${UPPER_SNAKE}` and nothing else — no operators, no inline defaults (`${X:-y}` is not portable across the two engines). Both engines — Flux's `postBuild.substituteFrom` in the artifact layers, Terraform `templatefile` for environment-authored files — **fail hard on an undefined variable**, so a typo'd token stops the reconcile or the apply rather than passing through as an empty string. A literal `$` is escaped as `$${...}`, which both engines honour. `check-substitution` enforces token shape across the tree.
+
+**The secret-placement rule.** Never substitute a token that resolves from `cluster-secrets` into a ConfigMap-shaped document — a secret value must not land in a ConfigMap. Secret-shaped resources carry substituted secret values under `stringData`. `check-secret-placement` enforces this.
 
 See [Module pipeline → the boundary](module-pipeline.md#the-terraformflux-boundary). Do not have Terraform template the manifest directly; the substitution inputs are the interface.
 
@@ -98,7 +108,7 @@ The three existing providers — `route53`, `cloudflare`, `digitalocean` — are
 
 Steps 4–5 are the ones a half-added provider is missing — the manifests exist but the name fails validation, or the credential silently never arrives.
 
-The `dns` Kustomization deploys `gitops/dns/${dns_provider}/`, so the directory name must match the value adopters put in `dns.provider`. A DNS provider touches nothing in the infrastructure or application layers — that independence is the point.
+The `dns` Kustomization deploys `gitops/dns/${DNS_PROVIDER}/`, so the directory name must match the value adopters put in `dns.provider`. A DNS provider touches nothing in the infrastructure or application layers — that independence is the point.
 
 ## Health gating
 

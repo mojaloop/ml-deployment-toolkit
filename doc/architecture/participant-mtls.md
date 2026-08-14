@@ -45,7 +45,7 @@ Three distinct certificates are in play, with very different lifetimes:
 | Certificate | Issued to | Signed by | Lifetime |
 |-------------|-----------|-----------|----------|
 | Scheme root | The Hub CA itself | Self | 10 years |
-| Hub FSPIOP endpoint (`extapi-tls`) | `extapi.${domain}` | Scheme CA | **30 days** |
+| Hub FSPIOP endpoint (`extapi-tls`) | `extapi.${DOMAIN}` | Scheme CA | **30 days** |
 | Participant client certificates | Each participant | Scheme CA | Up to 5 years |
 
 The 30-day endpoint certificate is issued by cert-manager through a Vault issuer and renewed automatically at 15 days. Participant certificates rotate through the enrolment machinery: the participant's agent submits a fresh CSR on its own — at enrolment, and again whenever the current certificate comes within its expiry threshold (30 days by default) — and each CSR waits for a HubOps signature in MCM before the agent picks up the new certificate and rotates without downtime.
