@@ -38,6 +38,10 @@ spec:
       name: opentelemetry-operator-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: opentelemetry-operator-values-override
+      name: platform-system-opentelemetry-operator-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: platform-system-opentelemetry-operator-values-override
       valuesKey: values.yaml
       optional: true

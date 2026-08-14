@@ -13,7 +13,7 @@ spec:
     - name: gw-ext
       namespace: platform-system
   hostnames:
-    - "mcm.ext.${domain}"
+    - "mcm.ext.${DOMAIN}"
   rules:
     - matches:
         - path:

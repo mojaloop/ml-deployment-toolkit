@@ -16,10 +16,10 @@ spec:
       s3-backup:
         type: s3
         s3:
-          bucket: ${backup_s3_bucket}
-          region: ${backup_s3_region}
-          endpointUrl: ${backup_s3_endpoint}
-          prefix: ${cluster_name}/mongodb
+          bucket: ${BACKUP_S3_BUCKET}
+          region: ${BACKUP_S3_REGION}
+          endpointUrl: ${BACKUP_S3_ENDPOINT}
+          prefix: ${CLUSTER_NAME}/mongodb
           credentialsSecret: backup-s3-credentials
     tasks:
       - name: daily
@@ -58,7 +58,7 @@ spec:
     - name: rs0
       size: 3
       tolerations:
-        - key: "node-role"
+        - key: "${P_NODE_ROLE_LABEL_KEY}"
           operator: "Equal"
           value: "db"
           effect: "NoSchedule"
@@ -69,7 +69,7 @@ spec:
               - weight: 100
                 preference:
                   matchExpressions:
-                    - key: node-role
+                    - key: ${P_NODE_ROLE_LABEL_KEY}
                       operator: In
                       values: ["db"]
           podAntiAffinity:
@@ -89,7 +89,7 @@ spec:
             - --collect-all
           env:
             - name: MONGODB_URI
-              value: "mongodb://clusterMonitor:${mongodb_root_password}@localhost:27017/admin?ssl=false"
+              value: "mongodb://clusterMonitor:${MONGODB_ROOT_PASSWORD}@localhost:27017/admin?ssl=false"
           ports:
             - containerPort: 9216
               name: metrics
@@ -110,6 +110,6 @@ spec:
         persistentVolumeClaim:
           resources:
             requests:
-              storage: ${mongodb_storage}
+              storage: ${MONGODB_STORAGE}
   sharding:
     enabled: false

@@ -9,9 +9,9 @@ metadata:
     cert-manager.io/cluster-issuer: acme-prod
     # What external-dns publishes for every attached route: the wan side of the
     # border DNAT when cluster.lb_ipam.pools.gw-ext.wan is set, the lan IP otherwise.
-    external-dns.alpha.kubernetes.io/target: "${gw_ext_dns_target}"
+    external-dns.alpha.kubernetes.io/target: "${GW_EXT_DNS_TARGET}"
 spec:
-  gatewayClassName: ${gateway_class_name}
+  gatewayClassName: ${P_GATEWAY_CLASS}
   # Propagated to the generated LoadBalancer Service; the gw-ext
   # CiliumLoadBalancerIPPool selects on it.
   infrastructure:
@@ -19,7 +19,7 @@ spec:
       lb-pool: gw-ext
   listeners:
     - name: https
-      hostname: "*.ext.${domain}"
+      hostname: "*.ext.${DOMAIN}"
       port: 443
       protocol: HTTPS
       tls:

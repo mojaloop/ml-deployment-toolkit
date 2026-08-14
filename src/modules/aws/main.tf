@@ -2,7 +2,7 @@
 # Provisions EKS managed Kubernetes cluster
 
 locals {
-  provider_config = yamldecode(file(var.provider_config_path))
+  provider_config = yamldecode(file(var.provider_config_path)).infra
   vpc_cidr        = try(local.provider_config.vpc.cidr, "10.0.0.0/16")
 
   # Use up to 3 AZs from the region

@@ -10,10 +10,10 @@ metadata:
   labels:
     lb-pool: gw-extapi
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: "extapi.${domain}"
+    external-dns.alpha.kubernetes.io/hostname: "extapi.${DOMAIN}"
     # The wan side of the border DNAT when cluster.lb_ipam.pools.gw-extapi.wan
     # is set, the lan IP otherwise.
-    external-dns.alpha.kubernetes.io/target: "${gw_extapi_dns_target}"
+    external-dns.alpha.kubernetes.io/target: "${GW_EXTAPI_DNS_TARGET}"
 spec:
   type: LoadBalancer
   selector:

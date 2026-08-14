@@ -11,9 +11,9 @@ metadata:
   annotations:
     # What external-dns publishes for every attached route: the wan side of the
     # border DNAT when cluster.lb_ipam.pools.gw-intapi.wan is set, the lan IP otherwise.
-    external-dns.alpha.kubernetes.io/target: "${gw_intapi_dns_target}"
+    external-dns.alpha.kubernetes.io/target: "${GW_INTAPI_DNS_TARGET}"
 spec:
-  gatewayClassName: ${gateway_class_name}
+  gatewayClassName: ${P_GATEWAY_CLASS}
   # Propagated to the generated LoadBalancer Service; the gw-intapi
   # CiliumLoadBalancerIPPool selects on it.
   infrastructure:
@@ -21,7 +21,7 @@ spec:
       lb-pool: gw-intapi
   listeners:
     - name: https
-      hostname: "intapi.int.${domain}"
+      hostname: "intapi.int.${DOMAIN}"
       port: 443
       protocol: HTTPS
       tls:

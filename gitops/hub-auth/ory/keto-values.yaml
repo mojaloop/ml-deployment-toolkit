@@ -1,7 +1,7 @@
 # Distribution values for the keto HelmRelease.
 # Adopter overrides go in environments/<env>/values/keto.yaml,
 # which is merged after this file and therefore wins.
-replicaCount: ${keto_replicas}
+replicaCount: ${KETO_REPLICAS}
 fullnameOverride: "keto"
 
 secret:
@@ -61,7 +61,7 @@ keto:
     enabled: true
     type: initContainer
   config:
-    dsn: "mysql://keto:${keto_db_password}@tcp(${mysql_host}:${mysql_port})/keto?max_conns=20&max_idle_conns=4"
+    dsn: "mysql://keto:${KETO_DB_PASSWORD}@tcp(${MYSQL_HOST}:${MYSQL_PORT})/keto?max_conns=20&max_idle_conns=4"
     serve:
       read:
         port: 4466

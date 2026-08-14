@@ -20,6 +20,13 @@ SECRET_KEYS=$(awk '
     if (!cont) inlist = 0
   }' Makefile)
 
+# SECRET_KEYS lists everything sourced from .env — not everything in it is a
+# secret. Keys below are declared non-sensitive and resolve from the
+# cluster-config ConfigMap (see flux-config/main.tf), so their appearance in a
+# ConfigMap document is by design.
+NON_SECRET_EXCEPTIONS="AWS_REGION"
+SECRET_KEYS=$(printf '%s\n' "$SECRET_KEYS" | grep -vxF "$NON_SECRET_EXCEPTIONS" || true)
+
 if [ -z "$SECRET_KEYS" ]; then
   echo "error: could not extract SECRET_KEYS from Makefile" >&2
   exit 2

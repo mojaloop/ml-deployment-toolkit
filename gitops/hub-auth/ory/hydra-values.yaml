@@ -1,7 +1,7 @@
 # Distribution values for the hydra HelmRelease.
 # Adopter overrides go in environments/<env>/values/hydra.yaml,
 # which is merged after this file and therefore wins.
-replicaCount: ${hydra_replicas}
+replicaCount: ${HYDRA_REPLICAS}
 fullnameOverride: "hydra"
 
 secret:
@@ -58,7 +58,7 @@ hydra:
     enabled: true
     type: initContainer
   config:
-    dsn: "mysql://hydra:${hydra_db_password}@tcp(${mysql_host}:${mysql_port})/hydra?max_conns=20&max_idle_conns=4"
+    dsn: "mysql://hydra:${HYDRA_DB_PASSWORD}@tcp(${MYSQL_HOST}:${MYSQL_PORT})/hydra?max_conns=20&max_idle_conns=4"
 
     serve:
       public:
@@ -66,13 +66,13 @@ hydra:
         cors:
           enabled: true
           allowed_origins:
-            - "https://*.${domain}"
+            - "https://*.${DOMAIN}"
       admin:
         port: 4445
 
     urls:
       self:
-        issuer: "https://hydra.ext.${domain}"
+        issuer: "https://hydra.ext.${DOMAIN}"
 
     oauth2:
       expose_internal_errors: false

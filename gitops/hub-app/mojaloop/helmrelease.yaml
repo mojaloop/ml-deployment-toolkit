@@ -43,7 +43,11 @@ spec:
       name: mojaloop-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: mojaloop-values-override
+      name: mojaloop-mojaloop-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: mojaloop-mojaloop-values-override
       valuesKey: values.yaml
       optional: true
   # The chart's common.topologySpread template hardcodes maxSkew=1/DoNotSchedule

@@ -5,8 +5,8 @@ db:
   user: mcm
   passwordSecret: mcm-db-secret
   passwordSecretKey: mysql-password
-  host: "${mysql_host}"
-  port: ${mysql_port}
+  host: "${MYSQL_HOST}"
+  port: ${MYSQL_PORT}
   schema: mcm
 
 api:
@@ -15,10 +15,10 @@ api:
     version: pr-202-v4
   ports:
     portName: api
-  url: "https://mcm.int.${domain}"
-  clientUrl: "https://mcm.int.${domain}"
-  switchFQDN: "${domain}"
-  switchId: "${hub_participant_name}"
+  url: "https://mcm.int.${DOMAIN}"
+  clientUrl: "https://mcm.int.${DOMAIN}"
+  switchFQDN: "${DOMAIN}"
+  switchId: "${HUB_PARTICIPANT_NAME}"
 
   env:
     IAM_ENABLED: "true"
@@ -28,7 +28,7 @@ api:
     KRATOS_ADMIN_URL: "http://kratos-admin.ory.svc.cluster.local:80"
     KRATOS_PUBLIC_URL: "http://kratos-public.ory.svc.cluster.local:80"
     KETO_READ_URL: "http://keto-read.ory.svc.cluster.local:80"
-    KETO_HUB_OBJECT: "${hub_participant_name}"
+    KETO_HUB_OBJECT: "${HUB_PARTICIPANT_NAME}"
 
   openid:
     enabled: false
@@ -70,8 +70,8 @@ api:
     writeUrl: http://keto-write.ory.svc.cluster.local:80
 
 ui:
-  checkSessionUrl: "https://mcm.int.${domain}/kratos/sessions/whoami"
-  loginUrl: "https://auth.int.${domain}/kratos/self-service/login/browser"
+  checkSessionUrl: "https://mcm.int.${DOMAIN}/kratos/sessions/whoami"
+  loginUrl: "https://auth.int.${DOMAIN}/kratos/self-service/login/browser"
   loginProvider: kratos
   logoutUrl: "/kratos/self-service/logout/browser"
   oauth:
@@ -90,7 +90,7 @@ migrations:
     VAULT_MOUNT_KV: secret/mcm
     VAULT_PKI_SERVER_ROLE: server-cert-role
     VAULT_PKI_CLIENT_ROLE: client-cert-role
-    SWITCH_ID: "${hub_participant_name}"
+    SWITCH_ID: "${HUB_PARTICIPANT_NAME}"
 
 ingress:
   enabled: false

@@ -36,6 +36,10 @@ spec:
       name: openebs-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: openebs-values-override
+      name: openebs-system-openebs-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: openebs-system-openebs-values-override
       valuesKey: values.yaml
       optional: true

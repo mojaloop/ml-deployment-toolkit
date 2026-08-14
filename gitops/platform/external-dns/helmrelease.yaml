@@ -39,6 +39,10 @@ spec:
     - kind: ConfigMap
       name: external-dns-provider-values
     - kind: ConfigMap
-      name: external-dns-values-override
+      name: external-dns-external-dns-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: external-dns-external-dns-values-override
       valuesKey: values.yaml
       optional: true

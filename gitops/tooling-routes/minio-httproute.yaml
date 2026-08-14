@@ -8,7 +8,7 @@ spec:
     - name: gw-int
       namespace: platform-system
   hostnames:
-    - "minio.int.${domain}"
+    - "minio.int.${DOMAIN}"
   rules:
     - backendRefs:
         - name: minio-console

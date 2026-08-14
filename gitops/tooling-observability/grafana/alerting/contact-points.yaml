@@ -23,10 +23,10 @@ stringData:
           - uid: ops-email
             type: email
             settings:
-              addresses: "${alert_email_to}"
+              addresses: "${ALERT_EMAIL_TO}"
               singleEmail: true
           - uid: ops-telegram
             type: telegram
             settings:
-              bottoken: "${telegram_bot_token}"
-              chatid: "${telegram_chat_id}"
+              bottoken: "${TELEGRAM_BOT_TOKEN}"
+              chatid: "${TELEGRAM_CHAT_ID}"

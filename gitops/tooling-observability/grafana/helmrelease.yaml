@@ -33,6 +33,10 @@ spec:
       name: grafana-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: grafana-values-override
+      name: observability-grafana-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: observability-grafana-values-override
       valuesKey: values.yaml
       optional: true

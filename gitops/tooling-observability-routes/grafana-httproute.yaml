@@ -8,7 +8,7 @@ spec:
     - name: gw-int
       namespace: platform-system
   hostnames:
-    - "grafana.int.${domain}"
+    - "grafana.int.${DOMAIN}"
   rules:
     - backendRefs:
         - name: grafana

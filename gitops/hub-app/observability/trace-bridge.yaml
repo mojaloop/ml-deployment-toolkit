@@ -55,11 +55,11 @@ spec:
           image: ghcr.io/kiswend/moja-trace-bridge:0.1.1
           env:
             - name: KAFKA_BROKERS
-              value: "${kafka_host}:${kafka_port}"
+              value: "${KAFKA_HOST}:${KAFKA_PORT}"
             - name: TRACE_TOPIC
               value: topic-event-trace
             - name: OTLP_URL
-              value: "${tempo_url}"
+              value: "${TEMPO_URL}"
             - name: TLS_SKIP
               value: "true"
           resources:

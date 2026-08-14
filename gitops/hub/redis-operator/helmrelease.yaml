@@ -37,6 +37,10 @@ spec:
       name: redis-operator-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: redis-operator-values-override
+      name: hub-system-redis-operator-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: hub-system-redis-operator-values-override
       valuesKey: values.yaml
       optional: true

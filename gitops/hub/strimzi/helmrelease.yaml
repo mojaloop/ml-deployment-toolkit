@@ -37,6 +37,10 @@ spec:
       name: strimzi-kafka-operator-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: strimzi-kafka-operator-values-override
+      name: hub-system-strimzi-kafka-operator-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: hub-system-strimzi-kafka-operator-values-override
       valuesKey: values.yaml
       optional: true

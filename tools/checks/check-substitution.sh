@@ -37,10 +37,14 @@ scan_file() {
   # engine-parity %{ rule never applies to them.
   tfcheck=0
   if [ "$mode" = "tf" ]; then tfcheck=1; fi
+  # *.tpl files are also exempt from the UPPER_SNAKE token rule: their ${...}
+  # are templatefile() variables internal to DTK, not adopter-facing
+  # substitution parameters. Operator forms would be HCL errors there anyway.
+  lcheck=1
   case "$f" in
-    *.tpl) tfcheck=0 ;;
+    *.tpl) tfcheck=0; lcheck=0 ;;
   esac
-  out=$(awk -v tfcheck="$tfcheck" '
+  out=$(awk -v tfcheck="$tfcheck" -v lcheck="$lcheck" '
     {
       line = $0
       # drop escaped literals $${...} — never substitutions
@@ -55,9 +59,10 @@ scan_file() {
       while (match(rest, /\$\{[^}]*\}/)) {
         tok = substr(rest, RSTART + 2, RLENGTH - 3)
         if (tok !~ /^[A-Z][A-Z0-9_]*$/) {
-          if (tok ~ /^[A-Za-z_][A-Za-z0-9_]*$/)
-            printf "%s:%d: lowercase substitution token (target is UPPER_SNAKE): ${%s}\n", FILENAME, FNR, tok
-          else
+          if (tok ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {
+            if (lcheck == 1)
+              printf "%s:%d: lowercase substitution token (target is UPPER_SNAKE): ${%s}\n", FILENAME, FNR, tok
+          } else
             printf "%s:%d: forbidden operator form in substitution token: ${%s}\n", FILENAME, FNR, tok
         }
         rest = substr(rest, RSTART + RLENGTH)

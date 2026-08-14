@@ -1,7 +1,8 @@
 # Flux Config Module (config stack)
 # Creates the in-cluster configuration Flux consumes:
-#   cluster-config ConfigMap + cluster-secrets Secret (postBuild substitution),
-#   per-chart values-override ConfigMaps, OCIRepository, and all Kustomizations.
+#   cluster-config ConfigMap + cluster-secrets Secret (postBuild substitution,
+#   keys UPPER_SNAKE matching the ${UPPER_SNAKE} gitops tokens), per-release
+#   values-override ConfigMaps/Secrets, OCIRepository, and all Kustomizations.
 #
 # Kustomization graph (Flux dependsOn, role-gated):
 #   platform -> dns/<provider> -> platform-config -> <vendor> -> <role>
@@ -38,16 +39,19 @@ locals {
     }
   }) : ""
 
-  # DNS provider credentials for gitops/dns/<provider> substitution
+  # DNS provider credentials for gitops/dns/<provider> substitution.
+  # AWS_REGION deliberately lives in cluster-config, not here: it is not a
+  # credential, and route53's external-dns/clusterissuer values consume it
+  # inside ConfigMap-shaped documents — a substituted secret must never land
+  # in a ConfigMap (secret-placement check enforces this).
   dns_credentials = {
-    digitalocean_token       = lookup(local.s, "DIGITALOCEAN_TOKEN", "")
-    cloudflare_api_token     = lookup(local.s, "CLOUDFLARE_API_TOKEN", "")
-    aws_access_key_id        = lookup(local.s, "AWS_ACCESS_KEY_ID", "")
-    aws_secret_access_key    = lookup(local.s, "AWS_SECRET_ACCESS_KEY", "")
-    aws_region               = lookup(local.s, "AWS_REGION", "")
-    powerdns_api_url         = lookup(local.s, "POWERDNS_API_URL", "")
-    powerdns_api_key         = lookup(local.s, "POWERDNS_API_KEY", "")
-    dns_provider_credentials = "${lookup(local.s, "DIGITALOCEAN_TOKEN", "")}${lookup(local.s, "CLOUDFLARE_API_TOKEN", "")}${lookup(local.s, "AWS_ACCESS_KEY_ID", "")}${lookup(local.s, "POWERDNS_API_KEY", "")}"
+    DIGITALOCEAN_TOKEN       = lookup(local.s, "DIGITALOCEAN_TOKEN", "")
+    CLOUDFLARE_API_TOKEN     = lookup(local.s, "CLOUDFLARE_API_TOKEN", "")
+    AWS_ACCESS_KEY_ID        = lookup(local.s, "AWS_ACCESS_KEY_ID", "")
+    AWS_SECRET_ACCESS_KEY    = lookup(local.s, "AWS_SECRET_ACCESS_KEY", "")
+    POWERDNS_API_URL         = lookup(local.s, "POWERDNS_API_URL", "")
+    POWERDNS_API_KEY         = lookup(local.s, "POWERDNS_API_KEY", "")
+    DNS_PROVIDER_CREDENTIALS = "${lookup(local.s, "DIGITALOCEAN_TOKEN", "")}${lookup(local.s, "CLOUDFLARE_API_TOKEN", "")}${lookup(local.s, "AWS_ACCESS_KEY_ID", "")}${lookup(local.s, "POWERDNS_API_KEY", "")}"
   }
 
   # ACME External Account Binding. Presence of the credentials is the switch —
@@ -61,79 +65,83 @@ locals {
   # Always present (empty when unused) so the Secret manifest still renders —
   # it is inert until the EAB patch below makes the issuer reference it.
   cert_credentials = {
-    acme_eab_key_id       = lookup(local.s, "ACME_EAB_KEY_ID", "")
-    acme_eab_hmac_encoded = lookup(local.s, "ACME_EAB_HMAC_ENCODED", "")
+    ACME_EAB_KEY_ID       = lookup(local.s, "ACME_EAB_KEY_ID", "")
+    ACME_EAB_HMAC_ENCODED = lookup(local.s, "ACME_EAB_HMAC_ENCODED", "")
   }
 
   # ---------------------------------------------------------------------------
   # Generated internal service passwords.
-  # A matching non-empty UPPER_CASE key in var.secrets overrides generation
-  # (used by external-unmanaged data stores and for migrating existing envs).
+  # Canonical names are UPPER_SNAKE — identical to the cluster-secrets data key,
+  # the ${TOKEN} in gitops manifests, and the .env variable name. A matching
+  # non-empty key in var.secrets overrides generation (used by
+  # external-unmanaged data stores and for migrating existing envs).
   # ---------------------------------------------------------------------------
   # Declared buckets (tooling only) each get a scoped MinIO user whose secret key
-  # follows the generated-secret pattern: minio_bucket_<name>_secret_key,
-  # overridable via the matching UPPER_CASE key in .env.
+  # follows the generated-secret pattern: MINIO_BUCKET_<NAME>_SECRET_KEY,
+  # overridable via the matching key in .env.
   minio_declared_buckets = local.is_tooling ? var.object_storage.buckets : []
   # Mirrors the default buckets list in gitops/tooling-config/minio/minio-values.yaml.
   minio_system_buckets = ["harbor", "backups", "thanos", "loki", "tempo"]
   minio_bucket_secret_names = {
     for b in local.minio_declared_buckets :
-    b => "minio_bucket_${replace(replace(b, "-", "_"), ".", "_")}_secret_key"
+    b => upper("minio_bucket_${replace(replace(b, "-", "_"), ".", "_")}_secret_key")
   }
 
   # Declared robot accounts (tooling only) each get a pull-only Harbor robot whose
-  # secret follows the same pattern: harbor_robot_<name>_secret, overridable
-  # via the matching UPPER_CASE key in .env.
+  # secret follows the same pattern: HARBOR_ROBOT_<NAME>_SECRET, overridable
+  # via the matching key in .env.
   harbor_declared_robots = local.is_tooling ? var.registry.robots : []
   harbor_robot_secret_names = {
     for r in local.harbor_declared_robots :
-    r => "harbor_robot_${replace(replace(r, "-", "_"), ".", "_")}_secret"
+    r => upper("harbor_robot_${replace(replace(r, "-", "_"), ".", "_")}_secret")
   }
 
   generated_secret_names = setunion(
     local.is_tooling ? [
-      "minio_root_password",
-      "harbor_admin_password",
-      "grafana_admin_password",
+      "MINIO_ROOT_PASSWORD",
+      "HARBOR_ADMIN_PASSWORD",
+      "GRAFANA_ADMIN_PASSWORD",
     ] : [],
     values(local.minio_bucket_secret_names),
     local.is_hub ? [
-      "mysql_root_password",
-      "mysql_central_ledger_password",
-      "mysql_account_lookup_password",
-      "mysql_oracle_msisdn_password",
-      "mongodb_root_password",
-      "mongodb_app_password",
-      "kratos_db_password",
-      "keto_db_password",
-      "hydra_db_password",
-      "mcm_db_password",
-      "hub_admin_password",
-      "mcm_oidc_client_secret",
-      "role_assign_svc_secret",
-      "kratos_secrets_cipher",
-      "kratos_secrets_cookie",
-      "kratos_secrets_csrf_cookie",
-      "kratos_secrets_default",
-      "hydra_secrets_system",
-      "hydra_secrets_cookie",
+      "MYSQL_ROOT_PASSWORD",
+      "MYSQL_CENTRAL_LEDGER_PASSWORD",
+      "MYSQL_ACCOUNT_LOOKUP_PASSWORD",
+      "MYSQL_ORACLE_MSISDN_PASSWORD",
+      "MONGODB_ROOT_PASSWORD",
+      "MONGODB_APP_PASSWORD",
+      "KRATOS_DB_PASSWORD",
+      "KETO_DB_PASSWORD",
+      "HYDRA_DB_PASSWORD",
+      "MCM_DB_PASSWORD",
+      "HUB_ADMIN_PASSWORD",
+      "MCM_OIDC_CLIENT_SECRET",
+      "ROLE_ASSIGN_SVC_SECRET",
+      "KRATOS_SECRETS_CIPHER",
+      "KRATOS_SECRETS_COOKIE",
+      "KRATOS_SECRETS_CSRF_COOKIE",
+      "KRATOS_SECRETS_DEFAULT",
+      "HYDRA_SECRETS_SYSTEM",
+      "HYDRA_SECRETS_COOKIE",
     ] : [],
   )
 
+  # The canonical name IS the .env key, so the override lookup needs no case
+  # mapping: a non-empty var.secrets entry under the same name wins.
   generated_secrets = merge(
     {
       for name in local.generated_secret_names :
       name => (
-        lookup(local.s, upper(name), "") != ""
-        ? local.s[upper(name)]
+        lookup(local.s, name, "") != ""
+        ? local.s[name]
         : random_password.generated[name].result
       )
     },
     {
       for r, name in local.harbor_robot_secret_names :
       name => (
-        lookup(local.s, upper(name), "") != ""
-        ? local.s[upper(name)]
+        lookup(local.s, name, "") != ""
+        ? local.s[name]
         : random_password.harbor_robot[name].result
       )
     },
@@ -170,8 +178,81 @@ resource "random_password" "harbor_robot" {
 }
 
 # ---------------------------------------------------------------------------
-# cluster-config — non-secret substitution variables
+# cluster-config — non-secret substitution variables.
+# Data keys are UPPER_SNAKE, matching the ${UPPER_SNAKE} tokens in gitops/.
 # ---------------------------------------------------------------------------
+locals {
+  cluster_config_base = merge(
+    {
+      # The gateway class is a provider interface symbol now: gitops references
+      # ${P_GATEWAY_CLASS}, supplied via var.params from the provider's
+      # params.yaml — config.yaml can no longer set or shadow it.
+      CLUSTER_NAME = var.cluster_name
+      DOMAIN       = var.domain
+      # Not a credential — consumed inside ConfigMap-shaped route53 documents,
+      # so it must resolve from cluster-config, never from cluster-secrets.
+      AWS_REGION = nonsensitive(lookup(var.secrets, "AWS_REGION", ""))
+
+      # Per-gateway LB pool addresses. Empty on cloud providers, where the
+      # talos layer (and with it every pool manifest) is never applied.
+      GW_INT_IP         = try(var.lb_ipam_pools["gw-int"].lan, "")
+      GW_INT_DNS_TARGET = try(var.lb_ipam_pools["gw-int"].dns_target, "")
+      GW_EXT_IP         = try(var.lb_ipam_pools["gw-ext"].lan, "")
+      GW_EXT_DNS_TARGET = try(var.lb_ipam_pools["gw-ext"].dns_target, "")
+
+      # cert capability (ACME)
+      ACME_EMAIL              = var.cert.acme_email
+      ACME_SERVER             = var.cert.acme_server
+      ACME_ACCOUNT_KEY_SECRET = var.cert.acme_account_key_secret
+
+      # email + alerting capabilities (non-secret halves)
+      SMTP_HOST        = var.email.host
+      SMTP_PORT        = var.email.port
+      ALERT_EMAIL_FROM = var.email.from
+      ALERT_EMAIL_TO   = var.alerting.email_to
+      TELEGRAM_CHAT_ID = var.alerting.telegram_chat_id
+
+      # observability sink
+      LOKI_URL  = var.observability.loki_url
+      MIMIR_URL = var.observability.mimir_url
+      TEMPO_URL = var.observability.tempo_url
+    },
+    local.is_hub ? {
+      GW_EXTAPI_IP         = try(var.lb_ipam_pools["gw-extapi"].lan, "")
+      GW_EXTAPI_DNS_TARGET = try(var.lb_ipam_pools["gw-extapi"].dns_target, "")
+      GW_INTAPI_IP         = try(var.lb_ipam_pools["gw-intapi"].lan, "")
+      GW_INTAPI_DNS_TARGET = try(var.lb_ipam_pools["gw-intapi"].dns_target, "")
+
+      MYSQL_HOST   = var.data_stores["mysql"].host
+      MYSQL_PORT   = var.data_stores["mysql"].port
+      KAFKA_HOST   = var.data_stores["kafka"].host
+      KAFKA_PORT   = var.data_stores["kafka"].port
+      MONGODB_HOST = var.data_stores["mongodb"].host
+      MONGODB_PORT = var.data_stores["mongodb"].port
+      REDIS_HOST   = var.data_stores["redis"].host
+      REDIS_PORT   = var.data_stores["redis"].port
+
+      HUB_PARTICIPANT_NAME     = var.app.hub_participant_name
+      HUB_ADMIN_EMAIL          = var.app.hub_admin_email
+      ONBOARDING_FUNDS_IN      = var.app.onboarding_funds_in
+      ONBOARDING_NET_DEBIT_CAP = var.app.onboarding_net_debit_cap
+      API_TYPE                 = var.app.api_type
+
+      BACKUP_S3_ENDPOINT = var.object_storage.endpoint
+      BACKUP_S3_BUCKET   = var.object_storage.bucket
+      BACKUP_S3_REGION   = var.object_storage.region
+    } : {},
+    { for k, v in var.profile_vars : upper(k) => v },
+  )
+
+  # Provider symbols (P_*) may never shadow a config key, and vice versa —
+  # merge order would silently pick a winner, so collisions are an error.
+  cluster_config_collisions = sort(setintersection(
+    toset(keys(local.cluster_config_base)),
+    toset(keys(var.params)),
+  ))
+}
+
 resource "kubernetes_config_map_v1" "cluster_config" {
   metadata {
     name      = "cluster-config"
@@ -179,66 +260,21 @@ resource "kubernetes_config_map_v1" "cluster_config" {
   }
 
   data = merge(
-    {
-      cluster_name       = var.cluster_name
-      domain             = var.domain
-      gateway_class_name = var.gateway_class_name
-
-      # Per-gateway LB pool addresses. Empty on cloud providers, where the
-      # talos layer (and with it every pool manifest) is never applied.
-      gw_int_ip         = try(var.lb_ipam_pools["gw-int"].lan, "")
-      gw_int_dns_target = try(var.lb_ipam_pools["gw-int"].dns_target, "")
-      gw_ext_ip         = try(var.lb_ipam_pools["gw-ext"].lan, "")
-      gw_ext_dns_target = try(var.lb_ipam_pools["gw-ext"].dns_target, "")
-
-      # cert capability (ACME)
-      acme_email              = var.cert.acme_email
-      acme_server             = var.cert.acme_server
-      acme_account_key_secret = var.cert.acme_account_key_secret
-
-      # email + alerting capabilities (non-secret halves)
-      smtp_host        = var.email.host
-      smtp_port        = var.email.port
-      alert_email_from = var.email.from
-      alert_email_to   = var.alerting.email_to
-      telegram_chat_id = var.alerting.telegram_chat_id
-
-      # observability sink
-      loki_url  = var.observability.loki_url
-      mimir_url = var.observability.mimir_url
-      tempo_url = var.observability.tempo_url
-    },
-    local.is_hub ? {
-      gw_extapi_ip         = try(var.lb_ipam_pools["gw-extapi"].lan, "")
-      gw_extapi_dns_target = try(var.lb_ipam_pools["gw-extapi"].dns_target, "")
-      gw_intapi_ip         = try(var.lb_ipam_pools["gw-intapi"].lan, "")
-      gw_intapi_dns_target = try(var.lb_ipam_pools["gw-intapi"].dns_target, "")
-
-      mysql_host   = var.data_stores["mysql"].host
-      mysql_port   = var.data_stores["mysql"].port
-      kafka_host   = var.data_stores["kafka"].host
-      kafka_port   = var.data_stores["kafka"].port
-      mongodb_host = var.data_stores["mongodb"].host
-      mongodb_port = var.data_stores["mongodb"].port
-      redis_host   = var.data_stores["redis"].host
-      redis_port   = var.data_stores["redis"].port
-
-      hub_participant_name     = var.app.hub_participant_name
-      hub_admin_email          = var.app.hub_admin_email
-      onboarding_funds_in      = var.app.onboarding_funds_in
-      onboarding_net_debit_cap = var.app.onboarding_net_debit_cap
-      api_type                 = var.app.api_type
-
-      backup_s3_endpoint = var.object_storage.endpoint
-      backup_s3_bucket   = var.object_storage.bucket
-      backup_s3_region   = var.object_storage.region
-    } : {},
-    var.profile_vars,
+    local.cluster_config_base,
+    var.params,
   )
+
+  lifecycle {
+    precondition {
+      condition     = length(local.cluster_config_collisions) == 0
+      error_message = "params keys collide with cluster-config keys: ${join(", ", local.cluster_config_collisions)}. Rename the provider symbols or the conflicting config keys."
+    }
+  }
 }
 
 # ---------------------------------------------------------------------------
-# cluster-secrets — secret substitution variables
+# cluster-secrets — secret substitution variables.
+# Data keys are UPPER_SNAKE, matching the ${UPPER_SNAKE} tokens in gitops/.
 # ---------------------------------------------------------------------------
 resource "kubernetes_secret_v1" "cluster_secrets" {
   metadata {
@@ -250,50 +286,50 @@ resource "kubernetes_secret_v1" "cluster_secrets" {
     local.dns_credentials,
     local.cert_credentials,
     {
-      oci_repo_username = lookup(local.s, "OCI_REPO_USERNAME", "")
-      oci_repo_password = lookup(local.s, "OCI_REPO_PASSWORD", "")
-      smtp_user         = lookup(local.s, "SMTP_USER", "")
-      smtp_password     = lookup(local.s, "SMTP_PASSWORD", "")
+      OCI_REPO_USERNAME = lookup(local.s, "OCI_REPO_USERNAME", "")
+      OCI_REPO_PASSWORD = lookup(local.s, "OCI_REPO_PASSWORD", "")
+      SMTP_USER         = lookup(local.s, "SMTP_USER", "")
+      SMTP_PASSWORD     = lookup(local.s, "SMTP_PASSWORD", "")
       # Grafana Telegram contact point tolerates a dummy token; empty breaks provisioning
-      telegram_bot_token = lookup(local.set_secrets, "TELEGRAM_BOT_TOKEN", "unset")
+      TELEGRAM_BOT_TOKEN = lookup(local.set_secrets, "TELEGRAM_BOT_TOKEN", "unset")
     },
     local.is_tooling ? {
-      minio_root_user        = lookup(local.set_secrets, "MINIO_ROOT_USER", "minioadmin")
-      minio_root_password    = local.generated_secrets["minio_root_password"]
-      harbor_admin_password  = local.generated_secrets["harbor_admin_password"]
-      grafana_admin_password = local.generated_secrets["grafana_admin_password"]
+      MINIO_ROOT_USER        = lookup(local.set_secrets, "MINIO_ROOT_USER", "minioadmin")
+      MINIO_ROOT_PASSWORD    = local.generated_secrets["MINIO_ROOT_PASSWORD"]
+      HARBOR_ADMIN_PASSWORD  = local.generated_secrets["HARBOR_ADMIN_PASSWORD"]
+      GRAFANA_ADMIN_PASSWORD = local.generated_secrets["GRAFANA_ADMIN_PASSWORD"]
       # Robot payload for the Harbor setup Job. base64 because it is
       # substituted into the data: field of a Secret manifest — quoting-proof
       # for JSON content. Always present ("W10=" = []) so substitution and the
       # Job's mount never fail on a Tooling Cluster with no robots declared.
-      harbor_robots_json = base64encode(jsonencode(local.harbor_robots))
+      HARBOR_ROBOTS_JSON = base64encode(jsonencode(local.harbor_robots))
       # Substituted into the Job's pod-template annotations: any robot or
       # secret change alters the Job spec, and the force annotation on the Job
       # lets Flux recreate (= re-run) it.
-      harbor_robots_hash = sha256(jsonencode(local.harbor_robots))
+      HARBOR_ROBOTS_HASH = sha256(jsonencode(local.harbor_robots))
     } : {},
     local.is_hub ? {
-      mysql_root_password           = local.generated_secrets["mysql_root_password"]
-      mysql_central_ledger_password = local.generated_secrets["mysql_central_ledger_password"]
-      mysql_account_lookup_password = local.generated_secrets["mysql_account_lookup_password"]
-      mysql_oracle_msisdn_password  = local.generated_secrets["mysql_oracle_msisdn_password"]
-      mongodb_root_password         = local.generated_secrets["mongodb_root_password"]
-      mongodb_app_password          = local.generated_secrets["mongodb_app_password"]
-      kratos_db_password            = local.generated_secrets["kratos_db_password"]
-      keto_db_password              = local.generated_secrets["keto_db_password"]
-      hydra_db_password             = local.generated_secrets["hydra_db_password"]
-      mcm_db_password               = local.generated_secrets["mcm_db_password"]
-      hub_admin_password            = local.generated_secrets["hub_admin_password"]
-      mcm_oidc_client_secret        = local.generated_secrets["mcm_oidc_client_secret"]
-      role_assign_svc_secret        = local.generated_secrets["role_assign_svc_secret"]
-      kratos_secrets_cipher         = local.generated_secrets["kratos_secrets_cipher"]
-      kratos_secrets_cookie         = local.generated_secrets["kratos_secrets_cookie"]
-      kratos_secrets_csrf_cookie    = local.generated_secrets["kratos_secrets_csrf_cookie"]
-      kratos_secrets_default        = local.generated_secrets["kratos_secrets_default"]
-      hydra_secrets_system          = local.generated_secrets["hydra_secrets_system"]
-      hydra_secrets_cookie          = local.generated_secrets["hydra_secrets_cookie"]
-      backup_s3_access_key          = lookup(local.s, "BACKUP_S3_ACCESS_KEY", "")
-      backup_s3_secret_key          = lookup(local.s, "BACKUP_S3_SECRET_KEY", "")
+      MYSQL_ROOT_PASSWORD           = local.generated_secrets["MYSQL_ROOT_PASSWORD"]
+      MYSQL_CENTRAL_LEDGER_PASSWORD = local.generated_secrets["MYSQL_CENTRAL_LEDGER_PASSWORD"]
+      MYSQL_ACCOUNT_LOOKUP_PASSWORD = local.generated_secrets["MYSQL_ACCOUNT_LOOKUP_PASSWORD"]
+      MYSQL_ORACLE_MSISDN_PASSWORD  = local.generated_secrets["MYSQL_ORACLE_MSISDN_PASSWORD"]
+      MONGODB_ROOT_PASSWORD         = local.generated_secrets["MONGODB_ROOT_PASSWORD"]
+      MONGODB_APP_PASSWORD          = local.generated_secrets["MONGODB_APP_PASSWORD"]
+      KRATOS_DB_PASSWORD            = local.generated_secrets["KRATOS_DB_PASSWORD"]
+      KETO_DB_PASSWORD              = local.generated_secrets["KETO_DB_PASSWORD"]
+      HYDRA_DB_PASSWORD             = local.generated_secrets["HYDRA_DB_PASSWORD"]
+      MCM_DB_PASSWORD               = local.generated_secrets["MCM_DB_PASSWORD"]
+      HUB_ADMIN_PASSWORD            = local.generated_secrets["HUB_ADMIN_PASSWORD"]
+      MCM_OIDC_CLIENT_SECRET        = local.generated_secrets["MCM_OIDC_CLIENT_SECRET"]
+      ROLE_ASSIGN_SVC_SECRET        = local.generated_secrets["ROLE_ASSIGN_SVC_SECRET"]
+      KRATOS_SECRETS_CIPHER         = local.generated_secrets["KRATOS_SECRETS_CIPHER"]
+      KRATOS_SECRETS_COOKIE         = local.generated_secrets["KRATOS_SECRETS_COOKIE"]
+      KRATOS_SECRETS_CSRF_COOKIE    = local.generated_secrets["KRATOS_SECRETS_CSRF_COOKIE"]
+      KRATOS_SECRETS_DEFAULT        = local.generated_secrets["KRATOS_SECRETS_DEFAULT"]
+      HYDRA_SECRETS_SYSTEM          = local.generated_secrets["HYDRA_SECRETS_SYSTEM"]
+      HYDRA_SECRETS_COOKIE          = local.generated_secrets["HYDRA_SECRETS_COOKIE"]
+      BACKUP_S3_ACCESS_KEY          = lookup(local.s, "BACKUP_S3_ACCESS_KEY", "")
+      BACKUP_S3_SECRET_KEY          = lookup(local.s, "BACKUP_S3_SECRET_KEY", "")
     } : {}
   )
 
@@ -347,8 +383,11 @@ resource "kubernetes_secret_v1" "minio_buckets_values" {
   type = "Opaque"
 }
 
-# Deployer Helm value overrides — one ConfigMap per values/<chart>.yaml file.
-# Referenced by every HelmRelease via valuesFrom (optional: true).
+# Deployer Helm value overrides — one object per values/<namespace>/<release>.yaml
+# file, named <namespace>-<release>-values-override. Referenced by every
+# HelmRelease via valuesFrom (optional: true). Files that reference no secret
+# key become ConfigMaps; files that do arrive pre-classified in
+# helm_value_secret_overrides and become Secrets instead (same name, same key).
 resource "kubernetes_config_map_v1" "helm_value_overrides" {
   for_each = { for k, v in var.helm_value_overrides : k => v if v != "" }
 
@@ -360,6 +399,23 @@ resource "kubernetes_config_map_v1" "helm_value_overrides" {
   data = {
     "values.yaml" = each.value
   }
+}
+
+resource "kubernetes_secret_v1" "helm_value_overrides" {
+  # Keys are <namespace>-<release> file names, not secret material — strip the
+  # sensitive mark inherited from the values so they can drive for_each.
+  for_each = nonsensitive(toset(keys(var.helm_value_secret_overrides)))
+
+  metadata {
+    name      = "${each.key}-values-override"
+    namespace = var.flux_namespace
+  }
+
+  data = {
+    "values.yaml" = var.helm_value_secret_overrides[each.key]
+  }
+
+  type = "Opaque"
 }
 
 # OCI registry credentials (Flux source-controller pull auth)
@@ -566,7 +622,7 @@ locals {
           spec = {
             acme = {
               externalAccountBinding = {
-                keyID = "$${acme_eab_key_id}"
+                keyID = "$${ACME_EAB_KEY_ID}"
                 keySecretRef = {
                   name = "acme-eab-credentials"
                   key  = "hmac-encoded"

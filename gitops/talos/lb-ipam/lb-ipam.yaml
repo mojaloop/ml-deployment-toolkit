@@ -11,8 +11,8 @@ metadata:
   name: gw-int
 spec:
   blocks:
-    - start: "${gw_int_ip}"
-      stop: "${gw_int_ip}"
+    - start: "${GW_INT_IP}"
+      stop: "${GW_INT_IP}"
   serviceSelector:
     matchLabels:
       lb-pool: gw-int
@@ -23,8 +23,8 @@ metadata:
   name: gw-ext
 spec:
   blocks:
-    - start: "${gw_ext_ip}"
-      stop: "${gw_ext_ip}"
+    - start: "${GW_EXT_IP}"
+      stop: "${GW_EXT_IP}"
   serviceSelector:
     matchLabels:
       lb-pool: gw-ext
@@ -35,6 +35,6 @@ metadata:
   name: default-l2-policy
 spec:
   interfaces:
-    - ^eth[0-9]+
+    - ${P_L2_INTERFACE_REGEX}
   externalIPs: true
   loadBalancerIPs: true

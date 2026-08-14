@@ -3,8 +3,14 @@
 # the config stack (src/config), which applies fast and cannot touch VMs.
 
 locals {
-  env_config_path = "${var.environments_dir}/${var.env_name}/config.yaml"
+  env_dir         = "${var.environments_dir}/${var.env_name}"
+  env_config_path = "${local.env_dir}/config.yaml"
   artifacts_path  = "${var.artifacts_dir}/${var.env_name}"
+
+  # Provider infra facts moved out of config.yaml into a sidecar the provider
+  # alone consumes: <env>/proxmox/proxmox.yaml (network_bridge, storage pools).
+  proxmox_env_file = "${local.env_dir}/proxmox/proxmox.yaml"
+  proxmox_env      = fileexists(local.proxmox_env_file) ? yamldecode(file(local.proxmox_env_file)) : {}
 
   # Read raw config for provider selection (before module.config expands it)
   config_raw    = yamldecode(file(local.env_config_path))
@@ -42,6 +48,8 @@ module "config" {
   workload_classes_path = "../../config/definitions/workload-classes.yaml"
   templates_path        = "../../config/templates"
   env_name              = var.env_name
+  env_dir               = local.env_dir
+  dtk_tag               = var.dtk_tag
 }
 
 # Proxmox Cluster (Talos VMs)
@@ -59,7 +67,7 @@ module "proxmox" {
 
   patches_path         = module.config.paths.patches
   artifacts_path       = local.artifacts_path
-  provider_config_path = "../../config/templates/mappings/proxmox.yaml"
+  provider_config_path = "../../config/templates/proxmox/params.yaml"
 
   # registry capability (image pull-through cache -> Talos machine mirrors)
   oci_proxy_active   = module.config.registry.active
@@ -69,11 +77,11 @@ module "proxmox" {
 
   nameservers             = try(local.config_raw.infra.talos.nameservers, [])
   ntp_servers             = try(local.config_raw.infra.talos.ntp_servers, [])
-  network_bridge_override = try(local.config_raw.infra.proxmox.network_bridge, "")
+  network_bridge_override = try(local.proxmox_env.network_bridge, "")
   storage_override = {
-    disks    = try(local.config_raw.infra.proxmox.storage.disks, "")
-    images   = try(local.config_raw.infra.proxmox.storage.images, "")
-    snippets = try(local.config_raw.infra.proxmox.storage.snippets, "")
+    disks    = try(local.proxmox_env.storage.disks, "")
+    images   = try(local.proxmox_env.storage.images, "")
+    snippets = try(local.proxmox_env.storage.snippets, "")
   }
 }
 
@@ -87,7 +95,7 @@ module "digitalocean" {
   node_pools         = module.config.do_node_pools
 
   artifacts_path       = local.artifacts_path
-  provider_config_path = "../../config/templates/mappings/digitalocean.yaml"
+  provider_config_path = "../../config/templates/digitalocean/params.yaml"
 
   region = try(local.config_raw.infra.digitalocean.region, "nyc1")
 }
@@ -102,7 +110,7 @@ module "aws" {
   node_groups        = module.config.aws_node_groups
 
   artifacts_path       = local.artifacts_path
-  provider_config_path = "../../config/templates/mappings/aws.yaml"
+  provider_config_path = "../../config/templates/aws/params.yaml"
 
   region = try(local.config_raw.infra.aws.region, "us-east-1")
 }

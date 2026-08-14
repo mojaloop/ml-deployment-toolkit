@@ -5,18 +5,18 @@ expose:
   type: clusterIP
   tls:
     enabled: false
-externalURL: https://harbor.${domain}
+externalURL: https://harbor.${DOMAIN}
 persistence:
   enabled: true
   persistentVolumeClaim:
     registry:
-      size: ${harbor_registry_storage}
+      size: ${HARBOR_REGISTRY_STORAGE}
     database:
-      size: ${harbor_db_storage}
+      size: ${HARBOR_DB_STORAGE}
     redis:
-      size: ${harbor_redis_storage}
+      size: ${HARBOR_REDIS_STORAGE}
     trivy:
-      size: ${harbor_trivy_storage}
+      size: ${HARBOR_TRIVY_STORAGE}
 # Use MinIO for S3-compatible storage backend
 imageChartStorage:
   type: s3

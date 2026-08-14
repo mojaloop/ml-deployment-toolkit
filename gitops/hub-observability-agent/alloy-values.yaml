@@ -110,7 +110,7 @@ alloy:
       // Remote write logs to Loki in ml-cc cluster
       loki.write "default" {
         endpoint {
-          url = "${loki_url}"
+          url = "${LOKI_URL}"
 
           // Skip TLS verification (both clusters in same network)
           // TODO: Remove insecure_skip_verify when proper CA trust is configured
@@ -121,7 +121,7 @@ alloy:
 
         // Add cluster identifier label to all logs
         external_labels = {
-          cluster_name = "${cluster_name}",
+          cluster_name = "${CLUSTER_NAME}",
         }
       }
 
@@ -440,7 +440,7 @@ alloy:
       // Remote write metrics to Mimir in ml-cc cluster
       prometheus.remote_write "mimir" {
         endpoint {
-          url = "${mimir_url}"
+          url = "${MIMIR_URL}"
 
           tls_config {
             insecure_skip_verify = true
@@ -449,7 +449,7 @@ alloy:
 
         // Add cluster identifier label to all metrics
         external_labels = {
-          cluster_name = "${cluster_name}",
+          cluster_name = "${CLUSTER_NAME}",
         }
       }
 
@@ -629,10 +629,10 @@ alloy:
       otelcol.exporter.otlphttp "tempo" {
         // tempo_url already ends in /v1/traces, so set traces_endpoint
         // explicitly — client.endpoint would have /v1/traces appended again.
-        traces_endpoint = "${tempo_url}"
+        traces_endpoint = "${TEMPO_URL}"
 
         client {
-          endpoint = "${tempo_url}"
+          endpoint = "${TEMPO_URL}"
 
           tls {
             // Matches the existing loki/mimir posture: cc serves internal

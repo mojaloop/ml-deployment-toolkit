@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Environment placement",
+  "description": "Schema for <env>/placement.yaml — adopter facts about where node groups land. Maps the template's placement groups (pg-N) to physical provider nodes. Sits at the environment root beside config.yaml because it drives both the VM side (node targets) and the labelling side, and it is the file adopters edit most.",
+  "type": "object",
+  "required": ["version", "placement"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "description": "Placement format version",
+      "type": "integer",
+      "minimum": 1
+    },
+    "placement": {
+      "description": "Placement group -> physical node name (e.g. pg-1: pve-node-a). Every pg-N the selected template references must be mapped; the plan fails otherwise.",
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

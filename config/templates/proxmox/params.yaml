@@ -1,0 +1,61 @@
+# yaml-language-server: $schema=../../schemas/params.schema.json
+# -----------------------------------------------------------------------------
+# Provider parameters — Proxmox (Talos)
+#
+# `params` is the provider interface: every P_* symbol common gitops may
+# reference, satisfying config/schemas/params.schema.json. P_* symbols resolve
+# from this file only — an environment config.yaml can never define or shadow
+# them. Distribution-maintained; an adopter editing this file is forking the
+# distribution, and the pristine-clone check will say so.
+#
+# `infra` is Terraform-consumed provider configuration (formerly
+# config/templates/mappings/proxmox.yaml).
+# -----------------------------------------------------------------------------
+version: 1
+description: "Proxmox VE + Talos Linux, bare-metal networking (Cilium LB-IPAM/L2)"
+
+params:
+  P_GATEWAY_CLASS: "cilium"
+  # Empty = rely on the cluster default StorageClass (OpenEBS LocalPV hostpath,
+  # set as default by the talos vendor layer).
+  P_STORAGE_CLASS: ""
+  P_NODE_ROLE_LABEL_KEY: "node-role"
+  P_L2_INTERFACE_REGEX: "^eth[0-9]+"
+  # Talos KubePrism — in-cluster API endpoint the CNI targets.
+  P_KUBE_API_HOST: "localhost"
+  P_KUBE_API_PORT: "7445"
+
+infra:
+  # Talos image settings
+  talos:
+    platform: "nocloud"
+    image:
+      content_type: "iso"
+      datastore: "local"
+      decompression: "gz"
+
+  # VM defaults applied to every rendered node
+  vm_defaults:
+    cpu_type: "host"
+    scsihw: "virtio-scsi-pci"
+    boot_order: "scsi0"
+    qemu_agent: true
+
+    network:
+      bridge: "vmbr0"
+      model: "virtio"
+      firewall: false
+
+    disk:
+      type: "scsi"
+      format: "raw"
+      discard: true
+
+  # Storage configuration
+  storage:
+    default_pool: "local-lvm"
+
+  # Provider-specific Talos patches (paths relative to this file's directory)
+  talos-patches:
+    config-patch-control-plane:
+      ../../patches/talos/patch-vip.yaml.tpl

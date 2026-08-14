@@ -8,7 +8,7 @@ spec:
     - name: gw-int
       namespace: platform-system
   hostnames:
-    - "tempo.int.${domain}"
+    - "tempo.int.${DOMAIN}"
   rules:
     # OTLP/HTTP ingest (moja-trace-bridge in env clusters → Tempo)
     - matches:

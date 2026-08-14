@@ -8,8 +8,8 @@ kubeProxyReplacement: true
 # disabled, the in-cluster Service VIP only works while Cilium's own
 # datapath is up. Must match rendering/cilium/values.yaml so the takeover
 # doesn't leave agent/operator depending on the VIP.
-k8sServiceHost: localhost
-k8sServicePort: 7445
+k8sServiceHost: ${P_KUBE_API_HOST}
+k8sServicePort: "${P_KUBE_API_PORT}"
 
 # IPAM mode — use Kubernetes-assigned pod CIDRs
 ipam:

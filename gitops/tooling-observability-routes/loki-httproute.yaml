@@ -8,7 +8,7 @@ spec:
     - name: gw-int
       namespace: platform-system
   hostnames:
-    - "loki.int.${domain}"
+    - "loki.int.${DOMAIN}"
   rules:
     - backendRefs:
         - name: loki-gateway

@@ -5,7 +5,7 @@ locals {
   vip_address = var.cluster.vip
 
   # Read provider config for patch references
-  provider_config = yamldecode(file(var.provider_config_path))
+  provider_config = yamldecode(file(var.provider_config_path)).infra
 
   # All instances are Talos (no standalone support)
   talos_instances = var.instances

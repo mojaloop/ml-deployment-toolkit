@@ -20,3 +20,15 @@ variable "env_name" {
   type        = string
   default     = ""
 }
+
+variable "env_dir" {
+  description = "Environment directory (<environments_dir>/<env>) — holds the config.yaml siblings placement.yaml and proxmox/. Empty disables sidecar file loading."
+  type        = string
+  default     = ""
+}
+
+variable "dtk_tag" {
+  description = "The clone's actual git tag (git describe --tags --exact-match), empty when untagged. When the environment declares dtk_version, a mismatch fails the plan — matched versions only."
+  type        = string
+  default     = ""
+}

@@ -38,6 +38,10 @@ spec:
       name: cert-manager-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: cert-manager-values-override
+      name: cert-manager-cert-manager-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: cert-manager-cert-manager-values-override
       valuesKey: values.yaml
       optional: true

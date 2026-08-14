@@ -10,7 +10,7 @@ spec:
     - name: gw-intapi
       namespace: platform-system
   hostnames:
-    - "intapi.int.${domain}"
+    - "intapi.int.${DOMAIN}"
   rules:
     # Account Lookup Service
     - matches:

@@ -1,5 +1,5 @@
 # Hub-only LB pools — kept out of the shared talos layer so a tooling cluster
-# never sees the ${gw_extapi_ip}/${gw_intapi_ip} substitution vars (an
+# never sees the ${GW_EXTAPI_IP}/${GW_INTAPI_IP} substitution vars (an
 # unsubstituted var would break the apply there). gw-int/gw-ext live in
 # gitops/talos/lb-ipam. Same rule as there: every pool MUST carry a selector.
 apiVersion: "cilium.io/v2alpha1"
@@ -8,8 +8,8 @@ metadata:
   name: gw-extapi
 spec:
   blocks:
-    - start: "${gw_extapi_ip}"
-      stop: "${gw_extapi_ip}"
+    - start: "${GW_EXTAPI_IP}"
+      stop: "${GW_EXTAPI_IP}"
   serviceSelector:
     matchLabels:
       lb-pool: gw-extapi
@@ -20,8 +20,8 @@ metadata:
   name: gw-intapi
 spec:
   blocks:
-    - start: "${gw_intapi_ip}"
-      stop: "${gw_intapi_ip}"
+    - start: "${GW_INTAPI_IP}"
+      stop: "${GW_INTAPI_IP}"
   serviceSelector:
     matchLabels:
       lb-pool: gw-intapi

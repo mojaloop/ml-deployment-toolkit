@@ -16,6 +16,6 @@ spec:
   privateKey:
     algorithm: RSA
     size: 4096
-  commonName: "extapi.${domain}"
+  commonName: "extapi.${DOMAIN}"
   dnsNames:
-    - "extapi.${domain}"
+    - "extapi.${DOMAIN}"

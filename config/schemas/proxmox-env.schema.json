@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Environment Proxmox facts",
+  "description": "Schema for <env>/proxmox/proxmox.yaml — single-consumer Proxmox facts moved out of config.yaml (they are consumed only by the Proxmox provider modules). Overrides the provider defaults from config/templates/proxmox/params.yaml.",
+  "type": "object",
+  "required": ["version"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "description": "Format version",
+      "type": "integer",
+      "minimum": 1
+    },
+    "network_bridge": {
+      "description": "Proxmox bridge VMs attach to (overrides the provider default, e.g. vmbr0)",
+      "type": "string"
+    },
+    "storage": {
+      "description": "Storage pool overrides per artifact kind",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "disks": {
+          "description": "Pool for VM disks",
+          "type": "string"
+        },
+        "images": {
+          "description": "Pool for Talos images",
+          "type": "string"
+        },
+        "snippets": {
+          "description": "Pool for cloud-init snippets",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

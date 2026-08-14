@@ -10,13 +10,13 @@ metadata:
   name: acme-prod
 spec:
   acme:
-    server: ${acme_server}
-    email: ${acme_email}
+    server: ${ACME_SERVER}
+    email: ${ACME_EMAIL}
     # Name derives from a hash of the directory URL: pointing cert.server at a
     # different CA changes it, which forces re-registration. Reusing one account
     # key across CAs makes cert-manager silently keep the old account.
     privateKeySecretRef:
-      name: ${acme_account_key_secret}
+      name: ${ACME_ACCOUNT_KEY_SECRET}
     # externalAccountBinding is injected by the flux-config module when both
     # ACME_EAB_KEY_ID and ACME_EAB_HMAC_ENCODED are set. It must be absent —
     # not empty — for CAs that do not use EAB, which is why it is a patch and
@@ -42,4 +42,4 @@ metadata:
   namespace: cert-manager
 type: Opaque
 stringData:
-  hmac-encoded: "${acme_eab_hmac_encoded}"
+  hmac-encoded: "${ACME_EAB_HMAC_ENCODED}"

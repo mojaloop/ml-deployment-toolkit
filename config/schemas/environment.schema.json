@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Environment configuration",
-  "description": "Schema for environments/<name>/config.yaml \u2014 flat capability sections. Secrets never live here; they belong in the sibling .env file.",
+  "description": "Schema for environments/<name>/config.yaml — flat capability sections. Secrets never live here; they belong in the sibling .env file.",
   "type": "object",
   "required": [
     "version",
@@ -35,7 +35,7 @@
       "additionalProperties": false,
       "properties": {
         "name": {
-          "description": "Cluster identity \u2014 defaults to the environment directory name. Durable: it becomes the external-dns TXT owner id, backup prefixes, and VM name prefix. Do not change it on an existing cluster.",
+          "description": "Cluster identity — defaults to the environment directory name. Durable: it becomes the external-dns TXT owner id, backup prefixes, and VM name prefix. Do not change it on an existing cluster.",
           "type": "string",
           "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
         },
@@ -52,7 +52,7 @@
           "type": "string"
         },
         "lb_ipam": {
-          "description": "Cilium LB IPAM \u2014 one dedicated single-IP pool per gateway (on-prem). Required for on-prem providers.",
+          "description": "Cilium LB IPAM — one dedicated single-IP pool per gateway (on-prem). Required for on-prem providers.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
@@ -158,15 +158,11 @@
             }
           },
           "description": "Flux configuration"
-        },
-        "gateway_class_name": {
-          "type": "string",
-          "description": "GatewayClass name for the Gateways (default: cilium)"
         }
       }
     },
     "template": {
-      "description": "Deployment template name \u2014 config/templates/{role}/{template}.yaml",
+      "description": "Deployment template name — config/templates/{role}/{template}.yaml",
       "type": "string"
     },
     "infra": {
@@ -187,37 +183,11 @@
         "proxmox": {
           "type": "object",
           "additionalProperties": false,
-          "properties": {
-            "placement": {
-              "description": "Maps template placement groups (pg-N) to Proxmox physical nodes",
-              "type": "object",
-              "additionalProperties": true
-            },
-            "network_bridge": {
-              "type": "string"
-            },
-            "storage": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "disks": {
-                  "description": "Datastore for VM disks",
-                  "type": "string"
-                },
-                "images": {
-                  "description": "Datastore for Talos images",
-                  "type": "string"
-                },
-                "snippets": {
-                  "description": "Datastore for cloud-init snippets",
-                  "type": "string"
-                }
-              }
-            }
-          }
+          "properties": {},
+          "description": "Proxmox provider selection. Placement lives in <env>/placement.yaml; network_bridge and storage pools in <env>/proxmox/proxmox.yaml."
         },
         "talos": {
-          "description": "Talos node OS overrides (optional \u2014 any on-prem provider)",
+          "description": "Talos node OS overrides (optional — any on-prem provider)",
           "type": "object",
           "additionalProperties": false,
           "properties": {
@@ -298,7 +268,7 @@
           "type": "string"
         },
         "version": {
-          "description": "OCI tag \u2014 must be a pinned version (vX.Y.Z). 'latest' is disallowed: it contradicts matched-versions-only and the version assert cannot check a moving target.",
+          "description": "OCI tag — must be a pinned version (vX.Y.Z). 'latest' is disallowed: it contradicts matched-versions-only and the version assert cannot check a moving target.",
           "type": "string",
           "pattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$"
         },
@@ -321,11 +291,11 @@
           "type": "boolean"
         },
         "url": {
-          "description": "Registry URL, stated outright \u2014 no oci:// prefix (this becomes a Talos registry mirror endpoint). Required when enabled is true.",
+          "description": "Registry URL, stated outright — no oci:// prefix (this becomes a Talos registry mirror endpoint). Required when enabled is true.",
           "type": "string"
         },
         "robots": {
-          "description": "tooling role only: pull-only robot accounts to provision in the toolkit Harbor, one per consuming Hub (convention: name = the Hub's cluster.name). The Hub authenticates as robot-<name>; 'make secrets' prints the secret. Additive and creation-only \u2014 removing an entry never deletes the robot.",
+          "description": "tooling role only: pull-only robot accounts to provision in the toolkit Harbor, one per consuming Hub (convention: name = the Hub's cluster.name). The Hub authenticates as robot-<name>; 'make secrets' prints the secret. Additive and creation-only — removing an entry never deletes the robot.",
           "type": "array",
           "items": {
             "type": "object",
@@ -369,7 +339,7 @@
           "type": "string"
         },
         "buckets": {
-          "description": "tooling role only: extra buckets to serve from the toolkit MinIO, each with a generated scoped user (access key = bucket name; 'make secrets' prints the secret key). System buckets (harbor, backups, thanos, loki, tempo) always exist and cannot be re-declared. Additive and creation-only \u2014 removing an entry never deletes data.",
+          "description": "tooling role only: extra buckets to serve from the toolkit MinIO, each with a generated scoped user (access key = bucket name; 'make secrets' prints the secret key). System buckets (harbor, backups, thanos, loki, tempo) always exist and cannot be re-declared. Additive and creation-only — removing an entry never deletes data.",
           "type": "array",
           "items": {
             "type": "object",
@@ -415,7 +385,7 @@
       }
     },
     "data": {
-      "description": "Data layer \u2014 per-store deployment mode",
+      "description": "Data layer — per-store deployment mode",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -550,7 +520,7 @@
       "additionalProperties": false,
       "properties": {
         "api_type": {
-          "description": "Mojaloop API dialect \u2014 set once at deploy time",
+          "description": "Mojaloop API dialect — set once at deploy time",
           "enum": [
             "fspiop",
             "iso20022"

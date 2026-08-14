@@ -38,7 +38,11 @@ spec:
       name: external-secrets-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: external-secrets-values-override
+      name: external-secrets-external-secrets-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: external-secrets-external-secrets-values-override
       valuesKey: values.yaml
       optional: true
   dependsOn:

@@ -31,6 +31,10 @@ spec:
       name: alloy-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: alloy-values-override
+      name: observability-alloy-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: observability-alloy-values-override
       valuesKey: values.yaml
       optional: true

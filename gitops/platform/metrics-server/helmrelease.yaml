@@ -35,6 +35,10 @@ spec:
       name: metrics-server-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: metrics-server-values-override
+      name: kube-system-metrics-server-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: kube-system-metrics-server-values-override
       valuesKey: values.yaml
       optional: true

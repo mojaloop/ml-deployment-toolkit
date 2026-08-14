@@ -4,8 +4,8 @@
 #
 # Host is matched non-capturing across BOTH gateways so capture-group indices
 # match PR#202 (group 1 = dfspId):
-#   mcm.int.${domain}  internal ops (humans, cookie_session)
-#   mcm.ext.${domain}  DFSP-facing PM4ML machines (jwt)
+#   mcm.int.${DOMAIN}  internal ops (humans, cookie_session)
+#   mcm.ext.${DOMAIN}  DFSP-facing PM4ML machines (jwt)
 # Every route accepts cookie_session OR jwt; Keto scopes the caller (a machine
 # client is only ever a Dfsp member). Identity headers come from the global
 # header mutator (see helmrelease-oathkeeper.yaml).
@@ -18,7 +18,7 @@ metadata:
   namespace: ory
 spec:
   match:
-    url: "<http|https>://mcm.<?:int|ext>.${domain}/api/dfsps<$>"
+    url: "<http|https>://mcm.<?:int|ext>.${DOMAIN}/api/dfsps<$>"
     methods: [GET]
   authenticators:
     - handler: cookie_session
@@ -39,7 +39,7 @@ metadata:
   namespace: ory
 spec:
   match:
-    url: "<http|https>://mcm.<?:int|ext>.${domain}/api/dfsps<$>"
+    url: "<http|https>://mcm.<?:int|ext>.${DOMAIN}/api/dfsps<$>"
     methods: [POST]
   authenticators:
     - handler: cookie_session
@@ -51,7 +51,7 @@ spec:
       payload: |
         {
           "namespace": "Hub",
-          "object": "${hub_participant_name}",
+          "object": "${HUB_PARTICIPANT_NAME}",
           "relation": "dfspManage",
           "subject_id": "{{ print .Subject }}"
         }
@@ -69,7 +69,7 @@ metadata:
   namespace: ory
 spec:
   match:
-    url: "<http|https>://mcm.<?:int|ext>.${domain}/api/dfsps/states-status<$>"
+    url: "<http|https>://mcm.<?:int|ext>.${DOMAIN}/api/dfsps/states-status<$>"
     methods: [GET]
   authenticators:
     - handler: cookie_session
@@ -81,7 +81,7 @@ spec:
       payload: |
         {
           "namespace": "Hub",
-          "object": "${hub_participant_name}",
+          "object": "${HUB_PARTICIPANT_NAME}",
           "relation": "dfspList",
           "subject_id": "{{ print .Subject }}"
         }
@@ -99,7 +99,7 @@ metadata:
   namespace: ory
 spec:
   match:
-    url: "<http|https>://mcm.<?:int|ext>.${domain}/api/dfsps/<?!jwscerts|servercerts|states-status|endpoints><[^/]+><$>"
+    url: "<http|https>://mcm.<?:int|ext>.${DOMAIN}/api/dfsps/<?!jwscerts|servercerts|states-status|endpoints><[^/]+><$>"
     methods: [GET, PUT]
   authenticators:
     - handler: cookie_session
@@ -129,7 +129,7 @@ metadata:
   namespace: ory
 spec:
   match:
-    url: "<http|https>://mcm.<?:int|ext>.${domain}/api/dfsps/<?!jwscerts|servercerts|states-status|endpoints><[^/]+><$>"
+    url: "<http|https>://mcm.<?:int|ext>.${DOMAIN}/api/dfsps/<?!jwscerts|servercerts|states-status|endpoints><[^/]+><$>"
     methods: [DELETE]
   authenticators:
     - handler: cookie_session
@@ -141,7 +141,7 @@ spec:
       payload: |
         {
           "namespace": "Hub",
-          "object": "${hub_participant_name}",
+          "object": "${HUB_PARTICIPANT_NAME}",
           "relation": "dfspManage",
           "subject_id": "{{ print .Subject }}"
         }
@@ -159,7 +159,7 @@ metadata:
   namespace: ory
 spec:
   match:
-    url: "<http|https>://mcm.<?:int|ext>.${domain}/api/dfsps/<[^/]+>/credentials<$>"
+    url: "<http|https>://mcm.<?:int|ext>.${DOMAIN}/api/dfsps/<[^/]+>/credentials<$>"
     methods: [GET, POST, PUT, DELETE]
   authenticators:
     - handler: cookie_session
@@ -189,7 +189,7 @@ metadata:
   namespace: ory
 spec:
   match:
-    url: "<http|https>://mcm.<?:int|ext>.${domain}/api/dfsps/<?!endpoints><[^/]+>/<?!credentials><.*>"
+    url: "<http|https>://mcm.<?:int|ext>.${DOMAIN}/api/dfsps/<?!endpoints><[^/]+>/<?!credentials><.*>"
     methods: [GET, POST, PUT, DELETE]
   authenticators:
     - handler: cookie_session
@@ -219,7 +219,7 @@ metadata:
   namespace: ory
 spec:
   match:
-    url: "<http|https>://mcm.<?:int|ext>.${domain}/api/dfsps/endpoints/unprocessed<$>"
+    url: "<http|https>://mcm.<?:int|ext>.${DOMAIN}/api/dfsps/endpoints/unprocessed<$>"
     methods: [GET, POST, PUT, DELETE]
   authenticators:
     - handler: cookie_session
@@ -231,7 +231,7 @@ spec:
       payload: |
         {
           "namespace": "Hub",
-          "object": "${hub_participant_name}",
+          "object": "${HUB_PARTICIPANT_NAME}",
           "relation": "dfspManage",
           "subject_id": "{{ print .Subject }}"
         }
@@ -249,7 +249,7 @@ metadata:
   namespace: ory
 spec:
   match:
-    url: "<http|https>://mcm.<?:int|ext>.${domain}/api/dfsps/servercerts<$>"
+    url: "<http|https>://mcm.<?:int|ext>.${DOMAIN}/api/dfsps/servercerts<$>"
     methods: [GET]
   authenticators:
     - handler: cookie_session
@@ -261,7 +261,7 @@ spec:
       payload: |
         {
           "namespace": "Hub",
-          "object": "${hub_participant_name}",
+          "object": "${HUB_PARTICIPANT_NAME}",
           "relation": "serverCertsView",
           "subject_id": "{{ print .Subject }}"
         }
@@ -279,7 +279,7 @@ metadata:
   namespace: ory
 spec:
   match:
-    url: "<http|https>://mcm.<?:int|ext>.${domain}/api/dfsps/jwscerts<$>"
+    url: "<http|https>://mcm.<?:int|ext>.${DOMAIN}/api/dfsps/jwscerts<$>"
     methods: [GET]
   authenticators:
     - handler: cookie_session
@@ -303,7 +303,7 @@ metadata:
   namespace: ory
 spec:
   match:
-    url: "<http|https>://mcm.<?:int|ext>.${domain}/api/external-dfsps/jwscerts<$>"
+    url: "<http|https>://mcm.<?:int|ext>.${DOMAIN}/api/external-dfsps/jwscerts<$>"
     methods: [POST]
   authenticators:
     - handler: cookie_session
@@ -315,7 +315,7 @@ spec:
       payload: |
         {
           "namespace": "Hub",
-          "object": "${hub_participant_name}",
+          "object": "${HUB_PARTICIPANT_NAME}",
           "relation": "dfspManage",
           "subject_id": "{{ print .Subject }}"
         }
@@ -333,7 +333,7 @@ metadata:
   namespace: ory
 spec:
   match:
-    url: "<http|https>://mcm.<?:int|ext>.${domain}/api/monetaryzones<(?:/.*)?$>"
+    url: "<http|https>://mcm.<?:int|ext>.${DOMAIN}/api/monetaryzones<(?:/.*)?$>"
     methods: [GET]
   authenticators:
     - handler: cookie_session
@@ -354,7 +354,7 @@ metadata:
   namespace: ory
 spec:
   match:
-    url: "<http|https>://mcm.<?:int|ext>.${domain}/api/hub/<.*>"
+    url: "<http|https>://mcm.<?:int|ext>.${DOMAIN}/api/hub/<.*>"
     methods: [GET]
   authenticators:
     - handler: cookie_session
@@ -380,7 +380,7 @@ metadata:
   namespace: ory
 spec:
   match:
-    url: "<http|https>://mcm.<?:int|ext>.${domain}/api/hub/<.*>"
+    url: "<http|https>://mcm.<?:int|ext>.${DOMAIN}/api/hub/<.*>"
     methods: [POST, PUT, DELETE]
   authenticators:
     - handler: cookie_session
@@ -392,7 +392,7 @@ spec:
       payload: |
         {
           "namespace": "Hub",
-          "object": "${hub_participant_name}",
+          "object": "${HUB_PARTICIPANT_NAME}",
           "relation": "endpointsManage",
           "subject_id": "{{ print .Subject }}"
         }
@@ -410,7 +410,7 @@ metadata:
   namespace: ory
 spec:
   match:
-    url: "<http|https>://mcm.<?:int|ext>.${domain}/api/health<$>"
+    url: "<http|https>://mcm.<?:int|ext>.${DOMAIN}/api/health<$>"
     methods: [GET]
   authenticators:
     - handler: noop

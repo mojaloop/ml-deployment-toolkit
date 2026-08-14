@@ -189,7 +189,7 @@ spec:
           roles:
             - name: server-cert-role
               allowed_domains:
-                - "${domain}"
+                - "${DOMAIN}"
               allow_subdomains: true
               max_ttl: 43800h
               key_type: rsa
@@ -213,30 +213,30 @@ spec:
         path: secret/kratos
         data:
           data:
-            dsn: "mysql://kratos:${kratos_db_password}@tcp(${mysql_host}:${mysql_port})/kratos?max_conns=20&max_idle_conns=4"
-            secretsCipher: "${kratos_secrets_cipher}"
-            secretsCookie: "${kratos_secrets_cookie}"
-            secretsCSRFCookie: "${kratos_secrets_csrf_cookie}"
-            secretsDefault: "${kratos_secrets_default}"
-            smtpConnectionURI: "smtp://${smtp_user}:${smtp_password}@${smtp_host}:${smtp_port}/?skip_ssl_verify=true"
+            dsn: "mysql://kratos:${KRATOS_DB_PASSWORD}@tcp(${MYSQL_HOST}:${MYSQL_PORT})/kratos?max_conns=20&max_idle_conns=4"
+            secretsCipher: "${KRATOS_SECRETS_CIPHER}"
+            secretsCookie: "${KRATOS_SECRETS_COOKIE}"
+            secretsCSRFCookie: "${KRATOS_SECRETS_CSRF_COOKIE}"
+            secretsDefault: "${KRATOS_SECRETS_DEFAULT}"
+            smtpConnectionURI: "smtp://${SMTP_USER}:${SMTP_PASSWORD}@${SMTP_HOST}:${SMTP_PORT}/?skip_ssl_verify=true"
       - type: kv
         path: secret/keto
         data:
           data:
-            dsn: "mysql://keto:${keto_db_password}@tcp(${mysql_host}:${mysql_port})/keto?max_conns=20&max_idle_conns=4"
+            dsn: "mysql://keto:${KETO_DB_PASSWORD}@tcp(${MYSQL_HOST}:${MYSQL_PORT})/keto?max_conns=20&max_idle_conns=4"
       - type: kv
         path: secret/hydra
         data:
           data:
-            dsn: "mysql://hydra:${hydra_db_password}@tcp(${mysql_host}:${mysql_port})/hydra?max_conns=20&max_idle_conns=4"
-            secretsSystem: "${hydra_secrets_system}"
-            secretsCookie: "${hydra_secrets_cookie}"
+            dsn: "mysql://hydra:${HYDRA_DB_PASSWORD}@tcp(${MYSQL_HOST}:${MYSQL_PORT})/hydra?max_conns=20&max_idle_conns=4"
+            secretsSystem: "${HYDRA_SECRETS_SYSTEM}"
+            secretsCookie: "${HYDRA_SECRETS_COOKIE}"
       - type: kv
         path: secret/finance-portal
         data:
           data:
-            role_assign_svc_secret: "${role_assign_svc_secret}"
-            mongodb_app_password: "${mongodb_app_password}"
+            role_assign_svc_secret: "${ROLE_ASSIGN_SVC_SECRET}"
+            mongodb_app_password: "${MONGODB_APP_PASSWORD}"
 
   # Persistent storage for Vault data (Raft integrated storage)
   volumeMounts:

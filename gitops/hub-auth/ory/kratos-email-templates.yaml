@@ -9,7 +9,7 @@ data:
   recovery-body.txt.gotmpl: |
     Hello,
 
-    The ${hub_participant_name} hub administrator has requested that a password be set for your account.
+    The ${HUB_PARTICIPANT_NAME} hub administrator has requested that a password be set for your account.
 
     Click the link below to set your password:
     {{ .RecoveryURL }}
@@ -22,7 +22,7 @@ data:
     <body style="font-family:sans-serif;color:#222;max-width:600px;margin:0 auto;padding:32px 16px;">
       <h2 style="color:#1a73e8;">Set your account password</h2>
       <p>
-        The <strong>${hub_participant_name}</strong> hub administrator has requested that a
+        The <strong>${HUB_PARTICIPANT_NAME}</strong> hub administrator has requested that a
         password be set for your account (<strong>{{ index (index .Identity "traits") "email" }}</strong>).
       </p>
       <p style="margin:32px 0;">

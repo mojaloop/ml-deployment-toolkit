@@ -53,13 +53,13 @@ spec:
                   mountPath: /snapshots
               env:
                 - name: CLUSTER_NAME
-                  value: "${cluster_name}"
+                  value: "${CLUSTER_NAME}"
                 - name: S3_ENDPOINT
-                  value: "${backup_s3_endpoint}"
+                  value: "${BACKUP_S3_ENDPOINT}"
                 - name: S3_BUCKET
-                  value: "${backup_s3_bucket}"
+                  value: "${BACKUP_S3_BUCKET}"
                 - name: AWS_DEFAULT_REGION
-                  value: "${backup_s3_region}"
+                  value: "${BACKUP_S3_REGION}"
                 - name: AWS_ACCESS_KEY_ID
                   valueFrom:
                     secretKeyRef:

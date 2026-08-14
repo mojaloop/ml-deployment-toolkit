@@ -37,6 +37,10 @@ spec:
       name: psmdb-operator-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: psmdb-operator-values-override
+      name: hub-system-psmdb-operator-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: hub-system-psmdb-operator-values-override
       valuesKey: values.yaml
       optional: true

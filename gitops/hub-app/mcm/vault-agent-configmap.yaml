@@ -402,12 +402,12 @@ data:
             "HOST_ORACLE_MSISDN": "http://moja-als-msisdn-oracle",
             "DFSP_CALLBACK_URL": "http://{{ .Data.fqdn }}",
             "DFSP_NAME": "{{ .Data.host }}",
-            "HUB_NAME": "${hub_participant_name}",
+            "HUB_NAME": "${HUB_PARTICIPANT_NAME}",
             "currency": "{{ .Data.currency_code }}",
-            "fundsIn": "${onboarding_funds_in}",
+            "fundsIn": "${ONBOARDING_FUNDS_IN}",
             "isProxy": "{{ .Data.isProxy }}",
             "hub_operator": "NOT_APPLICABLE",
-            "NET_DEBIT_CAP": "${onboarding_net_debit_cap}",
+            "NET_DEBIT_CAP": "${ONBOARDING_NET_DEBIT_CAP}",
             "dfspEmail": "{{ .Data.dfspEmail }}"
           }
         }
@@ -471,11 +471,11 @@ data:
                       -u http://moja-ml-testing-toolkit-backend:5050 \
                       --report-format html \
                       --report-auto-filename-enable true \
-                      --extra-summary-information="Test Suite:Provisioning DFSP,Environment:ttk.int.${domain}" \
+                      --extra-summary-information="Test Suite:Provisioning DFSP,Environment:ttk.int.${DOMAIN}" \
                       --save-report true \
                       --report-folder /tmp \
                       --report-name {{ .Data.host }}-onboard-dfsp \
-                      --save-report-base-url https://ttk.int.${domain};
+                      --save-report-base-url https://ttk.int.${DOMAIN};
                     export TEST_RUNNER_EXIT_CODE="$?";
 
                   else
@@ -490,11 +490,11 @@ data:
                         -u http://moja-ml-testing-toolkit-backend:5050 \
                         --report-format html \
                         --report-auto-filename-enable true \
-                        --extra-summary-information="Test Suite:Provisioning FXP currency $fxp_currency,Environment:ttk.int.${domain}" \
+                        --extra-summary-information="Test Suite:Provisioning FXP currency $fxp_currency,Environment:ttk.int.${DOMAIN}" \
                         --save-report true \
                         --report-folder /tmp \
                         --report-name {{ .Data.host }}-onboard-fxp-$fxp_currency \
-                        --save-report-base-url https://ttk.int.${domain};
+                        --save-report-base-url https://ttk.int.${DOMAIN};
                       export TEST_RUNNER_EXIT_CODE="$?";
                       if [ "$TEST_RUNNER_EXIT_CODE" -ne 0 ]; then break; fi;
                     done;
@@ -553,7 +553,7 @@ data:
   # Adapted for the hashicorp/vault:1.18.4 image:
   #   - Uses /tools/kubectl (downloaded by init container)
   #   - Uses jsonpath instead of jq (not available in vault image)
-  #   - Hardcoded config values (avoids Flux ${var:-default} substitution)
+  #   - Hardcoded config values (avoids Flux $${var:-default} substitution)
   # ---------------------------------------------------------------------------
   clean-jobs.sh: |
     #!/bin/sh
@@ -564,7 +564,7 @@ data:
 
     set -e
 
-    # Configuration (hardcoded to avoid Flux ${var:-default} substitution conflicts)
+    # Configuration (hardcoded to avoid Flux $${var:-default} substitution conflicts)
     CLEAN_RETAIN_COUNT=5
     CLEAN_NAMESPACE=mojaloop
     CLEAN_DRY_RUN=false

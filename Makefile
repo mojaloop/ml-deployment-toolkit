@@ -57,6 +57,7 @@ LOAD_ENV = set -a && source $(abspath $(ENV_FILE)) && set +a && \
 	export TF_VAR_env_name=$(ENV) && \
 	export TF_VAR_environments_dir=$(abspath $(ENVIRONMENTS_ROOT)) && \
 	export TF_VAR_artifacts_dir=$(abspath $(ARTIFACTS_ROOT)) && \
+	export TF_VAR_dtk_tag=$$(git describe --tags --exact-match 2>/dev/null || true) && \
 	export TF_SECRET_KEYS="$(strip $(SECRET_KEYS))" && \
 	export TF_VAR_secrets=$$(jq -cn 'env.TF_SECRET_KEYS | split(" ") | map({key: ., value: (env[.] // "")}) | from_entries') && \
 	export AWS_ACCESS_KEY_ID=$${AWS_ACCESS_KEY_ID:-unused} \
@@ -159,14 +160,24 @@ validate:
 	@yq -o json e '.' $(ENV_DIR)/config.yaml | python3 tools/validate.py config/schemas/environment.schema.json
 	@role=$$(yq -r '.cluster.role' $(ENV_DIR)/config.yaml); \
 	 tmpl=$$(yq -r '.template' $(ENV_DIR)/config.yaml); \
-	 tfile="config/templates/$$role/$$tmpl.yaml"; \
+	 provider=$$(yq -r '.infra.provider' $(ENV_DIR)/config.yaml); \
+	 tfile="config/templates/$$provider/$$role/$$tmpl.yaml"; \
 	 if [ ! -f "$$tfile" ]; then echo "ERROR: template $$tfile not found"; exit 1; fi; \
 	 echo "Validating $$tfile against schema..."; \
 	 yq -o json e '.' "$$tfile" | python3 tools/validate.py config/schemas/template.schema.json
 	@provider=$$(yq -r '.infra.provider' $(ENV_DIR)/config.yaml); \
-	 mfile="config/templates/mappings/$$provider.yaml"; \
-	 if [ ! -f "$$mfile" ]; then echo "ERROR: provider mapping $$mfile not found"; exit 1; fi; \
-	 yq -o json e '.' "$$mfile" | python3 tools/validate.py config/schemas/mapping.schema.json
+	 pfile="config/templates/$$provider/params.yaml"; \
+	 if [ ! -f "$$pfile" ]; then echo "ERROR: provider params $$pfile not found"; exit 1; fi; \
+	 echo "Validating $$pfile against schema..."; \
+	 yq -o json e '.' "$$pfile" | python3 tools/validate.py config/schemas/params.schema.json
+	@if [ -f "$(ENV_DIR)/placement.yaml" ]; then \
+	 echo "Validating $(ENV_DIR)/placement.yaml against schema..."; \
+	 yq -o json e '.' $(ENV_DIR)/placement.yaml | python3 tools/validate.py config/schemas/placement.schema.json; \
+	fi
+	@if [ -f "$(ENV_DIR)/proxmox/proxmox.yaml" ]; then \
+	 echo "Validating $(ENV_DIR)/proxmox/proxmox.yaml against schema..."; \
+	 yq -o json e '.' $(ENV_DIR)/proxmox/proxmox.yaml | python3 tools/validate.py config/schemas/proxmox-env.schema.json; \
+	fi
 	@if [ -d "$(INFRA_DIR)/.terraform" ]; then \
 		cd $(INFRA_DIR) && $(LOAD_ENV) && terraform validate && cd ../../$(CONFIG_DIR) && $(LOAD_ENV) && terraform validate; \
 	else \

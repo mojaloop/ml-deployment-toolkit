@@ -15,7 +15,7 @@ data:
           "url": "http://localhost:4456"
         },
         "match": {
-          "url": "<https|http>://<finance-portal|mcm>.${domain}/health",
+          "url": "<https|http>://<finance-portal|mcm>.${DOMAIN}/health",
           "methods": ["GET"]
         },
         "authenticators": [{"handler": "anonymous"}],

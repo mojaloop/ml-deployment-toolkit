@@ -11,7 +11,7 @@ data:
       name: aws
     env:
       - name: AWS_DEFAULT_REGION
-        value: "${aws_region}"
+        value: "${AWS_REGION}"
       - name: AWS_ACCESS_KEY_ID
         valueFrom:
           secretKeyRef:

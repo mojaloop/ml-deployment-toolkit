@@ -52,7 +52,7 @@ spec:
     resourceAttributes:
       # Mirrors the cluster_name external_label Alloy adds to metrics, so
       # traces, metrics and logs correlate on the same cluster identifier.
-      cluster.name: ${cluster_name}
+      cluster.name: ${CLUSTER_NAME}
   nodejs:
     resourceRequirements:
       # The injected SDK adds RSS to every instrumented pod. These nodes have

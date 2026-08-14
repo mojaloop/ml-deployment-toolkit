@@ -29,6 +29,10 @@ spec:
       name: goldilocks-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: goldilocks-values-override
+      name: goldilocks-goldilocks-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: goldilocks-goldilocks-values-override
       valuesKey: values.yaml
       optional: true

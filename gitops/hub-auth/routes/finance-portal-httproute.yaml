@@ -17,7 +17,7 @@ spec:
     - name: gw-int
       namespace: platform-system
   hostnames:
-    - "finance-portal.int.${domain}"
+    - "finance-portal.int.${DOMAIN}"
   rules:
     # --- Kratos proxy (no auth) ---
     # Logout browser flow
@@ -169,7 +169,7 @@ spec:
           responseHeaderModifier:
             set:
               - name: Content-Security-Policy
-                value: "default-src 'self'; form-action 'self' https://auth.int.${domain}/kratos/ https://keycloak.int.${domain}/realms/hub-operators/; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://auth.int.${domain}; img-src 'self' data: https://mojaloop.io"
+                value: "default-src 'self'; form-action 'self' https://auth.int.${DOMAIN}/kratos/ https://keycloak.int.${DOMAIN}/realms/hub-operators/; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://auth.int.${DOMAIN}; img-src 'self' data: https://mojaloop.io"
       backendRefs:
         - name: fin-portal-reporting-hub-bop-shell
           port: 80

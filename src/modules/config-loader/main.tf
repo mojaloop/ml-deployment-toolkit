@@ -1,8 +1,10 @@
 # Config Loader Module
 # Loads and resolves the environment configuration:
-#   environments/<env>/config.yaml   (adopter-authored, schema-validated)
-#   config/templates/<role>/<template>.yaml  (generic capacity template)
-#   config/templates/mappings/<provider>.yaml (provider mapping)
+#   <env>/config.yaml                 (adopter-authored, schema-validated)
+#   <env>/placement.yaml              (adopter-authored, node placement facts)
+#   <env>/proxmox/proxmox.yaml        (adopter-authored, provider infra facts)
+#   config/templates/<provider>/<role>/<template>.yaml  (provider-specific capacity template)
+#   config/templates/<provider>/params.yaml  (provider interface + infra config)
 #   config/definitions/workload-classes.yaml  (platform definitions)
 # Expands node groups into provider shapes and resolves capability bindings
 # (registry, object_storage, observability, cert, email, alerting, data modes).
@@ -22,8 +24,13 @@ locals {
   cluster_role  = local.cluster.role
   provider_name = local.config.infra.provider
 
-  mapping  = yamldecode(file("${var.templates_path}/mappings/${local.provider_name}.yaml"))
-  template = yamldecode(file("${var.templates_path}/${local.cluster_role}/${local.config.template}.yaml"))
+  # Provider parameters: the interface symbols (params, P_*) plus the
+  # Terraform-consumed provider config (infra — formerly the mapping file).
+  provider_params_file = yamldecode(file("${var.templates_path}/${local.provider_name}/params.yaml"))
+  provider_params      = try(local.provider_params_file.params, {})
+  mapping              = try(local.provider_params_file.infra, {})
+
+  template = yamldecode(file("${var.templates_path}/${local.provider_name}/${local.cluster_role}/${local.config.template}.yaml"))
 
   node_groups = try(local.template.node_groups, [])
 
@@ -64,7 +71,14 @@ locals {
   # --- Node-group expansion (on-prem: one VM per node) ---------------------
   # Node i of a group takes placement[i], wrapping when the list is shorter
   # than count. Placement groups resolve through infra.<provider>.placement.
-  placement_map = try(local.config.infra[local.provider_name].placement, {})
+  # Placement is an adopter fact (which physical node each group lands on) and
+  # lives beside config.yaml as placement.yaml — it drives both the VM side and
+  # the node-labelling side, and it is the file adopters edit most.
+  placement_file = var.env_dir != "" ? "${var.env_dir}/placement.yaml" : ""
+  placement_doc = (
+    local.placement_file != "" && fileexists(local.placement_file)
+  ) ? yamldecode(file(local.placement_file)) : {}
+  placement_map = try(local.placement_doc.placement, {})
 
   expanded_nodes = flatten([
     for g in local.node_groups : [
@@ -365,7 +379,29 @@ resource "terraform_data" "validation" {
           ])
         ])
       )
-      error_message = "template '${local.config.template}' references placement groups that infra.${local.provider_name}.placement does not map: ${join(", ", setsubtract(local.template_placement_groups, keys(local.placement_map)))}."
+      error_message = "template '${local.config.template}' references placement groups that ${var.env_dir}/placement.yaml does not map: ${join(", ", setsubtract(local.template_placement_groups, keys(local.placement_map)))}."
+    }
+
+    # Matched versions only: an environment declaring dtk_version pins the DTK
+    # release it was written against; the clone's actual tag must equal it. A
+    # mismatch fails — it never warns — because env repos and the clone version
+    # independently and this assert is what holds the model together.
+    precondition {
+      condition     = try(local.config.dtk_version, "") == "" || try(local.config.dtk_version, "") == var.dtk_tag
+      error_message = "config.yaml declares dtk_version '${try(local.config.dtk_version, "")}' but the clone is at '${var.dtk_tag != "" ? var.dtk_tag : "(no exact tag)"}'. Check out the matching DTK tag or update dtk_version."
+    }
+
+    # The node-role label key is an interface symbol (P_NODE_ROLE_LABEL_KEY).
+    # Workload classes declare node_labels with a literal key; the two must
+    # agree or gitops selectors and Talos-applied labels silently drift apart.
+    precondition {
+      condition = alltrue([
+        for name, class in try(local.workload_classes.classes, {}) : alltrue([
+          for k in keys(try(class.node_labels, {})) :
+          k == try(local.provider_params.P_NODE_ROLE_LABEL_KEY, "node-role")
+        ])
+      ])
+      error_message = "workload-classes.yaml declares node_labels keys that differ from the provider interface symbol P_NODE_ROLE_LABEL_KEY ('${try(local.provider_params.P_NODE_ROLE_LABEL_KEY, "node-role")}')."
     }
 
     # Node group names become VM name suffixes and for_each keys.

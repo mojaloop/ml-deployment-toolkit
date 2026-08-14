@@ -37,6 +37,10 @@ spec:
       name: pxc-operator-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: pxc-operator-values-override
+      name: hub-system-pxc-operator-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: hub-system-pxc-operator-values-override
       valuesKey: values.yaml
       optional: true

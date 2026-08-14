@@ -13,8 +13,10 @@ declared=""
 have_schema=0
 if [ -f "$SCHEMA" ]; then
   have_schema=1
-  required=$(jq -r '.required[]?' "$SCHEMA")
-  declared=$(jq -r '(.properties // {}) | keys[]' "$SCHEMA")
+  # Interface symbols live under the schema's params block:
+  # .properties.params.{required,properties}
+  required=$(jq -r '.properties.params.required[]?' "$SCHEMA")
+  declared=$(jq -r '(.properties.params.properties // {}) | keys[]' "$SCHEMA")
   # every required symbol is implicitly declared
   declared=$(printf '%s\n%s\n' "$declared" "$required" | sort -u | sed '/^$/d')
 else
@@ -29,7 +31,7 @@ if [ "$have_schema" = "1" ]; then
     echo "warning: no config/templates/<provider>/params.yaml files exist yet — skipping required-symbol check" >&2
   else
     for pf in $provider_params; do
-      keys=$(yq eval 'keys | .[]' "$pf" 2>/dev/null) || { echo "$pf:1: YAML parse error"; findings=$((findings+1)); continue; }
+      keys=$(yq eval '.params | keys | .[]' "$pf" 2>/dev/null) || { echo "$pf:1: YAML parse error"; findings=$((findings+1)); continue; }
       for sym in $required; do
         if ! printf '%s\n' "$keys" | grep -qx "$sym"; then
           echo "$pf: required interface symbol '$sym' not supplied"

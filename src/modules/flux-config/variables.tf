@@ -36,12 +36,6 @@ variable "domain" {
   type        = string
 }
 
-variable "gateway_class_name" {
-  description = "GatewayClass name for the Gateways"
-  type        = string
-  default     = "cilium"
-}
-
 variable "lb_ipam_pools" {
   description = "Per-gateway LB IPAM pools: name => { lan, wan, dns_target }"
   type = map(object({
@@ -150,9 +144,9 @@ variable "app" {
 # --- Secrets ---------------------------------------------------------------
 
 # Raw external credentials from environments/<env>/.env, passed as one map by
-# the Makefile (keys are the .env variable names). Any generated-secret name
-# present here (upper-cased, non-empty) overrides generation — this is how
-# external-unmanaged data stores supply their own passwords.
+# the Makefile (keys are the .env variable names, UPPER_SNAKE). Any
+# generated-secret name present here non-empty overrides generation — this is
+# how external-unmanaged data stores supply their own passwords.
 variable "secrets" {
   description = "External credentials map from .env (keys = env var names)"
   type        = map(string)
@@ -163,15 +157,31 @@ variable "secrets" {
 # --- Template tuning + overrides ------------------------------------------
 
 variable "profile_vars" {
-  description = "Template tuning variables (app/data/tooling sections, flattened) for postBuild substitution"
+  description = "Template tuning variables (app/data/tooling sections, flattened) for postBuild substitution; keys are upper-cased before merging into cluster-config"
+  type        = map(string)
+  default     = {}
+}
+
+# Provider symbols (P_*) merged into the cluster-config ConfigMap. Keys arrive
+# already UPPER_SNAKE and must not collide with any base config key — the
+# cluster_config precondition fails listing the collisions otherwise.
+variable "params" {
+  description = "Provider symbols (P_*, already UPPER_SNAKE) merged into cluster-config"
   type        = map(string)
   default     = {}
 }
 
 variable "helm_value_overrides" {
-  description = "Per-chart Helm values overrides (chart name -> values.yaml content)"
+  description = "Non-secret Helm values overrides (<namespace>-<release> -> templated values.yaml content), delivered as ConfigMaps"
   type        = map(string)
   default     = {}
+}
+
+variable "helm_value_secret_overrides" {
+  description = "Secret-referencing Helm values overrides (<namespace>-<release> -> templated values.yaml content), delivered as Secrets"
+  type        = map(string)
+  default     = {}
+  sensitive   = true
 }
 
 # Deliberately `any`: each value is a list of Flux patch entries whose elements

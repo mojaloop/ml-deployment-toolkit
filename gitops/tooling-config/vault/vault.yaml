@@ -49,7 +49,7 @@ metadata:
   name: vault
   namespace: vault
 spec:
-  size: ${vault_replicas}
+  size: ${VAULT_REPLICAS}
   image: hashicorp/vault:1.21.4
   bankVaultsImage: ghcr.io/bank-vaults/bank-vaults:v1.31.3
 
@@ -112,23 +112,23 @@ spec:
         path: secret/data/minio
         data:
           data:
-            rootUser: "${minio_root_user}"
-            rootPassword: "${minio_root_password}"
+            rootUser: "${MINIO_ROOT_USER}"
+            rootPassword: "${MINIO_ROOT_PASSWORD}"
       - type: kv
         path: secret/data/harbor
         data:
           data:
-            adminPassword: "${harbor_admin_password}"
+            adminPassword: "${HARBOR_ADMIN_PASSWORD}"
       - type: kv
         path: secret/data/dns-provider
         data:
           data:
-            credentials: "${dns_provider_credentials}"
+            credentials: "${DNS_PROVIDER_CREDENTIALS}"
       - type: kv
         path: secret/data/observability
         data:
           data:
-            grafanaAdminPassword: "${grafana_admin_password}"
+            grafanaAdminPassword: "${GRAFANA_ADMIN_PASSWORD}"
 
   # Persistent storage for Vault data
   volumeMounts:

@@ -9,7 +9,7 @@ spec:
     - name: gw-int
       namespace: platform-system
   hostnames:
-    - "tx-requests.int.${domain}"
+    - "tx-requests.int.${DOMAIN}"
   rules:
     - backendRefs:
         - name: moja-transaction-requests-service

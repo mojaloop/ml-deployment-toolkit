@@ -18,7 +18,7 @@ spec:
         app.kubernetes.io/name: harbor-proxy-cache-setup
       annotations:
         # Changes whenever a robot account or its secret changes.
-        mojaloop.io/robots-hash: "${harbor_robots_hash}"
+        mojaloop.io/robots-hash: "${HARBOR_ROBOTS_HASH}"
     spec:
       restartPolicy: OnFailure
       containers:

@@ -3,8 +3,8 @@
 # which is merged after this file and therefore wins.
 global:
   kafka:
-    host: "${kafka_host}"
-    port: ${kafka_port}
+    host: "${KAFKA_HOST}"
+    port: ${KAFKA_PORT}
 
 # --- Central Ledger ---
 # Event SDK (configOverride.EVENT_SDKrc) enables audit event production to
@@ -16,14 +16,14 @@ centralledger:
   centralledger-service:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${cl_service_replicas}
+    replicaCount: ${CL_SERVICE_REPLICAS}
     config:
-      kafka_host: "${kafka_host}"
-      kafka_port: ${kafka_port}
-      db_host: "${mysql_host}"
-      db_port: ${mysql_port}
+      kafka_host: "${KAFKA_HOST}"
+      kafka_port: ${KAFKA_PORT}
+      db_host: "${MYSQL_HOST}"
+      db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${mysql_central_ledger_password}"
+      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     init:
       enabled: true
@@ -43,7 +43,7 @@ centralledger:
                     compression.type: lz4
                     dr_cb: false
                     event_cb: true
-                    metadata.broker.list: "${kafka_host}:${kafka_port}"
+                    metadata.broker.list: "${KAFKA_HOST}:${KAFKA_PORT}"
                     queue.buffering.max.messages: 10000000
                     socket.keepalive.enable: true
                   topicConf:
@@ -59,7 +59,7 @@ centralledger:
                     compression.type: lz4
                     dr_cb: false
                     event_cb: true
-                    metadata.broker.list: "${kafka_host}:${kafka_port}"
+                    metadata.broker.list: "${KAFKA_HOST}:${KAFKA_PORT}"
                     queue.buffering.max.messages: 10000000
                     socket.keepalive.enable: true
                   topicConf:
@@ -79,7 +79,7 @@ centralledger:
                     compression.type: lz4
                     dr_cb: false
                     event_cb: true
-                    metadata.broker.list: "${kafka_host}:${kafka_port}"
+                    metadata.broker.list: "${KAFKA_HOST}:${KAFKA_PORT}"
                     queue.buffering.max.messages: 10000000
                     socket.keepalive.enable: true
                   topicConf:
@@ -101,14 +101,14 @@ centralledger:
   centralledger-handler-transfer-prepare:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${cl_handler_prepare_replicas}
+    replicaCount: ${CL_HANDLER_PREPARE_REPLICAS}
     config:
-      kafka_host: "${kafka_host}"
-      kafka_port: ${kafka_port}
-      db_host: "${mysql_host}"
-      db_port: ${mysql_port}
+      kafka_host: "${KAFKA_HOST}"
+      kafka_port: ${KAFKA_PORT}
+      db_host: "${MYSQL_HOST}"
+      db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${mysql_central_ledger_password}"
+      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
@@ -116,86 +116,86 @@ centralledger:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
     config:
-      kafka_host: "${kafka_host}"
-      kafka_port: ${kafka_port}
-      db_host: "${mysql_host}"
-      db_port: ${mysql_port}
+      kafka_host: "${KAFKA_HOST}"
+      kafka_port: ${KAFKA_PORT}
+      db_host: "${MYSQL_HOST}"
+      db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${mysql_central_ledger_password}"
+      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
   centralledger-handler-transfer-position-batch:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${cl_handler_position_batch_replicas}
+    replicaCount: ${CL_HANDLER_POSITION_BATCH_REPLICAS}
     config:
-      kafka_host: "${kafka_host}"
-      kafka_port: ${kafka_port}
-      db_host: "${mysql_host}"
-      db_port: ${mysql_port}
+      kafka_host: "${KAFKA_HOST}"
+      kafka_port: ${KAFKA_PORT}
+      db_host: "${MYSQL_HOST}"
+      db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${mysql_central_ledger_password}"
+      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
   centralledger-handler-transfer-get:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${cl_handler_get_replicas}
+    replicaCount: ${CL_HANDLER_GET_REPLICAS}
     metrics:
       enabled: true
     config:
-      kafka_host: "${kafka_host}"
-      kafka_port: ${kafka_port}
-      db_host: "${mysql_host}"
-      db_port: ${mysql_port}
+      kafka_host: "${KAFKA_HOST}"
+      kafka_port: ${KAFKA_PORT}
+      db_host: "${MYSQL_HOST}"
+      db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${mysql_central_ledger_password}"
+      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
   centralledger-handler-transfer-fulfil:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${cl_handler_fulfil_replicas}
+    replicaCount: ${CL_HANDLER_FULFIL_REPLICAS}
     config:
-      kafka_host: "${kafka_host}"
-      kafka_port: ${kafka_port}
-      db_host: "${mysql_host}"
-      db_port: ${mysql_port}
+      kafka_host: "${KAFKA_HOST}"
+      kafka_port: ${KAFKA_PORT}
+      db_host: "${MYSQL_HOST}"
+      db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${mysql_central_ledger_password}"
+      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
   centralledger-handler-timeout:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${cl_handler_timeout_replicas}
+    replicaCount: ${CL_HANDLER_TIMEOUT_REPLICAS}
     metrics:
       enabled: true
     config:
-      kafka_host: "${kafka_host}"
-      kafka_port: ${kafka_port}
-      db_host: "${mysql_host}"
-      db_port: ${mysql_port}
+      kafka_host: "${KAFKA_HOST}"
+      kafka_port: ${KAFKA_PORT}
+      db_host: "${MYSQL_HOST}"
+      db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${mysql_central_ledger_password}"
+      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
   centralledger-handler-admin-transfer:
-    replicaCount: ${cl_handler_admin_replicas}
+    replicaCount: ${CL_HANDLER_ADMIN_REPLICAS}
     metrics:
       enabled: true
     config:
-      kafka_host: "${kafka_host}"
-      kafka_port: ${kafka_port}
-      db_host: "${mysql_host}"
-      db_port: ${mysql_port}
+      kafka_host: "${KAFKA_HOST}"
+      kafka_port: ${KAFKA_PORT}
+      db_host: "${MYSQL_HOST}"
+      db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${mysql_central_ledger_password}"
+      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
@@ -204,7 +204,7 @@ centralledger:
 # Event SDK: produces audit events to Kafka for Finance Portal reporting
 quoting-service:
   quoting-service:
-    replicaCount: ${qs_service_replicas}
+    replicaCount: ${QS_SERVICE_REPLICAS}
     podAnnotations:
       prometheus.io/scrape: "true"
       prometheus.io/port: "3002"
@@ -218,19 +218,19 @@ quoting-service:
     metrics:
       enabled: true
     config:
-      api_type: ${api_type}
-      kafka_host: "${kafka_host}"
-      kafka_port: ${kafka_port}
-      db_host: "${mysql_host}"
-      db_port: ${mysql_port}
+      api_type: ${API_TYPE}
+      kafka_host: "${KAFKA_HOST}"
+      kafka_port: ${KAFKA_PORT}
+      db_host: "${MYSQL_HOST}"
+      db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${mysql_central_ledger_password}"
+      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
       simple_routing_mode_enabled: false
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
   quoting-service-handler:
-    replicaCount: ${qs_handler_replicas}
+    replicaCount: ${QS_HANDLER_REPLICAS}
     commonAnnotations: &switchJwsReloader
       secret.reloader.stakater.com/reload: switch-jws
     podAnnotations:
@@ -240,12 +240,12 @@ quoting-service:
     metrics:
       enabled: true
     config:
-      kafka_host: "${kafka_host}"
-      kafka_port: ${kafka_port}
-      db_host: "${mysql_host}"
-      db_port: ${mysql_port}
+      kafka_host: "${KAFKA_HOST}"
+      kafka_port: ${KAFKA_PORT}
+      db_host: "${MYSQL_HOST}"
+      db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${mysql_central_ledger_password}"
+      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
       # Must be false so the handler persists quotes to MySQL.
       # Without this, the aggregator's INNER JOIN on the quote table
@@ -263,50 +263,50 @@ quoting-service:
 # --- Central Settlement (shares central_ledger DB) ---
 centralsettlement:
   centralsettlement-service:
-    replicaCount: ${cs_service_replicas}
+    replicaCount: ${CS_SERVICE_REPLICAS}
     metrics:
       enabled: true
     config:
-      kafka_host: "${kafka_host}"
-      kafka_port: ${kafka_port}
-      db_host: "${mysql_host}"
-      db_port: ${mysql_port}
+      kafka_host: "${KAFKA_HOST}"
+      kafka_port: ${KAFKA_PORT}
+      db_host: "${MYSQL_HOST}"
+      db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${mysql_central_ledger_password}"
+      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
   centralsettlement-handler-deferredsettlement:
-    replicaCount: ${cs_handler_deferred_replicas}
+    replicaCount: ${CS_HANDLER_DEFERRED_REPLICAS}
     metrics:
       enabled: true
     config:
-      kafka_host: "${kafka_host}"
-      kafka_port: ${kafka_port}
-      db_host: "${mysql_host}"
-      db_port: ${mysql_port}
+      kafka_host: "${KAFKA_HOST}"
+      kafka_port: ${KAFKA_PORT}
+      db_host: "${MYSQL_HOST}"
+      db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${mysql_central_ledger_password}"
+      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
   centralsettlement-handler-grosssettlement:
     config:
-      kafka_host: "${kafka_host}"
-      kafka_port: ${kafka_port}
-      db_host: "${mysql_host}"
-      db_port: ${mysql_port}
+      kafka_host: "${KAFKA_HOST}"
+      kafka_port: ${KAFKA_PORT}
+      db_host: "${MYSQL_HOST}"
+      db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${mysql_central_ledger_password}"
+      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     replicaCount: 0
   centralsettlement-handler-rules:
-    replicaCount: ${cs_handler_rules_replicas}
+    replicaCount: ${CS_HANDLER_RULES_REPLICAS}
     metrics:
       enabled: true
     config:
-      kafka_host: "${kafka_host}"
-      kafka_port: ${kafka_port}
-      db_host: "${mysql_host}"
-      db_port: ${mysql_port}
+      kafka_host: "${KAFKA_HOST}"
+      kafka_port: ${KAFKA_PORT}
+      db_host: "${MYSQL_HOST}"
+      db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${mysql_central_ledger_password}"
+      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
 
 # --- Account Lookup Service ---
@@ -315,14 +315,14 @@ account-lookup-service:
   account-lookup-service:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${als_service_replicas}
+    replicaCount: ${ALS_SERVICE_REPLICAS}
     commonAnnotations: *switchJwsReloader
     config:
-      api_type: ${api_type}
-      db_host: "${mysql_host}"
-      db_port: ${mysql_port}
+      api_type: ${API_TYPE}
+      db_host: "${MYSQL_HOST}"
+      db_port: ${MYSQL_PORT}
       db_user: account_lookup
-      db_password: "${mysql_account_lookup_password}"
+      db_password: "${MYSQL_ACCOUNT_LOOKUP_PASSWORD}"
       db_database: account_lookup
       db_secret:
         name: mysqldb
@@ -334,14 +334,14 @@ account-lookup-service:
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
   account-lookup-service-admin:
-    replicaCount: ${als_admin_replicas}
+    replicaCount: ${ALS_ADMIN_REPLICAS}
     metrics:
       enabled: true
     config:
-      db_host: "${mysql_host}"
-      db_port: ${mysql_port}
+      db_host: "${MYSQL_HOST}"
+      db_port: ${MYSQL_PORT}
       db_user: account_lookup
-      db_password: "${mysql_account_lookup_password}"
+      db_password: "${MYSQL_ACCOUNT_LOOKUP_PASSWORD}"
       db_database: account_lookup
       db_secret:
         name: mysqldb
@@ -351,14 +351,14 @@ account-lookup-service:
 
 # --- ALS MSISDN Oracle ---
 als-msisdn-oracle:
-  replicaCount: ${als_oracle_replicas}
+  replicaCount: ${ALS_ORACLE_REPLICAS}
   metrics:
     enabled: true
   config:
-    db_host: "${mysql_host}"
-    db_port: ${mysql_port}
+    db_host: "${MYSQL_HOST}"
+    db_port: ${MYSQL_PORT}
     db_user: oracle_msisdn
-    db_password: "${mysql_oracle_msisdn_password}"
+    db_password: "${MYSQL_ORACLE_MSISDN_PASSWORD}"
     db_database: oracle_msisdn
     db_secret:
       name: mysqldb
@@ -366,7 +366,7 @@ als-msisdn-oracle:
 
 # --- Transaction Requests Service ---
 transaction-requests-service:
-  replicaCount: ${tx_requests_replicas}
+  replicaCount: ${TX_REQUESTS_REPLICAS}
   metrics:
     enabled: true
 
@@ -376,22 +376,22 @@ ml-api-adapter:
   ml-api-adapter-service:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${ml_adapter_service_replicas}
+    replicaCount: ${ML_ADAPTER_SERVICE_REPLICAS}
     config:
-      api_type: ${api_type}
-      kafka_host: "${kafka_host}"
-      kafka_port: ${kafka_port}
+      api_type: ${API_TYPE}
+      kafka_host: "${KAFKA_HOST}"
+      kafka_port: ${KAFKA_PORT}
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
   ml-api-adapter-handler-notification:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${ml_adapter_handler_notification_replicas}
+    replicaCount: ${ML_ADAPTER_HANDLER_NOTIFICATION_REPLICAS}
     commonAnnotations: *switchJwsReloader
     config:
-      api_type: ${api_type}
-      kafka_host: "${kafka_host}"
-      kafka_port: ${kafka_port}
+      api_type: ${API_TYPE}
+      kafka_host: "${KAFKA_HOST}"
+      kafka_port: ${KAFKA_PORT}
       endpointSecurity:
         jwsSigningKeySecret: *switchJwsSigningKey
     configOverride:
@@ -401,20 +401,20 @@ ml-api-adapter:
 mojaloop-bulk:
   enabled: true
   config:
-    mongo_host: "${mongodb_host}"
-    mongo_port: ${mongodb_port}
+    mongo_host: "${MONGODB_HOST}"
+    mongo_port: ${MONGODB_PORT}
     mongo_database: mlos
     mongo_user: mlos
-    mongo_password: "${mongodb_app_password}"
+    mongo_password: "${MONGODB_APP_PASSWORD}"
   bulk-api-adapter:
     bulk-api-adapter-service:
       config: &bulkApiConfig
-        kafka_host: "${kafka_host}"
-        kafka_port: ${kafka_port}
-        mongo_host: "${mongodb_host}"
-        mongo_port: ${mongodb_port}
+        kafka_host: "${KAFKA_HOST}"
+        kafka_port: ${KAFKA_PORT}
+        mongo_host: "${MONGODB_HOST}"
+        mongo_port: ${MONGODB_PORT}
         mongo_user: mlos
-        mongo_password: "${mongodb_app_password}"
+        mongo_password: "${MONGODB_APP_PASSWORD}"
         mongo_secret:
           name: bulk-mongodb-app-secrets
           key: MONGODB_APP_PASSWORD
@@ -423,10 +423,10 @@ mojaloop-bulk:
         # The umbrella chart overrides initContainers for bulk-api-adapter services
         # to use the TLS variant, which reads config.mongodb.* instead of config.mongo_*.
         mongodb:
-          host: "${mongodb_host}"
-          port: "${mongodb_port}"
+          host: "${MONGODB_HOST}"
+          port: "${MONGODB_PORT}"
           user: mlos
-          password: "${mongodb_app_password}"
+          password: "${MONGODB_APP_PASSWORD}"
           secret:
             name: bulk-mongodb-app-secrets
             key: MONGODB_APP_PASSWORD
@@ -443,20 +443,20 @@ mojaloop-bulk:
   bulk-centralledger:
     cl-handler-bulk-transfer-prepare:
       config: &bulkClConfig
-        kafka_host: "${kafka_host}"
-        kafka_port: ${kafka_port}
-        mongo_host: "${mongodb_host}"
-        mongo_port: ${mongodb_port}
+        kafka_host: "${KAFKA_HOST}"
+        kafka_port: ${KAFKA_PORT}
+        mongo_host: "${MONGODB_HOST}"
+        mongo_port: ${MONGODB_PORT}
         mongo_user: mlos
-        mongo_password: "${mongodb_app_password}"
+        mongo_password: "${MONGODB_APP_PASSWORD}"
         mongo_secret:
           name: bulk-mongodb-app-secrets
           key: MONGODB_APP_PASSWORD
         mongo_database: mlos
-        db_host: "${mysql_host}"
-        db_port: ${mysql_port}
+        db_host: "${MYSQL_HOST}"
+        db_port: ${MYSQL_PORT}
         db_user: central_ledger
-        db_password: "${mysql_central_ledger_password}"
+        db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
         db_database: central_ledger
     cl-handler-bulk-transfer-fulfil:
       config: *bulkClConfig
@@ -470,10 +470,10 @@ ml-testing-toolkit:
   enabled: true
   config:
     mongodb:
-      host: "${mongodb_host}"
-      port: "${mongodb_port}"
+      host: "${MONGODB_HOST}"
+      port: "${MONGODB_PORT}"
       user: ttk
-      password: "${mongodb_app_password}"
+      password: "${MONGODB_APP_PASSWORD}"
       database: ttk
       secret: null
       connectionString: null
@@ -565,10 +565,10 @@ ml-testing-toolkit:
           {{- end }}
     config:
       mongodb:
-        host: "${mongodb_host}"
-        port: "${mongodb_port}"
+        host: "${MONGODB_HOST}"
+        port: "${MONGODB_PORT}"
         user: ttk
-        password: "${mongodb_app_password}"
+        password: "${MONGODB_APP_PASSWORD}"
         database: ttk
         secret:
           name: bulk-mongodb-app-secrets
@@ -586,7 +586,7 @@ ml-testing-toolkit:
 
   ml-testing-toolkit-frontend:
     config:
-      API_BASE_URL: https://ttk-backend.int.${domain}
+      API_BASE_URL: https://ttk-backend.int.${DOMAIN}
 
   ml-testing-toolkit-cli:
     enabled: false

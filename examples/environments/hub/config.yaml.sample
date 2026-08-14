@@ -27,17 +27,9 @@ template: "tps-10"
 
 infra:
   provider: "proxmox"                 # proxmox | aws | digitalocean
-  proxmox:
-    # Maps template placement groups -> Proxmox physical nodes
-    placement:
-      pg-1: "pve-node-1"
-      pg-2: "pve-node-2"
-      pg-3: "pve-node-3"
-    network_bridge: "vmbr0"
-    storage:
-      disks: "local-lvm"
-      images: "local"
-      snippets: "local"
+  # Provider infra facts live beside this file, not here:
+  #   placement.yaml       — placement groups -> physical nodes
+  #   proxmox/proxmox.yaml — network bridge, storage pools
   # Talos node OS overrides (optional — any on-prem provider)
   talos:
     nameservers:

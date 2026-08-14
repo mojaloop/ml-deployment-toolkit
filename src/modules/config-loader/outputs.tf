@@ -10,6 +10,11 @@ output "provider_name" {
   value       = local.provider_name
 }
 
+output "provider_params" {
+  description = "Provider interface symbols (P_*) from config/templates/<provider>/params.yaml — merged into the cluster-config ConfigMap for Flux substitution"
+  value       = local.provider_params
+}
+
 output "cluster" {
   description = "Cluster configuration (name, role, vip, lb_ipam, flux)"
   value       = local.cluster

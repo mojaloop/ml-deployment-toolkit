@@ -20,6 +20,12 @@ variable "artifacts_dir" {
   default     = "../../../artifacts"
 }
 
+variable "dtk_tag" {
+  description = "The clone's exact git tag (empty when untagged); asserted against the environment's dtk_version"
+  type        = string
+  default     = ""
+}
+
 # External credentials from environments/<env>/.env, passed as one map by the
 # Makefile (keys are the .env variable names). The infra stack only reads the
 # registry-proxy credentials (Talos machine mirrors).

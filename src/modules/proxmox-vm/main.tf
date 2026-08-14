@@ -3,7 +3,7 @@
 
 locals {
   # Read Proxmox provider configuration from YAML
-  provider_config = yamldecode(file(var.provider_config_path))
+  provider_config = yamldecode(file(var.provider_config_path)).infra
 
   # Process instances with storage config
   instances_with_specs = [

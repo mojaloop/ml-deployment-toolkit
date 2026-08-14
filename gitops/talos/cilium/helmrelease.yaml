@@ -37,7 +37,11 @@ spec:
       name: cilium-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: cilium-values-override
+      name: cilium-cilium-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: cilium-cilium-values-override
       valuesKey: values.yaml
       optional: true
 

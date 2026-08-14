@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../schemas/template.schema.json
+# yaml-language-server: $schema=../../../schemas/template.schema.json
 # -----------------------------------------------------------------------------
 # Deployment template — env/tps-1 (minimal Mojaloop Hub, ~1 TPS)
 # Provider-independent capacity template: node groups + app/data tuning.
@@ -17,7 +17,7 @@ node_groups:
     cores: 6
     memory: 5120         # MB
     disks: [32]          # GB
-    placement: [pg-2]
+    placement: [pg-1]
 
   - name: w
     class: worker-general

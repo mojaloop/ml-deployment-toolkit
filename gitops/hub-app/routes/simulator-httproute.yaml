@@ -9,7 +9,7 @@ spec:
     - name: gw-int
       namespace: platform-system
   hostnames:
-    - "simulator.int.${domain}"
+    - "simulator.int.${DOMAIN}"
   rules:
     - backendRefs:
         - name: moja-simulator

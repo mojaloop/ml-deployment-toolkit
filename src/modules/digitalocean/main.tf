@@ -2,7 +2,7 @@
 # Provisions DOKS managed Kubernetes cluster
 
 locals {
-  provider_config = yamldecode(file(var.provider_config_path))
+  provider_config = yamldecode(file(var.provider_config_path)).infra
 }
 
 # VPC for cluster network isolation

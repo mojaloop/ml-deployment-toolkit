@@ -75,6 +75,6 @@ spec:
               echo "Hub admin Keto tuples seeded for identity $IDENTITY_ID."
           env:
             - name: HUB_ADMIN_EMAIL
-              value: "${hub_admin_email}"
+              value: "${HUB_ADMIN_EMAIL}"
             - name: HUB_OBJECT
-              value: "${hub_participant_name}"
+              value: "${HUB_PARTICIPANT_NAME}"

@@ -3,7 +3,7 @@
 # which is merged after this file and therefore wins.
 # Admin credentials
 adminUser: admin
-adminPassword: "${grafana_admin_password}"
+adminPassword: "${GRAFANA_ADMIN_PASSWORD}"
 
 # SMTP credentials via env vars (GF_SMTP_USER/GF_SMTP_PASSWORD) — see
 # smtp-secret.yaml; pairs with the grafana.ini smtp block below
@@ -137,12 +137,12 @@ grafana.ini:
   # env vars) — the chart rejects an inline smtp.password here.
   smtp:
     enabled: true
-    host: "${smtp_host}:${smtp_port}"
-    from_address: "${alert_email_from}"
+    host: "${SMTP_HOST}:${SMTP_PORT}"
+    from_address: "${ALERT_EMAIL_FROM}"
     from_name: "Grafana"
     skip_verify: true
   server:
-    root_url: "https://grafana.int.${domain}"
+    root_url: "https://grafana.int.${DOMAIN}"
   auth.anonymous:
     enabled: false
   security:

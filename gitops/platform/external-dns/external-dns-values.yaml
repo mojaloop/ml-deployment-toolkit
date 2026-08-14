@@ -8,6 +8,6 @@ sources:
   - service
   - gateway-httproute
 domainFilters:
-  - ${domain}
-txtOwnerId: ${cluster_name}
+  - ${DOMAIN}
+txtOwnerId: ${CLUSTER_NAME}
 policy: sync

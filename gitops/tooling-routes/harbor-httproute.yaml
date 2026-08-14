@@ -8,7 +8,7 @@ spec:
     - name: gw-int
       namespace: platform-system
   hostnames:
-    - "harbor.int.${domain}"
+    - "harbor.int.${DOMAIN}"
   rules:
     - backendRefs:
         - name: harbor

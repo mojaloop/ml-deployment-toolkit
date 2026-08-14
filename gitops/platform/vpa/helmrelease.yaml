@@ -36,6 +36,10 @@ spec:
       name: vpa-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: vpa-values-override
+      name: vpa-vpa-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: vpa-vpa-values-override
       valuesKey: values.yaml
       optional: true

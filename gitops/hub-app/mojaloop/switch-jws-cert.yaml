@@ -20,6 +20,6 @@ spec:
     algorithm: RSA
     size: 4096
     rotationPolicy: Always
-  commonName: "${hub_participant_name}.${domain}"
+  commonName: "${HUB_PARTICIPANT_NAME}.${DOMAIN}"
   dnsNames:
-    - "${hub_participant_name}.${domain}"
+    - "${HUB_PARTICIPANT_NAME}.${DOMAIN}"
