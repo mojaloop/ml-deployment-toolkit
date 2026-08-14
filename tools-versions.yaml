@@ -1,0 +1,59 @@
+# Workstation toolchain manifest — enforced by tools/checks/check-tools.sh as a hard
+# pre-apply gate (a failing tool check fails the apply; it never warns).
+#
+# The DTK release pins Terraform code, gitops content and the OCI artifact to each other;
+# this file pins the toolchain those three are exercised with. Version drift here is a
+# recurring source of confusing failures — notably the mikefarah/kislyuk yq split and
+# provider-plugin behaviour changes.
+#
+# `min` is a floor, not an exact pin: patch/minor upgrades within a major are expected to
+# work. Raise a floor only with a reason recorded in the git history.
+version: 1
+tools:
+  tofu:
+    min: "1.9.0"
+    required: true
+    reason: "Primary IaC engine; both stacks are validated against OpenTofu."
+  flux:
+    min: "2.7.0"
+    required: true
+    reason: >-
+      Strict post-build substitution (fail on undefined variables) ships default-on with
+      kustomize-controller 1.9 / Flux 2.7. Below this line, an undefined ${VAR} silently
+      renders as an empty string in-cluster — the exact failure mode the engine-parity
+      invariant exists to prevent. Do not lower this floor.
+  helm:
+    min: "3.14.0"
+    required: true
+    reason: "Offline rendering of values chains and the Cilium bootstrap manifest."
+  talosctl:
+    min: "1.8.0"
+    required: true
+    reason: "Machine config generation/validation for the proxmox-talos provider."
+  kubectl:
+    min: "1.29.0"
+    required: true
+    reason: "Cluster verification and troubleshooting commands documented in doc/."
+  yq:
+    min: "4.40.0"
+    required: true
+    flavor: mikefarah
+    reason: >-
+      Must be mikefarah/yq (Go). The python/kislyuk yq is a different tool with
+      incompatible syntax and is explicitly rejected by the gate.
+  jq:
+    min: "1.7"
+    required: true
+    reason: "Makefile secret plumbing and check scripts."
+  python3:
+    min: "3.9.0"
+    required: true
+    reason: "tools/validate.py schema validation."
+  jsonnet:
+    min: "0.20.0"
+    required: false
+    reason: "Only needed to re-render Thanos manifests (make render-thanos)."
+  jb:
+    min: "0.5.1"
+    required: false
+    reason: "Only needed to re-render Thanos manifests (make render-thanos)."

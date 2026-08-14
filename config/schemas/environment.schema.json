@@ -21,6 +21,11 @@
       "type": "integer",
       "minimum": 1
     },
+    "dtk_version": {
+      "description": "DTK release this environment is written against. Asserted against the clone's actual git tag at apply time; a mismatch fails, it does not warn. This is what keeps 'matched versions only' true now that env repos and the DTK clone version independently.",
+      "type": "string",
+      "pattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$"
+    },
     "cluster": {
       "description": "Cluster identity and networking",
       "type": "object",
@@ -293,8 +298,9 @@
           "type": "string"
         },
         "version": {
-          "description": "OCI tag \u2014 'latest' or a pinned version",
-          "type": "string"
+          "description": "OCI tag \u2014 must be a pinned version (vX.Y.Z). 'latest' is disallowed: it contradicts matched-versions-only and the version assert cannot check a moving target.",
+          "type": "string",
+          "pattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$"
         },
         "active": {
           "type": "boolean",

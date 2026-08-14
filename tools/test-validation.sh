@@ -74,6 +74,9 @@ expect_reject "lb_ipam without pools"      'del(.cluster.lb_ipam.pools)'
 expect_reject "lb_ipam legacy range key"   '.cluster.lb_ipam.range = "192.168.0.10-192.168.0.20"'
 expect_reject "unknown key in cert"        '.cert.bogus = "x"'
 expect_reject "unknown key in artifact"    '.artifact.bogus = "x"'
+expect_reject "artifact.version latest"    '.artifact.version = "latest"'
+expect_reject "artifact.version branch"    '.artifact.version = "main"'
+expect_reject "dtk_version not a release"  '.dtk_version = "latest"'
 expect_reject "invalid cert provider"      '.cert.provider = "vault-pki"' 
 
 echo

@@ -109,6 +109,8 @@ help:
 	@echo ""
 	@echo "Main commands:"
 	@echo "  make validate      - Schema-validate config.yaml + template, terraform validate"
+	@echo "  make check         - Run all repo contract checks (tools/checks/, no ENV needed)"
+	@echo "  make check-pristine [ENV=<env>] - Pristine-clone/tag gate (apply-time)"
 	@echo "  make plan-apply    - Full deployment: infra stack, then config stack"
 	@echo "  make apply-config  - Fast path: apply ONLY config changes (no infra plan)"
 	@echo "  make secrets       - Show generated internal service passwords"
@@ -164,6 +166,29 @@ validate:
 
 fmt:
 	@cd src && terraform fmt -recursive
+
+# --------------------------------------------------------------------------
+# Repo contract checks (tools/checks/) — config-layering gates
+#
+#   make check          - Every repo-state check: substitution token syntax,
+#                         HelmRelease valuesFrom chain, P_* provider interface,
+#                         secret placement, node-role placement, tool versions,
+#                         talos fragments. No ENV required.
+#   make check-pristine - Adopter/apply-time gate: clean working tree on an
+#                         exact release tag. With ENV=<env>, also verifies the
+#                         dtk_version pinned in environments/<env>/config.yaml.
+# --------------------------------------------------------------------------
+.PHONY: check check-pristine
+
+check:
+	@tools/checks/check-all.sh
+
+check-pristine:
+	@if [ -n "$(ENV)" ] && [ -f "$(ENV_DIR)/config.yaml" ]; then \
+		tools/checks/check-pristine.sh "$(ENV_DIR)/config.yaml"; \
+	else \
+		tools/checks/check-pristine.sh; \
+	fi
 
 # --------------------------------------------------------------------------
 # Init / Plan / Apply

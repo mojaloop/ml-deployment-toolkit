@@ -62,7 +62,7 @@ cert:
 # Distribution gitops artifact consumed by Flux (credentials OCI_REPO_* in .env)
 artifact:
   url: "oci://ghcr.io/your-org/ml-deployment-toolkit"
-  version: "latest"                   # OCI tag — "latest" or pin to a version
+  version: "v0.19.0"                  # OCI tag — must be a pinned version; "latest" is disallowed
 
 # ------------------------------------------------------------------
 # Supporting services: image cache, backup storage, telemetry sink.
