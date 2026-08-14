@@ -60,3 +60,5 @@ environments/mlf-lab1-sw1/*
 !environments/mlf-lab1-cc1/perf-scenarios/
 
 perf-result/*
+environments/*/perf-scenarios/*
+environments/*/perf-topology.yaml
