@@ -39,7 +39,7 @@ spec:
     volumes:
       - id: 0
         type: persistent-claim
-        size: ${KAFKA_STORAGE}
+        size: 8Gi
         deleteClaim: false
   resources:
     # Memory-bound lab nodes: cap broker working set (heap is pinned to 512m
@@ -84,7 +84,7 @@ spec:
       transaction.state.log.min.isr: 2
       default.replication.factor: 3
       min.insync.replicas: 2
-      num.partitions: ${KAFKA_DEFAULT_PARTITIONS}
+      num.partitions: 6
   entityOperator:
     topicOperator: {}
   kafkaExporter:

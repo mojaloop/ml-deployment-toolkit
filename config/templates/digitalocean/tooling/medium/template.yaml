@@ -1,18 +1,8 @@
 # yaml-language-server: $schema=../../../../schemas/template.schema.json
 # -----------------------------------------------------------------------------
 # Deployment template — cc/medium (Tooling Cluster, several environments)
-# Provider-independent capacity template: node groups + service tuning.
-# Provider specifics (VM defaults, instance types) live in mappings/<provider>.yaml
+# Full-overlay template: identity here; topology in placement.yaml; tuning
+# as values/ and patches/ overlays; per-pool Talos fragments in talos/.
 # -----------------------------------------------------------------------------
 version: 1
 description: "Single mixed-plane node tooling cluster (16 GB)"
-
-# --- Tooling services scaling ---
-tooling:
-  vault_replicas: 1
-  harbor_registry_storage: "20Gi"
-  harbor_db_storage: "2Gi"
-  harbor_redis_storage: "1Gi"
-  harbor_trivy_storage: "5Gi"
-  minio_replicas: 1
-  minio_storage: "32Gi"

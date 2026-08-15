@@ -19,12 +19,12 @@ A cluster can be rebuilt from the artifact and the configuration — but only if
 | Keep | Why | Without it |
 |------|-----|-----------|
 | **Vault unseal keys / root token** | The Secret in the `vault` namespace, which dies with the cluster | The raft snapshots are encrypted and unopenable — the PKI is lost |
-| **Terraform state** (`../artifacts/<env>/`) | **Both** state files — `terraform/infra.tfstate` is Terraform's record of the infrastructure (and, on Talos environments, the machine secrets, also written to `../artifacts/<env>/talos-secrets/secrets.yaml`); `terraform/config.tfstate` holds every **generated** internal service password. The `../artifacts/` tree sits outside both the clone and the environment repository — no git remote protects it | Terraform cannot manage or cleanly rebuild what it no longer knows exists; on Talos, expired client certs become a [permanent lockout](../operate/known-issues.md#lost-or-expired-cluster-access--kubeconfig-and-talosconfig-talos) — the API is mTLS-only with no fallback. Losing the config state loses the database, Vault-backed, and admin passwords unless the cluster is still up to read them from |
+| **Terraform state** (`../artifacts/<env>/state/`) | **Both** state files — `state/infra.tfstate` is Terraform's record of the infrastructure (and, on Talos environments, the machine secrets, also written to `../artifacts/<env>/talos-secrets/secrets.yaml`); `state/config.tfstate` holds every **generated** internal service password. The `../artifacts/` tree sits outside both the clone and the environment repository — no git remote protects it | Terraform cannot manage or cleanly rebuild what it no longer knows exists; on Talos, expired client certs become a [permanent lockout](../operate/known-issues.md#lost-or-expired-cluster-access--kubeconfig-and-talosconfig-talos) — the API is mTLS-only with no fallback. Losing the config state loses the database, Vault-backed, and admin passwords unless the cluster is still up to read them from |
 | **The environment repository and `.env`** | `../environments/<env>/` is its own git repository holding the environment's identity — `config.yaml`, `placement.yaml`, `proxmox/proxmox.yaml`, `values/`, `patches/`; `.env` holds the external credentials and is never committed anywhere | No way to reproduce the same cluster |
 
 Back the first two up explicitly — see [Backups → What the adopter must back up](backup.md#what-the-adopter-must-back-up). For the third, push the environment repository to a private remote; `.env` is excluded from it by the shipped `.gitignore` and exists nowhere but the adopter's disk and the adopter's own secure copy ([Backups → The environment repository and `.env`](backup.md#the-environment-repository-and-env)).
 
-While a cluster is still running, its generated passwords can be read back two ways — `make secrets ENV=<env>` from the config state, or the `cluster-secrets` Secret in `flux-system`. Neither survives losing both the state and the cluster, which is why the state backup covers `../artifacts/<env>/terraform/` in full.
+While a cluster is still running, its generated passwords can be read back two ways — `make secrets ENV=<env>` from the config state, or the `cluster-secrets` Secret in `flux-system`. Neither survives losing both the state and the cluster, which is why the state backup covers `../artifacts/<env>/state/` in full.
 
 A rebuild with all three is a procedure. A rebuild missing any of them is a partial reconstruction with permanent loss — know which situation applies before starting.
 
@@ -62,7 +62,7 @@ The order is infrastructure, then secrets/PKI, then data: restoring data before 
 
 The same shape, and simpler — a Tooling Cluster holds no scheme PKI and no ledger:
 
-1. Restore the environment repository to `../environments/<env>/` and `.env` from the secure copy, plus both state files under `../artifacts/<env>/terraform/`.
+1. Restore the environment repository to `../environments/<env>/` and `.env` from the secure copy, plus both state files under `../artifacts/<env>/state/`.
 2. `make init ENV=<env> && make plan ENV=<env> && make apply ENV=<env>`.
 3. Let Flux bring up Harbor, MinIO, and the observability stack.
 4. **Its Vault rebuilds fresh** — a Tooling Cluster's Vault has no scheduled snapshot ([Backups](backup.md#what-runs-automatically)), and it holds no scheme CA. Its secrets are seeded from the config stack on deploy, so with the state restored in step 2 the rebuilt Vault converges to the same credentials.

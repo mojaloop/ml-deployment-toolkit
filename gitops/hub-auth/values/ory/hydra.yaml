@@ -1,7 +1,7 @@
 # Distribution values for the hydra HelmRelease.
 # Adopter overrides go in environments/<env>/values/hydra.yaml,
 # which is merged after this file and therefore wins.
-replicaCount: ${HYDRA_REPLICAS}
+replicaCount: 1
 fullnameOverride: "hydra"
 
 secret:

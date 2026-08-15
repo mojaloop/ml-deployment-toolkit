@@ -99,7 +99,9 @@ module "talos_config" {
       workload_patches = concat(
         lookup(local.workload_class_patches, inst.workload_class, []),
         lookup(local.provider_patches_by_class, inst.workload_class, []),
-        try([var.label_taint_patches[inst.workload_class]], []),
+        # Pool-keyed: the label derives from the pool name and the taints come
+        # from the pool's own placement.yaml declaration.
+        try([var.label_taint_patches[inst.group]], []),
         local.registry_mirror_patch,
         local.nameservers_patch,
         local.ntp_patch,

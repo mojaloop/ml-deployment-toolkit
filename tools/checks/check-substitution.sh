@@ -86,7 +86,9 @@ for entry in $SCAN_LIST; do
 '
     continue
   fi
-  files=$(find "$dir" -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.tpl' \) | sort)
+  # *.yaml.sample: examples/environments mirrors adopter env dirs with a .sample
+  # suffix — same substitution rules apply.
+  files=$(find "$dir" -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.tpl' -o -name '*.yaml.sample' -o -name '*.yml.sample' \) | sort)
   for f in $files; do
     scan_file "$f" "$mode"
   done

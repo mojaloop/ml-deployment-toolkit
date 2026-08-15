@@ -11,6 +11,6 @@ configMapGenerator:
   - name: vault-operator-values
     namespace: flux-system
     files:
-      - values.yaml=vault-operator/vault-operator-values.yaml
+      - values.yaml=values/tooling-system/vault-operator.yaml
 generatorOptions:
   disableNameSuffixHash: true

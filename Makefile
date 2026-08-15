@@ -14,22 +14,26 @@
 SHELL := /bin/bash
 ENV ?=
 # Adopter data lives OUTSIDE the clone, in sibling directories under the
-# project root (see doc: config-layering design). Both roots are entry-point
+# project root (see doc/architecture/config-layering-design.md). Both roots are entry-point
 # parameters; override them for a non-standard layout, e.g.
 #   make plan ENV=x ENVIRONMENTS_ROOT=/path/to/envs ARTIFACTS_ROOT=/path/to/artifacts
 ENVIRONMENTS_ROOT ?= ../environments
 ARTIFACTS_ROOT ?= ../artifacts
 ENV_DIR := $(ENVIRONMENTS_ROOT)/$(ENV)
 ENV_FILE := $(ENV_DIR)/.env
-ARTIFACTS_DIR := $(ARTIFACTS_ROOT)/$(ENV)/terraform
+# State gets a visible boundary: it is the NON-REGENERABLE, secret-bearing part
+# of the artifacts tree — losing it orphans the cluster. Disposable output
+# (plans) lives separately so no cleanup step is ever tempted to touch state/.
+STATE_DIR := $(ARTIFACTS_ROOT)/$(ENV)/state
+PLANS_DIR := $(ARTIFACTS_ROOT)/$(ENV)/plans
 INFRA_DIR := src/infra
 CONFIG_DIR := src/config
-INFRA_PLAN := $(ARTIFACTS_DIR)/tfplan-infra
-CONFIG_PLAN := $(ARTIFACTS_DIR)/tfplan-config
+INFRA_PLAN := $(PLANS_DIR)/tfplan-infra
+CONFIG_PLAN := $(PLANS_DIR)/tfplan-config
 # abspath keeps overrides working whether the roots are given relative (to the
 # repo root, where make runs) or absolute; terraform init runs in src/<stack>.
-INFRA_BACKEND := path=$(abspath $(ARTIFACTS_DIR))/infra.tfstate
-CONFIG_BACKEND := path=$(abspath $(ARTIFACTS_DIR))/config.tfstate
+INFRA_BACKEND := path=$(abspath $(STATE_DIR))/infra.tfstate
+CONFIG_BACKEND := path=$(abspath $(STATE_DIR))/config.tfstate
 
 # External credential names read from .env into the TF_VAR_secrets map.
 # UPPER_CASE password names double as generation overrides (migrating envs /
@@ -103,6 +107,11 @@ endef
 # -reconfigure (not -upgrade) keeps this cheap enough to do every time.
 BIND_INFRA  = terraform init -reconfigure -input=false -backend-config="$(INFRA_BACKEND)" >/dev/null
 BIND_CONFIG = terraform init -reconfigure -input=false -backend-config="$(CONFIG_BACKEND)" >/dev/null
+
+# State files are secret-bearing (Talos machine secrets, credentials in
+# resources). Terraform rewrites them 0644 on every apply/destroy — re-tighten
+# immediately after. Never fails the target.
+PROTECT_STATE = @chmod 700 $(STATE_DIR) 2>/dev/null; chmod 600 $(STATE_DIR)/*.tfstate* 2>/dev/null; true
 
 .DEFAULT_GOAL := help
 
@@ -180,6 +189,10 @@ validate:
 	 echo "Validating $(ENV_DIR)/proxmox/proxmox.yaml against schema..."; \
 	 yq -o json e '.' $(ENV_DIR)/proxmox/proxmox.yaml | python3 tools/validate.py config/schemas/proxmox-env.schema.json; \
 	fi
+	@if [ -f "$(ENV_DIR)/talos.yaml" ]; then \
+	 echo "Validating $(ENV_DIR)/talos.yaml against schema..."; \
+	 yq -o json e '.' $(ENV_DIR)/talos.yaml | python3 tools/validate.py config/schemas/talos-env.schema.json; \
+	fi
 	@if [ -d "$(INFRA_DIR)/.terraform" ]; then \
 		cd $(INFRA_DIR) && $(LOAD_ENV) && terraform validate && cd ../../$(CONFIG_DIR) && $(LOAD_ENV) && terraform validate; \
 	else \
@@ -219,14 +232,16 @@ check-pristine:
 
 init-infra:
 	$(CHECK_ENV)
-	@mkdir -p $(ARTIFACTS_DIR)
+	@mkdir -p $(STATE_DIR) $(PLANS_DIR)
+	@chmod 700 $(STATE_DIR)
 	@$(ENSURE_KUBECONFIG)
 	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform init -upgrade -reconfigure \
 		-backend-config="$(INFRA_BACKEND)"
 
 init-config:
 	$(CHECK_ENV)
-	@mkdir -p $(ARTIFACTS_DIR)
+	@mkdir -p $(STATE_DIR) $(PLANS_DIR)
+	@chmod 700 $(STATE_DIR)
 	@$(ENSURE_KUBECONFIG)
 	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform init -upgrade -reconfigure \
 		-backend-config="$(CONFIG_BACKEND)"
@@ -249,6 +264,7 @@ apply-infra:
 	$(CHECK_ENV)
 	@if [ ! -f "$(INFRA_PLAN)" ]; then echo "No infra plan — run 'make plan-infra ENV=$(ENV)'"; exit 1; fi
 	@cd $(INFRA_DIR) && $(LOAD_ENV) && $(BIND_INFRA) && terraform apply ../../$(INFRA_PLAN)
+	$(PROTECT_STATE)
 
 # Fast path: config changes converge without touching infrastructure.
 apply-config: init-config
@@ -256,13 +272,16 @@ apply-config: init-config
 	@echo "Applying config stack only (ENV=$(ENV))..."
 	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform plan -out=../../$(CONFIG_PLAN)
 	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform apply ../../$(CONFIG_PLAN)
+	$(PROTECT_STATE)
 
 apply:
 	$(CHECK_ENV)
 	@if [ ! -f "$(INFRA_PLAN)" ]; then echo "No infra plan — run 'make plan ENV=$(ENV)'"; exit 1; fi
 	@cd $(INFRA_DIR) && $(LOAD_ENV) && $(BIND_INFRA) && terraform apply ../../$(INFRA_PLAN)
+	$(PROTECT_STATE)
 	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform plan -out=../../$(CONFIG_PLAN)
 	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform apply ../../$(CONFIG_PLAN)
+	$(PROTECT_STATE)
 
 # Plan and apply both stacks in order (config planned AFTER infra applies, so
 # it sees the real cluster).
@@ -271,9 +290,11 @@ plan-apply: init
 	@echo "Deploying infra stack (ENV=$(ENV))..."
 	@cd $(INFRA_DIR) && $(LOAD_ENV) && $(BIND_INFRA) && terraform plan -out=../../$(INFRA_PLAN)
 	@cd $(INFRA_DIR) && $(LOAD_ENV) && $(BIND_INFRA) && terraform apply ../../$(INFRA_PLAN)
+	$(PROTECT_STATE)
 	@echo "Deploying config stack (ENV=$(ENV))..."
 	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform plan -out=../../$(CONFIG_PLAN)
 	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform apply ../../$(CONFIG_PLAN)
+	$(PROTECT_STATE)
 
 # --------------------------------------------------------------------------
 # Generated secrets
@@ -295,8 +316,10 @@ destroy:
 	@$(ENSURE_KUBECONFIG)
 	@echo "Destroying config stack (best effort)..."
 	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform destroy -auto-approve -refresh=false || true
+	$(PROTECT_STATE)
 	@echo "Destroying infra stack..."
 	@cd $(INFRA_DIR) && $(LOAD_ENV) && $(BIND_INFRA) && terraform destroy -auto-approve
+	$(PROTECT_STATE)
 
 destroy-fast:
 	$(CHECK_ENV)
@@ -305,7 +328,9 @@ destroy-fast:
 	@sleep 3
 	@$(ENSURE_KUBECONFIG)
 	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform destroy -auto-approve -refresh=false || true
+	$(PROTECT_STATE)
 	@cd $(INFRA_DIR) && $(LOAD_ENV) && $(BIND_INFRA) && terraform destroy -auto-approve -refresh=false
+	$(PROTECT_STATE)
 
 # Removes generated artifacts for ONE environment, never the Terraform state —
 # deleting state orphans running VMs and managed clusters.
@@ -314,7 +339,7 @@ clean:
 	@echo "Removing generated artifacts for $(ENV) (state is preserved)..."
 	@rm -rf $(ARTIFACTS_ROOT)/$(ENV)/kubernetes $(ARTIFACTS_ROOT)/$(ENV)/talos $(ARTIFACTS_ROOT)/$(ENV)/talos-config \
 		$(ARTIFACTS_ROOT)/$(ENV)/talos-secrets $(INFRA_PLAN) $(CONFIG_PLAN)
-	@echo "Done. Terraform state under $(ARTIFACTS_ROOT)/$(ENV)/terraform/ was kept."
+	@echo "Done. Terraform state under $(STATE_DIR)/ was kept."
 
 list:
 	$(CHECK_ENV)

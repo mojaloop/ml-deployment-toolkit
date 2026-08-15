@@ -1,9 +1,12 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Provider interface parameters",
-  "description": "Schema for config/templates/<provider>/params.yaml — the provider interface. The `params` block declares every P_* substitution symbol the gitops layer may reference; a provider must supply all of them, and gitops must reference only symbols declared here. P_* symbols resolve from params.yaml only — config.yaml can never define or shadow them. The `infra` block carries Terraform-consumed provider configuration (VM defaults, images, instance shapes) and is provider-shaped by design.",
+  "description": "Schema for config/templates/<provider>/params.yaml — the provider interface. The `params` block declares every P_* substitution symbol the gitops layer may reference; a provider must supply all of them, and gitops must reference only symbols declared here. P_* symbols resolve from params.yaml only — config.yaml can never define or shadow them. The `infra` block carries Terraform-consumed provider configuration (VM defaults, images, instance shapes) and is provider-shaped by design. Symbols from the design enumeration resolved elsewhere by decision: LB pools and the registry are multi-consumer network facts in config.yaml; the DNS mechanism is the config.yaml dns.provider structural selector; the secrets backend is fixed (in-cluster Vault via ESO) and becomes a symbol only when a second backend exists.",
   "type": "object",
-  "required": ["version", "params"],
+  "required": [
+    "version",
+    "params"
+  ],
   "additionalProperties": false,
   "properties": {
     "version": {
@@ -33,7 +36,7 @@
           "pattern": "^[a-z][a-z0-9-]*$"
         },
         "P_STORAGE_CLASS": {
-          "description": "Default StorageClass name workloads should request; empty string means rely on the cluster default",
+          "description": "Default StorageClass name workloads should request; empty string means rely on the cluster default. Deliberately UNREFERENCED in gitops today: on proxmox-talos the cluster default (OpenEBS LocalPV) is the decided behavior, and naming a class in workload manifests would rewrite immutable PVC specs on live clusters. The symbol exists so cloud providers can bind it when second-provider validation lands.",
           "type": "string"
         },
         "P_NODE_ROLE_LABEL_KEY": {

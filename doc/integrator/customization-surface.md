@@ -31,21 +31,21 @@ The no-fork rows are not integrator-specific — they are the [adopter](../adopt
 
 ## Configuration: no fork
 
-Everything in `config.yaml` and `.env` is per-environment and carried by no one. Infrastructure and DNS providers, deployment template, domain, artifact source, registry and object-storage bindings, data modes, email and alerting — all configuration. The environment directory also carries `placement.yaml` (placement groups → physical nodes) and `proxmox/proxmox.yaml` (network bridge and storage pools), so physical-infrastructure tailoring needs no fork either. If a client's need is expressible here, it is free.
+Everything in `config.yaml` and `.env` is per-environment and carried by no one. Infrastructure and DNS providers, deployment template, domain, artifact source, registry and object-storage bindings, data modes, email and alerting — all configuration. The environment directory also carries `placement.yaml` (placement groups → physical nodes), `proxmox/proxmox.yaml` (network bridge and storage pools), and `talos.yaml` (node OS facts), so physical-infrastructure tailoring needs no fork either. If a client's need is expressible here, it is free.
 
 See [Configuration](../adopter/deploy/configuration.md) for the full schema.
 
 ## Helm value overrides: no fork
 
-The integrator can override the platform's Helm values for **any** chart the distribution ships, without forking, by placing a file at `values/<namespace>/<release>.yaml` in the environment directory — the path *is* the binding; there is no `target:` header. Every HelmRelease ends its `valuesFrom` chain with the optional override twins — a ConfigMap and a Secret, both named `<namespace>-<release>-values-override` — so the file is picked up with no wiring change. Applying one is `make apply-config ENV=<env>`: seconds, and it cannot touch infrastructure.
+The integrator can override the platform's Helm values for **any** chart the distribution ships, without forking, by placing a file at `values/<namespace>/<release>.yaml` in the environment directory — the path *is* the binding; there is no `target:` header. Every HelmRelease ends its `valuesFrom` chain with the optional three-layer tail — the selected template's `<namespace>-<release>-values-template` ConfigMap, then the override twins, a ConfigMap and a Secret both named `<namespace>-<release>-values-override` — so the file is picked up with no wiring change. Applying one is `make apply-config ENV=<env>`: seconds, and it cannot touch infrastructure.
 
 This covers a large amount of application-level tailoring — resource sizing, feature flags, chart-exposed settings — with zero maintenance burden, because the override lives in the client's environment repository. It reaches every value the distribution sets, not just the ones it leaves blank: no HelmRelease uses inline `spec.values`, the distribution's own values arrive as a `<release>-values` ConfigMap listed first in `valuesFrom`, and the client's override twins are listed last, so they win.
 
-The files are templated: `${DOMAIN}`, `${CLUSTER_NAME}`, the resolved telemetry URLs, and the template's tuning keys expand at apply time, so a client's override does not re-hardcode values the cluster already knows. An undefined `${NAME}` fails the apply rather than passing through. Lines referencing a `.env` key land in the Secret twin, never the ConfigMap — a client can override a credentialed value without it appearing in a ConfigMap. See [Configuration → Helm value overrides](../adopter/deploy/configuration.md#helm-value-overrides).
+The files are templated: `${DOMAIN}`, `${CLUSTER_NAME}`, the resolved telemetry URLs, and the other config-derived tokens expand at apply time, so a client's override does not re-hardcode values the cluster already knows. An undefined `${NAME}` fails the apply rather than passing through. Lines referencing a `.env` key land in the Secret twin, never the ConfigMap — a client can override a credentialed value without it appearing in a ConfigMap. See [Configuration → Helm value overrides](../adopter/deploy/configuration.md#helm-value-overrides).
 
 ## Manifest patches: no fork
 
-Value overrides stop where charts stop. The data layer is the case that matters: Kafka, MySQL, MongoDB, and Redis ship as custom resources for their operators, not as charts, so no values file reaches them. Their `config.yaml` surface is the six scalars in the template's `data:` block — storage sizes, `num.partitions`, two MySQL settings — and nothing else.
+Value overrides stop where charts stop. The data layer is the case that matters: Kafka, MySQL, MongoDB, and Redis ship as custom resources for their operators, not as charts, so no values file reaches them. Their tuning — storage sizes, partition counts, MySQL settings — is literal in the shipped manifests, scaled per tier by the selected template's own patches, so from the environment there is no values-style surface at all.
 
 For everything past that, the integrator drops a file named for the Flux Kustomization in the environment's `patches/` directory, and its contents are appended to that Kustomization's `spec.patches`. JVM heap, replica counts, resource requests, an operator setting the distribution never anticipated — all reachable, without touching `gitops/`. The mechanism is not data-layer-specific: any Kustomization can be named, so it covers every plain manifest the distribution ships.
 
@@ -65,7 +65,7 @@ What is different for an integrator is the **cost model**. Every line the integr
 
 For any client requirement, walk down the layers and stop at the first that works:
 
-1. **Can `config.yaml` / `.env` / `placement.yaml` / `proxmox/proxmox.yaml` express it?** → configuration. Done, free.
+1. **Can `config.yaml` / `.env` / `placement.yaml` / `proxmox/proxmox.yaml` / `talos.yaml` express it?** → configuration. Done, free.
 2. **Is it a value on a chart the distribution ships?** → value override. Done, free.
 3. **Is it a field on a manifest the distribution ships?** → manifest patch. Done, free.
 4. **Could it be any of those, if the field existed?** → consider [contributing it upstream](../platform/index.md) so it becomes free — for the integrator and everyone.

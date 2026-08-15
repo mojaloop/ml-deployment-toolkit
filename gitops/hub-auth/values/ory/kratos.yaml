@@ -1,7 +1,7 @@
 # Distribution values for the kratos HelmRelease.
 # Adopter overrides go in environments/<env>/values/kratos.yaml,
 # which is merged after this file and therefore wins.
-replicaCount: ${KRATOS_REPLICAS}
+replicaCount: 1
 fullnameOverride: "kratos"
 
 secret:

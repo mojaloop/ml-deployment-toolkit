@@ -91,25 +91,8 @@ output "talos_image" {
 }
 
 output "label_taint_patches" {
-  description = "Dynamic label/taint patches per workload class"
-  value       = local.label_taint_patches
-}
-
-# --- Template tuning sections ---------------------------------------------
-
-output "template_app" {
-  description = "Application scaling variables from the template"
-  value       = try(local.template.app, {})
-}
-
-output "template_data" {
-  description = "Data layer tuning variables from the template"
-  value       = try(local.template.data, {})
-}
-
-output "template_tooling" {
-  description = "Tooling services scaling variables from the template"
-  value       = try(local.template.tooling, {})
+  description = "Per-POOL Talos machine-config patch: mechanically derived node label (<P_NODE_ROLE_LABEL_KEY>=<pool>) plus the taints the pool declares in placement.yaml"
+  value       = local.pool_label_taint_patches
 }
 
 # --- Resolved capabilities ------------------------------------------------

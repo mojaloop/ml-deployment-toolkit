@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Environment Talos node facts",
+  "description": "Schema for <env>/talos.yaml — single-consumer Talos node OS facts moved out of config.yaml (consumed only by the on-prem machine-config path). Per-pool machine-config fragments live separately in <env>/talos/<pool>.yaml.",
+  "type": "object",
+  "required": ["version"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "description": "Format version",
+      "type": "integer",
+      "minimum": 1
+    },
+    "nameservers": {
+      "description": "DNS resolvers for the Talos nodes",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "ntp_servers": {
+      "description": "NTP servers for the Talos nodes",
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

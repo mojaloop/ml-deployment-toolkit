@@ -14,14 +14,14 @@ configMapGenerator:
   - name: alloy-values
     namespace: flux-system
     files:
-      - values.yaml=alloy-values.yaml
+      - values.yaml=values/observability/alloy.yaml
   - name: kube-state-metrics-values
     namespace: flux-system
     files:
-      - values.yaml=kube-state-metrics-values.yaml
+      - values.yaml=values/observability/kube-state-metrics.yaml
   - name: node-exporter-values
     namespace: flux-system
     files:
-      - values.yaml=node-exporter-values.yaml
+      - values.yaml=values/observability/node-exporter.yaml
 generatorOptions:
   disableNameSuffixHash: true

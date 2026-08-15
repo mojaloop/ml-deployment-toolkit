@@ -30,25 +30,17 @@ classes:
       - patch-openebs.yaml
       - patch-allow-scheduling-on-cp.yaml
 
+  # Node labels are NOT declared here: they derive mechanically from the pool
+  # name (<P_NODE_ROLE_LABEL_KEY>=<pool>). Taints are declared by the pool
+  # itself in the template's placement.yaml. A pool meant for Kafka is simply
+  # NAMED kafka — that name becomes its label, and gitops selects on it.
   worker-kafka:
     talos_type: "worker"
     talos_patches:
       - patch-cilium-install.yaml
-    node_labels:
-      node-role: "kafka"
-    node_taints:
-      - key: "node-role"
-        value: "kafka"
-        effect: "NoSchedule"
 
   worker-db:
     talos_type: "worker"
     talos_patches:
       - patch-cilium-install.yaml
       - patch-openebs.yaml
-    node_labels:
-      node-role: "db"
-    node_taints:
-      - key: "node-role"
-        value: "db"
-        effect: "NoSchedule"

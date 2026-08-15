@@ -16,7 +16,7 @@ centralledger:
   centralledger-service:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${CL_SERVICE_REPLICAS}
+    replicaCount: 1
     config:
       kafka_host: "${KAFKA_HOST}"
       kafka_port: ${KAFKA_PORT}
@@ -101,7 +101,7 @@ centralledger:
   centralledger-handler-transfer-prepare:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${CL_HANDLER_PREPARE_REPLICAS}
+    replicaCount: 1
     config:
       kafka_host: "${KAFKA_HOST}"
       kafka_port: ${KAFKA_PORT}
@@ -128,7 +128,7 @@ centralledger:
   centralledger-handler-transfer-position-batch:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${CL_HANDLER_POSITION_BATCH_REPLICAS}
+    replicaCount: 1
     config:
       kafka_host: "${KAFKA_HOST}"
       kafka_port: ${KAFKA_PORT}
@@ -142,7 +142,7 @@ centralledger:
   centralledger-handler-transfer-get:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${CL_HANDLER_GET_REPLICAS}
+    replicaCount: 1
     metrics:
       enabled: true
     config:
@@ -158,7 +158,7 @@ centralledger:
   centralledger-handler-transfer-fulfil:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${CL_HANDLER_FULFIL_REPLICAS}
+    replicaCount: 1
     config:
       kafka_host: "${KAFKA_HOST}"
       kafka_port: ${KAFKA_PORT}
@@ -172,7 +172,7 @@ centralledger:
   centralledger-handler-timeout:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${CL_HANDLER_TIMEOUT_REPLICAS}
+    replicaCount: 1
     metrics:
       enabled: true
     config:
@@ -186,7 +186,7 @@ centralledger:
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
   centralledger-handler-admin-transfer:
-    replicaCount: ${CL_HANDLER_ADMIN_REPLICAS}
+    replicaCount: 1
     metrics:
       enabled: true
     config:
@@ -204,7 +204,7 @@ centralledger:
 # Event SDK: produces audit events to Kafka for Finance Portal reporting
 quoting-service:
   quoting-service:
-    replicaCount: ${QS_SERVICE_REPLICAS}
+    replicaCount: 1
     podAnnotations:
       prometheus.io/scrape: "true"
       prometheus.io/port: "3002"
@@ -230,7 +230,7 @@ quoting-service:
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
   quoting-service-handler:
-    replicaCount: ${QS_HANDLER_REPLICAS}
+    replicaCount: 3
     commonAnnotations: &switchJwsReloader
       secret.reloader.stakater.com/reload: switch-jws
     podAnnotations:
@@ -263,7 +263,7 @@ quoting-service:
 # --- Central Settlement (shares central_ledger DB) ---
 centralsettlement:
   centralsettlement-service:
-    replicaCount: ${CS_SERVICE_REPLICAS}
+    replicaCount: 1
     metrics:
       enabled: true
     config:
@@ -275,7 +275,7 @@ centralsettlement:
       db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
   centralsettlement-handler-deferredsettlement:
-    replicaCount: ${CS_HANDLER_DEFERRED_REPLICAS}
+    replicaCount: 1
     metrics:
       enabled: true
     config:
@@ -297,7 +297,7 @@ centralsettlement:
       db_database: central_ledger
     replicaCount: 0
   centralsettlement-handler-rules:
-    replicaCount: ${CS_HANDLER_RULES_REPLICAS}
+    replicaCount: 1
     metrics:
       enabled: true
     config:
@@ -315,7 +315,7 @@ account-lookup-service:
   account-lookup-service:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${ALS_SERVICE_REPLICAS}
+    replicaCount: 1
     commonAnnotations: *switchJwsReloader
     config:
       api_type: ${API_TYPE}
@@ -334,7 +334,7 @@ account-lookup-service:
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
   account-lookup-service-admin:
-    replicaCount: ${ALS_ADMIN_REPLICAS}
+    replicaCount: 1
     metrics:
       enabled: true
     config:
@@ -351,7 +351,7 @@ account-lookup-service:
 
 # --- ALS MSISDN Oracle ---
 als-msisdn-oracle:
-  replicaCount: ${ALS_ORACLE_REPLICAS}
+  replicaCount: 1
   metrics:
     enabled: true
   config:
@@ -366,7 +366,7 @@ als-msisdn-oracle:
 
 # --- Transaction Requests Service ---
 transaction-requests-service:
-  replicaCount: ${TX_REQUESTS_REPLICAS}
+  replicaCount: 1
   metrics:
     enabled: true
 
@@ -376,7 +376,7 @@ ml-api-adapter:
   ml-api-adapter-service:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${ML_ADAPTER_SERVICE_REPLICAS}
+    replicaCount: 1
     config:
       api_type: ${API_TYPE}
       kafka_host: "${KAFKA_HOST}"
@@ -386,7 +386,7 @@ ml-api-adapter:
   ml-api-adapter-handler-notification:
     podAnnotations:
       instrumentation.opentelemetry.io/inject-nodejs: "true"
-    replicaCount: ${ML_ADAPTER_HANDLER_NOTIFICATION_REPLICAS}
+    replicaCount: 6
     commonAnnotations: *switchJwsReloader
     config:
       api_type: ${API_TYPE}

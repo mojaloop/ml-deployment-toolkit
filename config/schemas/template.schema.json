@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Capacity template",
-  "description": "Schema for config/templates/<provider>/<role>/<name>/template.yaml — template identity and app/data/tooling tuning. The topology lives beside it in placement.yaml; gitops deltas in values/ and patches/; per-pool Talos fragments in talos/.",
+  "description": "Schema for config/templates/<provider>/<role>/<name>/template.yaml — template identity only. Topology lives in placement.yaml; service tuning is expressed as values/ and patches/ overlays (composition), never as parameter blocks (no knobs).",
   "type": "object",
   "required": [
     "version"
@@ -16,21 +16,6 @@
     "description": {
       "description": "Human-readable summary of the template",
       "type": "string"
-    },
-    "tooling": {
-      "description": "Tooling services tuning (tooling templates) — open-ended key set",
-      "type": "object",
-      "additionalProperties": true
-    },
-    "app": {
-      "description": "Application horizontal scaling (hub templates) — open-ended key set",
-      "type": "object",
-      "additionalProperties": true
-    },
-    "data": {
-      "description": "Data layer tuning (hub templates) — open-ended key set",
-      "type": "object",
-      "additionalProperties": true
     }
   }
 }

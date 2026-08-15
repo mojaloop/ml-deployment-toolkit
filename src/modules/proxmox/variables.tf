@@ -41,7 +41,7 @@ variable "talos_image" {
 }
 
 variable "label_taint_patches" {
-  description = "Dynamic label/taint patches per workload class"
+  description = "Dynamic label/taint patches per POOL (node group name): mechanically derived node label plus the pool's declared taints"
   type        = map(string)
   default     = {}
 }

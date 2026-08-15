@@ -8,13 +8,14 @@ What the system is and how it works, stated once. Every other guide references t
 
 ## Where to start
 
-**New to the toolkit?** Read [System overview](system-overview.md). It covers the delivery chain, cluster roles, reconciliation order, and the configuration system, and is the prerequisite for everything else.
+**New to the toolkit?** Read [System overview](system-overview.md). It covers the delivery chain, cluster roles, reconciliation order, and the configuration system, and is the prerequisite for everything else. For the full configuration model — the layer composition, the no-knobs rule, and the decisions behind them — continue with the [config-layering design](config-layering-design.md).
 
 ## How these fit together
 
 ```mermaid
 flowchart TD
     ov["System overview"]
+    cld["Config-layering design"]
     pm["Provider model"]
     gs["GitOps structure"]
     nw["Networking"]
@@ -24,6 +25,7 @@ flowchart TD
     pi["Participant integration"]
     pm2["Participant mTLS"]
 
+    ov --> cld
     ov --> pm
     ov --> gs
     ov --> nw
@@ -41,6 +43,7 @@ flowchart TD
 | Document | Covers |
 |----------|--------|
 | [System overview](system-overview.md) | Delivery chain, cluster roles, reconciliation order, configuration tiers |
+| [Config-layering design](config-layering-design.md) | The configuration model as designed and confirmed — layers, parameterization, no-knobs templates, placement contract |
 | [Provider model](provider-model.md) | Infrastructure and DNS providers, what is supported, deployment templates |
 | [GitOps structure](gitops-structure.md) | OCI artifact layout, Flux consumption, substitution, versioning |
 | [Networking](networking.md) | Four entry points, gateways, load balancer addresses, DNS, certificates |

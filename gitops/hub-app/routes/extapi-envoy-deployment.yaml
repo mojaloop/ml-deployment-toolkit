@@ -8,7 +8,7 @@ metadata:
   name: extapi-envoy
   namespace: mojaloop
 spec:
-  replicas: ${EXTAPI_ENVOY_REPLICAS}
+  replicas: 2
   selector:
     matchLabels:
       app: extapi-envoy

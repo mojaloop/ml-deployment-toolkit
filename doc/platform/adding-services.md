@@ -30,7 +30,7 @@ Match the reconciliation stage to the dependency. A service needing the database
 Each service lives in its own subdirectory of the Kustomization root — `platform/cert-manager/`, `hub-auth/vault/` — holding its HelmRelease and its values file:
 
 1. **Create `<root>/<service>/`** with the manifest — a `HelmRelease` referencing a `HelmRepository`, or plain YAML — as `<service>/helmrelease.yaml`.
-2. **Put the chart's values in `<service>/<service>-values.yaml`** beside it — never in `spec.values`. See the rule below.
+2. **Put the chart's values in `<root>/values/<namespace>/<release>.yaml`** — never in `spec.values`. See the rule below. The `values/<namespace>/<release>.yaml` path suffix is the same one the template and environment layers use for the same release, so an override's base is always found by path.
 3. **Register both in the root's `kustomization.yaml`** — the manifest under `resources:` (`- <service>/helmrelease.yaml`), and the values file as a `configMapGenerator` entry. A resource not listed there is silently not applied. This is the most common omission.
 4. **Add a namespace** if the service needs its own — either a `Namespace` manifest or `install.createNamespace` on the HelmRelease, consistent with the neighbours.
 5. **Add a route** if it needs external access — an `HTTPRoute` attaching to `gw-int` or `gw-ext`, in the appropriate routes Kustomization. See [Networking](../architecture/networking.md).
@@ -42,9 +42,12 @@ Keep it provider-agnostic. If the service needs a value that varies by environme
 Flux merges a HelmRelease's inline `spec.values` *after* everything in `spec.valuesFrom`, so any value set inline cannot be overridden by an adopter. Every chart therefore ships its values in a ConfigMap listed first, with the adopter's override last:
 
 ```yaml
-# <service>/<service>-values.yaml, beside the HelmRelease — plain chart values, no wrapper
-replicaCount: ${SOME_TEMPLATE_KEY}
+# <root>/values/<namespace>/<release>.yaml — plain chart values, no wrapper
+ingress:
+  host: "<service>.int.${DOMAIN}"
 ```
+
+Tuning that varies by environment stays a literal default here (a template or an adopter overrides it through the chain); a `${UPPER_SNAKE}` token appears only for values `config.yaml` or `.env` actually parameterizes — a domain, an endpoint, a credential. There are no template-supplied variables.
 
 ```yaml
 # in the HelmRelease — no spec.values anywhere
@@ -52,6 +55,10 @@ replicaCount: ${SOME_TEMPLATE_KEY}
     - kind: ConfigMap
       name: <release>-values                        # distribution defaults
       valuesKey: values.yaml
+    - kind: ConfigMap
+      name: <namespace>-<release>-values-template   # template layer
+      valuesKey: values.yaml
+      optional: true
     - kind: ConfigMap
       name: <namespace>-<release>-values-override   # adopter override twin
       valuesKey: values.yaml
@@ -62,7 +69,7 @@ replicaCount: ${SOME_TEMPLATE_KEY}
       optional: true
 ```
 
-Every HelmRelease's chain must **end with the override twins, in that order** — ConfigMap then Secret, both named `<targetNamespace>-<release>-values-override`, both `optional: true`. `check-valuesfrom` (run by `make check`) enforces chain completeness, so an incomplete chain fails before it ships. The distribution's own `<release>-values` ConfigMap naming is otherwise unchanged.
+Every HelmRelease's chain must **end with the three-layer tail, in that order** — the `<targetNamespace>-<release>-values-template` ConfigMap, then the override twins, ConfigMap then Secret, both named `<targetNamespace>-<release>-values-override`, all `optional: true`. Do not write the tail by hand: `tools/generate-valuesfrom.sh` splices it mechanically and is idempotent, and `check-valuesfrom` (run by `make check`) only verifies, so an incomplete chain fails before it ships. The distribution's own `<release>-values` ConfigMap naming is otherwise unchanged.
 
 ```yaml
 # in the root's kustomization.yaml
@@ -70,7 +77,7 @@ configMapGenerator:
   - name: <release>-values
     namespace: flux-system
     files:
-      - values.yaml=<service>/<service>-values.yaml
+      - values.yaml=values/<namespace>/<release>.yaml
 generatorOptions:
   disableNameSuffixHash: true
 ```
@@ -87,7 +94,7 @@ If the service needs an environment-specific value — a domain, an endpoint, a 
 2. Carry it through `config-loader` and into `flux-config`, which writes it to `cluster-config` (non-secret) or `cluster-secrets` (secret) — the key name is `UPPER_SNAKE`, like every key in both objects
 3. Reference it in the manifest with `${UPPER_SNAKE}`
 
-Substitution tokens are bare `${UPPER_SNAKE}` and nothing else — no operators, no inline defaults (`${X:-y}` is not portable across the two engines). Both engines — Flux's `postBuild.substituteFrom` in the artifact layers, Terraform `templatefile` for environment-authored files — **fail hard on an undefined variable**, so a typo'd token stops the reconcile or the apply rather than passing through as an empty string. A literal `$` is escaped as `$${...}`, which both engines honour. `check-substitution` enforces token shape across the tree.
+Substitution tokens are bare `${UPPER_SNAKE}` and nothing else — no operators, no inline defaults (`${X:-y}` is not portable across the two engines). Both engines — Flux's `postBuild.substituteFrom` in the artifact layers, Terraform `templatefile` for environment-authored files — **fail hard on an undefined variable**, so a typo'd token stops the reconcile or the apply rather than passing through as an empty string. A literal `$` is escaped as `$${...}`, which both engines honour. `check-substitution` enforces token shape across the tree — including the environment directories — and `check-token-resolution` verifies, role-aware, that every token a manifest references is one the config stack defines for the roles that apply it, so a token added to a manifest without step 2 fails the check rather than the reconcile.
 
 **The secret-placement rule.** Never substitute a token that resolves from `cluster-secrets` into a ConfigMap-shaped document — a secret value must not land in a ConfigMap. Secret-shaped resources carry substituted secret values under `stringData`. `check-secret-placement` enforces this.
 

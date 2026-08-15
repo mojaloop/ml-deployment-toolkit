@@ -15,10 +15,10 @@ configMapGenerator:
   - name: cilium-values
     namespace: flux-system
     files:
-      - values.yaml=cilium/cilium-values.yaml
+      - values.yaml=values/cilium/cilium.yaml
   - name: openebs-values
     namespace: flux-system
     files:
-      - values.yaml=openebs/openebs-values.yaml
+      - values.yaml=values/openebs-system/openebs.yaml
 generatorOptions:
   disableNameSuffixHash: true

@@ -82,6 +82,33 @@
               "type": "string"
             },
             "description": "Extra Proxmox/cloud tags applied to every node in the group"
+          },
+          "taints": {
+            "description": "Taints this pool declares for itself, once (design: pools declare their own taints). Each entry: {key, value, effect}. The node label is derived mechanically: <P_NODE_ROLE_LABEL_KEY>=<pool name>.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "key",
+                "effect"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                },
+                "effect": {
+                  "enum": [
+                    "NoSchedule",
+                    "PreferNoSchedule",
+                    "NoExecute"
+                  ]
+                }
+              }
+            }
           }
         }
       }

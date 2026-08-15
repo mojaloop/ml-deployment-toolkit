@@ -10,6 +10,8 @@
 
 > **Amended 2026-08-14 (config-layering refactor).** The ADR-015 layout named above has itself moved on: templates are now provider-specific full overlays at `config/templates/<provider>/<role>/<name>.yaml`, and the per-provider mapping is folded into `config/templates/<provider>/params.yaml`. Tier naming and the one-tier-bundles-all principle are unchanged — see [Provider model → Deployment templates](../provider-model.md#deployment-templates) for the current layout.
 
+> **Amended 2026-08-15 (config-layering refactor, second wave).** The tuning-by-variables flow described in the Decision — app/data/tooling profile variables merged into `cluster-config` for Flux substitution — no longer exists. A template is now a full overlay *directory* (`config/templates/<provider>/<role>/<name>/`) that defines no substitution variables at all: its tuning ships as `values/` and `patches/` overlays merged into the release chains, and the former variable values are literal defaults in the distribution's manifests. Tier naming and the one-tier-bundles-all principle still hold — a tier now bundles topology (`placement.yaml`) with its tuning overlays instead of with variables.
+
 ## Context
 
 Deploying Mojaloop required the deployer to understand infrastructure topology names (e.g. `h2c1w3`) and had no connection between infrastructure sizing and application-level scaling. Application replicas, Kafka partitions, and MySQL tuning were hardcoded in gitops manifests. This meant deployers needed expert knowledge of both infrastructure and Mojaloop internals.

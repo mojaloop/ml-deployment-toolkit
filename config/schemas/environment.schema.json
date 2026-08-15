@@ -166,7 +166,7 @@
       "type": "string"
     },
     "infra": {
-      "description": "Infrastructure provider settings",
+      "description": "Infrastructure provider settings Talos node OS facts (nameservers, NTP) live in <env>/talos.yaml.",
       "type": "object",
       "required": [
         "provider"
@@ -185,25 +185,6 @@
           "additionalProperties": false,
           "properties": {},
           "description": "Proxmox provider selection. Placement lives in <env>/placement.yaml; network_bridge and storage pools in <env>/proxmox/proxmox.yaml."
-        },
-        "talos": {
-          "description": "Talos node OS overrides (optional — any on-prem provider)",
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "nameservers": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "ntp_servers": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
         },
         "aws": {
           "description": "AWS provider settings (region, vpc overrides, ...)",

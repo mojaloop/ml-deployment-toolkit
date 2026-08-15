@@ -59,15 +59,15 @@ make apply-config ENV=<env>   # push config changes in seconds, without touching
 
 | Path | Contents |
 |---|---|
-| `../environments/<env>/` | Adopter-owned sibling of the clone, each environment its own git repo: `config.yaml`, `.env`, `placement.yaml`, `proxmox/proxmox.yaml`, optional `values/` and `patches/`, and the perf topology + scenarios |
-| `../artifacts/<env>/` | Generated output outside the clone: Terraform state, kubeconfig, Talos configs — the adopter's own backup |
+| `../environments/<env>/` | Adopter-owned sibling of the clone, each environment its own git repo: `config.yaml`, `.env`, `placement.yaml`, `talos.yaml`, `proxmox/proxmox.yaml`, optional `values/`, `patches/`, and `talos/`, and the perf topology + scenarios |
+| `../artifacts/<env>/` | Generated output outside the clone: `state/` (Terraform state — the adopter's own backup), `plans/` (disposable), kubeconfig, Talos configs |
 | `config/` | Provider-specific templates + `params.yaml` (the provider interface), JSON Schemas, platform definitions, Talos patches, rendered bootstrap manifests |
 | `examples/environments/` | Reference environments (`hub/`, `tooling/`) as `.sample` files — copied out to start a deployment |
 | `src/infra/` | Terraform stack: cluster VMs / managed Kubernetes + Flux bootstrap |
 | `src/config/` | Terraform stack: everything Flux consumes (config, secrets, Kustomizations) |
 | `gitops/` | The distribution artifact — environment-neutral manifests |
 | `rendering/` | Sources for the rendered manifests (Thanos Jsonnet, Cilium values) |
-| `tools/` | Validation, schema self-check, state migration |
+| `tools/` | Validation, repo contract checks, offline render, `valuesFrom` chain generation, support bundles, state migration |
 | `tools-versions.yaml` | Pinned CLI tool floors (Terraform, Flux, yq, …) — checked as a hard gate before every apply |
 | `ttk/` | Testing Toolkit collections — hub provisioning |
 | `doc/` | The documentation — routed by audience |

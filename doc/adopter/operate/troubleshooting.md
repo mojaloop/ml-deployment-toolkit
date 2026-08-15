@@ -27,6 +27,8 @@ If the kubeconfig is missing, expired, or `kubectl` dials `127.0.0.1:1` (the see
 
 If a Kustomization is not Ready, that is almost always the root — fix it before chasing application symptoms, and start from the **earliest** failing one in the chain, since later failures are usually consequences.
 
+When escalating a problem to someone else, attach a support bundle built with `tools/support-bundle.sh <env>` — it stages an explicit whitelist (environment config, offline render output, version metadata) and verifies the archive holds nothing sensitive. Never tar `../artifacts/<env>/` wholesale: it contains the Terraform state, kubeconfig, talosconfig, and plaintext machine secrets.
+
 ## Flux and reconciliation
 
 **A Kustomization stuck on "dependency not ready."** An upstream failed and blocked everything behind it. Find the earliest failure and inspect it:

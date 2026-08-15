@@ -7,10 +7,16 @@ locals {
   env_config_path = "${local.env_dir}/config.yaml"
   artifacts_path  = "${var.artifacts_dir}/${var.env_name}"
 
-  # Provider infra facts moved out of config.yaml into a sidecar the provider
-  # alone consumes: <env>/proxmox/proxmox.yaml (network_bridge, storage pools).
-  proxmox_env_file = "${local.env_dir}/proxmox/proxmox.yaml"
-  proxmox_env      = fileexists(local.proxmox_env_file) ? yamldecode(file(local.proxmox_env_file)) : {}
+  # Provider infra facts moved out of config.yaml into sidecars the provider
+  # alone consumes: <env>/proxmox/proxmox.yaml (network_bridge, storage pools)
+  # and <env>/talos.yaml (node nameservers, NTP). The template layer may also
+  # carry proxmox/proxmox.yaml defaults; resolution is env > template > params.
+  proxmox_env_file      = "${local.env_dir}/proxmox/proxmox.yaml"
+  proxmox_env           = fileexists(local.proxmox_env_file) ? yamldecode(file(local.proxmox_env_file)) : {}
+  proxmox_template_file = "${module.config.template_dir}/proxmox/proxmox.yaml"
+  proxmox_template      = fileexists(local.proxmox_template_file) ? yamldecode(file(local.proxmox_template_file)) : {}
+  talos_env_file        = "${local.env_dir}/talos.yaml"
+  talos_env             = fileexists(local.talos_env_file) ? yamldecode(file(local.talos_env_file)) : {}
 
   # Per-pool Talos machine-config fragments: talos/<pool>.yaml in the selected
   # template directory (the shape), then in the environment (the instance),
@@ -102,13 +108,13 @@ module "proxmox" {
   oci_proxy_username = lookup(var.secrets, "OCI_PROXY_USERNAME", "")
   oci_proxy_password = lookup(var.secrets, "OCI_PROXY_PASSWORD", "")
 
-  nameservers             = try(local.config_raw.infra.talos.nameservers, [])
-  ntp_servers             = try(local.config_raw.infra.talos.ntp_servers, [])
-  network_bridge_override = try(local.proxmox_env.network_bridge, "")
+  nameservers             = try(local.talos_env.nameservers, [])
+  ntp_servers             = try(local.talos_env.ntp_servers, [])
+  network_bridge_override = try(local.proxmox_env.network_bridge, try(local.proxmox_template.network_bridge, ""))
   storage_override = {
-    disks    = try(local.proxmox_env.storage.disks, "")
-    images   = try(local.proxmox_env.storage.images, "")
-    snippets = try(local.proxmox_env.storage.snippets, "")
+    disks    = try(local.proxmox_env.storage.disks, try(local.proxmox_template.storage.disks, ""))
+    images   = try(local.proxmox_env.storage.images, try(local.proxmox_template.storage.images, ""))
+    snippets = try(local.proxmox_env.storage.snippets, try(local.proxmox_template.storage.snippets, ""))
   }
 }
 

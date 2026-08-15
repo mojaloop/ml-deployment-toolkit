@@ -4,7 +4,7 @@
 
 **Audiences:** adopter (deploy)
 
-An environment is described by a handful of files in its own directory: `config.yaml` for what the deployment is, `.env` for the credentials it needs from the outside world, `placement.yaml` and `proxmox/proxmox.yaml` for the facts about the hardware it lands on, and the optional `values/` and `patches/` directories for reaching past all of them. Everything specific to a deployment lives in these; the adopter never edits the distribution.
+An environment is described by a handful of files in its own directory: `config.yaml` for what the deployment is, `.env` for the credentials it needs from the outside world, `placement.yaml`, `proxmox/proxmox.yaml`, and `talos.yaml` for the facts about the hardware it lands on, and the optional `values/`, `patches/`, and `talos/` directories for reaching past all of them. Everything specific to a deployment lives in these; the adopter never edits the distribution.
 
 - [Vocabulary](#vocabulary)
 - [Environment layout](#environment-layout)
@@ -37,27 +37,36 @@ Each environment is a directory under `../environments/` — a **sibling of the 
       config.yaml            # what the deployment is
       .env                   # external credentials — never committed anywhere
       placement.yaml         # placement groups -> physical nodes
+      talos.yaml             # Talos node OS facts — nameservers, NTP
+      talos/                 # optional per-pool Talos machine-config fragments — <pool>.yaml
       proxmox/
         proxmox.yaml         # network bridge and storage pools
       values/                # optional Helm overrides — <namespace>/<release>.yaml
       patches/               # optional manifest patches — <kustomization>.yaml
   artifacts/
-    my-cc/                   # generated output + Terraform state — the adopter's own backup
+    my-cc/
+      state/                 # Terraform state — secret-bearing, the adopter's own backup
+      plans/                 # saved plans — disposable
 ```
 
 Environments are fully independent — their own repository, config, secrets, and Terraform state. One clone manages any number of them. A Tooling Cluster and its Hubs are separate environments, each deployed with its own `make plan-apply ENV=<name>`.
 
 **The clone stays pristine.** The adopter never commits to it — editing it is forking public software, and `make check-pristine` reports a dirty tree or an untagged checkout ([Validating](#validating)). Upgrading the clone is a `git checkout` of the next release tag, never a rebase.
 
-**The environment repository holds everything except `.env`.** Commit `config.yaml`, `placement.yaml`, `proxmox/proxmox.yaml`, `values/`, and `patches/`; the `.gitignore` shipped with the sample environments excludes `.env`, and it must never be committed anywhere — it holds the external credentials.
+**The environment repository holds everything except `.env`.** Commit `config.yaml`, `placement.yaml`, `talos.yaml`, `talos/`, `proxmox/proxmox.yaml`, `values/`, and `patches/`; the `.gitignore` shipped with the sample environments excludes `.env`, and it must never be committed anywhere — it holds the external credentials.
 
-Beside `config.yaml`, two small files carry the facts about the adopter's hardware, each schema-validated by `make validate`:
+Beside `config.yaml`, three small files carry the facts about the adopter's hardware, each schema-validated by `make validate`:
 
 ```yaml
 # placement.yaml — which physical node each template placement group lands on
 version: 1
 placement:
   pg-1: "pve-node-1"
+# Optional: override the template's node pools BY NAME — partial keys inherit
+# the rest, enabled: false drops a default pool, an unknown name adds one.
+pools:
+  w:
+    count: 4
 ```
 
 ```yaml
@@ -70,11 +79,20 @@ storage:
   snippets: "local"
 ```
 
+```yaml
+# talos.yaml — Talos node OS facts, read only by the on-prem machine-config path
+version: 1
+nameservers: ["8.8.8.8", "1.1.1.1"]
+ntp_servers: ["time.cloudflare.com"]
+```
+
+Per-pool Talos machine-config fragments go in `talos/<pool>.yaml`, where `<pool>` is a pool name from the template's `placement.yaml` — each fragment is merged into every node of that pool, after the template's own fragment for the same pool. Talos merge rules differ from Helm's: maps merge, **lists append** — state only the additions, and remove entries with `$patch: delete`.
+
 **`cluster.name` defaults to the directory name** and can be omitted for a new deployment, so identity is normally one value rather than two. Set it explicitly only to keep a name a cluster already has — it is durable identity, becoming the external-dns record owner, the Vault backup prefix, and the VM name prefix, so changing it on a live cluster orphans its DNS records and forces VM replacement.
 
-State and generated artifacts land under `../artifacts/<env>/` — a sibling of both repositories, tracked by neither — see [System overview](../../architecture/system-overview.md#configuration-tiers) and [Backups](../recover/backup.md#terraform-state).
+State and generated artifacts land under `../artifacts/<env>/` — a sibling of both repositories, tracked by neither. The split inside it is the backup boundary: `state/` holds the Terraform state — non-regenerable and secret-bearing, created mode `0700` by `make init`, with its own backup policy — while `plans/` holds saved plans, which are disposable. See [System overview](../../architecture/system-overview.md#configuration-tiers) and [Backups](../recover/backup.md#terraform-state).
 
-> **Start from the reference environments.** The clone carries `examples/environments/hub/` and `examples/environments/tooling/`, each holding `config.yaml.sample`, `.env.sample`, `placement.yaml.sample`, and `proxmox/proxmox.yaml.sample` — the Hub sample also ships performance-test samples (`perf-topology.yaml.sample`, `perf-scenarios/`). From the clone root:
+> **Start from the reference environments.** The clone carries `examples/environments/hub/` and `examples/environments/tooling/`, each holding `config.yaml.sample`, `.env.sample`, `placement.yaml.sample`, `talos.yaml.sample`, and `proxmox/proxmox.yaml.sample` — the Hub sample also ships performance-test samples (`perf-topology.yaml.sample`, `perf-scenarios/`). From the clone root:
 >
 > ```bash
 > cp -R examples/environments/hub ../environments/<env>
@@ -92,7 +110,7 @@ State and generated artifacts land under `../artifacts/<env>/` — a sibling of 
 | `dtk_version` | no | the exact DTK release tag this environment is written against, e.g. `v0.19.0` | none — when set, the plan fails unless the clone is checked out at that tag |
 | `cluster` | yes | `name`, `role`, `vip`, `lb_ipam.pools` (per-gateway `lan`/`wan`), `flux.version` | Flux `2.9.3` |
 | `template` | yes | a name under `config/templates/<provider>/<role>/` | — |
-| `infra` | yes | `provider` (`proxmox` \| `aws` \| `digitalocean`), `talos.{nameservers, ntp_servers}` on Talos providers, `aws.region`, `digitalocean` — placement, bridge, and storage live in the sidecar files `placement.yaml` and `proxmox/proxmox.yaml`, not here | — |
+| `infra` | yes | `provider` (`proxmox` \| `aws` \| `digitalocean`), `aws.region`, `digitalocean` — placement, bridge, storage, and the Talos node OS facts live in the sidecar files `placement.yaml`, `proxmox/proxmox.yaml`, and `talos.yaml`, not here | — |
 | `dns` | yes | `provider` (`digitalocean` \| `cloudflare` \| `route53`), `domain` | — |
 | `cert` | yes | `email` (ACME contact), `server` (ACME directory URL) — both required, neither defaulted | — |
 | `artifact` | no | `url`, `version` (a pinned `vX.Y.Z` tag — `latest` is rejected by the schema), `active` — the gitops OCI artifact Flux reconciles | none — no Kustomizations created; `active` defaults to true once `url` is set |
@@ -109,7 +127,7 @@ Three fields decide the shape of everything else:
 | Field | Effect |
 |-------|--------|
 | `cluster.role` | Which Kustomizations deploy — `tooling` or `hub` — and, with `infra.provider`, which template directory is read |
-| `template` | Node count, machine sizing, replica counts, data-layer tuning |
+| `template` | Node pools, machine sizing, and the template's `values/`, `patches/`, and `talos/` overlays |
 | `artifact.version` | The exact platform release the cluster runs — always a pinned tag, bumped deliberately ([Upgrading](upgrading.md)) |
 
 Sample files carry a `# yaml-language-server: $schema=` header on the first line. An editor with the YAML language server gives autocomplete and inline errors against the real schema — keep that line when copying.
@@ -142,9 +160,7 @@ infra:
   # Provider infra facts live beside this file, not here:
   #   placement.yaml       — placement groups -> physical nodes
   #   proxmox/proxmox.yaml — network bridge, storage pools
-  talos:                              # optional node OS overrides
-    nameservers: ["8.8.8.8", "1.1.1.1"]
-    ntp_servers: ["time.cloudflare.com"]
+  # Talos node OS facts (nameservers, NTP) live in talos.yaml beside this file.
 
 dns:
   provider: "route53"                 # digitalocean | cloudflare | route53
@@ -303,7 +319,7 @@ With all three supporting-service sections at `enabled: false`, a Hub is standal
 
 ## Deployment templates
 
-`template` names a file under `config/templates/<provider>/<role>/` — the file read is `config/templates/<provider>/<role>/<name>/`, selected by `infra.provider`, `cluster.role`, and `template` together. Each provider carries its own complete set: a template is a full overlay for that provider, with no knobs or conditionals inside it. Templates declare **node groups** and the service tuning that must scale with them.
+`template` names a directory under `config/templates/<provider>/<role>/` — the directory read is `config/templates/<provider>/<role>/<name>/`, selected by `infra.provider`, `cluster.role`, and `template` together. Each provider carries its own complete set: a template is a full overlay for that provider, with no knobs or conditionals inside it. There are **no template-supplied substitution variables**: `template.yaml` carries identity only (`version`, `description`), the topology lives in the template's `placement.yaml`, and any service tuning that must scale with the topology ships as ordinary `values/<namespace>/<release>.yaml` and `patches/<kustomization>.yaml` overlays inside the template directory — the same file kinds the environment uses, merged between the distribution's defaults and the environment's own overrides. Per-pool Talos machine-config fragments sit in the template's `talos/`.
 
 | Role | Templates |
 |------|-----------|
@@ -313,21 +329,24 @@ With all three supporting-service sections at `enabled: false`, a Hub is standal
 
 Hub templates are named for the transactions-per-second they are sized to sustain. Rationale in [ADR-012](../../architecture/decisions/012-tps-sizing-profiles.md); the current two-layer shape in [ADR-015](../../architecture/decisions/015-two-stack-capability-config.md).
 
-A node group expands to `count` nodes named `<cluster>-<group>-<index>`:
+The template's `placement.yaml` declares the node pools. A pool expands to `count` nodes named `<cluster>-<pool>-<index>`:
 
 ```yaml
 node_groups:
   - name: w
-    class: worker-general      # workload class — labels, taints, Talos patches
+    class: worker-general      # workload class — Talos machine type and patches
     count: 3
     cores: 6
     memory: 12288              # MB
     disks: [64, 64]            # GB
     placement: [pg-3, pg-2, pg-1]
     tags: [lab1]               # optional — extra Proxmox/cloud tags on every node
+    taints: []                 # optional — taints this pool declares for itself
 ```
 
 Every node carries the tags `ml` and the cluster name; `tags` on a group adds to that list. `placement` is index-aligned — node `i` lands on `placement[i]`, wrapping when the list is shorter than `count`. The `pg-N` names are abstract; the environment's `placement.yaml` maps them to physical Proxmox nodes ([Environment layout](#environment-layout)). Provide a mapping for every group the template references — an unmapped group fails the plan.
+
+**A pool's name is its placement contract.** Each node is labelled mechanically as `<P_NODE_ROLE_LABEL_KEY>=<pool name>` — a pool named `kafka` labels its nodes `node-role=kafka`, and nothing else assigns node labels. A pool that should repel other workloads declares its own taints in `taints:` (`{key, value, effect}` entries). The distribution's manifests reference pools with **soft affinity**, so a template without a given pool still schedules — the workload lands somewhere rather than staying Pending — and `check-placement` (environment-aware) fails any hard selector naming a pool outside the environment's effective pool set: the template's pools, minus those the environment's `placement.yaml` disables, plus those it adds.
 
 ### The provider interface: `params.yaml`
 
@@ -439,7 +458,7 @@ Four things worth knowing:
 - **Any generated secret can be pinned** by setting its UPPER_CASE name in `.env` — `MYSQL_ROOT_PASSWORD`, `HARBOR_ADMIN_PASSWORD`, and so on. A non-empty value there is used verbatim and nothing is generated for that name; generation only kicks in for names that are absent or empty. This is how an `external-unmanaged` data store receives its credentials, and it is the migration path for an existing environment whose passwords must not rotate — see [Upgrading → Migrating an existing environment](upgrading.md#migrating-an-existing-environment).
 - **The Ory signing secrets are pinnable too.** `KRATOS_SECRETS_CIPHER`, `KRATOS_SECRETS_COOKIE`, `KRATOS_SECRETS_CSRF_COOKIE`, `KRATOS_SECRETS_DEFAULT`, `HYDRA_SECRETS_SYSTEM`, and `HYDRA_SECRETS_COOKIE` behave like the passwords. They matter more than most: rotating `KRATOS_SECRETS_CIPHER` makes stored credential and recovery material undecryptable, and rotating `HYDRA_SECRETS_SYSTEM` invalidates every issued token and consent grant.
 - **Proxmox variables are read natively** by the provider. `PROXMOX_VE_*` are used as-is.
-- **Generated passwords live in the config stack's Terraform state** (`../artifacts/<env>/terraform/config.tfstate`) as well as in the cluster. Losing both loses the passwords — see [Disaster recovery](../recover/disaster-recovery.md#what-the-adopter-must-keep).
+- **Generated passwords live in the config stack's Terraform state** (`../artifacts/<env>/state/config.tfstate`) as well as in the cluster. Losing both loses the passwords — see [Disaster recovery](../recover/disaster-recovery.md#what-the-adopter-must-keep).
 
 ## Helm value overrides
 
@@ -452,9 +471,11 @@ The adopter can override the platform's Helm values for **any** chart the distri
   observability/loki.yaml
 ```
 
-Every HelmRelease's `valuesFrom` chain ends with the same pair of optional entries — a ConfigMap and then a Secret, both named `<targetNamespace>-<release>-values-override` — and the chain's completeness is checked by `tools/checks/check-valuesfrom.sh` (`make check`). The adopter's file becomes one of those two objects, so a missing file changes nothing. The path must match the HelmRelease and its target namespace, not the chart's upstream name: `values/hub-system/psmdb-operator.yaml`, not `percona-mongodb.yaml`.
+Every HelmRelease's `valuesFrom` chain ends with the same three-layer tail of optional entries — a ConfigMap named `<targetNamespace>-<release>-values-template` (the selected template's tuning), then a ConfigMap and a Secret both named `<targetNamespace>-<release>-values-override` (the adopter's file). The tail is generated mechanically by `tools/generate-valuesfrom.sh`, never hand-written, and its completeness is verified by `tools/checks/check-valuesfrom.sh` (`make check`). The adopter's file becomes one of the two override objects, so a missing file changes nothing. The path must match the HelmRelease and its target namespace, not the chart's upstream name: `values/hub-system/psmdb-operator.yaml`, not `percona-mongodb.yaml`.
 
-**The adopter's file is merged last, so it wins** ([ADR-022](../../architecture/decisions/022-helm-values-layering.md)). No HelmRelease uses inline `spec.values`; the distribution's own values ship as a ConfigMap listed *first* in `valuesFrom`, and the override twins are listed last. Flux merges `valuesFrom` entries in order, later overwriting earlier, so the effective precedence is chart defaults → distribution values → the adopter's file. Setting a key the distribution also sets is the normal case, and it takes effect. One merge rule to remember: maps merge, **lists replace** — overriding one element of a list means restating the whole list.
+The same `values/<namespace>/<release>.yaml` path suffix names a release's values at every layer — the distribution's defaults at `gitops/<layer>/values/<namespace>/<release>.yaml`, the template's tuning at `config/templates/<provider>/<role>/<name>/values/<namespace>/<release>.yaml`, and the adopter's override in the environment — so diffing an override against the layer beneath it is a direct path comparison.
+
+**The adopter's file is merged last, so it wins** ([ADR-022](../../architecture/decisions/022-helm-values-layering.md)). No HelmRelease uses inline `spec.values`; the distribution's own values ship as a ConfigMap listed *first* in `valuesFrom`, and the tail follows. Flux merges `valuesFrom` entries in order, later overwriting earlier, so the effective precedence is chart defaults → distribution values → template values → the adopter's file. Setting a key the distribution also sets is the normal case, and it takes effect. One merge rule to remember: maps merge, **lists replace** — overriding one element of a list means restating the whole list.
 
 **Override files are templated**, with the same `${UPPER_SNAKE}` token syntax the artifact's manifests use — the config stack expands them at apply time, because Flux does not substitute inside a ConfigMap it did not render:
 
@@ -462,10 +483,9 @@ Every HelmRelease's `valuesFrom` chain ends with the same pair of optional entri
 ingress:
   hosts:
     - "example.${DOMAIN}"
-replicas: ${CL_SERVICE_REPLICAS}
 ```
 
-Available tokens are the cluster identity (`${CLUSTER_NAME}`, `${DOMAIN}`), the resolved telemetry sinks (`${LOKI_URL}`, `${MIMIR_URL}`, `${TEMPO_URL}`), and every key from the template's `app:`, `data:`, and `tooling:` sections, uppercased — the template's `cl_service_replicas` is referenced as `${CL_SERVICE_REPLICAS}`.
+Available tokens are exactly the substitution parameters derived from `config.yaml` and `.env` — the cluster identity (`${CLUSTER_NAME}`, `${DOMAIN}`), the resolved telemetry sinks (`${LOKI_URL}`, `${MIMIR_URL}`, `${TEMPO_URL}`), the other capability-derived keys, and the secret names — plus the provider interface's `P_*` symbols. Templates supply no tokens of their own: a template tunes by shipping its own values and patches files, not by defining variables, and what was once a template variable is now a literal default in the distribution's values ([Deployment templates](#deployment-templates)).
 
 ### Substitution rules
 
@@ -474,6 +494,8 @@ The same rules hold everywhere a `${...}` token appears — in the artifact's ma
 - **Only bare `${UPPER_SNAKE}`.** No operators or inline defaults (`${VAR:-fallback}` is not supported by either engine), and no `%{ ... }` directives in environment-authored files.
 - **An undefined token fails**, in both engines — Terraform errors at plan time; Flux fails the Kustomization rather than substituting an empty string. That is the error to expect from a typo.
 - **A literal `${` is written `$${`** — the one escape that both engines honor.
+
+That the two engines behave identically on these rules is not assumed: `check-engine-parity` (part of the `tools/checks/` suite) A/B-tests the same inputs through both and fails on any behavioural difference.
 
 **Secrets choose the object.** A values file that references a key from `.env` — or any generated secret name, like `${MYSQL_ROOT_PASSWORD}` — is rendered as the **Secret** override, with the secret values available to it. A file with no secret reference becomes the ConfigMap and is templated **without** secrets, so a stray secret reference in a ConfigMap-destined file hard-fails at plan time instead of landing a credential in a ConfigMap. Patches never carry secrets — see [Manifest patches](#manifest-patches).
 
@@ -489,16 +511,7 @@ Seconds, no infrastructure plan, and Flux picks the change up on its next reconc
 
 Helm value overrides reach every chart the distribution ships, which leaves out everything the distribution ships as a plain manifest — most importantly **the data layer**. Kafka, MySQL, MongoDB, and Redis are deployed as custom resources handed to their operators (`Kafka`, `PerconaXtraDBCluster`, `PerconaServerMongoDB`, `Redis`), not as charts. A `values/data/kafka.yaml` has nothing to attach to.
 
-The tuning those stores expose through `config.yaml` is the template's `data:` block, which substitutes six scalars:
-
-| Key | Reaches |
-|-----|---------|
-| `kafka_default_partitions` | `num.partitions` |
-| `kafka_storage` | Kafka JBOD volume size |
-| `mysql_innodb_buffer_pool_size`, `mysql_max_connections` | the PXC `[mysqld]` config |
-| `mysql_storage`, `mongodb_storage` | PXC / PSMDB volume sizes |
-
-Anything else — JVM heap, replica counts, resource requests, MongoDB cache sizing, every Redis setting — needs a patch. Drop a file named for the **Flux Kustomization** in `patches/` (flat, unlike the namespaced `values/` layout):
+The shipped data-layer manifests carry their tuning — partition counts, buffer pools, volume sizes — as literal defaults, scaled per tier by the template's own `patches/` overlay. Changing any of it — JVM heap, replica counts, resource requests, MongoDB cache sizing, every Redis setting — is a patch. Drop a file named for the **Flux Kustomization** in `patches/` (flat, unlike the namespaced `values/` layout):
 
 ```
 ../environments/<env>/patches/
@@ -543,9 +556,9 @@ A YAML **list**. Each element is either a partial resource, where kustomize infe
       value: 5
 ```
 
-**Patches are templated**, exactly like values files: `${DOMAIN}`, `${CLUSTER_NAME}`, the telemetry URLs, and every uppercased `app:` / `data:` / `tooling:` template key expand at apply time, an unknown `${NAME}` fails the apply, and a literal `${` must be written `$${` ([Substitution rules](#substitution-rules)). One difference: **patches never carry secrets** — they are templated without the secret values, so a secret reference in a patch fails at plan time by design.
+**Patches are templated**, exactly like values files: `${DOMAIN}`, `${CLUSTER_NAME}`, the telemetry URLs, and the other config-derived tokens expand at apply time, an unknown `${NAME}` fails the apply, and a literal `${` must be written `$${` ([Substitution rules](#substitution-rules)). One difference: **patches never carry secrets** — they are templated without the secret values, so a secret reference in a patch fails at plan time by design.
 
-**The distribution's own patches apply first, so the adopter's win.** When `object_storage` is disabled the toolkit already patches the backup machinery off; the adopter's file is appended after that list, and kustomize applies patches in order.
+**The distribution's own patches apply first, then the template's, then the adopter's — so the adopter's win.** When `object_storage` is disabled the toolkit already patches the backup machinery off, and the selected template appends its per-tier tuning patches after that; the adopter's file is appended last, and kustomize applies patches in order.
 
 ### Semantics worth knowing
 
@@ -569,12 +582,13 @@ Deleting a patch file and re-applying reverts the field — the patch disappears
 make validate ENV=<env>
 ```
 
-This checks, in order: `config.yaml` against the JSON Schema, the selected template (`config/templates/<provider>/<role>/<name>/`) against the template schema, the provider's `params.yaml` against the params schema, the environment's `placement.yaml` and `proxmox/proxmox.yaml` (when present) against theirs, and then `terraform validate` on both stacks (skipped until `make init` has run).
+This checks, in order: `config.yaml` against the JSON Schema, the selected template's `template.yaml` and `placement.yaml` (`config/templates/<provider>/<role>/<name>/`) against theirs, the provider's `params.yaml` against the params schema, the environment's `placement.yaml`, `proxmox/proxmox.yaml`, and `talos.yaml` (when present) against theirs, and then `terraform validate` on both stacks (skipped until `make init` has run).
 
-Two more gates sit beside it:
+Three more gates sit beside it:
 
-- **`make check`** runs the repo contract checks in `tools/checks/` — substitution token syntax, the `valuesFrom` override twins, the `P_*` interface, secret placement, tool versions, and the rest. No `ENV=` needed.
+- **`make check`** runs the repo contract checks in `tools/checks/` — substitution token syntax (`check-substitution`, which lints the environment directories as well as the artifact layers), the `valuesFrom` three-layer chain (`check-valuesfrom`), the `P_*` interface (`check-interface`), secret placement, node-role placement (`check-placement`), values-file bindings (`check-values-files` — a values or patches file must bind to a release or Kustomization that exists), hardcoded-literal hygiene (`check-literals` — a value `config.yaml` parameterizes must appear in an overlay as its `${TOKEN}`, never verbatim), role-aware token resolution (`check-token-resolution`), substitution-engine parity (`check-engine-parity`), tool versions, and the Talos fragments. No `ENV=` needed.
 - **`make check-pristine ENV=<env>`** is the apply-time gate: a clean working tree, an exact release-tag checkout, and — when the environment pins `dtk_version` — that the clone's tag matches it.
+- **`tools/render.sh <env>`** renders everything offline, with no cluster: the merged values chain for every HelmRelease (release default → template → environment, with Helm's merge semantics), a kustomize build of every gitops layer, and a validation of the Talos machine-config fragments. Output lands under `../artifacts/<env>/render/` — the place to confirm what an edit actually produces before applying it.
 
 Two properties of the schema checker are worth knowing:
 

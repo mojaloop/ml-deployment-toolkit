@@ -20,34 +20,34 @@ configMapGenerator:
   - name: cert-manager-values
     namespace: flux-system
     files:
-      - values.yaml=cert-manager/cert-manager-values.yaml
+      - values.yaml=values/cert-manager/cert-manager.yaml
   - name: external-dns-values
     namespace: flux-system
     files:
-      - values.yaml=external-dns/external-dns-values.yaml
+      - values.yaml=values/external-dns/external-dns.yaml
   - name: external-secrets-values
     namespace: flux-system
     files:
-      - values.yaml=external-secrets/external-secrets-values.yaml
+      - values.yaml=values/external-secrets/external-secrets.yaml
   - name: goldilocks-values
     namespace: flux-system
     files:
-      - values.yaml=goldilocks/goldilocks-values.yaml
+      - values.yaml=values/goldilocks/goldilocks.yaml
   - name: metrics-server-values
     namespace: flux-system
     files:
-      - values.yaml=metrics-server/metrics-server-values.yaml
+      - values.yaml=values/kube-system/metrics-server.yaml
   - name: reloader-values
     namespace: flux-system
     files:
-      - values.yaml=reloader/reloader-values.yaml
+      - values.yaml=values/platform-system/reloader.yaml
   - name: vpa-values
     namespace: flux-system
     files:
-      - values.yaml=vpa/vpa-values.yaml
+      - values.yaml=values/vpa/vpa.yaml
   - name: opentelemetry-operator-values
     namespace: flux-system
     files:
-      - values.yaml=opentelemetry-operator/opentelemetry-operator-values.yaml
+      - values.yaml=values/platform-system/opentelemetry-operator.yaml
 generatorOptions:
   disableNameSuffixHash: true

@@ -158,20 +158,25 @@ locals {
   ]
 
   # --- Dynamic label/taint patches per workload class (Talos only) ---------
-  label_taint_patches = {
-    for class_name, class_def in local.workload_classes.classes :
-    class_name => yamlencode({
+  # Per-POOL machine-config patch: the node label derives MECHANICALLY from the
+  # pool name (<P_NODE_ROLE_LABEL_KEY>=<pool>) — never typed by hand, so the
+  # Talos side and the gitops selectors cannot drift. Taints are declared by
+  # the pool itself in placement.yaml, once.
+  node_role_label_key = try(local.provider_params.P_NODE_ROLE_LABEL_KEY, "node-role")
+  pool_label_taint_patches = {
+    for name, g in local.merged_pools :
+    name => yamlencode({
       machine = merge(
-        length(try(class_def.node_labels, {})) > 0 ? { nodeLabels = class_def.node_labels } : {},
-        length(try(class_def.node_taints, [])) > 0 ? {
+        { nodeLabels = { (local.node_role_label_key) = name } },
+        length(try(g.taints, [])) > 0 ? {
           nodeTaints = {
-            for taint in class_def.node_taints :
-            "${taint.key}=${taint.value}" => taint.effect
+            for taint in g.taints :
+            "${taint.key}=${try(taint.value, "")}" => taint.effect
           }
         } : {}
       )
     })
-    if length(try(class_def.node_labels, {})) > 0 || length(try(class_def.node_taints, [])) > 0
+    if try(g.enabled, true)
   }
 
   # =========================================================================
@@ -410,17 +415,27 @@ resource "terraform_data" "validation" {
       error_message = "config.yaml declares dtk_version '${try(local.config.dtk_version, "")}' but the clone is at '${var.dtk_tag != "" ? var.dtk_tag : "(no exact tag)"}'. Check out the matching DTK tag or update dtk_version."
     }
 
-    # The node-role label key is an interface symbol (P_NODE_ROLE_LABEL_KEY).
-    # Workload classes declare node_labels with a literal key; the two must
-    # agree or gitops selectors and Talos-applied labels silently drift apart.
+    # Node labels derive mechanically from pool names, so nothing may declare
+    # them by hand — a workload class carrying node_labels/node_taints is the
+    # old drift-prone pattern reintroduced.
     precondition {
       condition = alltrue([
-        for name, class in try(local.workload_classes.classes, {}) : alltrue([
-          for k in keys(try(class.node_labels, {})) :
-          k == try(local.provider_params.P_NODE_ROLE_LABEL_KEY, "node-role")
+        for name, class in try(local.workload_classes.classes, {}) :
+        !can(class.node_labels) && !can(class.node_taints)
+      ])
+      error_message = "workload-classes.yaml declares node_labels/node_taints on a class. Labels derive from pool names; taints are declared by the pool in placement.yaml."
+    }
+
+    # An environment-added pool (a name the template does not define) must
+    # carry the full pool shape, or node expansion fails cryptically later.
+    precondition {
+      condition = alltrue([
+        for name, o in local.env_pool_overrides :
+        contains(keys(local.template_pools), name) || !try(o.enabled, true) || alltrue([
+          for k in ["class", "count", "cores", "memory", "disks"] : can(o[k])
         ])
       ])
-      error_message = "workload-classes.yaml declares node_labels keys that differ from the provider interface symbol P_NODE_ROLE_LABEL_KEY ('${try(local.provider_params.P_NODE_ROLE_LABEL_KEY, "node-role")}')."
+      error_message = "placement.yaml pools defines a pool the template does not have without the full shape (class, count, cores, memory, disks are all required for new pools)."
     }
 
     # Node group names become VM name suffixes and for_each keys.

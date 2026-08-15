@@ -115,14 +115,18 @@ Hub templates are named for the transaction rate they are sized to sustain. `dev
 template: "tps-10"
 ```
 
-A template is a **provider-specific full overlay**. Each provider directory carries one complete file per role and tier — node groups with count, cores, memory, disks, and placement groups, plus the replica counts and data-layer tuning that must scale with them — with no knobs and no conditionals. Selection is `config.yaml`'s `template` value combined with `cluster.role` and `infra.provider`:
+A template is a **provider-specific full overlay directory** — with no knobs, no conditionals, and no substitution variables of its own. `template.yaml` carries identity only; the topology lives in `placement.yaml` — node pools with count, cores, memory, disks, and placement groups — and the service tuning that must scale with the topology ships as the template's own `values/` and `patches/` overlays, the same file kinds the common layer and the environment use. Selection is `config.yaml`'s `template` value combined with `cluster.role` and `infra.provider`:
 
 | File | Contents | Owner |
 |------|----------|-------|
-| `config/templates/<provider>/<role>/<name>/` | Full overlay directory — `template.yaml` tuning, `placement.yaml` topology, `values/`/`patches/`/`talos/` surfaces | Distribution, one directory per provider, role, and tier |
+| `config/templates/<provider>/<role>/<name>/` | Full overlay directory — `template.yaml` identity, `placement.yaml` topology, `values/`/`patches/`/`talos/` surfaces | Distribution, one directory per provider, role, and tier |
 | `config/templates/<provider>/params.yaml` | The provider interface: a `params` section (`P_*` values) and an `infra` section consumed by Terraform | Distribution, one file per provider |
 
-On Proxmox a node group expands into `count` individually-placed VMs; on a managed service it becomes a node group or pool of that size.
+On Proxmox a node pool expands into `count` individually-placed VMs; on a managed service it becomes a node group or pool of that size.
+
+### Pool names are the placement contract
+
+Node labels derive mechanically from pool names: every node of a pool is labelled `<P_NODE_ROLE_LABEL_KEY>=<pool name>`, so a pool named `kafka` labels its nodes `node-role=kafka` — nothing else declares node labels, and workload classes carry none. A pool declares its own taints in the template's `placement.yaml` (`taints: [{key, value, effect}]`), once, where the pool is defined. The shared manifests reference pools with **soft affinity**, so a template that lacks a pool degrades to schedules-somewhere rather than leaving pods Pending. `check-placement` is environment-aware: given an environment's config it computes the effective pool set — the template's pools, minus those the environment disables, plus those it adds — and fails any hard selector naming a pool outside it, while soft references only warn, since degrading is their design.
 
 ### The provider interface
 

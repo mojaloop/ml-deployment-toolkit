@@ -29,12 +29,12 @@ configMapGenerator:
   - name: harbor-values
     namespace: flux-system
     files:
-      - values.yaml=harbor/harbor-values.yaml
+      - values.yaml=values/harbor/harbor.yaml
     options:
       disableNameSuffixHash: true
   - name: minio-values
     namespace: flux-system
     files:
-      - values.yaml=minio/minio-values.yaml
+      - values.yaml=values/minio/minio.yaml
     options:
       disableNameSuffixHash: true

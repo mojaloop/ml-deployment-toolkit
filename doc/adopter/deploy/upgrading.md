@@ -76,7 +76,7 @@ Kubernetes and Talos versions are set centrally in the platform definitions, not
 
 ## Migrating an existing environment
 
-An environment deployed before the two-stack split holds a single `terraform.tfstate` under its artifacts directory. Splitting it is a one-time state operation — no VM is recreated ([ADR-015](../../architecture/decisions/015-two-stack-capability-config.md)).
+An environment deployed before the two-stack split holds a single `terraform.tfstate` under its artifacts directory. Splitting it is a one-time state operation — no VM is recreated ([ADR-015](../../architecture/decisions/015-two-stack-capability-config.md)). The split lands directly in the current layout: the script reads and writes `../artifacts/<env>/state/`, so a migrated environment comes out on the `state/` + `plans/` arrangement with nothing further to move.
 
 ```bash
 tools/migrate-state.sh <env>            # dry run — prints every operation, changes nothing
@@ -102,7 +102,7 @@ make plan ENV=<env>
 
 ## Migrating across the config-layering release
 
-An environment deployed before the config-layering release lived *inside* the clone and used the old configuration surface. Bringing it forward is a one-time restructure:
+An environment deployed before the config-layering release ([design record](../../architecture/config-layering-design.md)) lived *inside* the clone and used the old configuration surface. Bringing it forward is a one-time restructure:
 
 1. **Move the environment out of the clone.** Its home is `../environments/<env>/`, a sibling of the clone, as its own git repository ([Configuration → Environment layout](configuration.md#environment-layout)):
 
@@ -112,11 +112,19 @@ An environment deployed before the config-layering release lived *inside* the cl
 
    Compare it against the current samples in `examples/environments/` — in particular, take the `.gitignore` that keeps `.env` out of the repository — then `git init` and commit.
 
-2. **Split the provider facts out of `config.yaml`.** The `infra.proxmox.placement`, `infra.proxmox.network_bridge`, and `infra.proxmox.storage` keys are gone: their values move to `placement.yaml` and `proxmox/proxmox.yaml` beside the config. Delete `cluster.gateway_class_name` — the GatewayClass is the provider's `P_GATEWAY_CLASS` now — and pin `artifact.version` to an exact `vX.Y.Z` tag, since `latest` is rejected.
+2. **Split the provider facts out of `config.yaml`.** The `infra.proxmox.placement`, `infra.proxmox.network_bridge`, and `infra.proxmox.storage` keys are gone: their values move to `placement.yaml` and `proxmox/proxmox.yaml` beside the config. The `infra.talos.nameservers` and `infra.talos.ntp_servers` keys are gone too — their values move to `talos.yaml` beside the config ([Configuration → Environment layout](configuration.md#environment-layout)). Delete `cluster.gateway_class_name` — the GatewayClass is the provider's `P_GATEWAY_CLASS` now — and pin `artifact.version` to an exact `vX.Y.Z` tag, since `latest` is rejected.
 
-3. **Uppercase the substitution tokens** in any `values/` and `patches/` files — `${domain}` becomes `${DOMAIN}`, and so on — and move each values file to its `values/<namespace>/<release>.yaml` path ([Helm value overrides](configuration.md#helm-value-overrides)).
+3. **Adopt the artifacts layout.** State and plans are separated inside `../artifacts/<env>/`: the two `.tfstate` files live in `state/` — the non-regenerable, secret-bearing directory, created mode `0700` by `make init`, the one to back up — and saved plans in `plans/`, which is disposable. An environment whose state still sits in the old `../artifacts/<env>/terraform/` moves it once:
 
-4. **Migrate the state keys.** The generated internal passwords are keyed by UPPER_SNAKE names now; without a state move, the next apply would regenerate every one of them — rotating live database and service credentials:
+   ```bash
+   mv ../artifacts/<env>/terraform ../artifacts/<env>/state
+   ```
+
+   Stale `tfplan-*` files in `state/` can be deleted — the next `make plan` writes fresh ones into `plans/`.
+
+4. **Uppercase the substitution tokens** in any `values/` and `patches/` files — `${domain}` becomes `${DOMAIN}`, and so on — and move each values file to its `values/<namespace>/<release>.yaml` path ([Helm value overrides](configuration.md#helm-value-overrides)).
+
+5. **Migrate the state keys.** The generated internal passwords are keyed by UPPER_SNAKE names now; without a state move, the next apply would regenerate every one of them — rotating live database and service credentials:
 
    ```bash
    tools/migrate-uppercase-state.sh <env>            # dry run — prints every state mv, changes nothing
@@ -125,14 +133,14 @@ An environment deployed before the config-layering release lived *inside* the cl
 
    The values-override ConfigMaps also changed keys and are deliberately *not* moved — they are regenerable, and their destroy/create on the next apply is harmless.
 
-5. **Validate and plan:**
+6. **Validate and plan:**
 
    ```bash
    make validate ENV=<env>
    make plan ENV=<env>
    ```
 
-   The infra plan must show no changes. The config plan shows the values-override recreations from step 4 and nothing that touches a password.
+   The infra plan must show no changes. The config plan shows the values-override recreations from step 5 and nothing that touches a password.
 
 ## Rolling back
 

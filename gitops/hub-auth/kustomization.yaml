@@ -31,26 +31,26 @@ configMapGenerator:
   - name: bof-values
     namespace: flux-system
     files:
-      - values.yaml=ory/bof-values.yaml
+      - values.yaml=values/ory/bof.yaml
   - name: hydra-values
     namespace: flux-system
     files:
-      - values.yaml=ory/hydra-values.yaml
+      - values.yaml=values/ory/hydra.yaml
   - name: keto-values
     namespace: flux-system
     files:
-      - values.yaml=ory/keto-values.yaml
+      - values.yaml=values/ory/keto.yaml
   - name: kratos-values
     namespace: flux-system
     files:
-      - values.yaml=ory/kratos-values.yaml
+      - values.yaml=values/ory/kratos.yaml
   - name: kratos-selfservice-ui-values
     namespace: flux-system
     files:
-      - values.yaml=ory/kratos-selfservice-ui-values.yaml
+      - values.yaml=values/ory/kratos-selfservice-ui.yaml
   - name: oathkeeper-values
     namespace: flux-system
     files:
-      - values.yaml=ory/oathkeeper-values.yaml
+      - values.yaml=values/ory/oathkeeper.yaml
 generatorOptions:
   disableNameSuffixHash: true

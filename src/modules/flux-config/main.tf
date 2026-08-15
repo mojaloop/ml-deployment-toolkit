@@ -184,6 +184,8 @@ resource "random_password" "harbor_robot" {
 locals {
   cluster_config_base = merge(
     {
+      # TOKEN-KEYS: common (parsed by tools/checks/check-token-resolution.sh —
+      # keep the marker comments when editing these blocks)
       # The gateway class is a provider interface symbol now: gitops references
       # ${P_GATEWAY_CLASS}, supplied via var.params from the provider's
       # params.yaml — config.yaml can no longer set or shadow it.
@@ -218,6 +220,7 @@ locals {
       TEMPO_URL = var.observability.tempo_url
     },
     local.is_hub ? {
+      # TOKEN-KEYS: hub-only
       GW_EXTAPI_IP         = try(var.lb_ipam_pools["gw-extapi"].lan, "")
       GW_EXTAPI_DNS_TARGET = try(var.lb_ipam_pools["gw-extapi"].dns_target, "")
       GW_INTAPI_IP         = try(var.lb_ipam_pools["gw-intapi"].lan, "")
@@ -242,7 +245,6 @@ locals {
       BACKUP_S3_BUCKET   = var.object_storage.bucket
       BACKUP_S3_REGION   = var.object_storage.region
     } : {},
-    { for k, v in var.profile_vars : upper(k) => v },
   )
 
   # Provider symbols (P_*) may never shadow a config key, and vice versa —
@@ -858,6 +860,10 @@ resource "kubectl_manifest" "kustomization" {
           name = "ml-gitops"
         }
         postBuild = {
+          # Always: the kustomize-controller >= 1.9 default (WithVariables)
+          # skips substitution entirely when zero variables resolve — which
+          # would silently leave ${...} tokens unrendered. Never rely on it.
+          substituteStrategy = "Always"
           substituteFrom = [
             { kind = "ConfigMap", name = kubernetes_config_map_v1.cluster_config.metadata[0].name },
             { kind = "Secret", name = kubernetes_secret_v1.cluster_secrets.metadata[0].name },

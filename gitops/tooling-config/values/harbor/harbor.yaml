@@ -10,13 +10,13 @@ persistence:
   enabled: true
   persistentVolumeClaim:
     registry:
-      size: ${HARBOR_REGISTRY_STORAGE}
+      size: 20Gi
     database:
-      size: ${HARBOR_DB_STORAGE}
+      size: 2Gi
     redis:
-      size: ${HARBOR_REDIS_STORAGE}
+      size: 1Gi
     trivy:
-      size: ${HARBOR_TRIVY_STORAGE}
+      size: 5Gi
 # Use MinIO for S3-compatible storage backend
 imageChartStorage:
   type: s3

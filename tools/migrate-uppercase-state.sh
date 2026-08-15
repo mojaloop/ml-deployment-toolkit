@@ -23,7 +23,7 @@ MODE="${2:-}"
 [ -n "$ENV_NAME" ] || { echo "usage: $0 <env> [--apply]" >&2; exit 2; }
 
 ARTIFACTS_ROOT="${ARTIFACTS_ROOT:-$REPO_ROOT/../artifacts}"
-STATE="$ARTIFACTS_ROOT/$ENV_NAME/terraform/config.tfstate"
+STATE="$ARTIFACTS_ROOT/$ENV_NAME/state/config.tfstate"
 [ -f "$STATE" ] || { echo "error: no config stack state at $STATE" >&2; exit 2; }
 
 cd "$REPO_ROOT/src/config"

@@ -36,14 +36,14 @@ Terraform is split into two roots with separate state, and knowing which one a c
 
 | Stack | Owns | State | Applies in |
 |-------|------|-------|-----------|
-| **infra** (`src/infra`) | VMs or managed cluster, Talos, Flux controllers | `../artifacts/<env>/terraform/infra.tfstate` | about five minutes |
-| **config** (`src/config`) | `OCIRepository`, Kustomizations, `cluster-config`, `cluster-secrets`, values overrides | `../artifacts/<env>/terraform/config.tfstate` | seconds |
+| **infra** (`src/infra`) | VMs or managed cluster, Talos, Flux controllers | `../artifacts/<env>/state/infra.tfstate` | about five minutes |
+| **config** (`src/config`) | `OCIRepository`, Kustomizations, `cluster-config`, `cluster-secrets`, values overrides | `../artifacts/<env>/state/config.tfstate` | seconds |
 
 The config stack has no provider that can address a VM, so a config-only change physically cannot disturb the cluster. `make plan-apply` runs both in order — infra first, then config against the real cluster.
 
 ## State is bound per environment
 
-The two stack directories, `src/infra` and `src/config`, are shared by every environment. What separates one environment from another is not the directory but the backend: state lives per environment at `../artifacts/<env>/terraform/infra.tfstate` and `../artifacts/<env>/terraform/config.tfstate` — under `ARTIFACTS_ROOT`, a sibling of the clone — selected by `terraform init -backend-config`.
+The two stack directories, `src/infra` and `src/config`, are shared by every environment. What separates one environment from another is not the directory but the backend: state lives per environment at `../artifacts/<env>/state/infra.tfstate` and `../artifacts/<env>/state/config.tfstate` — under `ARTIFACTS_ROOT`, a sibling of the clone — selected by `terraform init -backend-config`. The `state/` directory is created mode `0700` and holds the non-regenerable, secret-bearing part of the artifacts tree; saved plans land separately in `../artifacts/<env>/plans/`, which is disposable.
 
 Every make target that runs Terraform rebinds the backend to `ENV=` immediately before doing so — `plan`, `apply`, `destroy`, `secrets`, `list`, `show`, all of them. Two consequences worth knowing:
 
@@ -74,7 +74,7 @@ Then validate the configuration itself:
 make validate ENV=<env>
 ```
 
-This schema-checks `config.yaml`, the selected template, the provider's `params.yaml`, and the environment's `placement.yaml` and `proxmox/proxmox.yaml` before Terraform runs. The credentials each role needs are listed in [Prerequisites](prerequisites.md#credentials-checklist) — a missing one is not caught here, and typically fails deep into reconciliation rather than at plan time, so it is worth checking now.
+This schema-checks `config.yaml`, the selected template, the provider's `params.yaml`, and the environment's `placement.yaml`, `proxmox/proxmox.yaml`, and `talos.yaml` before Terraform runs. The credentials each role needs are listed in [Prerequisites](prerequisites.md#credentials-checklist) — a missing one is not caught here, and typically fails deep into reconciliation rather than at plan time, so it is worth checking now.
 
 ## Deploy
 
@@ -179,12 +179,14 @@ All commands run from the clone root. `ENV=` selects the environment — the dir
 
 | Command | Does |
 |---------|------|
-| `make validate ENV=<env>` | Schema-validate `config.yaml`, the template, the provider `params.yaml`, and the placement/proxmox sidecar files, then `terraform validate` both stacks |
-| `make check` | Run the repo contract checks in `tools/checks/` — tokens, `valuesFrom` chains, the `P_*` interface, tool versions. No `ENV=` needed |
+| `make validate ENV=<env>` | Schema-validate `config.yaml`, the template, the provider `params.yaml`, and the placement/proxmox/talos sidecar files, then `terraform validate` both stacks |
+| `make check` | Run the repo contract checks in `tools/checks/` — tokens, `valuesFrom` chains, the `P_*` interface, placement, literals, tool versions. No `ENV=` needed |
 | `make check-pristine ENV=<env>` | Apply-time gate — clean tree, exact release tag, and the environment's `dtk_version` when set |
+| `tools/render.sh <env>` | Offline render, no cluster needed — merged values chains, kustomize builds of every layer, Talos fragment validation, into `../artifacts/<env>/render/` |
 | `make secrets ENV=<env>` | Print the generated internal service passwords |
 | `make show ENV=<env>` | Show current infra-stack state |
 | `make list ENV=<env>` | List resources in both stacks' state |
+| `tools/support-bundle.sh <env>` | Build a whitelist-based support bundle — config, render output, versions; never state, kubeconfigs, or `.env` |
 
 These load the environment's `.env`, so they need `ENV=` like everything else.
 
@@ -194,7 +196,7 @@ These load the environment's `.env`, so they need `ENV=` like everything else.
 |---------|------|
 | `make destroy ENV=<env>` | Destroy config then infra — 5-second cancel window |
 | `make destroy-fast ENV=<env>` | Destroy skipping the state refresh on both stacks — 3-second window |
-| `make clean ENV=<env>` | Delete one environment's generated artifacts — kubeconfig, Talos config and secrets, saved plans. **Terraform state is preserved** |
+| `make clean ENV=<env>` | Delete one environment's generated artifacts — kubeconfig, Talos config and secrets, saved plans. **Terraform state (`state/`) is preserved** |
 
 ## Destroying
 
@@ -202,6 +204,6 @@ These load the environment's `.env`, so they need `ENV=` like everything else.
 
 Across clusters, **destroy Hubs before the Tooling Cluster** they depend on — otherwise the Hubs lose their registry and secrets mid-teardown and the destroy can stall.
 
-**`make clean ENV=<env>` keeps the state.** It is scoped to one environment and removes only that environment's generated artifacts — `../artifacts/<env>/kubernetes`, `talos-config`, `talos-secrets`, and the two saved plan files. `../artifacts/<env>/terraform/` is left untouched: deleting state orphans running VMs and managed clusters, and loses the generated passwords held in `config.tfstate`. `ENV=` is required, as everywhere else.
+**`make clean ENV=<env>` keeps the state.** It is scoped to one environment and removes only that environment's generated artifacts — `../artifacts/<env>/kubernetes`, `talos-config`, `talos-secrets`, and the saved plans in `plans/`. `../artifacts/<env>/state/` is left untouched: deleting state orphans running VMs and managed clusters, and loses the generated passwords held in `config.tfstate`. `ENV=` is required, as everywhere else.
 
 The removed files are Terraform-managed copies — `kubeconfig`, `talosconfig`, the per-node machine configs, and `talos-secrets/secrets.yaml` are all written from infra state, so the next apply writes them back. The state is the authoritative copy, which is why it is the thing to back up. See [Recover → What the adopter must keep](../recover/disaster-recovery.md#what-the-adopter-must-keep).

@@ -6,7 +6,7 @@
 #
 # Default is a dry run: it prints every state operation without executing it.
 # Pass --apply to perform the migration. A timestamped backup of the original
-# state is always written to <artifacts-root>/<env>/terraform/ before any change.
+# state is always written to <artifacts-root>/<env>/state/ before any change.
 #
 # What it does:
 #   1. Backs up the existing terraform.tfstate.
@@ -36,7 +36,7 @@ if [[ -z "$ENV_NAME" ]]; then
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-STATE_DIR="${ARTIFACTS_ROOT:-$REPO_ROOT/../artifacts}/$ENV_NAME/terraform"
+STATE_DIR="${ARTIFACTS_ROOT:-$REPO_ROOT/../artifacts}/$ENV_NAME/state"
 OLD_STATE="$STATE_DIR/terraform.tfstate"
 INFRA_STATE="$STATE_DIR/infra.tfstate"
 CONFIG_STATE="$STATE_DIR/config.tfstate"

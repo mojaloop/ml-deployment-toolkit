@@ -35,13 +35,7 @@ infra:
   # Provider infra facts live beside this file, not here:
   #   placement.yaml       — placement groups -> physical nodes
   #   proxmox/proxmox.yaml — network bridge, storage pools
-  # Talos node OS overrides (optional — any on-prem provider)
-  talos:
-    nameservers:
-      - "8.8.8.8"
-      - "1.1.1.1"
-    ntp_servers:
-      - "time.cloudflare.com"
+  # Talos node OS facts (nameservers, NTP) live in talos.yaml beside this file.
 
 # Credentials in .env: DIGITALOCEAN_TOKEN, CLOUDFLARE_API_TOKEN,
 # or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_REGION for route53.

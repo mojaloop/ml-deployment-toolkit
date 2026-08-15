@@ -12,6 +12,7 @@ What to prepare in Proxmox and DNS before deploying. The same setup serves a Too
 - [Storage pools](#storage-pools)
 - [Network and IP plan](#network-and-ip-plan)
 - [Placement groups](#placement-groups)
+- [Talos node facts](#talos-node-facts)
 - [DNS zone](#dns-zone)
 
 ## Proxmox state
@@ -112,7 +113,22 @@ placement:
   pg-3: "node2"   # only if the template uses three
 ```
 
-Which groups a template references is in `config/templates/proxmox/{tooling,hub,bare}/<template>/placement.yaml`, in each node group's `placement:` list. Provide a node mapping for every group named there; an unmapped `pg-N` fails the plan before anything is created.
+Which groups a template references is in `config/templates/proxmox/{tooling,hub,bare}/<template>/placement.yaml`, in each node pool's `placement:` list. Provide a node mapping for every group named there; an unmapped `pg-N` fails the plan before anything is created.
+
+The same file defines the node pools themselves. A pool's name doubles as its Kubernetes placement identity — every node it expands to is labelled `node-role=<pool name>` mechanically, and a pool that should repel other workloads declares its own `taints:` there. The distribution schedules against pools with soft affinity, so a template without a given pool still runs everything — see [Provider model → Pool names are the placement contract](../../architecture/provider-model.md#pool-names-are-the-placement-contract). The environment's `placement.yaml` may also override the template's pools by name — a partial entry (say, a `count` bump) inherits the rest, `enabled: false` drops a default pool, and an unknown name adds an extra one.
+
+## Talos node facts
+
+The environment's `talos.yaml` — beside `config.yaml`, like the other sidecar files — carries the node OS facts only the on-prem machine-config path reads. Both keys are optional; omitted, the nodes use their DHCP-provided defaults:
+
+```yaml
+# ../environments/<env>/talos.yaml
+version: 1
+nameservers: ["8.8.8.8", "1.1.1.1"]
+ntp_servers: ["time.cloudflare.com"]
+```
+
+Per-pool Talos machine-config fragments — kubelet settings, sysctls, and similar — go in `talos/<pool>.yaml`, applied to every node of that pool after the template's own fragment ([Configuration → Environment layout](configuration.md#environment-layout)).
 
 ## DNS zone
 

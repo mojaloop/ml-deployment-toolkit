@@ -12,18 +12,15 @@ locals {
   # Non-secret variables an override file may reference as ${UPPER_SNAKE}.
   # Flux cannot substitute inside a ConfigMap it does not render, so overrides
   # are templated here instead — same ${...} syntax as the gitops manifests.
-  override_vars = merge(
-    {
-      CLUSTER_NAME = module.config.cluster.name
-      DOMAIN       = module.config.dns.domain
-      LOKI_URL     = module.config.observability.loki_url
-      MIMIR_URL    = module.config.observability.mimir_url
-      TEMPO_URL    = module.config.observability.tempo_url
-    },
-    { for k, v in module.config.template_app : upper(k) => tostring(v) },
-    { for k, v in module.config.template_data : upper(k) => tostring(v) },
-    { for k, v in module.config.template_tooling : upper(k) => tostring(v) },
-  )
+  # Parameters come from config.yaml/.env ONLY — template tuning is expressed
+  # as values/patches overlays (composition), never as substitution variables.
+  override_vars = {
+    CLUSTER_NAME = module.config.cluster.name
+    DOMAIN       = module.config.dns.domain
+    LOKI_URL     = module.config.observability.loki_url
+    MIMIR_URL    = module.config.observability.mimir_url
+    TEMPO_URL    = module.config.observability.tempo_url
+  }
 
   # Deployer Helm value overrides — <env>/values/<namespace>/<release>.yaml,
   # keyed <namespace>-<release>.
@@ -148,14 +145,7 @@ module "flux_config" {
 
   secrets = var.secrets
 
-  profile_vars = merge(
-    { for k, v in module.config.template_app : k => tostring(v) },
-    { for k, v in module.config.template_data : k => tostring(v) },
-    { for k, v in module.config.template_tooling : k => tostring(v) },
-  )
-
-  # Provider symbols (P_*, already UPPER_SNAKE) for cluster-config. try() keeps
-  # this stack valid until config-loader grows its params output.
+  # Provider symbols (P_*, already UPPER_SNAKE) for cluster-config.
   params = module.config.provider_params
 
   template_value_overrides    = local.template_value_overrides

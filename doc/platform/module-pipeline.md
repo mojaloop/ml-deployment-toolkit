@@ -21,8 +21,8 @@ There are two Terraform roots, each with its own state ([ADR-015](../architectur
 
 | Root | Modules it composes | State |
 |------|--------------------|-------|
-| `src/infra` | `config-loader`, one provider module, `flux-bootstrap` | `../artifacts/<env>/terraform/infra.tfstate` |
-| `src/config` | `config-loader`, `flux-config` | `../artifacts/<env>/terraform/config.tfstate` |
+| `src/infra` | `config-loader`, one provider module, `flux-bootstrap` | `../artifacts/<env>/state/infra.tfstate` |
+| `src/config` | `config-loader`, `flux-config` | `../artifacts/<env>/state/config.tfstate` |
 
 Both instantiate `config-loader` from the same `../environments/<env>/config.yaml`, so the resolved configuration is identical on either side. The config root declares no infrastructure provider, which is what makes `make apply-config` incapable of touching a VM.
 
@@ -44,7 +44,7 @@ The Makefile passes them into both stacks as the Terraform entry-point variables
 Two Makefile mechanisms carry the pipeline and are invisible in the module code:
 
 - **The placeholder kubeconfig.** The config stack's providers read `../artifacts/<env>/kubernetes/kubeconfig` at plan time — before any cluster exists. The Makefile seeds a placeholder pointing at `https://127.0.0.1:1` whenever the file is absent, which is the only reason a fresh `make plan` can evaluate the config stack at all. The real file, written by the provider module, replaces it during apply. A stray placeholder later shows up as `kubectl` dialing `127.0.0.1:1`.
-- **Backend rebinding.** Both roots are shared by every environment; what separates environments is the local state backend, and every Terraform-running target re-runs `terraform init -reconfigure` against `../artifacts/<env>/terraform/` immediately before acting. Removing that rebinding makes `make destroy ENV=a` operate on whichever environment was initialised last — the mechanism is load-bearing, not ceremony.
+- **Backend rebinding.** Both roots are shared by every environment; what separates environments is the local state backend, and every Terraform-running target re-runs `terraform init -reconfigure` against `../artifacts/<env>/state/` immediately before acting. (`state/` is created mode `0700` and holds only the non-regenerable, secret-bearing files; saved plans go to `plans/`, so no cleanup path is ever tempted to touch state.) Removing that rebinding makes `make destroy ENV=a` operate on whichever environment was initialised last — the mechanism is load-bearing, not ceremony.
 
 ## The chain
 
@@ -71,7 +71,7 @@ The modules, in `src/`:
 
 ## config-loader
 
-The first module in both stacks. It reads the environment's `config.yaml`, the environment's `placement.yaml` (placement groups → physical nodes), and the provider's `params.yaml` (the provider interface — the `P_*` symbols plus the Terraform-consumed `infra` section). From `config.yaml`'s `template`, the cluster's role, and the infrastructure provider it loads the template at `config/templates/<provider>/<role>/<name>/`, expands node groups into per-node shapes, resolves each capability section into concrete endpoints, and emits one merged configuration object that every downstream module reads.
+The first module in both stacks. It reads the environment's `config.yaml`, the environment's `placement.yaml` (placement groups → physical nodes), the environment's `talos.yaml` (Talos node OS facts), and the provider's `params.yaml` (the provider interface — the `P_*` symbols plus the Terraform-consumed `infra` section). From `config.yaml`'s `template`, the cluster's role, and the infrastructure provider it loads the template directory at `config/templates/<provider>/<role>/<name>/` — the topology from its `placement.yaml`, the tuning overlays from its `values/` and `patches/` — expands node pools into per-node shapes (deriving each node's label mechanically from its pool name and taking taints from the pool's own declaration), resolves each capability section into concrete endpoints, and emits one merged configuration object that every downstream module reads.
 
 This is where the configuration layers collapse into one — see [Configuration tiers](../architecture/system-overview.md#configuration-tiers). Downstream modules never read `config.yaml` directly; they read config-loader's output. When the platform developer adds a configuration field, it flows through here.
 
@@ -99,8 +99,9 @@ The largest module, the whole of the config stack, and the one that encodes the 
 - The **OCIRepository** pointing at the artifact
 - The **`cluster-config` ConfigMap** and **`cluster-secrets` Secret** — the substitution inputs. Every key is `UPPER_SNAKE`; the provider interface's `params` map (the `P_*` symbols from `config/templates/<provider>/params.yaml`) is merged into `cluster-config` alongside the environment-derived keys
 - The **generated internal passwords** (`random_password`), one per name in the role's set, overridable by a matching `UPPER_SNAKE` entry in the supplied secrets map
+- The **template values ConfigMaps** — one `<namespace>-<release>-values-template` per file in the selected template's `values/`, the middle slot of every HelmRelease's three-layer `valuesFrom` chain (common → template → environment)
 - The **values-override twins** — one ConfigMap *and* one Secret per `../environments/<env>/values/<namespace>/<release>.yaml`, both named `<namespace>-<release>-values-override`. The config root templates the file with Terraform `templatefile` before passing it in; an undefined `${NAME}` fails the apply. Lines referencing a `.env` key land in the Secret twin; the ConfigMap twin is templated without secrets, so a stray secret reference in ConfigMap-bound content hard-fails at plan
-- The **adopter's manifest patches** — each `../environments/<env>/patches/<kustomization>.yaml` is appended to that Kustomization's `spec.patches`, after the distribution's own patch list
+- The **manifest patches** — each Kustomization's `spec.patches` is layered in order: the distribution's own patches, then the selected template's `patches/<kustomization>.yaml`, then the adopter's `../environments/<env>/patches/<kustomization>.yaml`, so the adopter's patch wins
 - The **Kustomization dependency graph** for the cluster's role, with `dependsOn` and health gates ([ADR-019](../architecture/decisions/019-health-gated-reconciliation.md))
 
 The role (`tooling`, `hub`, `bare`) determines which Kustomizations exist and how they are chained; the data modes determine how many `hub-data-<store>` Kustomizations the fan-out has. The health gates — waiting on operators, on database readiness, on the Ory stack — live here. This is the module that makes a Hub converge in the right order; see [Reconciliation order](../architecture/system-overview.md#reconciliation-order).
@@ -109,6 +110,6 @@ The role (`tooling`, `hub`, `bare`) determines which Kustomizations exist and ho
 
 The pipeline ends where Flux begins. After `flux-config` creates the Kustomizations, Terraform's job is done and Flux owns convergence.
 
-The two communicate through two objects — the `cluster-config` ConfigMap and `cluster-secrets` Secret — plus the per-chart values-override twins (ConfigMap and Secret), which a HelmRelease reads directly rather than through substitution. A value that must reach a workload gets added to the ConfigMap or the Secret here, and referenced with `${UPPER_SNAKE}` substitution in the manifest that needs it; an undefined variable fails the reconcile rather than passing through. That is the interface between the two halves of the system, and keeping it narrow is what keeps them decoupled.
+The two communicate through two objects — the `cluster-config` ConfigMap and `cluster-secrets` Secret — plus the per-chart values chain tail (the template ConfigMap and the override twins), which a HelmRelease reads directly rather than through substitution. A value that must reach a workload gets added to the ConfigMap or the Secret here, and referenced with `${UPPER_SNAKE}` substitution in the manifest that needs it; an undefined variable fails the reconcile rather than passing through. That is the interface between the two halves of the system, and keeping it narrow is what keeps them decoupled.
 
 When adding a value a workload needs, the path is always: config field → config-loader → flux-config writes it into `cluster-config`/`cluster-secrets` under an `UPPER_SNAKE` key → the manifest substitutes it. The urge to have Terraform template a manifest directly is the boundary being crossed — put the value in the substitution inputs instead.

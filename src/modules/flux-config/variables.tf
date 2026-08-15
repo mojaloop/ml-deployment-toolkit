@@ -154,13 +154,7 @@ variable "secrets" {
   sensitive   = true
 }
 
-# --- Template tuning + overrides ------------------------------------------
-
-variable "profile_vars" {
-  description = "Template tuning variables (app/data/tooling sections, flattened) for postBuild substitution; keys are upper-cased before merging into cluster-config"
-  type        = map(string)
-  default     = {}
-}
+# --- Overrides -------------------------------------------------------------
 
 # Provider symbols (P_*) merged into the cluster-config ConfigMap. Keys arrive
 # already UPPER_SNAKE and must not collide with any base config key — the

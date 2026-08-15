@@ -72,7 +72,7 @@ singleBinary:
   # a soft ceiling making Go's GC progressively more aggressive as it nears the
   # value, so Loki sheds memory instead of being OOMKilled. ~90% of the limit,
   # leaving headroom for non-heap (stacks, mmap'd chunks). Same pattern applied
-  # to Tempo in tooling-observability/tempo/tempo-values.yaml.
+  # to Tempo in tooling-observability/values/observability/tempo.yaml.
   extraEnv:
     - name: GOMEMLIMIT
       value: "1350MiB"

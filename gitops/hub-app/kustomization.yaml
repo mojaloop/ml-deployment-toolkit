@@ -48,14 +48,14 @@ configMapGenerator:
   - name: finance-portal-values
     namespace: flux-system
     files:
-      - values.yaml=finance-portal/finance-portal-values.yaml
+      - values.yaml=values/finance-portal/finance-portal.yaml
   - name: mcm-values
     namespace: flux-system
     files:
-      - values.yaml=mcm/mcm-values.yaml
+      - values.yaml=values/mcm/mcm.yaml
   - name: mojaloop-values
     namespace: flux-system
     files:
-      - values.yaml=mojaloop/mojaloop-values.yaml
+      - values.yaml=values/mojaloop/mojaloop.yaml
 generatorOptions:
   disableNameSuffixHash: true

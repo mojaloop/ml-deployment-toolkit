@@ -92,14 +92,14 @@ configMapGenerator:
   - name: grafana-values
     namespace: flux-system
     files:
-      - values.yaml=grafana/grafana-values.yaml
+      - values.yaml=values/observability/grafana.yaml
   - name: loki-values
     namespace: flux-system
     files:
-      - values.yaml=loki/loki-values.yaml
+      - values.yaml=values/observability/loki.yaml
   - name: tempo-values
     namespace: flux-system
     files:
-      - values.yaml=tempo/tempo-values.yaml
+      - values.yaml=values/observability/tempo.yaml
 generatorOptions:
   disableNameSuffixHash: true

@@ -15,22 +15,22 @@ configMapGenerator:
   - name: psmdb-operator-values
     namespace: flux-system
     files:
-      - values.yaml=percona-mongodb/psmdb-operator-values.yaml
+      - values.yaml=values/hub-system/psmdb-operator.yaml
   - name: pxc-operator-values
     namespace: flux-system
     files:
-      - values.yaml=percona-xtradb/pxc-operator-values.yaml
+      - values.yaml=values/hub-system/pxc-operator.yaml
   - name: redis-operator-values
     namespace: flux-system
     files:
-      - values.yaml=redis-operator/redis-operator-values.yaml
+      - values.yaml=values/hub-system/redis-operator.yaml
   - name: strimzi-kafka-operator-values
     namespace: flux-system
     files:
-      - values.yaml=strimzi/strimzi-kafka-operator-values.yaml
+      - values.yaml=values/hub-system/strimzi-kafka-operator.yaml
   - name: vault-operator-values
     namespace: flux-system
     files:
-      - values.yaml=vault-operator/vault-operator-values.yaml
+      - values.yaml=values/hub-system/vault-operator.yaml
 generatorOptions:
   disableNameSuffixHash: true
