@@ -5,7 +5,7 @@
 #
 # The result deliberately does NOT contain the topology. It records which
 # environment ran and what test ran; the endpoints live in
-# environments/<env>/perf-topology.yaml and are managed like any other
+# ../environments/<env>/perf-topology.yaml and are managed like any other
 # deployment config. A result is therefore reproducible only if you also hold
 # that config — the same property `make plan-apply` has.
 
@@ -142,7 +142,7 @@ if [ ! -f "$OUT_DIR/notes.md" ]; then
 # $SCENARIO — $RUN_ID ($ENV)
 
 Numbers: \`summary.json\`. Test as run: \`scenario-snapshot.yaml\`. Health: \`health.json\`.
-Endpoints are not recorded here — see \`environments/$ENV/perf-topology.yaml\`.
+Endpoints are not recorded here — see the environment repo's \`perf-topology.yaml\`.
 
 ## Hypothesis
 

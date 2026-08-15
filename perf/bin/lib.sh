@@ -2,15 +2,16 @@
 # Shared resolution for the perf commands.
 #
 # WHERE THINGS LIVE
-#   environments/<env>/perf-topology.yaml     where the participants are
-#   environments/<env>/perf-scenarios/*.yaml  what tests to run against them
-#   perf-result/<env>/<scenario>/<ts>/        results
-#   perf/                                     this code, and nothing else
+#   ../environments/<env>/perf-topology.yaml     where the participants are
+#   ../environments/<env>/perf-scenarios/*.yaml  what tests to run against them
+#   perf-result/<env>/<scenario>/<ts>/           results (in this repo)
+#   perf/                                        this code, and nothing else
 #
-# Configuration sits beside the deployment configuration it belongs to, and is
-# gitignored by the same rule. Results never embed it: a result records WHICH
-# environment and WHAT test, never where the endpoints were. That means a
-# result is reproducible only if you also hold the environment's config —
+# Configuration sits beside the deployment configuration it belongs to, in the
+# adopter-owned environment repo OUTSIDE this clone (sibling layout; override
+# the root via ENVIRONMENTS_ROOT). Results never embed it: a result records
+# WHICH environment and WHAT test, never where the endpoints were. That means
+# a result is reproducible only if you also hold the environment's repo —
 # exactly the property `make plan-apply` already has.
 #
 # Dependencies: yq, jq, k6.
@@ -19,7 +20,8 @@ set -euo pipefail
 
 PERF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_ROOT="$(cd "$PERF_DIR/.." && pwd)"
-ENV_ROOT="$REPO_ROOT/environments"
+# Environments live OUTSIDE the clone as project-root siblings.
+ENV_ROOT="${ENVIRONMENTS_ROOT:-$REPO_ROOT/../environments}"
 RESULT_ROOT="$REPO_ROOT/perf-result"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -40,8 +42,8 @@ list_envs() {
 topology_path() {
   local env="$1"
   local path="$ENV_ROOT/${env}/perf-topology.yaml"
-  [ -f "$path" ] || die "no topology at environments/${env}/perf-topology.yaml
-       Copy environments/mlf-lab1-sw1/perf-topology.yaml.sample and edit it.
+  [ -f "$path" ] || die "no topology at $path
+       Copy examples/environments/hub/perf-topology.yaml.sample (in the clone) and edit it.
        Environments with a topology: $(list_envs)"
   echo "$path"
 }
@@ -54,7 +56,7 @@ list_scenarios() {
 scenario_path() {
   local env="$1" name="$2"
   local path="$ENV_ROOT/${env}/perf-scenarios/${name}.yaml"
-  [ -f "$path" ] || die "no scenario at environments/${env}/perf-scenarios/${name}.yaml
+  [ -f "$path" ] || die "no scenario at $path
        Available for ${env}: $(list_scenarios "$env")"
   echo "$path"
 }
@@ -157,8 +159,8 @@ build_scenario_snapshot() {
 # subject: two runs a fortnight apart are incomparable, and the change under
 # test — which is exactly what values/ and patches/ carry — is unrecorded.
 #
-# environments/<env>/ is gitignored, so NONE of this is recoverable from the
-# repository afterwards. That is why it is copied rather than referenced.
+# environments/<env>/ lives outside this repository (its own adopter repo), so
+# NONE of this is recoverable from THIS repo afterwards. Copied, not referenced.
 #
 # Copied from disk rather than read back from the cluster. These files are the
 # deployment inputs, and a copy needs no kubeconfig, so provenance does not
