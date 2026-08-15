@@ -161,10 +161,12 @@ validate:
 	@role=$$(yq -r '.cluster.role' $(ENV_DIR)/config.yaml); \
 	 tmpl=$$(yq -r '.template' $(ENV_DIR)/config.yaml); \
 	 provider=$$(yq -r '.infra.provider' $(ENV_DIR)/config.yaml); \
-	 tfile="config/templates/$$provider/$$role/$$tmpl.yaml"; \
-	 if [ ! -f "$$tfile" ]; then echo "ERROR: template $$tfile not found"; exit 1; fi; \
-	 echo "Validating $$tfile against schema..."; \
-	 yq -o json e '.' "$$tfile" | python3 tools/validate.py config/schemas/template.schema.json
+	 tdir="config/templates/$$provider/$$role/$$tmpl"; \
+	 if [ ! -d "$$tdir" ]; then echo "ERROR: template directory $$tdir not found"; exit 1; fi; \
+	 echo "Validating $$tdir/template.yaml against schema..."; \
+	 yq -o json e '.' "$$tdir/template.yaml" | python3 tools/validate.py config/schemas/template.schema.json; \
+	 echo "Validating $$tdir/placement.yaml against schema..."; \
+	 yq -o json e '.' "$$tdir/placement.yaml" | python3 tools/validate.py config/schemas/template-placement.schema.json
 	@provider=$$(yq -r '.infra.provider' $(ENV_DIR)/config.yaml); \
 	 pfile="config/templates/$$provider/params.yaml"; \
 	 if [ ! -f "$$pfile" ]; then echo "ERROR: provider params $$pfile not found"; exit 1; fi; \

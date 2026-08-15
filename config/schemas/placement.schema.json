@@ -1,9 +1,12 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Environment placement",
-  "description": "Schema for <env>/placement.yaml — adopter facts about where node groups land. Maps the template's placement groups (pg-N) to physical provider nodes. Sits at the environment root beside config.yaml because it drives both the VM side (node targets) and the labelling side, and it is the file adopters edit most.",
+  "description": "Schema for <env>/placement.yaml — adopter facts about node placement. `placement` maps the template's placement groups (pg-N) to physical provider nodes. `pools` overrides template node pools BY NAME (merge semantics: maps deep-merge; an override changing count inherits everything else; enabled: false drops a default pool — greppable, a visible decision rather than an absence; unknown names add extra pools).",
   "type": "object",
-  "required": ["version", "placement"],
+  "required": [
+    "version",
+    "placement"
+  ],
   "additionalProperties": false,
   "properties": {
     "version": {
@@ -13,6 +16,11 @@
     },
     "placement": {
       "description": "Placement group -> physical node name (e.g. pg-1: pve-node-a). Every pg-N the selected template references must be mapped; the plan fails otherwise.",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "pools": {
+      "description": "Per-pool overrides merged by name onto the template's node_groups: partial keys (count, cores, memory, disks, placement, tags, class) plus enabled: false to remove a pool. New names define extra pools and must then carry the full pool shape.",
       "type": "object",
       "additionalProperties": true
     }

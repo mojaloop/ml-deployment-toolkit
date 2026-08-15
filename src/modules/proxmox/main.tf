@@ -102,7 +102,10 @@ module "talos_config" {
         try([var.label_taint_patches[inst.workload_class]], []),
         local.registry_mirror_patch,
         local.nameservers_patch,
-        local.ntp_patch
+        local.ntp_patch,
+        # Per-pool fragments last so template/environment talos/<pool>.yaml
+        # overlays win over the generic class patches (Talos merges in order).
+        lookup(var.extra_pool_patches, try(inst.group, ""), []),
       )
     }
   ]

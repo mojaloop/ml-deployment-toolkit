@@ -71,7 +71,7 @@ The modules, in `src/`:
 
 ## config-loader
 
-The first module in both stacks. It reads the environment's `config.yaml`, the environment's `placement.yaml` (placement groups → physical nodes), and the provider's `params.yaml` (the provider interface — the `P_*` symbols plus the Terraform-consumed `infra` section). From `config.yaml`'s `template`, the cluster's role, and the infrastructure provider it loads the template at `config/templates/<provider>/<role>/<name>.yaml`, expands node groups into per-node shapes, resolves each capability section into concrete endpoints, and emits one merged configuration object that every downstream module reads.
+The first module in both stacks. It reads the environment's `config.yaml`, the environment's `placement.yaml` (placement groups → physical nodes), and the provider's `params.yaml` (the provider interface — the `P_*` symbols plus the Terraform-consumed `infra` section). From `config.yaml`'s `template`, the cluster's role, and the infrastructure provider it loads the template at `config/templates/<provider>/<role>/<name>/`, expands node groups into per-node shapes, resolves each capability section into concrete endpoints, and emits one merged configuration object that every downstream module reads.
 
 This is where the configuration layers collapse into one — see [Configuration tiers](../architecture/system-overview.md#configuration-tiers). Downstream modules never read `config.yaml` directly; they read config-loader's output. When the platform developer adds a configuration field, it flows through here.
 

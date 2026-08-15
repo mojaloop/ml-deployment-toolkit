@@ -38,6 +38,10 @@ spec:
       name: kratos-values
       valuesKey: values.yaml
     - kind: ConfigMap
+      name: ory-kratos-values-template
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: ory-kratos-values-override
       valuesKey: values.yaml
       optional: true

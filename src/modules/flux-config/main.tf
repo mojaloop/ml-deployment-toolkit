@@ -383,6 +383,24 @@ resource "kubernetes_secret_v1" "minio_buckets_values" {
   type = "Opaque"
 }
 
+# Template-layer Helm values — one ConfigMap per values/<namespace>/<release>.yaml
+# in the selected template directory, named <namespace>-<release>-values-template.
+# The middle slot of every HelmRelease's three-layer valuesFrom chain
+# (common -> template -> environment), optional because most templates
+# override nothing. Templates are DTK-authored: secrets are forbidden here.
+resource "kubernetes_config_map_v1" "helm_value_templates" {
+  for_each = { for k, v in var.template_value_overrides : k => v if v != "" }
+
+  metadata {
+    name      = "${each.key}-values-template"
+    namespace = var.flux_namespace
+  }
+
+  data = {
+    "values.yaml" = each.value
+  }
+}
+
 # Deployer Helm value overrides — one object per values/<namespace>/<release>.yaml
 # file, named <namespace>-<release>-values-override. Referenced by every
 # HelmRelease via valuesFrom (optional: true). Files that reference no secret
@@ -795,13 +813,15 @@ locals {
 
   kustomizations = { for k, v in local.all_kustomizations : k => v if v.enabled }
 
-  # Distribution patches first, deployer patches second: kustomize applies the
-  # list in order, so the deployer's win. A patches/<name>.yaml naming no
-  # enabled Kustomization is ignored — nothing here validates the filename.
+  # Layer order: distribution patches, then template patches, then deployer
+  # (environment) patches — kustomize applies the list in order, so later
+  # layers win. A patches/<name>.yaml naming no enabled Kustomization is
+  # ignored — nothing here validates the filename.
   effective_patches = {
     for k, _ in local.kustomizations : k => concat(
       lookup(local.backup_disabled_patches, k, []),
       lookup(local.eab_patches, k, []),
+      lookup(var.template_patches, k, []),
       lookup(var.kustomize_patches, k, []),
     )
   }

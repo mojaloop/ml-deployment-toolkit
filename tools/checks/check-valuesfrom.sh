@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Usage: check-valuesfrom.sh — verify every HelmRelease in gitops/ ends its valuesFrom
-# list with the environment override twins, in order:
+# Usage: check-valuesfrom.sh — verify every HelmRelease in gitops/ carries the full
+# three-layer chain tail (common -> template -> environment), in order:
+#   { kind: ConfigMap, name: <targetNamespace>-<release>-values-template, optional: true }
 #   { kind: ConfigMap, name: <targetNamespace>-<release>-values-override, optional: true }
 #   { kind: Secret,    name: <targetNamespace>-<release>-values-override, optional: true }
-# (A values override referencing only config params lands as the ConfigMap; one
-# referencing .env keys lands as the Secret — same name, Secret last so it wins.)
+# (The template slot carries the selected template's values/ deltas; an environment
+# override referencing only config params lands as the ConfigMap; one referencing
+# .env keys lands as the Secret — same name, Secret last so it wins.)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -24,6 +26,9 @@ while IFS= read -r f; do
       [ (.metadata.name // "?"),
         (.spec.targetNamespace // .metadata.namespace // ""),
         ((.spec.valuesFrom // []) | length),
+        ((.spec.valuesFrom // []) | (.[-3] // {}) | (.kind // "")),
+        ((.spec.valuesFrom // []) | (.[-3] // {}) | (.name // "")),
+        ((.spec.valuesFrom // []) | (.[-3] // {}) | (.optional // false)),
         ((.spec.valuesFrom // []) | (.[-2] // {}) | (.kind // "")),
         ((.spec.valuesFrom // []) | (.[-2] // {}) | (.name // "")),
         ((.spec.valuesFrom // []) | (.[-2] // {}) | (.optional // false)),
@@ -33,26 +38,31 @@ while IFS= read -r f; do
     ') || { echo "$f:1: YAML parse error (yq could not read file)"; findings=$((findings+1)); continue; }
   [ -n "$rows" ] || continue
 
-  while IFS=$'\t' read -r rel tns len pkind pname popt lkind lname lopt; do
+  while IFS=$'\t' read -r rel tns len tkind tname topt pkind pname popt lkind lname lopt; do
     [ -n "$rel" ] || continue
     seen=$((seen+1))
-    expected="${tns}-${rel}-values-override"
-    if [ "$len" = "0" ] || [ -z "$len" ] || [ "$len" = "1" ]; then
-      echo "$f: HelmRelease/$rel: valuesFrom must end with the override twins (ConfigMap+Secret $expected, both optional: true)"
+    exp_t="${tns}-${rel}-values-template"
+    exp_o="${tns}-${rel}-values-override"
+    if [ -z "$len" ] || [ "$len" -lt 3 ]; then
+      echo "$f: HelmRelease/$rel: valuesFrom must end with the three-layer tail (ConfigMap $exp_t, ConfigMap $exp_o, Secret $exp_o — all optional: true)"
       findings=$((findings+1))
       continue
     fi
     ok=1
-    if [ "$pkind" != "ConfigMap" ] || [ "$lkind" != "Secret" ]; then
-      echo "$f: HelmRelease/$rel: last two valuesFrom kinds are '$pkind','$lkind', want 'ConfigMap','Secret'"
+    if [ "$tkind" != "ConfigMap" ] || [ "$pkind" != "ConfigMap" ] || [ "$lkind" != "Secret" ]; then
+      echo "$f: HelmRelease/$rel: last three valuesFrom kinds are '$tkind','$pkind','$lkind', want 'ConfigMap','ConfigMap','Secret'"
       ok=0
     fi
-    if [ "$pname" != "$expected" ] || [ "$lname" != "$expected" ]; then
-      echo "$f: HelmRelease/$rel: override twin names are '$pname','$lname', want '$expected' for both"
+    if [ "$tname" != "$exp_t" ]; then
+      echo "$f: HelmRelease/$rel: template slot name is '$tname', want '$exp_t'"
       ok=0
     fi
-    if [ "$popt" != "true" ] || [ "$lopt" != "true" ]; then
-      echo "$f: HelmRelease/$rel: both override twins must be 'optional: true' (got '$popt','$lopt')"
+    if [ "$pname" != "$exp_o" ] || [ "$lname" != "$exp_o" ]; then
+      echo "$f: HelmRelease/$rel: override twin names are '$pname','$lname', want '$exp_o' for both"
+      ok=0
+    fi
+    if [ "$topt" != "true" ] || [ "$popt" != "true" ] || [ "$lopt" != "true" ]; then
+      echo "$f: HelmRelease/$rel: all three tail entries must be 'optional: true' (got '$topt','$popt','$lopt')"
       ok=0
     fi
     [ "$ok" = "1" ] || findings=$((findings+1))

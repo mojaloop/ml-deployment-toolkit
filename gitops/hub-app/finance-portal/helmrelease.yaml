@@ -35,6 +35,10 @@ spec:
       name: finance-portal-values
       valuesKey: values.yaml
     - kind: ConfigMap
+      name: finance-portal-finance-portal-values-template
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: finance-portal-finance-portal-values-override
       valuesKey: values.yaml
       optional: true

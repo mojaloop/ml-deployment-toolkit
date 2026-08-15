@@ -12,6 +12,32 @@ locals {
   proxmox_env_file = "${local.env_dir}/proxmox/proxmox.yaml"
   proxmox_env      = fileexists(local.proxmox_env_file) ? yamldecode(file(local.proxmox_env_file)) : {}
 
+  # Per-pool Talos machine-config fragments: talos/<pool>.yaml in the selected
+  # template directory (the shape), then in the environment (the instance),
+  # applied in that order. Terraform-substituted like every environment file;
+  # an undefined token fails the plan.
+  talos_fragment_vars = {
+    CLUSTER_NAME = try(module.config.cluster.name, var.env_name)
+    DOMAIN       = try(module.config.dns.domain, "")
+  }
+  template_talos_dir = "${module.config.template_dir}/talos"
+  env_talos_dir      = "${local.env_dir}/talos"
+  template_pool_patches = {
+    for f in try(fileset(local.template_talos_dir, "*.yaml"), []) :
+    trimsuffix(f, ".yaml") => templatefile("${local.template_talos_dir}/${f}", local.talos_fragment_vars)
+  }
+  env_pool_patches = {
+    for f in try(fileset(local.env_talos_dir, "*.yaml"), []) :
+    trimsuffix(f, ".yaml") => templatefile("${local.env_talos_dir}/${f}", local.talos_fragment_vars)
+  }
+  extra_pool_patches = {
+    for pool in distinct(concat(keys(local.template_pool_patches), keys(local.env_pool_patches))) :
+    pool => compact([
+      lookup(local.template_pool_patches, pool, ""),
+      lookup(local.env_pool_patches, pool, ""),
+    ])
+  }
+
   # Read raw config for provider selection (before module.config expands it)
   config_raw    = yamldecode(file(local.env_config_path))
   provider_name = local.config_raw.infra.provider
@@ -68,6 +94,7 @@ module "proxmox" {
   patches_path         = module.config.paths.patches
   artifacts_path       = local.artifacts_path
   provider_config_path = "../../config/templates/proxmox/params.yaml"
+  extra_pool_patches   = local.extra_pool_patches
 
   # registry capability (image pull-through cache -> Talos machine mirrors)
   oci_proxy_active   = module.config.registry.active

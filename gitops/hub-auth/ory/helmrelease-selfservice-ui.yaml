@@ -30,6 +30,10 @@ spec:
       name: kratos-selfservice-ui-values
       valuesKey: values.yaml
     - kind: ConfigMap
+      name: ory-kratos-selfservice-ui-values-template
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: ory-kratos-selfservice-ui-values-override
       valuesKey: values.yaml
       optional: true

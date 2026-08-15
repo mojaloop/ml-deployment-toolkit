@@ -53,6 +53,10 @@ spec:
       valuesKey: values.yaml
       optional: true
     - kind: ConfigMap
+      name: minio-minio-values-template
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: minio-minio-values-override
       valuesKey: values.yaml
       optional: true

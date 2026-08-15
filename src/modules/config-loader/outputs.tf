@@ -10,6 +10,11 @@ output "provider_name" {
   value       = local.provider_name
 }
 
+output "template_dir" {
+  description = "Directory of the selected template — the stacks read its values/, patches/ and talos/ overlay surfaces from here"
+  value       = local.template_dir
+}
+
 output "provider_params" {
   description = "Provider interface symbols (P_*) from config/templates/<provider>/params.yaml — merged into the cluster-config ConfigMap for Flux substitution"
   value       = local.provider_params

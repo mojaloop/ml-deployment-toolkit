@@ -117,7 +117,7 @@ Configuration merges from three tiers at plan time, each tier layered over the o
 | Tier | Owner | Contents | Location |
 |------|-------|----------|----------|
 | Common gitops | Distribution team | Environment-neutral GitOps manifests and Terraform modules — the distribution artifact | `gitops/`, `src/` |
-| Provider template | Distribution team | A full overlay per provider — one file per role and tier, no knobs or conditionals — plus the provider interface and its Terraform-consumed `infra` block | `config/templates/<provider>/<role>/<name>.yaml`, `config/templates/<provider>/params.yaml` |
+| Provider template | Distribution team | A full overlay directory per provider — one per role and tier (template.yaml, placement.yaml, values/, patches/, talos/), no knobs or conditionals — plus the provider interface and its Terraform-consumed `infra` block | `config/templates/<provider>/<role>/<name>/`, `config/templates/<provider>/params.yaml` |
 | Environment | Adopter | Capability bindings, cluster name, domain, template name, placement, external credentials, optional Helm value overrides and manifest patches | `../environments/<env>/` — a sibling of the clone, each environment its own git repository: `config.yaml`, `.env`, `placement.yaml`, `values/`, `patches/` |
 
 Parameterization is **orthogonal to the tiers, not a tier of its own**: `config.yaml` and `.env` supply the values that `${UPPER_SNAKE}` tokens in any tier resolve to — they select and fill the layers rather than sitting between them.
@@ -140,7 +140,7 @@ A value takes one of three routes.
 
 | Step | Where |
 |------|-------|
-| Template overlay tuning — replica counts, storage sizes, buffer pools | `config/templates/<provider>/<role>/<name>.yaml`, sections `app:` / `data:` / `tooling:` |
+| Template overlay tuning — replica counts, storage sizes, buffer pools | `config/templates/<provider>/<role>/<name>/template.yaml`, sections `app:` / `data:` / `tooling:` |
 | Environment config — capability bindings, domain, cluster identity | `../environments/<env>/config.yaml` |
 | Supplied credentials | `../environments/<env>/.env` |
 | Generated credentials — the ~20 internal service passwords | created by the config stack, never authored |

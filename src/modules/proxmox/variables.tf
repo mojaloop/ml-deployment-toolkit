@@ -5,6 +5,12 @@ variable "instances" {
   type        = any
 }
 
+variable "extra_pool_patches" {
+  description = "Per-pool Talos machine-config fragments (pool name -> ordered list of rendered patch documents): template-layer talos/<pool>.yaml first, environment-layer second. Applied to every node of the matching pool."
+  type        = map(list(string))
+  default     = {}
+}
+
 variable "cluster" {
   description = "Cluster configuration (name, vip, flux)"
   type        = any

@@ -30,6 +30,10 @@ spec:
       name: mcm-values
       valuesKey: values.yaml
     - kind: ConfigMap
+      name: mcm-mcm-values-template
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: mcm-mcm-values-override
       valuesKey: values.yaml
       optional: true

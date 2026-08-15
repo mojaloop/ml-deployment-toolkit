@@ -38,6 +38,10 @@ spec:
       name: vault-operator-values
       valuesKey: values.yaml
     - kind: ConfigMap
+      name: hub-system-vault-operator-values-template
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: hub-system-vault-operator-values-override
       valuesKey: values.yaml
       optional: true

@@ -119,7 +119,7 @@ A template is a **provider-specific full overlay**. Each provider directory carr
 
 | File | Contents | Owner |
 |------|----------|-------|
-| `config/templates/<provider>/<role>/<name>.yaml` | Full overlay — topology plus `app`/`data`/`tooling` tuning | Distribution, one file per provider, role, and tier |
+| `config/templates/<provider>/<role>/<name>/` | Full overlay directory — `template.yaml` tuning, `placement.yaml` topology, `values/`/`patches/`/`talos/` surfaces | Distribution, one directory per provider, role, and tier |
 | `config/templates/<provider>/params.yaml` | The provider interface: a `params` section (`P_*` values) and an `infra` section consumed by Terraform | Distribution, one file per provider |
 
 On Proxmox a node group expands into `count` individually-placed VMs; on a managed service it becomes a node group or pool of that size.

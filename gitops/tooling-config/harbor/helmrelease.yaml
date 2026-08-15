@@ -45,6 +45,10 @@ spec:
       valuesKey: adminPassword
       targetPath: harborAdminPassword
     - kind: ConfigMap
+      name: harbor-harbor-values-template
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: harbor-harbor-values-override
       valuesKey: values.yaml
       optional: true

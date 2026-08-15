@@ -40,6 +40,10 @@ spec:
       name: reloader-values
       valuesKey: values.yaml
     - kind: ConfigMap
+      name: platform-system-reloader-values-template
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: platform-system-reloader-values-override
       valuesKey: values.yaml
       optional: true

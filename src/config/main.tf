@@ -40,6 +40,29 @@ locals {
   # keys must be usable in for_each.
   secret_keys = nonsensitive(keys(var.secrets))
 
+  # Template-layer gitops deltas — the middle slot of the three-layer chain
+  # (common -> template -> environment). Same layout and templating as the
+  # environment's values/ and patches/, but DTK-authored: secrets are
+  # forbidden, so files are templated with override_vars only and any secret
+  # reference hard-fails at plan.
+  template_values_dir = "${module.config.template_dir}/values"
+  template_value_overrides = {
+    for f in try(fileset(local.template_values_dir, "*/*.yaml"), []) :
+    replace(trimsuffix(f, ".yaml"), "/", "-") => templatefile("${local.template_values_dir}/${f}", local.override_vars)
+  }
+
+  template_patches_dir = "${module.config.template_dir}/patches"
+  template_patches = {
+    for f in try(fileset(local.template_patches_dir, "*.yaml"), []) :
+    trimsuffix(f, ".yaml") => [
+      for doc in yamldecode(templatefile("${local.template_patches_dir}/${f}", local.override_vars)) :
+      merge(
+        { patch = try(tostring(doc.patch), yamlencode(doc.patch), yamlencode(doc)) },
+        can(doc.target) ? { target = doc.target } : {},
+      )
+    ]
+  }
+
   helm_value_files = {
     for f in try(fileset(local.values_dir, "*/*.yaml"), []) :
     replace(trimsuffix(f, ".yaml"), "/", "-") => "${local.values_dir}/${f}"
@@ -104,12 +127,12 @@ module "flux_config" {
   count  = module.config.artifact.active ? 1 : 0
   source = "../modules/flux-config"
 
-  cluster_name       = module.config.cluster.name
-  cluster_role       = module.config.cluster_role
-  infra_provider     = module.config.provider_name
-  dns_provider       = module.config.dns.provider
-  domain             = module.config.dns.domain
-  lb_ipam_pools      = module.config.lb_ipam_pools
+  cluster_name   = module.config.cluster.name
+  cluster_role   = module.config.cluster_role
+  infra_provider = module.config.provider_name
+  dns_provider   = module.config.dns.provider
+  domain         = module.config.dns.domain
+  lb_ipam_pools  = module.config.lb_ipam_pools
 
   artifact_url     = module.config.artifact.url
   artifact_version = module.config.artifact.version
@@ -135,6 +158,8 @@ module "flux_config" {
   # this stack valid until config-loader grows its params output.
   params = module.config.provider_params
 
+  template_value_overrides    = local.template_value_overrides
+  template_patches            = local.template_patches
   helm_value_overrides        = local.helm_value_overrides
   helm_value_secret_overrides = local.helm_value_secret_overrides
   kustomize_patches           = local.kustomize_patches

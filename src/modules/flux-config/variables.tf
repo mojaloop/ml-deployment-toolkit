@@ -171,6 +171,12 @@ variable "params" {
   default     = {}
 }
 
+variable "template_value_overrides" {
+  description = "Template-layer Helm values (<namespace>-<release> -> templated values.yaml content from the selected template's values/), delivered as ConfigMaps named *-values-template"
+  type        = map(string)
+  default     = {}
+}
+
 variable "helm_value_overrides" {
   description = "Non-secret Helm values overrides (<namespace>-<release> -> templated values.yaml content), delivered as ConfigMaps"
   type        = map(string)
@@ -189,6 +195,12 @@ variable "helm_value_secret_overrides" {
 # type constraint accepts. Keys naming no Kustomization are dropped downstream.
 variable "kustomize_patches" {
   description = "Per-Kustomization kustomize patches (kustomization name -> list of Flux spec.patches entries)"
+  type        = any
+  default     = {}
+}
+
+variable "template_patches" {
+  description = "Template-layer kustomize patches (kustomization name -> list of Flux spec.patches entries), applied after distribution patches and before environment patches"
   type        = any
   default     = {}
 }

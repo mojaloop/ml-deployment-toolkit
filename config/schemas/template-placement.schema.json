@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Template placement",
+  "description": "Schema for config/templates/<provider>/<role>/<name>/placement.yaml — the shape this template deploys: node pools, sizing, default topology. Environments override pools by name in their own placement.yaml (count, sizes, extra pools, enabled: false).",
+  "type": "object",
+  "required": [
+    "version",
+    "node_groups"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "description": "Placement format version",
+      "type": "integer",
+      "minimum": 1
+    },
+    "node_groups": {
+      "description": "Each group expands to <count> nodes named <cluster>-<name>-<index>",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "class",
+          "count",
+          "cores",
+          "memory",
+          "disks",
+          "placement"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Group name; part of rendered node names",
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "class": {
+            "description": "Workload class — see config/definitions/workload-classes.yaml",
+            "enum": [
+              "control-plane",
+              "worker-general",
+              "mixed-plane",
+              "worker-kafka",
+              "worker-db"
+            ]
+          },
+          "count": {
+            "description": "Number of nodes in this group",
+            "type": "integer",
+            "minimum": 1
+          },
+          "cores": {
+            "description": "vCPU cores per node",
+            "type": "integer",
+            "minimum": 1
+          },
+          "memory": {
+            "description": "Memory per node in MB",
+            "type": "integer",
+            "minimum": 512
+          },
+          "disks": {
+            "description": "Disk sizes in GB, rendered as scsi0..scsiN (Proxmox) / root+extra (cloud)",
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "placement": {
+            "description": "Index-aligned placement groups (node i -> placement[i]); shorter lists wrap around",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^pg-[0-9]+$"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Extra Proxmox/cloud tags applied to every node in the group"
+          }
+        }
+      }
+    }
+  }
+}

@@ -31,6 +31,10 @@ spec:
       name: node-exporter-values
       valuesKey: values.yaml
     - kind: ConfigMap
+      name: observability-node-exporter-values-template
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: observability-node-exporter-values-override
       valuesKey: values.yaml
       optional: true

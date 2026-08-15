@@ -135,7 +135,7 @@ cluster:
       gw-ext:
         lan: "192.168.0.212"
 
-template: "medium"                    # config/templates/proxmox/tooling/medium.yaml
+template: "medium"                    # config/templates/proxmox/tooling/medium/
 
 infra:
   provider: "proxmox"                 # proxmox | aws | digitalocean
@@ -244,7 +244,7 @@ cluster:
       gw-intapi:
         lan: "192.168.0.218"
 
-template: "tps-10"                    # config/templates/proxmox/hub/tps-10.yaml
+template: "tps-10"                    # config/templates/proxmox/hub/tps-10/
 
 # Supporting services — each independent, each may point anywhere.
 # All three are required; endpoints are stated outright, never derived.
@@ -303,7 +303,7 @@ With all three supporting-service sections at `enabled: false`, a Hub is standal
 
 ## Deployment templates
 
-`template` names a file under `config/templates/<provider>/<role>/` — the file read is `config/templates/<provider>/<role>/<name>.yaml`, selected by `infra.provider`, `cluster.role`, and `template` together. Each provider carries its own complete set: a template is a full overlay for that provider, with no knobs or conditionals inside it. Templates declare **node groups** and the service tuning that must scale with them.
+`template` names a file under `config/templates/<provider>/<role>/` — the file read is `config/templates/<provider>/<role>/<name>/`, selected by `infra.provider`, `cluster.role`, and `template` together. Each provider carries its own complete set: a template is a full overlay for that provider, with no knobs or conditionals inside it. Templates declare **node groups** and the service tuning that must scale with them.
 
 | Role | Templates |
 |------|-----------|
@@ -569,7 +569,7 @@ Deleting a patch file and re-applying reverts the field — the patch disappears
 make validate ENV=<env>
 ```
 
-This checks, in order: `config.yaml` against the JSON Schema, the selected template (`config/templates/<provider>/<role>/<name>.yaml`) against the template schema, the provider's `params.yaml` against the params schema, the environment's `placement.yaml` and `proxmox/proxmox.yaml` (when present) against theirs, and then `terraform validate` on both stacks (skipped until `make init` has run).
+This checks, in order: `config.yaml` against the JSON Schema, the selected template (`config/templates/<provider>/<role>/<name>/`) against the template schema, the provider's `params.yaml` against the params schema, the environment's `placement.yaml` and `proxmox/proxmox.yaml` (when present) against theirs, and then `terraform validate` on both stacks (skipped until `make init` has run).
 
 Two more gates sit beside it:
 

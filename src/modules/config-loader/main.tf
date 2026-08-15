@@ -3,7 +3,7 @@
 #   <env>/config.yaml                 (adopter-authored, schema-validated)
 #   <env>/placement.yaml              (adopter-authored, node placement facts)
 #   <env>/proxmox/proxmox.yaml        (adopter-authored, provider infra facts)
-#   config/templates/<provider>/<role>/<template>.yaml  (provider-specific capacity template)
+#   config/templates/<provider>/<role>/<template>/  (full-overlay template directory)
 #   config/templates/<provider>/params.yaml  (provider interface + infra config)
 #   config/definitions/workload-classes.yaml  (platform definitions)
 # Expands node groups into provider shapes and resolves capability bindings
@@ -30,9 +30,27 @@ locals {
   provider_params      = try(local.provider_params_file.params, {})
   mapping              = try(local.provider_params_file.infra, {})
 
-  template = yamldecode(file("${var.templates_path}/${local.provider_name}/${local.cluster_role}/${local.config.template}.yaml"))
+  # A template is a directory — the full overlay for one provider, role and
+  # capacity: template.yaml (identity + tuning), placement.yaml (the shape:
+  # node pools, default topology), values/ and patches/ (gitops deltas),
+  # talos/<pool>.yaml (per-pool machine-config fragments).
+  template_dir       = "${var.templates_path}/${local.provider_name}/${local.cluster_role}/${local.config.template}"
+  template           = yamldecode(file("${local.template_dir}/template.yaml"))
+  template_placement = yamldecode(file("${local.template_dir}/placement.yaml"))
 
-  node_groups = try(local.template.node_groups, [])
+  # --- VM pools merge by name ---------------------------------------------
+  # Template owns the shape; the environment owns the instance. Environment
+  # placement.yaml `pools:` entries deep-merge onto the template pool of the
+  # same name (changing count inherits everything else), unknown names add
+  # extra pools, and `enabled: false` drops a default pool — visible in the
+  # environment file as a deliberate decision rather than an absence.
+  template_pools     = { for g in try(local.template_placement.node_groups, []) : g.name => g }
+  env_pool_overrides = try(local.placement_doc.pools, {})
+  merged_pools = merge(
+    { for name, g in local.template_pools : name => merge(g, try(local.env_pool_overrides[name], {})) },
+    { for name, o in local.env_pool_overrides : name => merge({ name = name }, o) if !contains(keys(local.template_pools), name) },
+  )
+  node_groups = [for name, g in local.merged_pools : g if try(g.enabled, true)]
 
   # On-prem providers render one VM per node and need real placement targets.
   is_talos_provider = contains(["proxmox", "openstack"], local.provider_name)
@@ -84,6 +102,7 @@ locals {
     for g in local.node_groups : [
       for i in range(g.count) : {
         name            = "${g.name}-${i}"
+        group           = g.name
         workload_class  = g.class
         cores           = g.cores
         memory          = g.memory

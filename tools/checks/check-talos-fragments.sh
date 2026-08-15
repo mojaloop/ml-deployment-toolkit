@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Usage: check-talos-fragments.sh — every talos patch fragment (config/patches/talos/, config/templates/*/*/talos/, environments/*/talos/) must parse as YAML once ${...} tokens are stubbed, and must not be a JSON6902 patch (strategic-merge fragments only).
+# Usage: check-talos-fragments.sh — every talos patch fragment (config/patches/talos/, config/templates/<provider>/<role>/<name>/talos/, <env>/talos/) must parse as YAML once ${...} tokens are stubbed, and must not be a JSON6902 patch (strategic-merge fragments only).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -47,7 +47,7 @@ check_fragment() {
 }
 
 # Fixed root + target-state roots (silently absent until later phases).
-for dir in config/patches/talos config/templates/*/*/talos environments/*/talos; do
+for dir in config/patches/talos config/templates/*/*/*/talos "${ENVIRONMENTS_ROOT:-../environments}"/*/talos; do
   [ -d "$dir" ] || continue
   while IFS= read -r f; do
     check_fragment "$f"
