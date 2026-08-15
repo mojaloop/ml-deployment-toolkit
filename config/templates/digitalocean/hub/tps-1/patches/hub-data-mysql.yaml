@@ -1,0 +1,28 @@
+# Template patches — capacity tuning that lives in CRs, not Helm values.
+# Applied by the hub-data-mysql Flux Kustomization after the distribution's own
+# patches and before the environment's. JSON 6902 is used where the target
+# sits inside a list (strategic merge would replace the whole list).
+- apiVersion: pxc.percona.com/v1
+  kind: PerconaXtraDBCluster
+  metadata:
+    name: mojaloop-db
+    namespace: data
+  spec:
+    pxc:
+      volumeSpec:
+        persistentVolumeClaim:
+          resources:
+            requests:
+              storage: 8Gi
+      # Full configuration block restated: it is a single opaque string, so a
+      # partial cannot merge into it.
+      configuration: |
+        [mysqld]
+        pxc_strict_mode=PERMISSIVE
+        default_authentication_plugin=mysql_native_password
+        wsrep_auto_increment_control=OFF
+        auto_increment_increment=1
+        auto_increment_offset=1
+        innodb_buffer_pool_size=512M
+        max_connections=2000
+        character_set_server=utf8

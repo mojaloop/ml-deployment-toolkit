@@ -1,0 +1,11 @@
+# Template patches — capacity tuning that lives in CRs, not Helm values.
+# Applied by the tooling-config Flux Kustomization after the distribution's own
+# patches and before the environment's. JSON 6902 is used where the target
+# sits inside a list (strategic merge would replace the whole list).
+- apiVersion: vault.banzaicloud.com/v1alpha1
+  kind: Vault
+  metadata:
+    name: vault
+    namespace: vault
+  spec:
+    size: 1

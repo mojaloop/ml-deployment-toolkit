@@ -1,0 +1,4 @@
+# Template overlay — asserts this capacity profile's tuning explicitly, so a
+# drift in the common defaults can never silently change a deployed profile.
+# Merged over the common layer via the <namespace>-<release>-values-template slot; the environment layer wins last.
+replicaCount: 1

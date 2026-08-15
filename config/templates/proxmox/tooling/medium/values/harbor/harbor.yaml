@@ -1,0 +1,9 @@
+# Template overlay — asserts this capacity profile's tuning explicitly, so a
+# drift in the common defaults can never silently change a deployed profile.
+# Merged over the common layer via the <namespace>-<release>-values-template slot; the environment layer wins last.
+persistence:
+  persistentVolumeClaim:
+    registry: { size: 20Gi }
+    database: { size: 2Gi }
+    redis: { size: 1Gi }
+    trivy: { size: 5Gi }

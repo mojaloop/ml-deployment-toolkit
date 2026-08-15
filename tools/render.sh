@@ -14,8 +14,10 @@
 # Merge semantics: Helm merges maps deep and REPLACES lists wholesale. yq v4's
 # `*` operator does exactly that — verified against a fixture:
 #   m1: {a: {list: [1,2], map: {x: 1}}}  m2: {a: {list: [9], map: {y: 2}}}
-#   yq eval-all '. as $item ireduce ({}; . * $item)' m1 m2
+#   yq eval-all 'explode(.) as $item ireduce ({}; . * $item)' m1 m2
 #     => {a: {list: [9], map: {x: 1, y: 2}}}   (list replaced, map deep-merged)
+# explode(.) resolves anchors/aliases first; every output is re-parsed as a
+# self-check before being counted.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -81,11 +83,15 @@ render_chain() {
     echo "# Substitution tokens (\${...}) are left in place: this render shows the"
     echo "# values chain, not the parameter resolution."
   } > "$dst"
+  # explode(.) resolves YAML anchors/aliases per input BEFORE merging — a merge
+  # can replace the node that carried an anchor while aliases to it survive in
+  # other branches, leaving a dangling `*alias` in the output otherwise.
   # shellcheck disable=SC2086  # inputs are repo paths without whitespace
-  if yq eval-all '. as $item ireduce ({}; . * $item)' $inputs >> "$dst" 2>/dev/null; then
+  if yq eval-all 'explode(.) as $item ireduce ({}; . * $item)' $inputs >> "$dst" 2>/dev/null \
+     && yq eval 'true' "$dst" >/dev/null 2>&1; then
     values_rendered=$((values_rendered+1))
   else
-    echo "FAIL values $tns/$rel: yq merge failed for:$inputs" >&2
+    echo "FAIL values $tns/$rel: merge failed or output unparseable for:$inputs" >&2
     rm -f "$dst"
     errors=$((errors+1))
   fi
