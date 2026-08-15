@@ -92,10 +92,13 @@ locals {
   # Placement is an adopter fact (which physical node each group lands on) and
   # lives beside config.yaml as placement.yaml — it drives both the VM side and
   # the node-labelling side, and it is the file adopters edit most.
+  # Condition inside yamldecode: both branches are strings, so the conditional
+  # type-unifies (the decoded object type cannot unify with object({})). NOT
+  # try(): a malformed placement.yaml must fail the plan loudly.
   placement_file = var.env_dir != "" ? "${var.env_dir}/placement.yaml" : ""
-  placement_doc = (
-    local.placement_file != "" && fileexists(local.placement_file)
-  ) ? yamldecode(file(local.placement_file)) : {}
+  placement_doc = yamldecode(
+    (local.placement_file != "" && fileexists(local.placement_file)) ? file(local.placement_file) : "{}"
+  )
   placement_map = try(local.placement_doc.placement, {})
 
   expanded_nodes = flatten([

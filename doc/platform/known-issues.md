@@ -29,3 +29,15 @@ make render-cilium CILIUM_VERSION=<version>   # after a Cilium bump
 ## See also
 
 Reconciliation emergencies — suspend/resume, forced reconciles, finding the earliest failure — are the operator's levers, owned by [Adopter → Operate → Troubleshooting](../adopter/operate/troubleshooting.md#flux-and-reconciliation). Deployment-time issues are in [Adopter → Deploy → Known issues](../adopter/deploy/known-issues.md); runtime issues in [Adopter → Operate → Known issues](../adopter/operate/known-issues.md).
+
+## Noted during the config-layering refactor (not refactor scope)
+
+- **talosconfig written world-readable.** `local_file.talosconfig`
+  (talos-gen-config module) uses `file_permission = "0777"`; the machine
+  secrets file next to it is already 0700. Should be 0600, same spirit as the
+  `state/` boundary. Pre-existing; untouched by the refactor.
+- **No plan-level type checking in the local gates.** `terraform validate`
+  runs without variable values, so value-dependent errors (e.g. conditional
+  branch type unification that depends on `fileexists()` of a real path) only
+  surface at `terraform plan`. A plan-strictness smoke check against a fixture
+  environment would close the gap.

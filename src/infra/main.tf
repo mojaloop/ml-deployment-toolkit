@@ -11,12 +11,17 @@ locals {
   # alone consumes: <env>/proxmox/proxmox.yaml (network_bridge, storage pools)
   # and <env>/talos.yaml (node nameservers, NTP). The template layer may also
   # carry proxmox/proxmox.yaml defaults; resolution is env > template > params.
+  # The condition sits INSIDE yamldecode so both branches are strings —
+  # `fileexists(...) ? yamldecode(...) : {}` fails type unification the moment
+  # the file exists (the decoded object type cannot unify with object({})).
+  # NOT try(): a malformed sidecar must fail the plan loudly, never be
+  # silently ignored.
   proxmox_env_file      = "${local.env_dir}/proxmox/proxmox.yaml"
-  proxmox_env           = fileexists(local.proxmox_env_file) ? yamldecode(file(local.proxmox_env_file)) : {}
+  proxmox_env           = yamldecode(fileexists(local.proxmox_env_file) ? file(local.proxmox_env_file) : "{}")
   proxmox_template_file = "${module.config.template_dir}/proxmox/proxmox.yaml"
-  proxmox_template      = fileexists(local.proxmox_template_file) ? yamldecode(file(local.proxmox_template_file)) : {}
+  proxmox_template      = yamldecode(fileexists(local.proxmox_template_file) ? file(local.proxmox_template_file) : "{}")
   talos_env_file        = "${local.env_dir}/talos.yaml"
-  talos_env             = fileexists(local.talos_env_file) ? yamldecode(file(local.talos_env_file)) : {}
+  talos_env             = yamldecode(fileexists(local.talos_env_file) ? file(local.talos_env_file) : "{}")
 
   # Per-pool Talos machine-config fragments: talos/<pool>.yaml in the selected
   # template directory (the shape), then in the environment (the instance),
