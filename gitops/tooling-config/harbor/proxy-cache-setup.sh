@@ -214,7 +214,7 @@ done
 
 echo ""
 echo "=== Proxy cache setup complete ==="
-echo "Pull-through mirrors available at harbor.${domain}:"
+echo "Pull-through mirrors available at harbor.${DOMAIN}:"
 echo "  docker.io       -> /docker-hub/<image>"
 echo "  ghcr.io         -> /ghcr/<image>"
 echo "  quay.io         -> /quay/<image>"

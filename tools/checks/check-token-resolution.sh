@@ -94,7 +94,10 @@ RESOLVABLE_COMMON=$(printf '%s\n%s\n%s\n%s\n%s\n' \
 # --- Scan gitops tokens ------------------------------------------------------
 # Emit "file:line:token" with $${...} escapes stripped first (escaped literals
 # reach the workload untouched — never substituted).
-refs=$(find gitops -type f \( -name '*.yaml' -o -name '*.yml' \) | sort | xargs awk '
+# ALL files: configMapGenerators inline non-YAML files (scripts) into ConfigMaps,
+# and post-build substitution runs over the BUILT output — every file in the
+# artifact is substitution surface.
+refs=$(find gitops -type f | sort | xargs awk '
   {
     line = $0
     gsub(/\$\$\{[^}]*\}/, "", line)
