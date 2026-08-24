@@ -4,9 +4,10 @@
 # permission per UI (granted through the opsui MojaloopRole) decides access.
 #
 # Auth: cookie_session only — machines have no business here. An
-# unauthenticated browser is sent to the Kratos login page by the global
-# errors.redirect handler (Accept: text/html); XHR calls keep getting 401
-# JSON through the fallback.
+# unauthenticated browser is sent to the Kratos login page by the redirect
+# error handler each rule declares (per-rule errors — this oathkeeper only
+# consults handlers listed on the rule; the global config carries their
+# `when`); XHR calls keep getting 401 JSON through the fallback.
 #
 # TTK note: the frontend talks to the backend over socket.io (websockets).
 # Oathkeeper's reverse proxy passes connection upgrades through; verify the
@@ -36,6 +37,12 @@ spec:
         }
   mutators:
     - handler: header
+  # Consulted PER RULE in this oathkeeper (rl.Errors) — the global
+  # errors.handlers config only supplies the handler's `when` (unauthorized +
+  # Accept: text/html) and the json fallback. Without this stanza no rule
+  # ever redirects.
+  errors:
+    - handler: redirect
   upstream:
     preserveHost: false
     url: http://moja-ml-testing-toolkit-frontend.mojaloop.svc.cluster.local:6060
@@ -64,6 +71,12 @@ spec:
         }
   mutators:
     - handler: header
+  # Consulted PER RULE in this oathkeeper (rl.Errors) — the global
+  # errors.handlers config only supplies the handler's `when` (unauthorized +
+  # Accept: text/html) and the json fallback. Without this stanza no rule
+  # ever redirects.
+  errors:
+    - handler: redirect
   upstream:
     preserveHost: false
     url: http://moja-ml-testing-toolkit-backend.mojaloop.svc.cluster.local:5050
@@ -92,6 +105,12 @@ spec:
         }
   mutators:
     - handler: header
+  # Consulted PER RULE in this oathkeeper (rl.Errors) — the global
+  # errors.handlers config only supplies the handler's `when` (unauthorized +
+  # Accept: text/html) and the json fallback. Without this stanza no rule
+  # ever redirects.
+  errors:
+    - handler: redirect
   upstream:
     preserveHost: false
     url: http://flux-operator.flux-system.svc.cluster.local:9080
@@ -120,6 +139,12 @@ spec:
         }
   mutators:
     - handler: header
+  # Consulted PER RULE in this oathkeeper (rl.Errors) — the global
+  # errors.handlers config only supplies the handler's `when` (unauthorized +
+  # Accept: text/html) and the json fallback. Without this stanza no rule
+  # ever redirects.
+  errors:
+    - handler: redirect
   upstream:
     preserveHost: false
     url: http://goldilocks-goldilocks-dashboard.goldilocks.svc.cluster.local:80
@@ -148,6 +173,12 @@ spec:
         }
   mutators:
     - handler: header
+  # Consulted PER RULE in this oathkeeper (rl.Errors) — the global
+  # errors.handlers config only supplies the handler's `when` (unauthorized +
+  # Accept: text/html) and the json fallback. Without this stanza no rule
+  # ever redirects.
+  errors:
+    - handler: redirect
   upstream:
     preserveHost: false
     url: http://hubble-ui.cilium.svc.cluster.local:80
