@@ -96,6 +96,15 @@ locals {
     r => upper("harbor_robot_${replace(replace(r, "-", "_"), ".", "_")}_secret")
   }
 
+  # Declared telemetry-ingest accounts (tooling only) each get an htpasswd
+  # entry in the obs-ingest front whose password follows the same pattern:
+  # OBS_INGEST_<NAME>_PASSWORD, overridable via the matching key in .env.
+  obs_ingest_declared_users = local.is_tooling ? var.observability.ingest_users : []
+  obs_ingest_password_names = {
+    for u in local.obs_ingest_declared_users :
+    u => upper("obs_ingest_${replace(replace(u, "-", "_"), ".", "_")}_password")
+  }
+
   generated_secret_names = setunion(
     local.is_tooling ? [
       "MINIO_ROOT_PASSWORD",
@@ -103,6 +112,7 @@ locals {
       "GRAFANA_ADMIN_PASSWORD",
     ] : [],
     values(local.minio_bucket_secret_names),
+    values(local.obs_ingest_password_names),
     local.is_hub ? [
       "MYSQL_ROOT_PASSWORD",
       "MYSQL_CENTRAL_LEDGER_PASSWORD",
@@ -151,6 +161,12 @@ locals {
   harbor_robots = [
     for r, name in local.harbor_robot_secret_names :
     { name = r, secret = local.generated_secrets[name] }
+  ]
+
+  # Provisioning payload for the obs-ingest htpasswd: [{name, password}, ...].
+  obs_ingest_users = [
+    for u, name in local.obs_ingest_password_names :
+    { name = u, password = local.generated_secrets[name] }
   ]
 }
 
@@ -300,6 +316,14 @@ resource "kubernetes_secret_v1" "cluster_secrets" {
       MINIO_ROOT_PASSWORD    = local.generated_secrets["MINIO_ROOT_PASSWORD"]
       HARBOR_ADMIN_PASSWORD  = local.generated_secrets["HARBOR_ADMIN_PASSWORD"]
       GRAFANA_ADMIN_PASSWORD = local.generated_secrets["GRAFANA_ADMIN_PASSWORD"]
+      # Telemetry-ingest accounts served by this cluster, declared under
+      # observability.ingest_users — one generated password each, which the
+      # pushing cluster copies from `make secrets` into its .env (same flow
+      # as the Harbor robots and MinIO buckets). base64 for the same reason
+      # as HARBOR_ROBOTS_JSON; always present ("W10=" = []) so the Vault
+      # seed and the obs-ingest ExternalSecret never fail with no users
+      # declared — an empty htpasswd denies everything, fail-closed.
+      OBS_INGEST_USERS_JSON = base64encode(jsonencode(local.obs_ingest_users))
       # Robot payload for the Harbor setup Job. base64 because it is
       # substituted into the data: field of a Secret manifest — quoting-proof
       # for JSON content. Always present ("W10=" = []) so substitution and the
@@ -332,6 +356,12 @@ resource "kubernetes_secret_v1" "cluster_secrets" {
       HYDRA_SECRETS_COOKIE          = local.generated_secrets["HYDRA_SECRETS_COOKIE"]
       BACKUP_S3_ACCESS_KEY          = lookup(local.s, "BACKUP_S3_ACCESS_KEY", "")
       BACKUP_S3_SECRET_KEY          = lookup(local.s, "BACKUP_S3_SECRET_KEY", "")
+      # Telemetry-push credentials: the ingest account declared for this hub
+      # on the Tooling Cluster (observability.ingest_users), password copied
+      # from `make secrets` there (obs_ingest_<name>_password) — or a
+      # third-party sink's credentials.
+      OBS_INGEST_USERNAME = lookup(local.s, "OBS_INGEST_USERNAME", "")
+      OBS_INGEST_PASSWORD = lookup(local.s, "OBS_INGEST_PASSWORD", "")
     } : {}
   )
 
@@ -831,6 +861,18 @@ locals {
 
 # Cross-field validation over .env credentials, which the config.yaml JSON
 # Schema cannot see — it is handed only config.yaml (see Makefile: validate).
+resource "terraform_data" "obs_ingest_validation" {
+  lifecycle {
+    precondition {
+      # Tooling generates its pair; a hub must carry copied credentials —
+      # empty values would leave the telemetry push unauthenticated and
+      # rejected once the open ingest routes are gone.
+      condition     = var.cluster_role != "hub" || (lookup(local.s, "OBS_INGEST_USERNAME", "") != "" && lookup(local.s, "OBS_INGEST_PASSWORD", "") != "")
+      error_message = "OBS_INGEST_USERNAME and OBS_INGEST_PASSWORD must both be set in a hub environment's .env. Username = the account declared for this hub on the Tooling Cluster under observability.ingest_users; password from make secrets ENV=<your-cc-env> -> obs_ingest_<name>_password. For a third-party sink, use that sink's credentials."
+    }
+  }
+}
+
 resource "terraform_data" "cert_validation" {
   lifecycle {
     precondition {

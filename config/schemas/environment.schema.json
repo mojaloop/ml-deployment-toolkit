@@ -340,7 +340,7 @@
       }
     },
     "observability": {
-      "description": "Telemetry push sink. No credential field exists yet, so these URLs must be reachable without authentication — a private network, or mTLS terminated at the gateway.",
+      "description": "Telemetry push sink. Push credentials OBS_INGEST_USERNAME/PASSWORD in .env; until clients send them (Alloy basic auth), the URLs must also be reachable without authentication — a private network, or mTLS terminated at the gateway.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -350,6 +350,24 @@
         "enabled": {
           "description": "Whether this cluster pushes logs, metrics and traces to an external sink. When true, all three URLs are required (enforced as a Terraform precondition, not by this schema).",
           "type": "boolean"
+        },
+        "ingest_users": {
+          "description": "tooling role only: telemetry-ingest accounts to provision in the obs-ingest front, one per pushing cluster (convention: name = the pushing cluster's cluster.name). The pusher authenticates as <name>; 'make secrets' prints the password. Independent of enabled — this cluster serves the sink rather than pushing to one. Additive and creation-only — removing an entry stops managing the account.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "description": "Ingest account name (lowercase alphanumeric, '.', '_' or '-' separators)",
+                "type": "string",
+                "pattern": "^[a-z0-9]+([._-][a-z0-9]+)*$"
+              }
+            }
+          }
         },
         "loki_url": {
           "description": "Loki push URL, stated outright — e.g. https://loki.example.com/loki/api/v1/push. Required when enabled is true.",

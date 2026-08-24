@@ -92,9 +92,10 @@ object_storage:
   bucket: "my-switch-backups"
   region: "us-east-1"
 
-# Telemetry push sink. Note: no credential field exists yet, so these must be
-# endpoints reachable without authentication (private network or mTLS at the
-# gateway) — managed backends requiring a token are not supported today.
+# Telemetry push sink. Push credentials OBS_INGEST_USERNAME/PASSWORD in .env —
+# the account declared for this hub on the Tooling Cluster under
+# observability.ingest_users (until clients send them, the URLs must also be
+# reachable without authentication).
 # All three URLs are required when enabled; set enabled: false to ship nothing.
 observability:
   enabled: true

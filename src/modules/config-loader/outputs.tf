@@ -123,11 +123,12 @@ output "object_storage" {
 }
 
 output "observability" {
-  description = "Telemetry push sink URLs (resolved)"
+  description = "Telemetry push sink URLs + served ingest accounts (resolved)"
   value = {
-    loki_url  = local.loki_url
-    mimir_url = local.mimir_url
-    tempo_url = local.tempo_url
+    loki_url     = local.loki_url
+    mimir_url    = local.mimir_url
+    tempo_url    = local.tempo_url
+    ingest_users = local.observability_ingest_users
   }
 }
 

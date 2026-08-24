@@ -229,6 +229,12 @@ locals {
   mimir_url            = local.observability_active ? try(local.config.observability.mimir_url, "") : ""
   tempo_url            = local.observability_active ? try(local.config.observability.tempo_url, "") : ""
 
+  # tooling role only: telemetry-ingest accounts served by the obs-ingest
+  # front, one per pushing cluster (it authenticates as <name>; the password
+  # is generated). Creation is additive — removing an entry stops managing
+  # the account.
+  observability_ingest_users = [for u in try(local.config.observability.ingest_users, []) : u.name]
+
   # --- cert (ACME) ----------------------------------------------------------
   # The directory URL is the provider identity — there is no provider enum, so
   # any current or future ACME CA is reachable by setting cert.server alone.
@@ -493,6 +499,21 @@ resource "terraform_data" "validation" {
     precondition {
       condition     = length(local.registry_robots) == length(distinct(local.registry_robots))
       error_message = "registry.robots contains duplicate names."
+    }
+    precondition {
+      condition     = length(local.observability_ingest_users) == 0 || local.cluster_role == "tooling"
+      error_message = "observability.ingest_users declares telemetry-ingest accounts to provision and is only valid on cluster.role 'tooling'; hub clusters consume one via OBS_INGEST_USERNAME/PASSWORD in .env."
+    }
+    precondition {
+      condition = alltrue([
+        for u in local.observability_ingest_users :
+        can(regex("^[a-z0-9]+([._-][a-z0-9]+)*$", u))
+      ])
+      error_message = "observability.ingest_users names must be lowercase alphanumeric with '.', '_' or '-' separators."
+    }
+    precondition {
+      condition     = length(local.observability_ingest_users) == length(distinct(local.observability_ingest_users))
+      error_message = "observability.ingest_users contains duplicate names."
     }
   }
 }

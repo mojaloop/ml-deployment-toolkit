@@ -77,8 +77,17 @@ object_storage:
   #   - name: "my-switch-backups"
 
 # Telemetry push sink — this cluster is the sink, so it ships nowhere else.
+# ingest_users: telemetry-ingest accounts for pushing clusters. Each pusher
+# authenticates as <name>; the password comes from `make secrets`
+# (obs_ingest_<name>_password). Convention: one account per pushing cluster,
+# named after its cluster.name. Creation only — removing an entry stops
+# managing the account.
 observability:
   enabled: false
+  # ingest_users is independent of enabled — this cluster serves the sink
+  # rather than pushing to one.
+  # ingest_users:
+  #   - name: "my-switch"
 
 # Transactional email (SMTP). Credentials SMTP_USER/SMTP_PASSWORD in .env.
 email:

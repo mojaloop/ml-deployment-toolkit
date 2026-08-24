@@ -86,11 +86,12 @@ variable "alerting" {
 }
 
 variable "observability" {
-  description = "Telemetry push sink URLs: loki_url, mimir_url, tempo_url"
+  description = "Telemetry push sink URLs (loki_url, mimir_url, tempo_url) + ingest_users, tooling-only: ingest accounts to provision in the obs-ingest front, each with a generated password."
   type = object({
-    loki_url  = string
-    mimir_url = string
-    tempo_url = string
+    loki_url     = string
+    mimir_url    = string
+    tempo_url    = string
+    ingest_users = list(string)
   })
 }
 

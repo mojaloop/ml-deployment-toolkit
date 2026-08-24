@@ -129,6 +129,16 @@ spec:
         data:
           data:
             grafanaAdminPassword: "${GRAFANA_ADMIN_PASSWORD}"
+      # Telemetry-ingest accounts (observability.ingest_users, one generated
+      # password each) — consumed by the obs-ingest ExternalSecret
+      # (tooling-observability), which renders one htpasswd entry per account
+      # for the authenticated ingest front. base64 JSON [{name, password}],
+      # like HARBOR_ROBOTS_JSON.
+      - type: kv
+        path: secret/data/obs-ingest
+        data:
+          data:
+            usersJson: "${OBS_INGEST_USERS_JSON}"
 
   # Persistent storage for Vault data
   volumeMounts:
