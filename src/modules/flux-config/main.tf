@@ -362,6 +362,15 @@ resource "kubernetes_secret_v1" "cluster_secrets" {
       # third-party sink's credentials.
       OBS_INGEST_USERNAME = lookup(local.s, "OBS_INGEST_USERNAME", "")
       OBS_INGEST_PASSWORD = lookup(local.s, "OBS_INGEST_PASSWORD", "")
+      # trace-bridge cannot set an Authorization header, but Node's
+      # http.request turns URL userinfo into basic auth — so it gets the
+      # tempo push URL pre-credentialed. Plain URL when no credentials are
+      # set (a userinfo of ":@" would break parsing).
+      OBS_TEMPO_PUSH_URL = (
+        lookup(local.s, "OBS_INGEST_USERNAME", "") != "" && lookup(local.s, "OBS_INGEST_PASSWORD", "") != ""
+        ? replace(var.observability.tempo_url, "https://", "https://${lookup(local.s, "OBS_INGEST_USERNAME", "")}:${lookup(local.s, "OBS_INGEST_PASSWORD", "")}@")
+        : var.observability.tempo_url
+      )
     } : {}
   )
 

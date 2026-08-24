@@ -6,6 +6,7 @@ resources:
   - kube-state-metrics-helmrelease.yaml
   - node-exporter-helmrelease.yaml
   - alloy-helmrelease.yaml
+  - obs-push-credentials-secret.yaml
 
 # Distribution values for each HelmRelease in this kustomization.
 # Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;

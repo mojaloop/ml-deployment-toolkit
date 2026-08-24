@@ -34,6 +34,22 @@ alloy:
   # instead of all pods scraping all targets (avoids duplicate metrics)
   clustering:
     enabled: true
+  # Telemetry-push basic auth (tooling obs-ingest front). Values file lands in
+  # a ConfigMap, so the credentials arrive as env vars from the
+  # obs-push-credentials Secret and the river config reads sys.env() —
+  # plaintext never enters the values. Rotation needs a pod restart (env vars
+  # are read at start).
+  extraEnv:
+    - name: OBS_INGEST_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: obs-push-credentials
+          key: username
+    - name: OBS_INGEST_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: obs-push-credentials
+          key: password
   # OTLP ingress for traces from Mojaloop pods instrumented by the
   # OpenTelemetry Operator. Must be declared here so the ports land on the
   # Alloy Service — otelcol.receiver.otlp below only opens them in the pod.
@@ -107,15 +123,16 @@ alloy:
         }
       }
 
-      // Remote write logs to Loki in ml-cc cluster
+      // Remote write logs to Loki in ml-cc cluster — authenticated push to
+      // the obs-ingest front; the .ext endpoint serves a public ACME cert,
+      // so TLS verifies normally.
       loki.write "default" {
         endpoint {
           url = "${LOKI_URL}"
 
-          // Skip TLS verification (both clusters in same network)
-          // TODO: Remove insecure_skip_verify when proper CA trust is configured
-          tls_config {
-            insecure_skip_verify = true
+          basic_auth {
+            username = sys.env("OBS_INGEST_USERNAME")
+            password = sys.env("OBS_INGEST_PASSWORD")
           }
         }
 
@@ -437,13 +454,16 @@ alloy:
         }
       }
 
-      // Remote write metrics to Mimir in ml-cc cluster
+      // Remote write metrics to Mimir in ml-cc cluster — authenticated push
+      // to the obs-ingest front; the .ext endpoint serves a public ACME
+      // cert, so TLS verifies normally.
       prometheus.remote_write "mimir" {
         endpoint {
           url = "${MIMIR_URL}"
 
-          tls_config {
-            insecure_skip_verify = true
+          basic_auth {
+            username = sys.env("OBS_INGEST_USERNAME")
+            password = sys.env("OBS_INGEST_PASSWORD")
           }
         }
 
@@ -626,6 +646,13 @@ alloy:
         }
       }
 
+      // Authenticated push to the obs-ingest front; otelcol clients take
+      // credentials via an auth extension, not inline basic_auth.
+      otelcol.auth.basic "obs_ingest" {
+        username = sys.env("OBS_INGEST_USERNAME")
+        password = sys.env("OBS_INGEST_PASSWORD")
+      }
+
       otelcol.exporter.otlphttp "tempo" {
         // tempo_url already ends in /v1/traces, so set traces_endpoint
         // explicitly — client.endpoint would have /v1/traces appended again.
@@ -633,13 +660,9 @@ alloy:
 
         client {
           endpoint = "${TEMPO_URL}"
-
-          tls {
-            // Matches the existing loki/mimir posture: cc serves internal
-            // certs that Alloy does not trust. Trusting the cc CA once would
-            // let all three signals verify properly — worthwhile follow-up.
-            insecure_skip_verify = true
-          }
+          auth     = otelcol.auth.basic.obs_ingest.handler
+          // The .ext endpoint serves a public ACME cert — TLS verifies
+          // normally (the old insecure_skip_verify posture is gone).
         }
       }
 

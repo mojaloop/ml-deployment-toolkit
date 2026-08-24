@@ -340,7 +340,7 @@
       }
     },
     "observability": {
-      "description": "Telemetry push sink. Push credentials OBS_INGEST_USERNAME/PASSWORD in .env; until clients send them (Alloy basic auth), the URLs must also be reachable without authentication — a private network, or mTLS terminated at the gateway.",
+      "description": "Telemetry push sink. Alloy authenticates its push with basic auth from OBS_INGEST_USERNAME/PASSWORD in .env and verifies TLS — the URLs must present a publicly-trusted certificate (the Tooling Cluster's .ext ingest hostnames do).",
       "type": "object",
       "additionalProperties": false,
       "required": [

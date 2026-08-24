@@ -33,6 +33,19 @@
 # Source: tools/trace-bridge/ in this repo.
 # Produces traces only when Mojaloop services run with EVENT_SDK TRACE: kafka
 # (gitops/hub-app/mojaloop/helmrelease.yaml eventSdkConfig) — idle otherwise.
+#
+# The push URL arrives pre-credentialed (basic auth as URL userinfo — the only
+# auth mechanism the bridge supports; Node's http.request converts userinfo to
+# an Authorization header). Credentialed, so it lives in a Secret.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: trace-bridge-push
+  namespace: mojaloop
+type: Opaque
+stringData:
+  otlp-url: "${OBS_TEMPO_PUSH_URL}"
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -59,9 +72,13 @@ spec:
             - name: TRACE_TOPIC
               value: topic-event-trace
             - name: OTLP_URL
-              value: "${TEMPO_URL}"
+              valueFrom:
+                secretKeyRef:
+                  name: trace-bridge-push
+                  key: otlp-url
+            # The .ext ingest endpoint serves a public ACME cert.
             - name: TLS_SKIP
-              value: "true"
+              value: "false"
           resources:
             requests:
               cpu: 25m

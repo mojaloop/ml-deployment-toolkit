@@ -72,6 +72,9 @@ METRICS_URL="${PERF_METRICS_URL-$(jq -r '.observability.metrics_url // ""' "$CON
 TRACES_URL="$(jq -r '.observability.traces_url // ""' "$CONFIG")"
 INSECURE="$(jq -r '.observability.insecure_skip_tls_verify // false' "$CONFIG")"
 
+# Push endpoints sit behind the tooling cluster's obs-ingest basic auth.
+load_obs_creds "$TOPO"
+
 # OPT-IN via SHIP_LOGS=1. k6 supports a single --log-output, so shipping to
 # Loki REPLACES stderr: errors stop appearing in your terminal. Default to
 # visible; ship only when the run is long enough to be unattended.
@@ -85,13 +88,20 @@ if [ -n "$METRICS_URL" ]; then
   export K6_PROMETHEUS_RW_TREND_STATS="${PERF_TREND_STATS:-p(50),p(90),p(95),p(99),avg,max}"
   export K6_PROMETHEUS_RW_PUSH_INTERVAL="${PERF_PUSH_INTERVAL:-5s}"
   export K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY="$INSECURE"
+  if [ -n "${OBS_INGEST_USERNAME:-}" ] && [ -n "${OBS_INGEST_PASSWORD:-}" ]; then
+    export K6_PROMETHEUS_RW_USERNAME="$OBS_INGEST_USERNAME"
+    export K6_PROMETHEUS_RW_PASSWORD="$OBS_INGEST_PASSWORD"
+  fi
   info "metrics -> $METRICS_URL (testid=$RUN_ID)"
 else
   info "metrics -> not pushed (set observability.metrics_url in the topology)"
 fi
 
 if [ -n "$LOGS_URL" ]; then
-  K6_OUT+=(--log-output "loki=${LOGS_URL}?label.testid=${RUN_ID}&label.scenario=${SCENARIO}&label.env=${ENV}")
+  # Credentials ride as URL userinfo — the only auth mechanism k6's loki
+  # output supports. The credentialed URL exists only in this process; the
+  # plain URL is what gets logged and archived.
+  K6_OUT+=(--log-output "loki=$(url_with_obs_creds "$LOGS_URL")?label.testid=${RUN_ID}&label.scenario=${SCENARIO}&label.env=${ENV}")
   info "logs    -> $LOGS_URL (testid=$RUN_ID; stderr is now silent)"
 fi
 

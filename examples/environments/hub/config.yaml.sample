@@ -92,16 +92,17 @@ object_storage:
   bucket: "my-switch-backups"
   region: "us-east-1"
 
-# Telemetry push sink. Push credentials OBS_INGEST_USERNAME/PASSWORD in .env —
-# the account declared for this hub on the Tooling Cluster under
-# observability.ingest_users (until clients send them, the URLs must also be
-# reachable without authentication).
+# Telemetry push sink. Alloy authenticates its push with basic auth from
+# OBS_INGEST_USERNAME/PASSWORD in .env — the account declared for this hub on
+# the Tooling Cluster under observability.ingest_users (or a third-party
+# sink's credentials). TLS is verified: the endpoints must present a
+# publicly-trusted certificate (the Tooling Cluster's .ext hostnames do).
 # All three URLs are required when enabled; set enabled: false to ship nothing.
 observability:
   enabled: true
-  loki_url: "https://loki.int.cc1.lab1.example.com/loki/api/v1/push"
-  mimir_url: "https://thanos.int.cc1.lab1.example.com/api/v1/receive"
-  tempo_url: "https://tempo.int.cc1.lab1.example.com/v1/traces"
+  loki_url: "https://loki.ext.cc1.lab1.example.com/loki/api/v1/push"
+  mimir_url: "https://thanos.ext.cc1.lab1.example.com/api/v1/receive"
+  tempo_url: "https://tempo.ext.cc1.lab1.example.com/v1/traces"
 
 # Data layer — per-store mode: in-cluster-managed | external-unmanaged
 # (external-managed is schema-reserved, not yet implemented)

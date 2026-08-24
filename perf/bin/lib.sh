@@ -200,6 +200,32 @@ capture_deployment() {
   done
 }
 
+# Basic-auth credentials for the tooling obs-ingest front (metrics and log
+# push). Resolution order: OBS_INGEST_USERNAME/PASSWORD already in the
+# process environment win; otherwise the pair is read from the .env sitting
+# next to the topology — the same file `make apply-config` consumes, so perf
+# needs no credential store of its own. Both may end up empty: telemetry
+# sinks are optional and an unauthenticated push simply gets a 401.
+load_obs_creds() {
+  local topo="$1" envf
+  envf="$(dirname "$topo")/.env"
+  if [ -z "${OBS_INGEST_USERNAME:-}" ] && [ -f "$envf" ]; then
+    OBS_INGEST_USERNAME="$(sed -n 's/^OBS_INGEST_USERNAME=//p' "$envf" | tail -1 | tr -d '"')"
+    OBS_INGEST_PASSWORD="$(sed -n 's/^OBS_INGEST_PASSWORD=//p' "$envf" | tail -1 | tr -d '"')"
+  fi
+}
+
+# k6's loki output takes credentials only as URL userinfo. Generated
+# passwords are alphanumeric; an .env override containing URL-reserved
+# characters would need percent-encoding here.
+url_with_obs_creds() {
+  if [ -n "${OBS_INGEST_USERNAME:-}" ] && [ -n "${OBS_INGEST_PASSWORD:-}" ]; then
+    printf '%s' "$1" | sed "s|^https://|https://${OBS_INGEST_USERNAME}:${OBS_INGEST_PASSWORD}@|"
+  else
+    printf '%s' "$1"
+  fi
+}
+
 # Where the generator ran belongs in the report: it is inside every latency
 # figure, and comparing runs from different vantage points is meaningless.
 generator_host() {

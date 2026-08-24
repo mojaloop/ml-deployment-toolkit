@@ -36,7 +36,9 @@ LOGS_URL=""
 [ "${SHIP_LOGS:-0}" = "1" ] && LOGS_URL="${PERF_LOGS_URL-$(jq -r '.observability.logs_url // ""' "$CONFIG")}"
 K6_LOG=()
 if [ -n "$LOGS_URL" ]; then
-  K6_LOG=(--log-output "loki=${LOGS_URL}?label.perf_step=seed&label.topology=${ENV}")
+  # obs-ingest basic auth as URL userinfo — see run.sh for the reasoning.
+  load_obs_creds "$TOPO"
+  K6_LOG=(--log-output "loki=$(url_with_obs_creds "$LOGS_URL")?label.perf_step=seed&label.topology=${ENV}")
   info "logs -> $LOGS_URL (stderr is now silent)"
   echo
 fi

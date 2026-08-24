@@ -105,6 +105,11 @@ participants:
 #            so shipping to Loki SILENCES YOUR TERMINAL. Off by default; turn
 #            it on for long unattended runs.
 #
+# Both pushed signals authenticate against the Tooling Cluster's obs-ingest
+# front. The credentials are NOT declared here: they are read from the .env
+# beside this file (OBS_INGEST_USERNAME/PASSWORD), overridable via the
+# same-named environment variables per invocation.
+#
 #   traces   NOT PUSHED. k6 emits no spans at all. It injects a traceparent
 #            header, and the spans are produced by the hub and DFSP services
 #            and collected by their own agents. This URL is recorded in the
