@@ -40,6 +40,12 @@ resources:
   - routes/simulator-httproute.yaml
   - routes/settlement-httproute.yaml
   - routes/tx-requests-httproute.yaml
+  # Platform UI routes, moved here from platform-config/talos: hub-only,
+  # because the tooling cluster has no IAM to gate them behind (operators
+  # port-forward there). On the hub they go behind oathkeeper next.
+  - routes/flux-httproute.yaml
+  - routes/goldilocks-httproute.yaml
+  - routes/hubble-httproute.yaml
 
 # Distribution values for each HelmRelease in this kustomization.
 # Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;

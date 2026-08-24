@@ -20,6 +20,20 @@ Grafana runs on the **Tooling Cluster**, at `https://grafana.int.<tooling-domain
 
 A Hub ships metrics, logs, and traces to the Tooling Cluster — it runs no Grafana of its own. A deployment without a Tooling Cluster has no aggregated dashboard; a Hub keeps running, but there is no central place to watch it.
 
+Telemetry ingest is authenticated: pushers reach `thanos`/`loki`/`tempo` on `.ext.<tooling-domain>` through the obs-ingest front with basic auth (accounts declared under `observability.ingest_users` on the Tooling Cluster; passwords from `make secrets`). The query APIs have no route at all — Grafana reads them in-cluster.
+
+### Platform UIs without routes (Tooling Cluster)
+
+The Tooling Cluster exposes only natively-authenticated UIs (Grafana, Harbor, MinIO, Vault). Flux, Goldilocks, and Hubble have no route there — it has no IAM stack to gate them behind. Reach them with a port-forward when needed:
+
+```bash
+kubectl -n flux-system   port-forward svc/flux-operator 9080:9080     # http://localhost:9080
+kubectl -n goldilocks    port-forward svc/goldilocks-goldilocks-dashboard 8081:80
+kubectl -n cilium        port-forward svc/hubble-ui 8082:80
+```
+
+On a Hub these three UIs stay routed on `gw-int` (behind the hub's SSO).
+
 ## Start here: Switch Overview
 
 Open the **Switch Overview** dashboard first. It is the intended landing page — a single view of the whole Hub, with drill-downs into everything else. When someone reports a problem, begin here, not in a service-specific dashboard.

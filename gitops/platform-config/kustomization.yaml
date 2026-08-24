@@ -3,6 +3,9 @@ kind: Kustomization
 resources:
   - gateway/gateway.yaml
   - gateway/gateway-ext.yaml
-  - flux-httproute.yaml
+  # The flux/goldilocks UI routes moved to hub-app/routes (hub-only): the
+  # tooling cluster has no IAM to gate them behind, so it exposes no UI
+  # routes without native auth — operators use kubectl port-forward there.
+  # The networkpolicy stays: it restricts flux-operator ingress to its UI
+  # port on every cluster, route or no route.
   - flux-networkpolicy.yaml
-  - goldilocks-httproute.yaml

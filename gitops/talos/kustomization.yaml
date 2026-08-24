@@ -6,7 +6,8 @@ resources:
   - cilium/helmrelease.yaml
   - lb-ipam/lb-ipam.yaml
   - openebs/helmrelease.yaml
-  - hubble-httproute.yaml
+  # hubble-httproute moved to hub-app/routes (hub-only): the tooling cluster
+  # has no IAM to gate it behind — operators use kubectl port-forward there.
 
 # Distribution values for each HelmRelease in this kustomization.
 # Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;

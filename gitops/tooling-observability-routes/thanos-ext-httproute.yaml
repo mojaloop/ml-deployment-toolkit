@@ -1,7 +1,6 @@
-# Authenticated metric ingest on the external gateway — the additive half of
-# the obs-ingest migration. Only the push paths are routed, through the
-# obs-ingest basic-auth front; the query API has no external route. The open
-# gw-int route (thanos-httproute.yaml) stays until every client pushes here.
+# Authenticated metric ingest on the external gateway. Only the push paths
+# are routed, through the obs-ingest basic-auth front; the query API has no
+# external route (grafana queries thanos-query in-cluster).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

@@ -1,12 +1,14 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
+  # grafana keeps its gw-int route: the UI carries its own auth (admin
+  # password, anonymous disabled). The open thanos/loki/tempo gw-int routes
+  # are gone — with them the unauthenticated ingest paths and the
+  # thanos-query/tempo:3200 query fallthroughs; nothing outside the cluster
+  # queries telemetry (grafana reads in-cluster), and every pusher now uses
+  # the authenticated gw-ext routes below.
   - grafana-httproute.yaml
-  - thanos-httproute.yaml
-  - loki-httproute.yaml
-  - tempo-httproute.yaml
-  # Authenticated ingest on gw-ext (obs-ingest front) — additive beside the
-  # gw-int routes above until every telemetry client is switched over.
+  # Authenticated ingest on gw-ext (obs-ingest front)
   - thanos-ext-httproute.yaml
   - loki-ext-httproute.yaml
   - tempo-ext-httproute.yaml
