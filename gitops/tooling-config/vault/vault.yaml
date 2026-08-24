@@ -129,6 +129,16 @@ spec:
         data:
           data:
             grafanaAdminPassword: "${GRAFANA_ADMIN_PASSWORD}"
+      # Telemetry-ingest basic auth — consumed by the obs-ingest ExternalSecret
+      # (tooling-observability), which renders the pair into an htpasswd file
+      # for the authenticated ingest front. Same pair every pushing cluster
+      # sets in its .env.
+      - type: kv
+        path: secret/data/obs-ingest
+        data:
+          data:
+            username: "${OBS_INGEST_USERNAME}"
+            password: "${OBS_INGEST_PASSWORD}"
 
   # Persistent storage for Vault data
   volumeMounts:

@@ -294,6 +294,13 @@ resource "kubernetes_secret_v1" "cluster_secrets" {
       SMTP_PASSWORD     = lookup(local.s, "SMTP_PASSWORD", "")
       # Grafana Telegram contact point tolerates a dummy token; empty breaks provisioning
       TELEGRAM_BOT_TOKEN = lookup(local.set_secrets, "TELEGRAM_BOT_TOKEN", "unset")
+      # Telemetry-ingest basic auth: ONE credential pair shared by the tooling
+      # cluster (serves the authenticated obs-ingest endpoints, htpasswd seeded
+      # through Vault) and every cluster that pushes telemetry to it (Alloy,
+      # k6, host pushers). The same values must be set in each environment's
+      # .env — the pair cannot be generated per-cluster.
+      OBS_INGEST_USERNAME = lookup(local.s, "OBS_INGEST_USERNAME", "")
+      OBS_INGEST_PASSWORD = lookup(local.s, "OBS_INGEST_PASSWORD", "")
     },
     local.is_tooling ? {
       MINIO_ROOT_USER        = lookup(local.set_secrets, "MINIO_ROOT_USER", "minioadmin")
@@ -831,6 +838,18 @@ locals {
 
 # Cross-field validation over .env credentials, which the config.yaml JSON
 # Schema cannot see — it is handed only config.yaml (see Makefile: validate).
+resource "terraform_data" "obs_ingest_validation" {
+  lifecycle {
+    precondition {
+      # Empty values would seed an htpasswd entry that accepts empty
+      # credentials — authentication in name only. Tooling serves the ingest
+      # endpoints and hub pushes to them; bare clusters do neither.
+      condition     = var.cluster_role == "bare" || (lookup(local.s, "OBS_INGEST_USERNAME", "") != "" && lookup(local.s, "OBS_INGEST_PASSWORD", "") != "")
+      error_message = "OBS_INGEST_USERNAME and OBS_INGEST_PASSWORD must both be set in .env: the tooling cluster serves authenticated telemetry ingest with them, and hub clusters authenticate their telemetry push with the same pair."
+    }
+  }
+}
+
 resource "terraform_data" "cert_validation" {
   lifecycle {
     precondition {
