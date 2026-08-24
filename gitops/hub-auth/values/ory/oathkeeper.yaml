@@ -98,8 +98,23 @@ oathkeeper:
           enabled: true
           config:
             verbose: true
+        # Browsers navigating to a protected UI without a session get the
+        # Kratos login page instead of raw 401 JSON. Scoped to unauthorized +
+        # Accept: text/html: XHR/API callers (json accepts) fall through to
+        # the json handler, and a logged-in user lacking permission still
+        # sees a 403 — redirecting forbidden would loop through login.
         redirect:
-          enabled: false
+          enabled: true
+          config:
+            to: https://auth.int.${DOMAIN}/login
+            code: 302
+            when:
+              - error:
+                  - unauthorized
+                request:
+                  header:
+                    accept:
+                      - text/html
 
     serve:
       proxy:

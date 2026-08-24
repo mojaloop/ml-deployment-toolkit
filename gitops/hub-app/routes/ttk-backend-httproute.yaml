@@ -11,6 +11,11 @@ spec:
   hostnames:
     - "ttk-backend.int.${DOMAIN}"
   rules:
+    # Through oathkeeper (cookie_session + Keto opsui permission) — the
+    # matching Rule in hub-app/ops-ui/oathkeeper-rules.yaml carries the
+    # upstream; this route only decides that NOTHING reaches the backend
+    # without passing the proxy.
     - backendRefs:
-        - name: moja-ml-testing-toolkit-backend
-          port: 5050
+        - name: oathkeeper-proxy
+          namespace: ory
+          port: 4455

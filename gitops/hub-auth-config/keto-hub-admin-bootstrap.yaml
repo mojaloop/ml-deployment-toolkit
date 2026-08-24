@@ -71,6 +71,8 @@ spec:
               seed_role audit
               seed_role mcmadmin
               seed_role clerk
+              # Operations UIs (ttk/flux/goldilocks/hubble) — hub-app/ops-ui
+              seed_role opsui
 
               echo "Hub admin Keto tuples seeded for identity $IDENTITY_ID."
           env:

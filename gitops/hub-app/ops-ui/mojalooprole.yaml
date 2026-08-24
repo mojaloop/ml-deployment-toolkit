@@ -1,0 +1,18 @@
+# Role → permission mapping for the operations UIs. The
+# security-role-perm-operator-svc (BOF chart) watches this CRD and writes
+#   permission:<perm>#granted@(role:opsui#member)
+# tuples; membership in the role is what the ops-ui oathkeeper rules check.
+# The hub admin is seeded into the role by keto-hub-admin-bootstrap
+# (hub-auth-config); grant further operators with a role:opsui#member tuple.
+apiVersion: mojaloop.io/v1
+kind: MojaloopRole
+metadata:
+  name: opsui
+  namespace: ory
+spec:
+  role: opsui
+  permissions:
+    - ttkUi
+    - fluxUi
+    - goldilocksUi
+    - hubbleUi

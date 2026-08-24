@@ -1,7 +1,6 @@
-# Moved here from the shared layers (P4 of the security baseline): only hub
-# clusters expose this UI on gw-int — the tooling cluster has no IAM to gate
-# it behind, so operators port-forward there. Next step (P5) routes this
-# through oathkeeper instead of straight to the backend.
+# Hub-only (moved from the shared layers in P4): the tooling cluster has no
+# IAM to gate this UI behind, so it exposes no route — operators
+# port-forward there. Here it rides oathkeeper (cookie_session + Keto).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -14,6 +13,11 @@ spec:
   hostnames:
     - "hubble.int.${DOMAIN}"
   rules:
+    # Through oathkeeper (cookie_session + Keto opsui permission) — the
+    # matching Rule in hub-app/ops-ui/oathkeeper-rules.yaml carries the
+    # upstream; this route only decides that NOTHING reaches the backend
+    # without passing the proxy.
     - backendRefs:
-        - name: hubble-ui
-          port: 80
+        - name: oathkeeper-proxy
+          namespace: ory
+          port: 4455
