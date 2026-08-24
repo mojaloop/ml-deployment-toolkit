@@ -5,3 +5,8 @@ resources:
   - thanos-httproute.yaml
   - loki-httproute.yaml
   - tempo-httproute.yaml
+  # Authenticated ingest on gw-ext (obs-ingest front) — additive beside the
+  # gw-int routes above until every telemetry client is switched over.
+  - thanos-ext-httproute.yaml
+  - loki-ext-httproute.yaml
+  - tempo-ext-httproute.yaml

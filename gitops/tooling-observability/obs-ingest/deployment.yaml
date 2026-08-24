@@ -1,0 +1,97 @@
+# obs-ingest — basic-auth front for the telemetry ingest endpoints exposed on
+# gw-ext (thanos/loki/tempo *.ext HTTPRoutes). The backends carry no auth of
+# their own (loki auth_enabled: false, thanos-receive and tempo OTLP are open),
+# so every path from outside the cluster passes through this proxy.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/component: ingest-gateway
+    app.kubernetes.io/instance: obs-ingest
+    app.kubernetes.io/name: obs-ingest
+  name: obs-ingest
+  namespace: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: ingest-gateway
+      app.kubernetes.io/instance: obs-ingest
+      app.kubernetes.io/name: obs-ingest
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: ingest-gateway
+        app.kubernetes.io/instance: obs-ingest
+        app.kubernetes.io/name: obs-ingest
+    spec:
+      containers:
+        # Debian-based unprivileged variant, deliberately: the htpasswd entry
+        # is bcrypt (see obs-ingest/externalsecret.yaml) and musl's crypt()
+        # cannot verify it — every request would 401 on an Alpine image.
+        - image: nginxinc/nginx-unprivileged:1.28.0
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 4
+            httpGet:
+              path: /healthz
+              port: 8080
+              scheme: HTTP
+            periodSeconds: 30
+          name: nginx
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            failureThreshold: 20
+            httpGet:
+              path: /healthz
+              port: 8080
+              scheme: HTTP
+            periodSeconds: 5
+          resources:
+            limits:
+              memory: 64Mi
+            requests:
+              cpu: 25m
+              memory: 32Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsGroup: 101
+            runAsNonRoot: true
+            runAsUser: 101
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+            - mountPath: /etc/nginx/conf.d
+              name: nginx-conf
+              readOnly: true
+            - mountPath: /etc/nginx/auth
+              name: htpasswd
+              readOnly: true
+            # The unprivileged image points pid and all temp paths at /tmp.
+            - mountPath: /tmp
+              name: tmp
+      nodeSelector:
+        kubernetes.io/os: linux
+      securityContext:
+        fsGroup: 101
+        runAsGroup: 101
+        runAsNonRoot: true
+        runAsUser: 101
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - configMap:
+            name: obs-ingest-nginx
+          name: nginx-conf
+        - name: htpasswd
+          secret:
+            secretName: obs-ingest-htpasswd
+        - emptyDir: {}
+          name: tmp
