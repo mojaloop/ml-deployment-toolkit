@@ -69,6 +69,8 @@ Include the **callback source address** — the address Hub callbacks present, f
 
 These are not secret, but they are not discoverable either — the hand-off is a real step. What the participant does with them is the Integration Toolkit's [integration guide](https://github.com/mojaloop/integration-toolkit/blob/main/doc/integration.md).
 
+**Onboarding an FXP:** there is no discovery endpoint to hand over. The FSPIOP `/services/{ServiceType}` API exists only in the thirdparty/PISP stack, which this deployment does not run, and `sdk-scheme-adapter` never calls it — each DFSP resolves which FXPs serve a currency pair from its own configuration (`GET_SERVICES_FXP_RESPONSE`). Onboarding an FXP therefore means telling the *other participants* to add it to that setting, alongside the FXP's own enrolment above.
+
 ## 3. Sign the certificate
 
 Once the participant starts their agent, it submits a certificate signing request and then waits. On the Hub side, a pending CSR appears in MCM.

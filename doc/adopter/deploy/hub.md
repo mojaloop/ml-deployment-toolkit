@@ -89,14 +89,14 @@ object_storage:
   region: "us-east-1"
 observability:
   enabled: true
-  loki_url: "https://loki.int.cc1.example.com/loki/api/v1/push"
-  mimir_url: "https://thanos.int.cc1.example.com/api/v1/receive"
-  tempo_url: "https://tempo.int.cc1.example.com/v1/traces"
+  loki_url: "https://loki.ext.cc1.example.com/loki/api/v1/push"
+  mimir_url: "https://thanos.ext.cc1.example.com/api/v1/receive"
+  tempo_url: "https://tempo.ext.cc1.example.com/v1/traces"
 ```
 
 All three sections are required, and so is `enabled` in each — set it to `false` to switch a service off. Nothing here is derived or defaulted ([ADR-017](../../architecture/decisions/017-explicit-capability-endpoints.md)): when a capability is enabled its endpoints must be written out in full, and `make plan-config` fails naming the missing field if they are not. That includes `object_storage.region`, which is part of the S3 signature rather than a formality.
 
-Credentials stay in `.env` — `OCI_PROXY_*` for the registry, `BACKUP_S3_*` for object storage. When the target is a Tooling Cluster, both accounts are declared there and scoped to this Hub: a pull-only robot under `registry.robots` (convention: this `cluster.name`; `OCI_PROXY_USERNAME` is `robot-<name>`) and a bucket under `object_storage.buckets` (convention: `<this cluster.name>-backups`; `BACKUP_S3_ACCESS_KEY` is the bucket name). Both passwords come from `make secrets ENV=<cc-env>` — see the [hand-off](tooling-cluster.md#hand-off-to-the-hub). The telemetry sink has no credential field yet, so those URLs must be reachable without authentication (a private network, or mTLS terminated at the gateway); managed backends that require a token are not supported today.
+Credentials stay in `.env` — `OCI_PROXY_*` for the registry, `BACKUP_S3_*` for object storage, `OBS_INGEST_*` for the telemetry push. When the target is a Tooling Cluster, all three accounts are declared there and scoped to this Hub: a pull-only robot under `registry.robots` (convention: this `cluster.name`; `OCI_PROXY_USERNAME` is `robot-<name>`), a bucket under `object_storage.buckets` (convention: `<this cluster.name>-backups`; `BACKUP_S3_ACCESS_KEY` is the bucket name), and an ingest account under `observability.ingest_users` (convention: this `cluster.name`; `OBS_INGEST_USERNAME` is the account name). All three passwords come from `make secrets ENV=<cc-env>` — see the [hand-off](tooling-cluster.md#hand-off-to-the-hub). The telemetry push authenticates with basic auth and verifies TLS, so a third-party sink works too — set that sink's credentials in `OBS_INGEST_*` and its URLs above; it must present a publicly-trusted certificate.
 
 The Harbor proxy is a Talos-level registry mirror, transparent to the workloads.
 

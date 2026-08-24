@@ -52,7 +52,7 @@ Two details are non-obvious:
 
 ## Authorization model
 
-Permissions are relationship tuples in Keto, defined as code rather than configured per deployment. Twelve roles ship as `MojaloopRole` resources: `operator`, `manager`, `clerk`, `financemanager`, `dfspreconciliationreports`, `audit`, `mta`, `pta`, `everyone`, `dfsp`, `mcmadmin`, and `techops-admin`.
+Permissions are relationship tuples in Keto, defined as code rather than configured per deployment. Fourteen roles ship as `MojaloopRole` resources: `operator`, `manager`, `clerk`, `financemanager`, `dfspreconciliationreports`, `audit`, `mta`, `pta`, `everyone`, `dfsp`, `mcmadmin`, `techops-admin`, plus two the toolkit adds — `opsui` (the operations UIs: TTK, Flux, Goldilocks, Hubble, all routed through Oathkeeper on `gw-int`) and `intapi` (operator machine clients on `gw-intapi`; membership is written per Hydra `client_id`, which is what keeps a DFSP's MCM machine client out of the operator APIs).
 
 The Hub itself is an object in the permission graph, named by `hub_participant_name` (default `Hub`). That single value is simultaneously the scheme ID, the Keto Hub object, and the onboarding participant name — they must agree.
 

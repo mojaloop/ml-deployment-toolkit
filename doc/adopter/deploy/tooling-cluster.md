@@ -151,13 +151,15 @@ A Hub reaches this cluster through three endpoints it names in its own config �
 |---------|----------|
 | Registry | `harbor.int.<this cluster's domain>` |
 | Backup S3 | `https://s3.int.<domain>` |
-| Metrics | `https://thanos.int.<domain>/api/v1/receive` |
-| Logs | `https://loki.int.<domain>/loki/api/v1/push` |
-| Traces | `https://tempo.int.<domain>/v1/traces` |
+| Metrics | `https://thanos.ext.<domain>/api/v1/receive` |
+| Logs | `https://loki.ext.<domain>/loki/api/v1/push` |
+| Traces | `https://tempo.ext.<domain>/v1/traces` |
+
+The telemetry endpoints live on `gw-ext` behind basic auth (the obs-ingest front): only the push paths are routed, the query APIs have no route at all, and the `.ext` wildcard certificate is publicly trusted so pushers verify TLS. Anything pushing here authenticates as an ingest account declared under `observability.ingest_users` below.
 
 Write them into the Hub's `registry`, `object_storage`, and `observability` sections — see [Hub → Supporting services](hub.md#supporting-services). Each endpoint is stated outright; there is no shorthand that derives them from this cluster's domain ([ADR-017](../../architecture/decisions/017-explicit-capability-endpoints.md)).
 
-Give each Hub its own registry account and backup bucket by declaring them here, named after the Hub's `cluster.name`:
+Give each Hub its own registry account, backup bucket, and telemetry-ingest account by declaring them here, named after the Hub's `cluster.name`:
 
 ```yaml
 registry:
@@ -166,11 +168,14 @@ registry:
 object_storage:
   buckets:
     - name: "my-switch-backups"
+observability:
+  ingest_users:
+    - name: "my-switch"
 ```
 
-Each declared robot is created in Harbor as a pull-only account (`robot-<name>`) with a generated secret, so a Hub never holds the Harbor admin credential. Each declared bucket is created in MinIO with a generated user scoped to that one bucket, so a Hub's credentials cannot touch another Hub's backups — see [Configuration → A Tooling Cluster, annotated](configuration.md#a-tooling-cluster-annotated). Both are additive and creation-only: removing an entry stops managing it but deletes nothing.
+Each declared robot is created in Harbor as a pull-only account (`robot-<name>`) with a generated secret, so a Hub never holds the Harbor admin credential. Each declared bucket is created in MinIO with a generated user scoped to that one bucket, so a Hub's credentials cannot touch another Hub's backups — see [Configuration → A Tooling Cluster, annotated](configuration.md#a-tooling-cluster-annotated). Each declared ingest account becomes one htpasswd entry in the obs-ingest front, so a pusher's credential can be revoked without touching any other pusher's. All three are additive and creation-only: removing an entry stops managing it but deletes nothing.
 
-Two credentials do have to travel, because they are generated here and supplied there:
+Three credentials have to travel, because they are generated here and supplied there:
 
 ```bash
 make secrets ENV=<tooling-env>
@@ -180,10 +185,22 @@ make secrets ENV=<tooling-env>
 |---------------------|---------------------------|
 | `OCI_PROXY_USERNAME` / `OCI_PROXY_PASSWORD` | `robot-<name>` / `HARBOR_ROBOT_<NAME>_SECRET` |
 | `BACKUP_S3_ACCESS_KEY` / `BACKUP_S3_SECRET_KEY` | `<bucket name>` / `MINIO_BUCKET_<NAME>_SECRET_KEY` |
+| `OBS_INGEST_USERNAME` / `OBS_INGEST_PASSWORD` | `<ingest user name>` / `OBS_INGEST_<NAME>_PASSWORD` |
 
-With no declared robots or buckets, the fallbacks are the shared credentials — `admin` / `HARBOR_ADMIN_PASSWORD` for the registry, and the `backups` system bucket with `minioadmin` / `MINIO_ROOT_PASSWORD` for S3. Workable for a single Hub, but admin credentials in a Hub's `.env` are exactly what the scoped accounts exist to avoid.
+With no declared robots or buckets, the fallbacks are the shared credentials — `admin` / `HARBOR_ADMIN_PASSWORD` for the registry, and the `backups` system bucket with `minioadmin` / `MINIO_ROOT_PASSWORD` for S3. Workable for a single Hub, but admin credentials in a Hub's `.env` are exactly what the scoped accounts exist to avoid. Telemetry ingest has no fallback at all: with no `ingest_users` declared, the htpasswd is empty and every push is refused — declare an account per pusher.
 
 Carry those into [Deploy a Hub → Configuration](hub.md#configuration).
+
+### Host metric pushers (e.g. Proxmox)
+
+Anything else that pushes telemetry here follows the same flow: declare an ingest account for it, apply, read its password from `make secrets`. For Proxmox's built-in OpenTelemetry metric server (**Datacenter → Metric Server** in the PVE GUI, one per datacenter — convention: name the account after the datacenter):
+
+1. Declare the account (e.g. `ingest_users: [{name: "site0pve"}]`) and `make apply-config ENV=<tooling-env>`.
+2. `make secrets ENV=<tooling-env>` → `OBS_INGEST_SITE0PVE_PASSWORD`, then build the header value:
+   `printf '%s' 'site0pve:<password>' | base64`
+3. In the PVE form: **Server** `thanos.ext.<domain>`, **Port** `443`, **Protocol** HTTPS, **Path** `/api/v1/otlp`, **Verify SSL** on (the `.ext` certificate is publicly trusted), and under Advanced, **HTTP Headers (JSON)**:
+   `{ "Authorization": "Basic <base64 from step 2>" }`
+4. Verify: the Proxmox-hosts Grafana dashboard keeps receiving data; an unauthenticated `curl -X POST https://thanos.ext.<domain>/api/v1/otlp` returns 401.
 
 ## After deploying
 

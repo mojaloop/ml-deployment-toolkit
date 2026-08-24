@@ -39,9 +39,10 @@ gitops/
 
   tooling/                        # Tooling Cluster: namespaces, Vault operator
   tooling-config/                 #   Vault, Harbor, MinIO
-  tooling-routes/                 #   HTTPRoutes
-  tooling-observability/          #   Thanos, Loki, Tempo, Grafana, dashboards, alerts
-  tooling-observability-routes/   #   HTTPRoutes
+  tooling-routes/                 #   HTTPRoutes (natively-authed UIs)
+  tooling-observability/          #   Thanos, Loki, Tempo, Grafana, dashboards,
+                                  #   alerts, obs-ingest auth front
+  tooling-observability-routes/   #   HTTPRoutes (grafana + gw-ext ingest)
 
   hub/                       # Hub: namespaces, database operators
   hub-data/                  #   One root per store: common/, mysql/, kafka/,
@@ -49,7 +50,7 @@ gitops/
   hub-auth/                  #   Vault, Ory (Kratos, Hydra, Keto, Oathkeeper)
   hub-auth-config/           #   Bootstrap jobs, Oathkeeper maester seed
   hub-app/                   #   Mojaloop, MCM, Finance Portal, extapi Envoy,
-                             #   Oathkeeper access rules
+                             #   Oathkeeper access rules (apps, ops UIs, intapi)
   hub-observability-agent/   #   Alloy, kube-state-metrics, node-exporter
 ```
 

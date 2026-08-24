@@ -27,6 +27,8 @@ A Hub runs **no Grafana, no Prometheus, no Loki, and no Tempo.** It runs agents 
 
 Several Hubs report into one Tooling Cluster. Series are tagged by cluster, which is why alerts group on cluster name as well as alert name.
 
+The ingest path is authenticated. Pushers reach `thanos`/`loki`/`tempo` on `.ext.<tooling-domain>` — publicly-trusted ACME certificate, TLS verified — where an nginx front (`obs-ingest`, in the observability namespace) enforces basic auth before anything touches the backends, which carry no auth of their own. One ingest account is declared per pusher under `observability.ingest_users` on the Tooling Cluster (password generated, printed by `make secrets`), so a single pusher can be revoked without rotating the rest. Only the push paths are routed; the query APIs have no route on any gateway — Grafana reads Thanos, Loki, and Tempo in-cluster.
+
 ## Metrics
 
 Grafana Alloy scrapes each Hub and remote-writes to Thanos on the Tooling Cluster, where four components divide the work: **receive** ingests, **query** serves reads, **store** reads historical blocks from object storage, and **compact** downsamples.

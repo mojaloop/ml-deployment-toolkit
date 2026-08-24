@@ -116,7 +116,7 @@ State and generated artifacts land under `../artifacts/<env>/` — a sibling of 
 | `artifact` | no | `url`, `version` (a pinned `vX.Y.Z` tag — `latest` is rejected by the schema), `active` — the gitops OCI artifact Flux reconciles | none — no Kustomizations created; `active` defaults to true once `url` is set |
 | `registry` | yes | `enabled` + `url`; on a Tooling Cluster also `robots[]` | — |
 | `object_storage` | yes | `enabled` + `endpoint`, `bucket`, `region`; on a Tooling Cluster also `buckets[]` | — |
-| `observability` | yes | `enabled` + `loki_url`, `mimir_url`, `tempo_url` | — |
+| `observability` | yes | `enabled` + `loki_url`, `mimir_url`, `tempo_url`; on a Tooling Cluster also `ingest_users[]` | — |
 | `data` | no (Hub only) | per store: `in-cluster-managed`, `external-unmanaged`, `external-managed` (reserved) + `host`/`port` for external modes | `in-cluster-managed` |
 | `email` | no | SMTP relay for transactional mail — `host`, `port`, `from` | off |
 | `alerting` | no | Grafana contact points — `email.to`, `telegram.chat_id` | off |
@@ -184,6 +184,8 @@ object_storage:
 
 observability:
   enabled: false                      # the telemetry backend lives here too
+  ingest_users:                       # ingest accounts to serve — see below
+    - name: "my-switch"
 
 email:                                # transactional SMTP; credentials in .env
   host: "smtp.example.com"
@@ -276,9 +278,10 @@ object_storage:
 
 observability:
   enabled: true
-  loki_url: "https://loki.int.cc1.lab1.example.com/loki/api/v1/push"
-  mimir_url: "https://thanos.int.cc1.lab1.example.com/api/v1/receive"
-  tempo_url: "https://tempo.int.cc1.lab1.example.com/v1/traces"
+  # Authenticated push (basic auth, OBS_INGEST_* in .env; TLS verified)
+  loki_url: "https://loki.ext.cc1.lab1.example.com/loki/api/v1/push"
+  mimir_url: "https://thanos.ext.cc1.lab1.example.com/api/v1/receive"
+  tempo_url: "https://tempo.ext.cc1.lab1.example.com/v1/traces"
 
 data:
   mysql:
@@ -431,7 +434,7 @@ Read them back on demand:
 make secrets ENV=<env>
 ```
 
-That is also how a Hub's `.env` gets its Tooling Cluster credentials: `make secrets ENV=<tooling-env>` prints one `HARBOR_ROBOT_<NAME>_SECRET` per robot declared under `registry.robots`, which becomes the Hub's `OCI_PROXY_PASSWORD` (its `OCI_PROXY_USERNAME` is `robot-<name>`), and one `MINIO_BUCKET_<NAME>_SECRET_KEY` per bucket declared under `object_storage.buckets`, which becomes the Hub's `BACKUP_S3_SECRET_KEY` (its `BACKUP_S3_ACCESS_KEY` is the bucket name). In both generated names, hyphens and dots in `<NAME>` become underscores. A Tooling Cluster with nothing declared falls back to the shared credentials — `admin` / `HARBOR_ADMIN_PASSWORD` and `minioadmin` / `MINIO_ROOT_PASSWORD` — workable, but admin credentials in a Hub's `.env` are exactly what the scoped accounts exist to avoid.
+That is also how a Hub's `.env` gets its Tooling Cluster credentials: `make secrets ENV=<tooling-env>` prints one `HARBOR_ROBOT_<NAME>_SECRET` per robot declared under `registry.robots`, which becomes the Hub's `OCI_PROXY_PASSWORD` (its `OCI_PROXY_USERNAME` is `robot-<name>`), one `MINIO_BUCKET_<NAME>_SECRET_KEY` per bucket declared under `object_storage.buckets`, which becomes the Hub's `BACKUP_S3_SECRET_KEY` (its `BACKUP_S3_ACCESS_KEY` is the bucket name), and one `OBS_INGEST_<NAME>_PASSWORD` per account declared under `observability.ingest_users`, which becomes the Hub's `OBS_INGEST_PASSWORD` (its `OBS_INGEST_USERNAME` is the account name). In the generated names, hyphens and dots in `<NAME>` become underscores. A Tooling Cluster with nothing declared falls back to the shared credentials — `admin` / `HARBOR_ADMIN_PASSWORD` and `minioadmin` / `MINIO_ROOT_PASSWORD` — workable, but admin credentials in a Hub's `.env` are exactly what the scoped accounts exist to avoid.
 
 **Supplied in `.env`.** Only credentials that exist outside the deployment:
 
@@ -620,7 +623,7 @@ Cross-field rules the schema cannot express are Terraform preconditions on the c
 | `registry.enabled: true` without `registry.url` | An enabled capability must carry its parameters |
 | `object_storage.enabled: true` without all of `endpoint`, `bucket`, `region` | As above — none of the three is defaulted |
 | `observability.enabled: true` without all of `loki_url`, `mimir_url`, `tempo_url` | As above |
-| `object_storage.buckets` or `registry.robots` outside `role: tooling` | Serving buckets and robot accounts is what a Tooling Cluster does; a Hub consumes them |
+| `object_storage.buckets`, `registry.robots`, or `observability.ingest_users` outside `role: tooling` | Serving buckets, robot accounts, and ingest accounts is what a Tooling Cluster does; a Hub consumes them |
 | A declared bucket re-states a system bucket, breaks S3 naming rules, or repeats | The system buckets (`harbor`, `backups`, `thanos`, `loki`, `tempo`) always exist; names must be valid and unique |
 | A declared robot name breaks the naming pattern or repeats | Robot names become Harbor accounts (`robot-<name>`) and secret names |
 | One of `ACME_EAB_KEY_ID` / `ACME_EAB_HMAC_ENCODED` without the other | EAB is both-or-neither; this one fails at `make plan-config`, in the config stack |

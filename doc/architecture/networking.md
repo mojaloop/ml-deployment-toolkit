@@ -32,30 +32,28 @@ A Tooling Cluster uses only `gw-int` and `gw-ext`, hosting its own services rath
 
 ### `gw-int` — internal operations
 
-| Host | Service |
-|------|---------|
-| `mcm.int` | Connection Manager UI and API — HubOps onboarding |
-| `finance-portal.int` | Finance Portal |
-| `auth.int` | Kratos self-service — login, recovery, account settings |
-| `vault.int` | Vault UI |
-| `flux.int` | Flux Operator UI |
-| `hubble.int` | Cilium Hubble network observability |
-| `goldilocks.int` | Resource recommendations |
-| `ttk.int`, `ttk-backend.int` | Testing Toolkit |
-| `settlement.int` | Settlement API |
-| `tx-requests.int` | Transaction requests API |
+Every host on `gw-int` is authenticated: natively (Grafana, Harbor, MinIO, Vault, Kratos), or through Oathkeeper (session cookie + Keto permission — the route's backend is `oathkeeper-proxy`, and the matching Rule carries the upstream).
 
-On a Tooling Cluster: `harbor.int`, `minio.int`, `s3.int`, `grafana.int`, `loki.int`, `tempo.int`, `thanos.int`.
+| Host | Service | Auth |
+|------|---------|------|
+| `mcm.int` | Connection Manager UI and API — HubOps onboarding | Oathkeeper |
+| `finance-portal.int` | Finance Portal | Oathkeeper (API routes) |
+| `auth.int` | Kratos self-service — login, recovery, account settings | Kratos itself |
+| `vault.int` | Vault UI | Vault itself |
+| `flux.int` | Flux Operator UI | Oathkeeper (`opsui` role) |
+| `hubble.int` | Cilium Hubble network observability | Oathkeeper (`opsui` role) |
+| `goldilocks.int` | Resource recommendations | Oathkeeper (`opsui` role) |
+| `ttk.int`, `ttk-backend.int` | Testing Toolkit | Oathkeeper (`opsui` role) |
 
-### `gw-intapi` — machine APIs without mTLS
+On a Tooling Cluster only the natively-authenticated UIs are routed: `harbor.int`, `minio.int`, `s3.int`, `grafana.int`. Flux, Goldilocks, and Hubble have no route there (no IAM stack to gate them) — operators use `kubectl port-forward`. The observability backends have no `gw-int` route at all; ingest lives on `gw-ext` (below) and Grafana queries them in-cluster.
 
-`gw-intapi` carries cluster APIs consumed by the scheme's and participants' own tooling — test harnesses, provisioning scripts, back-office integrations — over server TLS without a client certificate. Today that is a single host, `intapi.int`, exposing the same FSPIOP paths as the participant endpoint.
+### `gw-intapi` — operator machine APIs (OAuth2)
 
-Anything that can reach it can transact as any participant — which is exactly why it sits on its own gateway with its own dedicated address rather than riding on `gw-int`: it can (and should) be firewalled independently of the ops UIs. It shares `gw-int`'s wildcard certificate.
+`gw-intapi` carries cluster APIs consumed by the scheme's own tooling — test harnesses, provisioning scripts, back-office integrations — over server TLS without a client certificate. A single host, `intapi.int`, routes everything through Oathkeeper: callers present a Hydra client-credentials token (`hydra.ext`), and Keto authorizes the client (`intapi` role — membership is granted per `client_id`, so a DFSP's MCM machine client has no access here). Settlement rides this host as a path prefix (`/settlements`, `/settlementWindows`, `/settlementModels`); the FSPIOP mirror prefixes remain part of the surface, behind the same OAuth2 gate.
+
+It still sits on its own gateway with its own dedicated address so it can be firewalled independently of the ops UIs, and it shares `gw-int`'s wildcard certificate.
 
 ### `gw-ext` — external parties
-
-Exactly two hosts:
 
 | Host | Service |
 |------|---------|
@@ -63,6 +61,8 @@ Exactly two hosts:
 | `hydra.ext` | OAuth2 token endpoint and JWKS |
 
 Participants authenticate at `hydra.ext` and manage their enrolment through `mcm.ext`.
+
+On a Tooling Cluster, `gw-ext` additionally serves the telemetry ingest hosts — `thanos.ext`, `loki.ext`, `tempo.ext` — routing only the push paths through the obs-ingest basic-auth front (accounts declared under `observability.ingest_users`). Query APIs get no route; the `.ext` wildcard is a publicly-trusted ACME certificate, so pushers verify TLS.
 
 > **Target state.** Participants — human and machine — reach MCM through `gw-ext`; `gw-int` is for in-house HubOps only. The MCM UI and Kratos self-service currently resolve to `.int` hosts, so account activation is performed on the Hub side today.
 
@@ -112,7 +112,7 @@ Setting `wan` on a pool declares that the border firewall 1:1-DNATs that outside
 
 `external-dns` watches HTTPRoutes and Services and reconciles records automatically. The operator never pre-creates records for Hub services — hand-created records cause ownership conflicts.
 
-Every record is a **per-host A record**: one for each HTTPRoute hostname (`mcm.int.${DOMAIN}`, `settlement.int.${DOMAIN}`, …) pointing at its gateway's address, and one for the FSPIOP endpoint from the annotation on its Service. There are no wildcard DNS records — the wildcards exist only as certificate names.
+Every record is a **per-host A record**: one for each HTTPRoute hostname (`mcm.int.${DOMAIN}`, `intapi.int.${DOMAIN}`, …) pointing at its gateway's address, and one for the FSPIOP endpoint from the annotation on its Service. There are no wildcard DNS records — the wildcards exist only as certificate names.
 
 Note that `extapi.${DOMAIN}` sits at the apex level, not under `.int` or `.ext`.
 
