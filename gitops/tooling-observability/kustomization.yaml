@@ -25,6 +25,9 @@ resources:
   # Grafana SMTP credentials (chart smtp.existingSecret)
   - grafana/smtp-secret.yaml
 
+  # Secret half of the grafana distribution values (admin password)
+  - grafana/values-secret.yaml
+
   # Grafana Alerting — contact points (Secret), policy and rules (ConfigMaps)
   - grafana/alerting/contact-points.yaml
   - grafana/alerting/notification-policy.yaml

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Usage: check-secret-placement.sh — forbid secret-named substitution tokens (Makefile SECRET_KEYS or *PASSWORD/SECRET/TOKEN/KEY_ID/ACCESS_KEY/API_TOKEN*) inside ConfigMap documents in gitops/.
+# Usage: check-secret-placement.sh — forbid secret-named substitution tokens (Makefile SECRET_KEYS or *PASSWORD/SECRET/TOKEN/KEY_ID/ACCESS_KEY/API_TOKEN*) inside ConfigMap documents in gitops/, AND inside any file a configMapGenerator inlines (the generator builds a ConfigMap out of it, which the document scan cannot see).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -69,6 +69,34 @@ while IFS= read -r f; do
     fi
   done
 done < <(find gitops -type f \( -name '*.yaml' -o -name '*.yml' \) | sort)
+
+# --- configMapGenerator inputs ----------------------------------------------
+# kustomize inlines these files into ConfigMaps at build time, so a secret
+# token inside one lands in a ConfigMap without any ConfigMap document
+# appearing in the repo. Secret-bearing distribution values belong in the
+# handwritten *-values-secret Secrets (stringData — a secretGenerator would
+# base64 the content and hide the tokens from post-build substitution).
+while IFS= read -r kz; do
+  dir=$(dirname "$kz")
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    rel="${spec#*=}"
+    src="$dir/$rel"
+    [ -f "$src" ] || continue
+    toks=$(sed 's/\$\${[^}]*}//g' "$src" \
+            | grep -oE '\$\{[A-Z][A-Z0-9_]*\}' \
+            | sed -e 's/^\${//' -e 's/}$//' | sort -u) || true
+    for tok in $toks; do
+      if is_secret_name "$tok"; then
+        hits=$(sed 's/\$\${[^}]*}//g' "$src" | grep -nF "\${$tok}" | cut -d: -f1 || true)
+        for ln in ${hits:-1}; do
+          echo "$src:$ln: secret-named token \${$tok} in a configMapGenerator input ($kz) — the generator inlines this file into a ConfigMap; move the key into the release's *-values-secret Secret"
+          findings=$((findings+1))
+        done
+      fi
+    done
+  done < <(yq -r '.configMapGenerator[]?.files[]?' "$kz" 2>/dev/null)
+done < <(find gitops -name kustomization.yaml | sort)
 
 if [ "$findings" -gt 0 ]; then
   echo "check-secret-placement: $findings finding(s)"

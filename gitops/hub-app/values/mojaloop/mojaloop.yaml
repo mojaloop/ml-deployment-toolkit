@@ -23,7 +23,6 @@ centralledger:
       db_host: "${MYSQL_HOST}"
       db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     init:
       enabled: true
@@ -108,7 +107,6 @@ centralledger:
       db_host: "${MYSQL_HOST}"
       db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
@@ -121,7 +119,6 @@ centralledger:
       db_host: "${MYSQL_HOST}"
       db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
@@ -135,7 +132,6 @@ centralledger:
       db_host: "${MYSQL_HOST}"
       db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
@@ -151,7 +147,6 @@ centralledger:
       db_host: "${MYSQL_HOST}"
       db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
@@ -165,7 +160,6 @@ centralledger:
       db_host: "${MYSQL_HOST}"
       db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
@@ -181,7 +175,6 @@ centralledger:
       db_host: "${MYSQL_HOST}"
       db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
@@ -195,7 +188,6 @@ centralledger:
       db_host: "${MYSQL_HOST}"
       db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     configOverride:
       .EVENT_SDKrc: *eventSdkConfig
@@ -224,7 +216,6 @@ quoting-service:
       db_host: "${MYSQL_HOST}"
       db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
       simple_routing_mode_enabled: false
     configOverride:
@@ -245,7 +236,6 @@ quoting-service:
       db_host: "${MYSQL_HOST}"
       db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
       # Must be false so the handler persists quotes to MySQL.
       # Without this, the aggregator's INNER JOIN on the quote table
@@ -272,7 +262,6 @@ centralsettlement:
       db_host: "${MYSQL_HOST}"
       db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
   centralsettlement-handler-deferredsettlement:
     replicaCount: 1
@@ -284,7 +273,6 @@ centralsettlement:
       db_host: "${MYSQL_HOST}"
       db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
   centralsettlement-handler-grosssettlement:
     config:
@@ -293,7 +281,6 @@ centralsettlement:
       db_host: "${MYSQL_HOST}"
       db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
     replicaCount: 0
   centralsettlement-handler-rules:
@@ -306,7 +293,6 @@ centralsettlement:
       db_host: "${MYSQL_HOST}"
       db_port: ${MYSQL_PORT}
       db_user: central_ledger
-      db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
       db_database: central_ledger
 
 # --- Account Lookup Service ---
@@ -322,7 +308,6 @@ account-lookup-service:
       db_host: "${MYSQL_HOST}"
       db_port: ${MYSQL_PORT}
       db_user: account_lookup
-      db_password: "${MYSQL_ACCOUNT_LOOKUP_PASSWORD}"
       db_database: account_lookup
       db_secret:
         name: mysqldb
@@ -341,7 +326,6 @@ account-lookup-service:
       db_host: "${MYSQL_HOST}"
       db_port: ${MYSQL_PORT}
       db_user: account_lookup
-      db_password: "${MYSQL_ACCOUNT_LOOKUP_PASSWORD}"
       db_database: account_lookup
       db_secret:
         name: mysqldb
@@ -358,7 +342,6 @@ als-msisdn-oracle:
     db_host: "${MYSQL_HOST}"
     db_port: ${MYSQL_PORT}
     db_user: oracle_msisdn
-    db_password: "${MYSQL_ORACLE_MSISDN_PASSWORD}"
     db_database: oracle_msisdn
     db_secret:
       name: mysqldb
@@ -405,7 +388,6 @@ mojaloop-bulk:
     mongo_port: ${MONGODB_PORT}
     mongo_database: mlos
     mongo_user: mlos
-    mongo_password: "${MONGODB_APP_PASSWORD}"
   bulk-api-adapter:
     bulk-api-adapter-service:
       config: &bulkApiConfig
@@ -414,7 +396,6 @@ mojaloop-bulk:
         mongo_host: "${MONGODB_HOST}"
         mongo_port: ${MONGODB_PORT}
         mongo_user: mlos
-        mongo_password: "${MONGODB_APP_PASSWORD}"
         mongo_secret:
           name: bulk-mongodb-app-secrets
           key: MONGODB_APP_PASSWORD
@@ -426,7 +407,6 @@ mojaloop-bulk:
           host: "${MONGODB_HOST}"
           port: "${MONGODB_PORT}"
           user: mlos
-          password: "${MONGODB_APP_PASSWORD}"
           secret:
             name: bulk-mongodb-app-secrets
             key: MONGODB_APP_PASSWORD
@@ -448,7 +428,6 @@ mojaloop-bulk:
         mongo_host: "${MONGODB_HOST}"
         mongo_port: ${MONGODB_PORT}
         mongo_user: mlos
-        mongo_password: "${MONGODB_APP_PASSWORD}"
         mongo_secret:
           name: bulk-mongodb-app-secrets
           key: MONGODB_APP_PASSWORD
@@ -456,7 +435,6 @@ mojaloop-bulk:
         db_host: "${MYSQL_HOST}"
         db_port: ${MYSQL_PORT}
         db_user: central_ledger
-        db_password: "${MYSQL_CENTRAL_LEDGER_PASSWORD}"
         db_database: central_ledger
     cl-handler-bulk-transfer-fulfil:
       config: *bulkClConfig
@@ -473,7 +451,6 @@ ml-testing-toolkit:
       host: "${MONGODB_HOST}"
       port: "${MONGODB_PORT}"
       user: ttk
-      password: "${MONGODB_APP_PASSWORD}"
       database: ttk
       secret: null
       connectionString: null
@@ -568,7 +545,6 @@ ml-testing-toolkit:
         host: "${MONGODB_HOST}"
         port: "${MONGODB_PORT}"
         user: ttk
-        password: "${MONGODB_APP_PASSWORD}"
         database: ttk
         secret:
           name: bulk-mongodb-app-secrets

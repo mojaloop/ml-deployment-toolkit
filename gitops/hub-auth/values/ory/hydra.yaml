@@ -58,7 +58,8 @@ hydra:
     enabled: true
     type: initContainer
   config:
-    dsn: "mysql://hydra:${HYDRA_DB_PASSWORD}@tcp(${MYSQL_HOST}:${MYSQL_PORT})/hydra?max_conns=20&max_idle_conns=4"
+    # dsn carries the DB password — supplied via hydra-values-secret
+    # (ory/values-secrets.yaml), merged after this file.
 
     serve:
       public:

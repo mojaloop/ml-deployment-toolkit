@@ -28,6 +28,11 @@ spec:
     - kind: ConfigMap
       name: keto-values
       valuesKey: values.yaml
+    # Secret half of the distribution values (credential-bearing keys) —
+    # merged right after them; template/environment overrides still win.
+    - kind: Secret
+      name: keto-values-secret
+      valuesKey: values.yaml
     - kind: ConfigMap
       name: ory-keto-values-template
       valuesKey: values.yaml

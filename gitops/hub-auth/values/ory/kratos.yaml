@@ -118,12 +118,14 @@ kratos:
       }
 
   config:
-    dsn: "mysql://kratos:${KRATOS_DB_PASSWORD}@tcp(${MYSQL_HOST}:${MYSQL_PORT})/kratos?max_conns=20&max_idle_conns=4"
+    # dsn carries the DB password — supplied via kratos-values-secret
+    # (ory/values-secrets.yaml), merged after this file.
 
     courier:
       smtp:
         connection_uri: "smtp://placeholder@localhost:25"
-        from_address: "${SMTP_USER}"
+        # from_address is the SMTP_USER cluster-secrets key — supplied via
+        # kratos-values-secret (ory/values-secrets.yaml), merged after this file.
         from_name: "Mojaloop Hub"
       templates:
         recovery:

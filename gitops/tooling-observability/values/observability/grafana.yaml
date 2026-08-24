@@ -3,7 +3,8 @@
 # which is merged after this file and therefore wins.
 # Admin credentials
 adminUser: admin
-adminPassword: "${GRAFANA_ADMIN_PASSWORD}"
+# adminPassword is supplied via grafana-values-secret
+# (grafana/values-secret.yaml), merged after this file.
 
 # SMTP credentials via env vars (GF_SMTP_USER/GF_SMTP_PASSWORD) — see
 # smtp-secret.yaml; pairs with the grafana.ini smtp block below

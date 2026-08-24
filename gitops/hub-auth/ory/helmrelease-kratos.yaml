@@ -37,6 +37,11 @@ spec:
     - kind: ConfigMap
       name: kratos-values
       valuesKey: values.yaml
+    # Secret half of the distribution values (credential-bearing keys) —
+    # merged right after them; template/environment overrides still win.
+    - kind: Secret
+      name: kratos-values-secret
+      valuesKey: values.yaml
     - kind: ConfigMap
       name: ory-kratos-values-template
       valuesKey: values.yaml

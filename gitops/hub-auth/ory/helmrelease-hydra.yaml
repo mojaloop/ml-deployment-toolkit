@@ -28,6 +28,11 @@ spec:
     - kind: ConfigMap
       name: hydra-values
       valuesKey: values.yaml
+    # Secret half of the distribution values (credential-bearing keys) —
+    # merged right after them; template/environment overrides still win.
+    - kind: Secret
+      name: hydra-values-secret
+      valuesKey: values.yaml
     - kind: ConfigMap
       name: ory-hydra-values-template
       valuesKey: values.yaml

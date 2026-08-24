@@ -61,7 +61,8 @@ keto:
     enabled: true
     type: initContainer
   config:
-    dsn: "mysql://keto:${KETO_DB_PASSWORD}@tcp(${MYSQL_HOST}:${MYSQL_PORT})/keto?max_conns=20&max_idle_conns=4"
+    # dsn carries the DB password — supplied via keto-values-secret
+    # (ory/values-secrets.yaml), merged after this file.
     serve:
       read:
         port: 4466

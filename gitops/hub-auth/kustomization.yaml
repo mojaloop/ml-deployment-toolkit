@@ -10,6 +10,8 @@ resources:
   - ory/externalsecret-kratos.yaml
   - ory/externalsecret-keto.yaml
   - ory/externalsecret-hydra.yaml
+  # Secret halves of the Ory distribution values (DSNs)
+  - ory/values-secrets.yaml
   - ory/helmrelease-kratos.yaml
   - ory/helmrelease-oathkeeper.yaml
   - ory/helmrelease-keto.yaml
