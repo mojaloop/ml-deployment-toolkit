@@ -1,5 +1,10 @@
-# FSPIOP internal API mirror — same routes as extapi but without mTLS, on its
-# own gateway (dedicated IP) so it can be firewalled independently.
+# gw-intapi — operator-tool machine APIs behind oauth2 (Hydra
+# client-credentials, verified by oathkeeper's jwt authenticator; Keto
+# authorizes per client). The API surface — the FSPIOP mirror prefixes and
+# the settlement paths that joined it — is defined by the Rules in
+# hub-app/ops-api/oathkeeper-rules.yaml, which carry the upstreams; this
+# route only decides that NOTHING on this gateway reaches a backend
+# without passing the proxy. Unmatched paths die in oathkeeper with 404.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -12,47 +17,7 @@ spec:
   hostnames:
     - "intapi.int.${DOMAIN}"
   rules:
-    # Account Lookup Service
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /participants
-        - path:
-            type: PathPrefix
-            value: /parties
-      backendRefs:
-        - name: moja-account-lookup-service
-          port: 80
-    # Quoting Service
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /quotes
-        - path:
-            type: PathPrefix
-            value: /fxQuotes
-      backendRefs:
-        - name: moja-quoting-service
-          port: 80
-    # ML API Adapter (transfers)
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /transfers
-        - path:
-            type: PathPrefix
-            value: /fxTransfers
-      backendRefs:
-        - name: moja-ml-api-adapter-service
-          port: 80
-    # Transaction Requests Service
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /transactionRequests
-        - path:
-            type: PathPrefix
-            value: /authorizations
-      backendRefs:
-        - name: moja-transaction-requests-service
-          port: 80
+    - backendRefs:
+        - name: oathkeeper-proxy
+          namespace: ory
+          port: 4455

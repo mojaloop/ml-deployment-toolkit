@@ -84,6 +84,13 @@ data:
                         - name: extapi
                           domains: ["*"]
                           routes:
+                            # /services/{ServiceType} (FSPIOP service/FXP
+                            # discovery) is DELIBERATELY absent: it exists only
+                            # in the thirdparty/PISP stack, which is not
+                            # deployed, and sdk-scheme-adapter never calls it —
+                            # it resolves FXPs from local configuration
+                            # (GET_SERVICES_FXP_RESPONSE; see the DFSP
+                            # onboarding docs).
                             # Account Lookup Service
                             - match:
                                 prefix: "/participants"

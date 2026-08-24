@@ -31,15 +31,18 @@ resources:
   - routes/extapi-envoy-deployment.yaml
   - observability/trace-bridge.yaml
   - observability/instrumentation.yaml
-  # gw-intapi (FSPIOP mirror without mTLS — dedicated gateway + IP)
+  # gw-intapi (operator-tool machine APIs, oauth2 via oathkeeper — dedicated
+  # gateway + IP; rules and role in ops-api/). The standalone settlement,
+  # tx-requests, and simulator gw-int routes are gone: settlement joined
+  # intapi as a path prefix, tx-requests duplicated the extapi mTLS surface,
+  # and the simulator route was unused.
   - routes/gateway-intapi.yaml
   - routes/intapi-httproute.yaml
+  - ops-api/oathkeeper-rules.yaml
+  - ops-api/mojalooprole.yaml
   # gw-int routes (internal ops)
   - routes/ttk-httproute.yaml
   - routes/ttk-backend-httproute.yaml
-  - routes/simulator-httproute.yaml
-  - routes/settlement-httproute.yaml
-  - routes/tx-requests-httproute.yaml
   # Platform UI routes, moved here from platform-config/talos: hub-only,
   # because the tooling cluster has no IAM to gate them behind (operators
   # port-forward there). Routed through oathkeeper — see ops-ui/.
