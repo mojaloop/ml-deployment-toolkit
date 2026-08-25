@@ -44,6 +44,20 @@ provider "helm" {
   }
 }
 
+# Aliased Helm provider for the aws module's in-module Cilium install. It
+# must NOT route through local.kubeconfig: that local reads module.aws
+# outputs, and a provider whose config depends on a module cannot serve a
+# resource inside it (cycle). The static path is safe here because the
+# cilium release carries an explicit depends_on on the kubeconfig file
+# resource — the write-before-dial guarantee moves from the provider config
+# to the resource graph.
+provider "helm" {
+  alias = "bootstrap"
+  kubernetes = {
+    config_path = local.static_kubeconfig
+  }
+}
+
 # Kubectl Provider — for the FluxInstance CR
 provider "kubectl" {
   config_path = local.kubeconfig

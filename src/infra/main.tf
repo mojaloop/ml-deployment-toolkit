@@ -152,17 +152,23 @@ module "aws" {
 
   region            = try(local.config_raw.infra.aws.region, "us-east-1")
   api_allowed_cidrs = try(local.config_raw.infra.aws.api_allowed_cidrs, [])
+
+  # The in-module Cilium install dials the cluster through the static
+  # kubeconfig path — see the aliased provider's comment in providers.tf.
+  providers = {
+    helm = helm.bootstrap
+  }
 }
 
-# AWS bootstrap — CNI, Gateway API CRDs and managed addons, in that order.
-# The Talos equivalent rides machine-config extraManifests; on EKS these must
-# be installed from outside between cluster creation and Flux.
+# AWS bootstrap — Gateway API CRDs and managed addons. Cilium itself is
+# installed inside the aws module (between cluster and node groups — EKS
+# only marks a node group ACTIVE once a CNI makes its nodes Ready). The
+# Talos equivalent of all of this rides machine-config extraManifests.
 module "aws_bootstrap" {
   count  = local.provider_name == "aws" ? 1 : 0
   source = "../modules/aws-bootstrap"
 
   cluster_name       = module.aws[0].cluster_name
-  cluster_endpoint   = module.aws[0].cluster_endpoint
   kubernetes_version = module.aws[0].kubernetes_version
 
   depends_on = [module.aws]

@@ -182,6 +182,46 @@ resource "aws_eks_cluster" "this" {
 }
 
 # --------------------------------------------------------------------------
+# CNI — must exist BEFORE the node groups.
+#
+# EKS refuses to mark a managed node group ACTIVE until its nodes are Ready,
+# and with bootstrap_self_managed_addons=false a node can only become Ready
+# once a CNI runs. Installing Cilium after the node groups therefore
+# deadlocks: the group waits ~20 minutes on NotReady nodes and fails with
+# NodeCreationFailure (observed live on the first aws-lab0-cc apply). The
+# install happens here, against an empty cluster: wait must stay false —
+# with zero nodes the operator Deployment can never come up, and the agent
+# DaemonSet reconciles as nodes arrive; the node group's own ACTIVE gate is
+# the real "CNI works" check.
+#
+# Flux's HelmRelease in gitops/aws/cilium adopts this exact release:
+# name/namespace stay in lockstep with its releaseName/storageNamespace.
+# --------------------------------------------------------------------------
+
+resource "helm_release" "cilium" {
+  name             = "cilium"
+  namespace        = "cilium"
+  create_namespace = true
+
+  repository = "https://helm.cilium.io/"
+  chart      = "cilium"
+  version    = var.cilium_version
+
+  values = [
+    templatefile("${path.module}/values/cilium-bootstrap.yaml.tpl", {
+      # k8sServiceHost wants a bare hostname; the EKS attribute is a URL.
+      k8s_service_host = trimprefix(aws_eks_cluster.this.endpoint, "https://")
+    })
+  ]
+
+  wait = false
+
+  # The root helm provider reads the kubeconfig at this exact path — the
+  # file must be written before the first helm operation dials the cluster.
+  depends_on = [local_sensitive_file.kubeconfig]
+}
+
+# --------------------------------------------------------------------------
 # EKS Node Groups
 # --------------------------------------------------------------------------
 
@@ -232,6 +272,9 @@ resource "aws_eks_node_group" "this" {
     aws_iam_role_policy_attachment.node_worker,
     aws_iam_role_policy_attachment.node_cni,
     aws_iam_role_policy_attachment.node_ecr,
+    # Nodes only reach Ready — and the group only reaches ACTIVE — once the
+    # CNI is installed; see the Cilium block above.
+    helm_release.cilium,
   ]
 }
 

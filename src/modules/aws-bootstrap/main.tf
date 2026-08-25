@@ -1,47 +1,16 @@
-# AWS Cluster Bootstrap — the pieces that must exist before Flux can run.
+# AWS Cluster Bootstrap — what Flux needs that the cluster does not have.
 #
-# The Talos path gets these from machine-config extraManifests (Cilium static
-# manifest + Gateway API CRDs) applied at node bootstrap. EKS has no such
-# hook and the cluster is created with bootstrap_self_managed_addons=false,
-# so this module plays that role from the outside, in dependency order:
+# The Talos path gets these from machine-config extraManifests applied at
+# node bootstrap. EKS has no such hook, so this module plays that role from
+# the outside, AFTER the aws module has delivered a functioning cluster —
+# Cilium itself is installed inside that module, between cluster and node
+# groups, because EKS refuses to mark a node group ACTIVE until nodes are
+# Ready and only a CNI makes them Ready. What remains here:
 #
-#   1. Cilium (helm) — nodes are NotReady until a CNI exists; nothing with a
-#      pod network can run before this.
-#   2. Gateway API CRDs — same vendored file the gitops/aws layer owns after
+#   1. Gateway API CRDs — same vendored file the gitops/aws layer owns after
 #      takeover; bootstrap parity with Talos extraManifests.
-#   3. coredns + aws-ebs-csi-driver managed addons — their pods need the CNI,
-#      and Flux (OCI pulls by hostname) needs coredns.
-#
-# Flux's HelmRelease in gitops/aws/cilium adopts the helm release installed
-# here: release name and namespace must stay in lockstep with that file's
-# explicit releaseName/storageNamespace.
-
-locals {
-  # k8sServiceHost wants a bare hostname; the EKS attribute is a https:// URL.
-  k8s_service_host = trimprefix(var.cluster_endpoint, "https://")
-}
-
-resource "helm_release" "cilium" {
-  name             = "cilium"
-  namespace        = "cilium"
-  create_namespace = true
-
-  repository = "https://helm.cilium.io/"
-  chart      = "cilium"
-  version    = var.cilium_version
-
-  values = [
-    templatefile("${path.module}/values/cilium-bootstrap.yaml.tpl", {
-      k8s_service_host = local.k8s_service_host
-    })
-  ]
-
-  # Nodes join NotReady (no CNI) — the chart applies fine regardless, but the
-  # agent pods are what flips them Ready. Wait so the addons below start on a
-  # functioning cluster instead of racing the datapath.
-  wait    = true
-  timeout = 900
-}
+#   2. coredns + aws-ebs-csi-driver managed addons — their pods need the
+#      CNI, and Flux (OCI pulls by hostname) needs coredns.
 
 # Gateway API CRDs — the platform-config Gateways reference them, and the
 # Cilium operator watches for them. Applied from the same vendored file the
@@ -71,9 +40,10 @@ resource "kubectl_manifest" "gateway_api" {
 }
 
 # --------------------------------------------------------------------------
-# Managed addons — after the CNI, because their pods need a network.
-# kube-proxy is deliberately absent (kubeProxyReplacement above); vpc-cni is
-# deliberately absent (Cilium ENI mode replaces it).
+# Managed addons — their pods need the CNI, which the aws module installed
+# before this module ran (module-level depends_on in src/infra). kube-proxy
+# is deliberately absent (kubeProxyReplacement); vpc-cni is deliberately
+# absent (Cilium ENI mode replaces it).
 # --------------------------------------------------------------------------
 
 data "aws_eks_addon_version" "coredns" {
@@ -86,8 +56,6 @@ resource "aws_eks_addon" "coredns" {
   cluster_name  = var.cluster_name
   addon_name    = "coredns"
   addon_version = data.aws_eks_addon_version.coredns.version
-
-  depends_on = [helm_release.cilium]
 }
 
 data "aws_eks_addon_version" "ebs_csi" {
@@ -102,6 +70,4 @@ resource "aws_eks_addon" "ebs_csi" {
   cluster_name  = var.cluster_name
   addon_name    = "aws-ebs-csi-driver"
   addon_version = data.aws_eks_addon_version.ebs_csi.version
-
-  depends_on = [helm_release.cilium]
 }
