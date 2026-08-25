@@ -66,7 +66,9 @@ LOAD_ENV = set -a && source $(abspath $(ENV_FILE)) && set +a && \
 	export TF_SECRET_KEYS="$(strip $(SECRET_KEYS))" && \
 	export TF_VAR_secrets=$$(jq -cn 'env.TF_SECRET_KEYS | split(" ") | map({key: ., value: (env[.] // "")}) | from_entries') && \
 	export AWS_ACCESS_KEY_ID=$${AWS_ACCESS_KEY_ID:-unused} \
-	       AWS_SECRET_ACCESS_KEY=$${AWS_SECRET_ACCESS_KEY:-unused}
+	       AWS_SECRET_ACCESS_KEY=$${AWS_SECRET_ACCESS_KEY:-unused} \
+	       PROXMOX_VE_ENDPOINT=$${PROXMOX_VE_ENDPOINT:-https://unused.invalid:8006} \
+	       PROXMOX_VE_API_TOKEN=$${PROXMOX_VE_API_TOKEN:-unused@pam!unused=00000000-0000-0000-0000-000000000000}
 
 # Placeholder kubeconfig — the alekc/kubectl provider validates (stats + loads)
 # its config_path at plan time, before the real kubeconfig exists on fresh

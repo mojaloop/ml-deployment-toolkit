@@ -47,12 +47,23 @@ resource "helm_release" "cilium" {
 # Cilium operator watches for them. Applied from the same vendored file the
 # gitops/aws vendor layer reconciles afterwards, so bootstrap and GitOps can
 # never disagree on the version.
-data "kubectl_file_documents" "gateway_api" {
-  content = file("${path.module}/../../../gitops/aws/gateway-api/crds.yaml")
+#
+# Split in pure HCL, not via the kubectl_file_documents data source: that
+# data source reads through the kubectl provider, whose kubeconfig only
+# exists at apply time on a fresh deploy — the read defers and for_each
+# over an unknown map fails the plan.
+locals {
+  gateway_api_docs = [
+    for doc in split("\n---\n", file("${path.module}/../../../gitops/aws/gateway-api/crds.yaml")) :
+    doc if can(yamldecode(doc)) && yamldecode(doc) != null
+  ]
 }
 
 resource "kubectl_manifest" "gateway_api" {
-  for_each = data.kubectl_file_documents.gateway_api.manifests
+  for_each = {
+    for doc in local.gateway_api_docs :
+    "${yamldecode(doc).kind}/${yamldecode(doc).metadata.name}" => doc
+  }
 
   yaml_body         = each.value
   server_side_apply = true
