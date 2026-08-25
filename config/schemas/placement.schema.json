@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Environment placement",
-  "description": "Schema for <env>/placement.yaml — adopter facts about node placement. `placement` maps the template's placement groups (pg-N) to physical provider nodes. `pools` overrides template node pools BY NAME (merge semantics: maps deep-merge; an override changing count inherits everything else; enabled: false drops a default pool — greppable, a visible decision rather than an absence; unknown names add extra pools).",
+  "description": "Schema for <env>/placement.yaml — adopter facts about node placement. `placement` maps the template's placement groups (pg-N) to provider failure domains: physical node names on on-prem providers, availability zones on AWS. `pools` overrides template node pools BY NAME (merge semantics: maps deep-merge; an override changing count inherits everything else; enabled: false drops a default pool — greppable, a visible decision rather than an absence; unknown names add extra pools).",
   "type": "object",
   "required": [
     "version",
@@ -15,7 +15,7 @@
       "minimum": 1
     },
     "placement": {
-      "description": "Placement group -> physical node name (e.g. pg-1: pve-node-a). Every pg-N the selected template references must be mapped; the plan fails otherwise.",
+      "description": "Placement group -> failure domain: a physical node name on on-prem providers (pg-1: pve-node-a), an availability zone on AWS (pg-1: eu-west-1a). On-prem, every pg-N the selected template references must be mapped; the plan fails otherwise. On AWS the file is optional (absent = best-effort ASG spread), but once present the same must-map rule applies.",
       "type": "object",
       "additionalProperties": true
     },

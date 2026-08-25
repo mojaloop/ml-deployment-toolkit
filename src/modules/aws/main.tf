@@ -5,8 +5,14 @@ locals {
   provider_config = yamldecode(file(var.provider_config_path)).infra
   vpc_cidr        = try(local.provider_config.vpc.cidr, "10.0.0.0/16")
 
-  # Use up to 3 AZs from the region
-  azs          = slice(data.aws_availability_zones.available.names, 0, min(3, length(data.aws_availability_zones.available.names)))
+  # AZs: the ones the environment's placement.yaml pins node groups to, else
+  # the first three the region offers (the pre-placement behaviour). Subnets
+  # key by AZ name, so a placement map naming the same AZs the slice picked
+  # leaves existing subnets untouched.
+  pinned_azs = distinct([for ng in var.node_groups : ng.az if ng.az != ""])
+  azs = length(local.pinned_azs) > 0 ? sort(local.pinned_azs) : slice(
+    data.aws_availability_zones.available.names, 0, min(3, length(data.aws_availability_zones.available.names))
+  )
   subnet_cidrs = { for i, az in local.azs : az => cidrsubnet(local.vpc_cidr, 8, i) }
 
   # EKS version is major.minor only (e.g. "1.34")
@@ -36,6 +42,15 @@ resource "aws_subnet" "cluster" {
   cidr_block              = each.value
   availability_zone       = each.key
   map_public_ip_on_launch = true
+
+  lifecycle {
+    # Catches a typo'd AZ in placement.yaml at plan time instead of a
+    # partially-built VPC.
+    precondition {
+      condition     = contains(data.aws_availability_zones.available.names, each.key)
+      error_message = "availability zone '${each.key}' does not exist in this region — check the environment's placement.yaml pg -> AZ map."
+    }
+  }
 
   tags = {
     Name                                        = "${var.cluster.name}-${each.key}"
@@ -178,8 +193,11 @@ resource "aws_eks_node_group" "this" {
   cluster_name    = aws_eks_cluster.this.name
   node_group_name = each.value.name
   node_role_arn   = aws_iam_role.node.arn
-  subnet_ids      = [for s in aws_subnet.cluster : s.id]
-  instance_types  = each.value.instance_types
+  # AZ-pinned groups get exactly their zone's subnet — the only placement
+  # control EKS offers; per-instance placement does not exist. Unpinned
+  # groups keep all subnets and the ASG spreads best-effort.
+  subnet_ids     = each.value.az != "" ? [aws_subnet.cluster[each.value.az].id] : [for s in aws_subnet.cluster : s.id]
+  instance_types = each.value.instance_types
 
   scaling_config {
     desired_size = each.value.desired_size

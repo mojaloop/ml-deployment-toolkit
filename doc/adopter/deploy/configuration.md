@@ -36,7 +36,7 @@ Each environment is a directory under `../environments/` — a **sibling of the 
     my-cc/                   # adopter-owned, its own git repository
       config.yaml            # what the deployment is
       .env                   # external credentials — never committed anywhere
-      placement.yaml         # placement groups -> physical nodes
+      placement.yaml         # placement groups -> physical nodes (on-prem) / AZs (aws)
       talos.yaml             # Talos node OS facts — nameservers, NTP
       talos/                 # optional per-pool Talos machine-config fragments — <pool>.yaml
       proxmox/
@@ -58,7 +58,8 @@ Environments are fully independent — their own repository, config, secrets, an
 Beside `config.yaml`, three small files carry the facts about the adopter's hardware, each schema-validated by `make validate`:
 
 ```yaml
-# placement.yaml — which physical node each template placement group lands on
+# placement.yaml — where each template placement group lands: a physical
+# node on on-prem providers, an availability zone on AWS
 version: 1
 placement:
   pg-1: "pve-node-1"

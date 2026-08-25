@@ -149,21 +149,45 @@ locals {
   # --- Cloud shapes (managed Kubernetes: one pool per node group) ----------
   instance_types = try(local.mapping.instance_types, {})
 
-  aws_node_groups = [
-    for g in local.node_groups : {
-      name           = g.name
-      instance_types = [lookup(local.instance_types, g.class, "m5.xlarge")]
-      desired_size   = g.count
-      min_size       = g.count
-      max_size       = g.count + 1
-      # Same mechanical derivation as the Talos machine-config patches:
-      # <P_NODE_ROLE_LABEL_KEY>=<pool> — the label every gitops selector and
-      # soft affinity keys on. Taints come from the pool, exactly like Talos.
-      labels = { (local.node_role_label_key) = g.name }
-      taints = try(g.taints, [])
-      tags   = distinct(concat(["ml"], try(g.tags, [])))
-    }
-  ]
+  # AWS placement: EKS has no per-instance placement — a managed node group is
+  # only constrained by which subnets (= AZs) it may use, and a multi-AZ group
+  # is best-effort spread. When the environment's placement.yaml maps the
+  # template's placement groups to AZs, each pool materializes as one
+  # single-AZ node group per distinct placement entry, honoring the same
+  # wrapping rule as the on-prem per-VM expansion (node i takes
+  # placement[i % len]). The split is internal: templates and placement.yaml
+  # keep their cross-provider shape. Without a placement map the lists are
+  # ignored and each pool stays one unpinned group AWS spreads best-effort —
+  # the pre-placement behaviour, and the adopter's explicit "don't care".
+  aws_placement_active = local.provider_name == "aws" && length(local.placement_map) > 0
+
+  aws_pool_slots = {
+    for g in local.node_groups : g.name => [
+      for i in range(g.count) :
+      local.aws_placement_active && length(try(g.placement, [])) > 0 ? g.placement[i % length(g.placement)] : ""
+    ]
+  }
+
+  aws_node_groups = flatten([
+    for g in local.node_groups : [
+      for pg, slots in { for s in local.aws_pool_slots[g.name] : s => s... } : {
+        # Suffixed by placement group, not AZ: remapping pg -> AZ later moves
+        # the subnet without renaming the Terraform address.
+        name           = pg != "" ? "${g.name}-${pg}" : g.name
+        az             = pg != "" ? lookup(local.placement_map, pg, "") : ""
+        instance_types = [lookup(local.instance_types, g.class, "m5.xlarge")]
+        desired_size   = length(slots)
+        min_size       = length(slots)
+        max_size       = length(slots) + 1
+        # Same mechanical derivation as the Talos machine-config patches:
+        # <P_NODE_ROLE_LABEL_KEY>=<pool> — the label every gitops selector and
+        # soft affinity keys on. Taints come from the pool, exactly like Talos.
+        labels = { (local.node_role_label_key) = g.name }
+        taints = try(g.taints, [])
+        tags   = distinct(concat(["ml"], try(g.tags, [])))
+      }
+    ]
+  ])
 
   do_node_pools = [
     for g in local.node_groups : {
@@ -416,10 +440,12 @@ resource "terraform_data" "validation" {
 
     # Placement groups referenced by the template must be mapped to real targets;
     # otherwise the provider is handed the literal group name as a node name and
-    # fails partway through apply with VMs already created.
+    # fails partway through apply with VMs already created. On AWS the map is
+    # optional (no placement.yaml = no AZ pinning), but once an environment
+    # maps anything, every group the template references must resolve to an AZ.
     precondition {
       condition = (
-        !local.is_talos_provider ||
+        !(local.is_talos_provider || local.aws_placement_active) ||
         alltrue([
           for g in local.node_groups : alltrue([
             for pg in try(g.placement, []) : contains(keys(local.placement_map), pg)

@@ -18,7 +18,10 @@ variable "node_groups" {
     desired_size   = number
     min_size       = number
     max_size       = number
-    labels         = optional(map(string), {})
+    # Availability zone this group is pinned to (from the environment's
+    # placement.yaml pg -> AZ map). Empty = all cluster subnets, ASG spreads.
+    az     = optional(string, "")
+    labels = optional(map(string), {})
     taints = optional(list(object({
       key    = string
       value  = optional(string)

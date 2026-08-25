@@ -42,7 +42,7 @@ The provider name must be known everywhere the toolkit enumerates providers. Mis
 | `required_providers` entry | `src/infra/versions.tf` | `terraform init` cannot resolve the provider plugin |
 | `provider "<name>" {}` block | `src/infra/providers.tf` | The module has no configured provider to run under |
 | Node-shape output | `src/modules/config-loader/` (the pattern of `aws_node_groups` / `do_node_pools`) | The module has no expanded machine shapes to consume |
-| Provider classification | `is_talos_provider` in `config-loader`, `is_talos` / `has_vendor` in `flux-config` | On-prem behaviour (VM expansion, LB-IPAM, placement) keys off these hardcoded lists |
+| Provider classification | `is_talos_provider` in `config-loader`, `is_talos` / `has_vendor` in `flux-config` | On-prem behaviour (VM expansion, LB-IPAM, per-VM placement) keys off these hardcoded lists; AWS consumes the same placement map as AZ pinning (`aws_placement_active`) |
 | `capabilities` block | `config/templates/<provider>/params.yaml` (schema-required) | Capability-gated features stay off: `in_cluster_data: false` forces every hub data store to `external-unmanaged` |
 
 That last row is also where the config stack *is* provider-aware — `flux-config` is part of the config stack, and its provider lists must match reality or Flux references a vendor directory that does not exist.
