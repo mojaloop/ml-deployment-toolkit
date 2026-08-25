@@ -23,7 +23,11 @@ eni:
 ipam:
   mode: eni
 routingMode: native
-egressMasqueradeInterfaces: "eth+"
+# ens+ — EKS AL2023 AMIs use predictable NIC names (ens5, ens6, ...); the
+# classic eth+ matches nothing there, which silently disables masquerading
+# and strands pod egress to the internet (found live: EBS CSI controller
+# i/o-timeout on ec2.<region>.amazonaws.com while hostNetwork pods worked).
+egressMasqueradeInterfaces: "ens+"
 
 # Gateway API must be enabled at bootstrap even though Flux owns the full
 # config: it sets enable-gateway-api/enable-envoy-config, and the operator

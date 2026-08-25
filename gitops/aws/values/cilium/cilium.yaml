@@ -24,7 +24,11 @@ eni:
 ipam:
   mode: eni
 routingMode: native
-egressMasqueradeInterfaces: "eth+"
+# ens+ — EKS AL2023 AMIs use predictable NIC names (ens5, ens6, ...); the
+# classic eth+ matches nothing there, which silently disables masquerading
+# and strands pod egress to the internet (found live: EBS CSI controller
+# i/o-timeout on ec2.<region>.amazonaws.com while hostNetwork pods worked).
+egressMasqueradeInterfaces: "ens+"
 
 # Gateway API support (CRDs installed by aws-bootstrap, owned by this layer)
 gatewayAPI:
