@@ -13,6 +13,13 @@
 version: 1
 description: "DigitalOcean DOKS managed Kubernetes (interface unvalidated)"
 
+# Structural facts consulted by config-loader/flux-config instead of
+# hardcoded provider-name lists (see params.schema.json). The in-cluster
+# data layer has never been validated on DOKS — hub environments here must
+# use external-unmanaged data stores until that validation happens.
+capabilities:
+  in_cluster_data: false
+
 params:
   P_GATEWAY_CLASS: "cilium"
   # Empty = rely on the cluster default StorageClass (do-block-storage on DOKS).

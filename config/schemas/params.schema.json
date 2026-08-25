@@ -5,7 +5,8 @@
   "type": "object",
   "required": [
     "version",
-    "params"
+    "params",
+    "capabilities"
   ],
   "additionalProperties": false,
   "properties": {
@@ -16,6 +17,20 @@
     },
     "description": {
       "type": "string"
+    },
+    "capabilities": {
+      "description": "Structural facts about what the toolkit can deploy on this provider. Unlike params (substitution symbols), capabilities gate Terraform behavior: config-loader preconditions and flux-config Kustomization sets consult them instead of hardcoded provider-name lists. Every provider must state every capability explicitly — absence is not false, it is a schema error.",
+      "type": "object",
+      "required": [
+        "in_cluster_data"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "in_cluster_data": {
+          "description": "True when the in-cluster data layer (hub-data: Percona MySQL/MongoDB operators, Strimzi Kafka, Redis) is packaged and supported on this provider. False forces every data.<store>.mode to external-unmanaged on hub environments.",
+          "type": "boolean"
+        }
+      }
     },
     "params": {
       "description": "Gitops-facing provider symbols. Adding a symbol here is an interface change: every provider must supply it and the reference must exist in gitops.",

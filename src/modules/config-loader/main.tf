@@ -30,6 +30,15 @@ locals {
   provider_params      = try(local.provider_params_file.params, {})
   mapping              = try(local.provider_params_file.infra, {})
 
+  # Structural capabilities the provider declares (params.schema.json requires
+  # every capability stated explicitly). Consumers gate on these, never on
+  # provider names: a new provider turns features on by declaring them, not by
+  # being added to lists scattered through the codebase. The try() default is
+  # unreachable for schema-valid files and exists only so a missing block
+  # fails the precondition below by name instead of erroring mid-expression.
+  provider_capabilities = try(local.provider_params_file.capabilities, {})
+  cap_in_cluster_data   = try(local.provider_capabilities.in_cluster_data, false)
+
   # A template is a directory — the full overlay for one provider, role and
   # capacity: template.yaml (identity + tuning), placement.yaml (the shape:
   # node pools, default topology), values/ and patches/ (gitops deltas),
@@ -388,16 +397,16 @@ resource "terraform_data" "validation" {
       error_message = "lb_ipam.pools wan addresses must be unique — two gateways cannot share one outside IP on :443."
     }
 
-    # The in-cluster data layer is only packaged for Talos providers. Without
-    # this, a managed-Kubernetes hub reconciles green while cluster-config
-    # advertises in-cluster hostnames that were never deployed, and every app
-    # pod CrashLoops on DNS.
+    # The in-cluster data layer only exists where the provider declares the
+    # capability. Without this, a hub on an undeclared provider reconciles
+    # green while cluster-config advertises in-cluster hostnames that were
+    # never deployed, and every app pod CrashLoops on DNS.
     precondition {
       condition = (
-        local.cluster_role != "hub" || local.is_talos_provider ||
+        local.cluster_role != "hub" || local.cap_in_cluster_data ||
         alltrue([for store, cfg in local.data_stores : !cfg.in_cluster])
       )
-      error_message = "infra.provider '${local.provider_name}' has no in-cluster data layer — every data.<store>.mode must be external-unmanaged on this provider."
+      error_message = "infra.provider '${local.provider_name}' does not declare capabilities.in_cluster_data — every data.<store>.mode must be external-unmanaged on this provider."
     }
 
     # Placement groups referenced by the template must be mapped to real targets;

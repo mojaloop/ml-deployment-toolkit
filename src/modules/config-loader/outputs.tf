@@ -57,6 +57,13 @@ output "worker_instances" {
   value       = local.worker_instances
 }
 
+output "capabilities" {
+  description = "Structural capabilities the provider declares in params.yaml (e.g. in_cluster_data)"
+  value = {
+    in_cluster_data = local.cap_in_cluster_data
+  }
+}
+
 output "aws_node_groups" {
   description = "EKS node groups derived from template node groups"
   value       = local.aws_node_groups

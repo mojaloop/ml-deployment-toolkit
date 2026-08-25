@@ -13,6 +13,13 @@
 version: 1
 description: "AWS EKS managed Kubernetes (interface unvalidated)"
 
+# Structural facts consulted by config-loader/flux-config instead of
+# hardcoded provider-name lists (see params.schema.json). The in-cluster
+# data layer is the DTK's deployed production architecture on AWS; managed
+# services remain reachable through external-unmanaged (ADR-024 boundary).
+capabilities:
+  in_cluster_data: true
+
 params:
   P_GATEWAY_CLASS: "cilium"
   # Empty = rely on the cluster default StorageClass (EBS CSI default on EKS).

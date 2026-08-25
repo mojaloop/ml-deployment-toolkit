@@ -529,7 +529,9 @@ resource "kubectl_manifest" "oci_repository" {
 # ---------------------------------------------------------------------------
 locals {
   # hub-data: one Kustomization per in-cluster store + a common slice.
-  in_cluster_stores = local.is_hub && local.is_talos ? sort([
+  # Gated on the provider's declared capability, not its name — config-loader
+  # already refused in-cluster modes on providers without the capability.
+  in_cluster_stores = local.is_hub && var.in_cluster_data ? sort([
     for store, cfg in var.data_stores : store if cfg.in_cluster
   ]) : []
 

@@ -26,6 +26,12 @@ variable "infra_provider" {
   type        = string
 }
 
+variable "in_cluster_data" {
+  description = "Provider capability (params.yaml capabilities.in_cluster_data): the in-cluster data layer is packaged on this provider, so hub-data Kustomizations may be generated"
+  type        = bool
+  default     = false
+}
+
 variable "dns_provider" {
   description = "DNS provider (selects gitops/dns/<provider>)"
   type        = string

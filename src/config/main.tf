@@ -124,9 +124,10 @@ module "flux_config" {
   count  = module.config.artifact.active ? 1 : 0
   source = "../modules/flux-config"
 
-  cluster_name   = module.config.cluster.name
-  cluster_role   = module.config.cluster_role
-  infra_provider = module.config.provider_name
+  cluster_name    = module.config.cluster.name
+  cluster_role    = module.config.cluster_role
+  infra_provider  = module.config.provider_name
+  in_cluster_data = module.config.capabilities.in_cluster_data
   dns_provider   = module.config.dns.provider
   domain         = module.config.dns.domain
   lb_ipam_pools  = module.config.lb_ipam_pools
