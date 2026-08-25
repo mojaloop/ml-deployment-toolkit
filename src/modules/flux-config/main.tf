@@ -234,6 +234,13 @@ locals {
       LOKI_URL  = var.observability.loki_url
       MIMIR_URL = var.observability.mimir_url
       TEMPO_URL = var.observability.tempo_url
+
+      # External Kubernetes API endpoint — a per-cluster fact (not a P_*
+      # interface symbol, which are static per provider). Referenced only by
+      # cloud vendor layers (gitops/aws cilium values); empty-but-present on
+      # providers that never substitute it.
+      K8S_API_HOST = var.k8s_api.host
+      K8S_API_PORT = var.k8s_api.port
     },
     local.is_hub ? {
       # TOKEN-KEYS: hub-only
@@ -286,6 +293,14 @@ resource "kubernetes_config_map_v1" "cluster_config" {
     precondition {
       condition     = length(local.cluster_config_collisions) == 0
       error_message = "params keys collide with cluster-config keys: ${join(", ", local.cluster_config_collisions)}. Rename the provider symbols or the conflicting config keys."
+    }
+    # The aws vendor layer substitutes K8S_API_HOST into Cilium's values; the
+    # placeholder kubeconfig (make init) parses to 127.0.0.1, which would
+    # brick the CNI on the first real reconcile. Only the infra stack's real
+    # kubeconfig may feed this.
+    precondition {
+      condition     = var.infra_provider != "aws" || (var.k8s_api.host != "" && var.k8s_api.host != "127.0.0.1")
+      error_message = "K8S_API_HOST resolved to '${var.k8s_api.host}' — the kubeconfig artifact is missing or still the placeholder. Apply the infra stack first (make apply ENV=...), then the config stack."
     }
   }
 }

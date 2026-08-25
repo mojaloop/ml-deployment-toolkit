@@ -1,0 +1,90 @@
+# Distribution values for the cilium HelmRelease on EKS.
+# Adopter overrides go in environments/<env>/values/cilium.yaml,
+# which is merged after this file and therefore wins.
+#
+# Every datapath-shaping value here must agree with the bootstrap install
+# (src/modules/aws-bootstrap/values/cilium-bootstrap.yaml.tpl) or the Flux
+# takeover rolls the datapath on first reconcile.
+
+# Kube-proxy replacement (Cilium handles all service routing; kube-proxy is
+# never installed on this provider)
+kubeProxyReplacement: true
+
+# With kube-proxy absent, the in-cluster Service VIP only works while
+# Cilium's own datapath is up — agent and operator reach the API server
+# through the EKS endpoint directly. The host is a per-cluster fact, so it
+# arrives as a cluster-config substitution, not a P_* interface symbol.
+k8sServiceHost: ${K8S_API_HOST}
+k8sServicePort: "${K8S_API_PORT}"
+
+# ENI IPAM — pods get VPC-routable IPs from ENIs the operator manages using
+# the node role's AmazonEKS_CNI_Policy (no IRSA by decision).
+eni:
+  enabled: true
+ipam:
+  mode: eni
+routingMode: native
+egressMasqueradeInterfaces: "eth+"
+
+# Gateway API support (CRDs installed by aws-bootstrap, owned by this layer)
+gatewayAPI:
+  enabled: true
+
+# No LB-IPAM / L2 announcements on a cloud provider: Gateway Services are
+# type LoadBalancer and the EKS cloud controller provisions NLBs for them.
+# Node-to-node WireGuard encryption (on by default in the Talos layer) is
+# deliberately NOT enabled here — explicitly out of scope for the AWS
+# provider by decision (2026-08-25); revisit as separate hardening work.
+
+# Same trap as operator.rollOutPods below, agent-side: the agent reads
+# cilium-config only at startup, and flag flips don't touch the DaemonSet
+# template — without this, config changes land in the ConfigMap but never
+# take effect on running nodes.
+rollOutCiliumPods: true
+
+# Cilium agent Prometheus metrics (port 9962)
+prometheus:
+  enabled: true
+
+# Hubble observability and metrics
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+  ui:
+    enabled: true
+  metrics:
+    enabled:
+      - dns
+      - drop
+      - tcp
+      - flow
+      - icmp
+      - httpV2:exemplars=true;labelsContext=source_ip,source_namespace,source_workload,destination_ip,destination_namespace,destination_workload,traffic_direction
+    dashboards:
+      enabled: false
+
+# Envoy proxy (external) with prometheus metrics for CEC visibility
+envoy:
+  enabled: true
+  prometheus:
+    enabled: true
+
+# Operator settings. rollOutPods adds a cilium-config checksum annotation
+# to the operator pod template so config changes (bootstrap → Flux
+# takeover, future flag flips) restart the operator — it only registers
+# feature-gated CRDs at startup.
+operator:
+  replicas: 1
+  rollOutPods: true
+
+# Agent resource limits (prevent OOM during BPF compilation). CPU limit
+# must leave headroom for endpoint restore after a node reboot — see the
+# Talos layer's note on the CrashLoopBackOff spiral below 2000m.
+resources:
+  requests:
+    cpu: 100m
+    memory: 400Mi
+  limits:
+    cpu: 2000m
+    memory: 1Gi

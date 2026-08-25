@@ -32,6 +32,15 @@ variable "in_cluster_data" {
   default     = false
 }
 
+variable "k8s_api" {
+  description = "External Kubernetes API endpoint (host + port), parsed from the infra stack's kubeconfig artifact. Consumed by cloud vendor layers whose CNI cannot rely on the in-cluster Service VIP (EKS: Cilium kube-proxy replacement needs the real endpoint)."
+  type = object({
+    host = string
+    port = string
+  })
+  default = { host = "", port = "" }
+}
+
 variable "dns_provider" {
   description = "DNS provider (selects gitops/dns/<provider>)"
   type        = string

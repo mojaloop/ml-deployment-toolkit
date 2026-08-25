@@ -14,6 +14,11 @@ metadata:
     # The wan side of the border DNAT when cluster.lb_ipam.pools.gw-extapi.wan
     # is set, the lan IP otherwise.
     external-dns.alpha.kubernetes.io/target: "${GW_EXTAPI_DNS_TARGET}"
+    # Consumed only where a cloud controller provisions the Service (AWS —
+    # Classic ELB otherwise); inert on-prem, where LB-IPAM assigns the
+    # address. NLB is TCP passthrough, so Envoy still sees the raw mTLS
+    # handshake.
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
 spec:
   type: LoadBalancer
   selector:

@@ -9,6 +9,19 @@ locals {
   env_dir         = "${var.environments_dir}/${var.env_name}"
   env_config_path = "${local.env_dir}/config.yaml"
 
+  # External Kubernetes API endpoint, parsed from the kubeconfig artifact the
+  # infra stack wrote — the one contract between the two stacks. Cloud vendor
+  # layers substitute it (EKS: Cilium's k8sServiceHost under kube-proxy
+  # replacement); a flux-config precondition rejects the make-init
+  # placeholder (127.0.0.1) on providers that consume it. Port defaults to
+  # 443 when the server URL carries none (EKS endpoints never do).
+  kubeconfig_server = try(yamldecode(file("${var.artifacts_dir}/${var.env_name}/kubernetes/kubeconfig")).clusters[0].cluster.server, "")
+  k8s_api_hostport  = split(":", trimprefix(local.kubeconfig_server, "https://"))
+  k8s_api = {
+    host = local.k8s_api_hostport[0]
+    port = length(local.k8s_api_hostport) > 1 ? local.k8s_api_hostport[1] : "443"
+  }
+
   # Non-secret variables an override file may reference as ${UPPER_SNAKE}.
   # Flux cannot substitute inside a ConfigMap it does not render, so overrides
   # are templated here instead — same ${...} syntax as the gitops manifests.
@@ -128,6 +141,7 @@ module "flux_config" {
   cluster_role    = module.config.cluster_role
   infra_provider  = module.config.provider_name
   in_cluster_data = module.config.capabilities.in_cluster_data
+  k8s_api         = local.k8s_api
   dns_provider   = module.config.dns.provider
   domain         = module.config.dns.domain
   lb_ipam_pools  = module.config.lb_ipam_pools

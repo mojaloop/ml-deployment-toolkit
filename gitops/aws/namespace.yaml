@@ -1,0 +1,11 @@
+# The cilium namespace is created by the aws-bootstrap helm install; this
+# declaration hands its ownership to GitOps. Privileged PSS labels match the
+# Talos layer — inert where no PSS is enforced, correct where it is.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cilium
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/warn: privileged
+    pod-security.kubernetes.io/audit: privileged
