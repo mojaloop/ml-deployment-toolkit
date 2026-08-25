@@ -23,6 +23,12 @@ eni:
 ipam:
   mode: eni
 routingMode: native
+# The chart defaults IPv4 masquerade OFF when eni.enabled is set — pods are
+# VPC-routable, but internet egress through the IGW still needs SNAT to the
+# node IP (public subnets, no NAT). Explicitly on; the interface pattern
+# below picks the devices. The native-routing CIDR is auto-derived from the
+# VPC in ENI mode.
+enableIPv4Masquerade: true
 # ens+ — EKS AL2023 AMIs use predictable NIC names (ens5, ens6, ...); the
 # classic eth+ matches nothing there, which silently disables masquerading
 # and strands pod egress to the internet (found live: EBS CSI controller
