@@ -10,7 +10,15 @@ locals {
   # key by AZ name, so a placement map naming the same AZs the slice picked
   # leaves existing subnets untouched.
   pinned_azs = distinct([for ng in var.node_groups : ng.az if ng.az != ""])
-  azs = length(local.pinned_azs) > 0 ? sort(local.pinned_azs) : slice(
+  # EKS refuses CreateCluster with subnets in fewer than two AZs, so a
+  # placement map pinning a single AZ (a one-pool tooling template) is padded
+  # from the region's remaining AZs up to that floor. Only the subnets pad —
+  # node groups stay pinned exactly where placement.yaml put them.
+  padded_azs = concat(local.pinned_azs, slice(
+    [for az in data.aws_availability_zones.available.names : az if !contains(local.pinned_azs, az)],
+    0, max(0, 2 - length(local.pinned_azs))
+  ))
+  azs = length(local.pinned_azs) > 0 ? sort(local.padded_azs) : slice(
     data.aws_availability_zones.available.names, 0, min(3, length(data.aws_availability_zones.available.names))
   )
   subnet_cidrs = { for i, az in local.azs : az => cidrsubnet(local.vpc_cidr, 8, i) }
