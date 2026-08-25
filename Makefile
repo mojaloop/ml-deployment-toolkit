@@ -258,8 +258,18 @@ plan-infra: init-infra
 
 plan-config: init-config
 	$(CHECK_ENV)
-	@echo "Planning config stack (ENV=$(ENV))..."
-	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform plan -out=../../$(CONFIG_PLAN)
+	@# On cloud providers the config stack bakes real cluster facts (K8S_API_*)
+	@# into cluster-config, so a plan against the placeholder kubeconfig would
+	@# either bake 127.0.0.1 or (by flux-config's precondition) fail. Skip it —
+	@# `make apply` re-plans config after infra applies and sees the real cluster.
+	@if [ "$$(yq e '.infra.provider' $(ENV_DIR)/config.yaml)" = "aws" ] && \
+	    grep -q 'server: https://127.0.0.1:1' "$(KUBECONFIG_FILE)" 2>/dev/null; then \
+		echo "Skipping config plan — cluster not built yet (placeholder kubeconfig)."; \
+		echo "'make apply ENV=$(ENV)' plans and applies config after the infra stack."; \
+	else \
+		echo "Planning config stack (ENV=$(ENV))..."; \
+		cd $(CONFIG_DIR) && $(LOAD_ENV) && $(BIND_CONFIG) && terraform plan -out=../../$(CONFIG_PLAN); \
+	fi
 
 plan: plan-infra plan-config
 
