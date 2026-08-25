@@ -1,0 +1,57 @@
+# Descheduler: autonomous recovery from pod placement pathologies.
+# The cluster must re-balance and clear wedged pods with no operator action —
+# node reboots (any order, any overlap) may concentrate pods on whichever
+# nodes are Ready, and stock Kubernetes never un-does that.
+# Policy validated live on ml-lab0-sw (2026-08-25 reboot pile-up incident).
+
+# Continuous mode: reacts within ~2 minutes of imbalance (a CronJob would
+# leave the cluster degraded for a full schedule interval).
+kind: Deployment
+deschedulingInterval: 2m
+replicas: 1
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+deschedulerPolicy:
+  # Rate limits: evictions land in small waves so receiving nodes never get
+  # a cold-start storm (the amplifier in the original incident).
+  maxNoOfPodsToEvictPerNode: 5
+  maxNoOfPodsToEvictPerNamespace: 5
+  profiles:
+    - name: rebalance
+      pluginConfig:
+        - name: DefaultEvictor
+          args:
+            nodeFit: true               # only evict if another node can actually hold the pod
+            evictLocalStoragePods: true # emptyDir contents are treated as disposable
+        - name: RemovePodsHavingTooManyRestarts
+          args:
+            podRestartThreshold: 25     # wedged/crashlooping pods get replaced instead of retrying forever
+            includingInitContainers: true
+        - name: RemoveFailedPods
+          args:
+            minPodLifetimeSeconds: 600  # don't fight controllers over freshly failed pods
+        - name: LowNodeUtilization
+          args:
+            # Based on resource *requests*; keep requests honest (VPA/Goldilocks).
+            thresholds:        # below this = underutilized (valid eviction destination)
+              cpu: 50          # narrow band: nodes keep receiving until ~cluster average,
+              memory: 50       # otherwise rebalancing stalls with one node still hot
+              pods: 50
+            targetThresholds:  # above this = overutilized (pods get evicted)
+              cpu: 60
+              memory: 60
+              pods: 60
+      plugins:
+        balance:
+          enabled:
+            - LowNodeUtilization
+        deschedule:
+          enabled:
+            - RemovePodsHavingTooManyRestarts
+            - RemoveFailedPods

@@ -5,6 +5,7 @@ resources:
   - observability-namespace.yaml
   - external-dns-namespace.yaml
   - metrics-server/helmrelease.yaml
+  - descheduler/helmrelease.yaml
   - cert-manager/helmrelease.yaml
   - external-dns/helmrelease.yaml
   - external-secrets/helmrelease.yaml
@@ -17,6 +18,10 @@ resources:
 # Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;
 # the adopter's <release>-values-override is merged after them and wins.
 configMapGenerator:
+  - name: descheduler-values
+    namespace: flux-system
+    files:
+      - values.yaml=values/kube-system/descheduler.yaml
   - name: cert-manager-values
     namespace: flux-system
     files:
