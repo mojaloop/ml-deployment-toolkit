@@ -235,12 +235,36 @@ locals {
   }
 }
 
+# IMDS hop limit 2 — the one deviation from the EKS node defaults, and load-
+# bearing for the whole no-IRSA credential model: pod-networked components
+# that use the node role (the EBS CSI controller) sit one network hop from
+# IMDS, and the default hop limit of 1 makes IMDSv2 responses die on the way
+# back ("no EC2 IMDS role found" CrashLoopBackOff, found live on the first
+# aws-lab0-cc bring-up). Trade-off stated plainly: hop limit 2 lets ANY pod
+# on the node read the node role's credentials — acceptable while the node
+# role holds only EBS/ENI/ECR-read, revisit with IRSA under cluster
+# hardening (todo #21).
+resource "aws_launch_template" "node" {
+  name_prefix = "${var.cluster.name}-node-"
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
+  }
+}
+
 resource "aws_eks_node_group" "this" {
   for_each = { for ng in var.node_groups : ng.name => ng }
 
   cluster_name    = aws_eks_cluster.this.name
   node_group_name = each.value.name
   node_role_arn   = aws_iam_role.node.arn
+
+  launch_template {
+    id      = aws_launch_template.node.id
+    version = aws_launch_template.node.latest_version
+  }
   # AZ-pinned groups get exactly their zone's subnet — the only placement
   # control EKS offers; per-instance placement does not exist. Unpinned
   # groups keep all subnets and the ASG spreads best-effort.
