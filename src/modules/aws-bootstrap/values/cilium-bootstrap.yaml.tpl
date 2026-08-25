@@ -1,0 +1,39 @@
+# Minimal values for the EKS bootstrap Cilium install (aws-bootstrap module).
+# The Terraform-side counterpart of rendering/cilium/values.yaml on Talos:
+# keep this to what a node needs to reach Ready — full runtime config lives
+# in gitops/aws/cilium/helmrelease.yaml and Flux reconciles to it once the
+# cluster is up. Every value here must agree with that file, or the takeover
+# rolls the datapath.
+
+# Kube-proxy replacement (Cilium handles all service routing; the cluster is
+# created with bootstrap_self_managed_addons=false, so kube-proxy never runs)
+kubeProxyReplacement: true
+
+# With kube-proxy absent, the in-cluster Service VIP is not routable until
+# Cilium's own datapath is up — agent and operator must reach the API server
+# through the EKS endpoint directly (resolves to the private endpoint ENIs
+# inside the VPC).
+k8sServiceHost: ${k8s_service_host}
+k8sServicePort: "443"
+
+# ENI IPAM — pods get VPC-routable IPs from ENIs the operator manages using
+# the node role's AmazonEKS_CNI_Policy (no IRSA by decision).
+eni:
+  enabled: true
+ipam:
+  mode: eni
+routingMode: native
+egressMasqueradeInterfaces: "eth+"
+
+# Gateway API must be enabled at bootstrap even though Flux owns the full
+# config: it sets enable-gateway-api/enable-envoy-config, and the operator
+# only registers the CiliumEnvoyConfig CRDs at startup based on those flags.
+gatewayAPI:
+  enabled: true
+
+# Flux enables Hubble with cluster-generated certs after takeover.
+hubble:
+  enabled: false
+
+operator:
+  replicas: 1

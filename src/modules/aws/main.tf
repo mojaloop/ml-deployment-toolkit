@@ -120,6 +120,15 @@ resource "aws_iam_role_policy_attachment" "node_ecr" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
+# EBS CSI driver credentials ride the node instance role — no OIDC/IRSA in
+# this module by decision (single raw-credential mechanism everywhere). The
+# CNI policy above serves double duty: it grants the ENI create/attach/tag
+# operations Cilium's operator performs in ENI IPAM mode.
+resource "aws_iam_role_policy_attachment" "node_ebs_csi" {
+  role       = aws_iam_role.node.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
 # --------------------------------------------------------------------------
 # EKS Cluster
 # --------------------------------------------------------------------------
@@ -129,8 +138,21 @@ resource "aws_eks_cluster" "this" {
   role_arn = aws_iam_role.cluster.arn
   version  = local.eks_version
 
+  # No self-managed addons: EKS installs neither vpc-cni, kube-proxy nor
+  # coredns. Cilium (ENI mode, kube-proxy replacement) is installed by the
+  # aws-bootstrap module before Flux; coredns and the EBS CSI driver follow
+  # as managed addons there, after the CNI exists to network their pods.
+  bootstrap_self_managed_addons = false
+
   vpc_config {
-    subnet_ids = [for s in aws_subnet.cluster : s.id]
+    subnet_ids             = [for s in aws_subnet.cluster : s.id]
+    endpoint_public_access = true
+    # Private access must be on when the public endpoint is CIDR-restricted:
+    # nodes egress from their own public IPs (public subnets, no NAT), which
+    # are never in api_allowed_cidrs — without the private endpoint, kubelet
+    # and the CNI would be locked out of their own API server.
+    endpoint_private_access = true
+    public_access_cidrs     = var.api_allowed_cidrs
   }
 
   depends_on = [aws_iam_role_policy_attachment.cluster_policy]

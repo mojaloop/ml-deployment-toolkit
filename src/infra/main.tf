@@ -150,7 +150,22 @@ module "aws" {
   artifacts_path       = local.artifacts_path
   provider_config_path = "../../config/templates/aws/params.yaml"
 
-  region = try(local.config_raw.infra.aws.region, "us-east-1")
+  region            = try(local.config_raw.infra.aws.region, "us-east-1")
+  api_allowed_cidrs = try(local.config_raw.infra.aws.api_allowed_cidrs, [])
+}
+
+# AWS bootstrap — CNI, Gateway API CRDs and managed addons, in that order.
+# The Talos equivalent rides machine-config extraManifests; on EKS these must
+# be installed from outside between cluster creation and Flux.
+module "aws_bootstrap" {
+  count  = local.provider_name == "aws" ? 1 : 0
+  source = "../modules/aws-bootstrap"
+
+  cluster_name       = module.aws[0].cluster_name
+  cluster_endpoint   = module.aws[0].cluster_endpoint
+  kubernetes_version = module.aws[0].kubernetes_version
+
+  depends_on = [module.aws]
 }
 
 # FluxCD Bootstrap — install controllers (always)
@@ -163,6 +178,7 @@ module "flux_bootstrap" {
   depends_on = [
     module.proxmox,
     module.digitalocean,
-    module.aws
+    module.aws,
+    module.aws_bootstrap
   ]
 }

@@ -36,3 +36,13 @@ variable "region" {
   description = "AWS region"
   type        = string
 }
+
+variable "api_allowed_cidrs" {
+  description = "CIDRs allowed to reach the public EKS API endpoint (infra.aws.api_allowed_cidrs)"
+  type        = list(string)
+
+  validation {
+    condition     = length(var.api_allowed_cidrs) > 0
+    error_message = "infra.aws.api_allowed_cidrs must list at least one CIDR — the EKS API endpoint is never left open to the world implicitly."
+  }
+}
