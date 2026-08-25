@@ -1,15 +1,19 @@
 # yaml-language-server: $schema=../../../../schemas/template-placement.schema.json
 # -----------------------------------------------------------------------------
 # Template placement — the SHAPE this template deploys: node pools, sizing,
-# default topology. The environment owns the INSTANCE: its placement.yaml maps
-# pg-N groups to physical nodes and may override pools by name (count, sizes,
-# extra pools, enabled: false to drop one).
+# default topology. The environment owns the INSTANCE: its placement.yaml may
+# override pools by name (count, extra pools, enabled: false to drop one).
+#
+# AWS consumes name, class and count ONLY: each group becomes an EKS managed
+# node group whose instance type is params.yaml infra.instance_types[class].
+# cores/memory/disks/placement are schema-required cross-provider fields —
+# on AWS they document intent (sized to match the instance type) but are not
+# rendered; pg-N groups have no meaning on a cloud scheduler.
 # -----------------------------------------------------------------------------
 version: 1
 
 # --- Infrastructure topology ---
-# Each group expands to <count> nodes named <cluster>-<name>-<index>.
-# placement is index-aligned (node i -> placement[i]); shorter lists wrap around.
+# Each group becomes one EKS managed node group of <count> nodes.
 node_groups:
   - name: m
     class: mixed-plane

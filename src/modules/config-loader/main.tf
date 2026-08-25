@@ -156,7 +156,12 @@ locals {
       desired_size   = g.count
       min_size       = g.count
       max_size       = g.count + 1
-      tags           = distinct(concat(["ml"], try(g.tags, [])))
+      # Same mechanical derivation as the Talos machine-config patches:
+      # <P_NODE_ROLE_LABEL_KEY>=<pool> — the label every gitops selector and
+      # soft affinity keys on. Taints come from the pool, exactly like Talos.
+      labels = { (local.node_role_label_key) = g.name }
+      taints = try(g.taints, [])
+      tags   = distinct(concat(["ml"], try(g.tags, [])))
     }
   ]
 

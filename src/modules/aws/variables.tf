@@ -18,7 +18,13 @@ variable "node_groups" {
     desired_size   = number
     min_size       = number
     max_size       = number
-    tags           = optional(list(string), [])
+    labels         = optional(map(string), {})
+    taints = optional(list(object({
+      key    = string
+      value  = optional(string)
+      effect = string
+    })), [])
+    tags = optional(list(string), [])
   }))
 }
 

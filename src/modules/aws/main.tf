@@ -162,6 +162,16 @@ resource "aws_eks_cluster" "this" {
 # EKS Node Groups
 # --------------------------------------------------------------------------
 
+locals {
+  # placement.yaml taints use Kubernetes effect names; the EKS API wants its
+  # own enum.
+  eks_taint_effects = {
+    NoSchedule       = "NO_SCHEDULE"
+    PreferNoSchedule = "PREFER_NO_SCHEDULE"
+    NoExecute        = "NO_EXECUTE"
+  }
+}
+
 resource "aws_eks_node_group" "this" {
   for_each = { for ng in var.node_groups : ng.name => ng }
 
@@ -175,6 +185,19 @@ resource "aws_eks_node_group" "this" {
     desired_size = each.value.desired_size
     min_size     = each.value.min_size
     max_size     = each.value.max_size
+  }
+
+  # node-role labels the whole gitops layer schedules on — the EKS
+  # counterpart of the Talos per-pool machine-config label patches.
+  labels = each.value.labels
+
+  dynamic "taint" {
+    for_each = each.value.taints
+    content {
+      key    = taint.value.key
+      value  = taint.value.value
+      effect = local.eks_taint_effects[taint.value.effect]
+    }
   }
 
   tags = { for tag in try(each.value.tags, []) : tag => "true" }
