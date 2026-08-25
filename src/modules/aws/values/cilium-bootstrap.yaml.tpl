@@ -39,5 +39,13 @@ gatewayAPI:
 hubble:
   enabled: false
 
+# Config changes only take effect when pods restart — the agent reads
+# cilium-config at startup and flag flips never touch the pod templates.
+# Same trap and same cure as the gitops values files; without these, a
+# terraform-side helm upgrade (e.g. the ens+ masquerade fix) lands in the
+# ConfigMap and silently never applies.
+rollOutCiliumPods: true
+
 operator:
   replicas: 1
+  rollOutPods: true
