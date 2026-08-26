@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=../../../../schemas/template.schema.json
+# -----------------------------------------------------------------------------
+# Deployment template — hub/c3w3 (topology tier 3)
+# Name reads as the pool list: c×3 + w×3. HA control plane with a separate
+# worker pool; data workloads still co-scheduled on the workers.
+# -----------------------------------------------------------------------------
+version: 1
+description: "Mojaloop hub: 3 control-plane + 3 general workers (HA split, data co-scheduled)"

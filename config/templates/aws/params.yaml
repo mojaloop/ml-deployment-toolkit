@@ -45,3 +45,4 @@ infra:
     worker-general: "m5.2xlarge"    # 8 vCPU / 32 GiB
     worker-kafka: "m5.2xlarge"      # 8 vCPU / 32 GiB
     worker-db: "r5.xlarge"          # 4 vCPU / 32 GiB (memory-optimized)
+    worker-hub: "c5.2xlarge"        # 8 vCPU / 16 GiB (compute-optimized, stateless hub core)

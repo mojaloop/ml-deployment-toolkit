@@ -1,0 +1,31 @@
+# Template patches — placement, not capacity: this template dedicates a
+# tainted db pool, so the soft affinity the distribution ships (preferred, so
+# pool-less templates degrade gracefully) is hardened to REQUIRED here. The
+# tolerations already ship in the base CR. Strategic merge on the CR: maps
+# merge, and the preferred block is not restated so it survives untouched.
+- apiVersion: pxc.percona.com/v1
+  kind: PerconaXtraDBCluster
+  metadata:
+    name: mojaloop-db
+    namespace: data
+  spec:
+    pxc:
+      affinity:
+        advanced:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: ${P_NODE_ROLE_LABEL_KEY}
+                      operator: In
+                      values: ["db"]
+    haproxy:
+      affinity:
+        advanced:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: ${P_NODE_ROLE_LABEL_KEY}
+                      operator: In
+                      values: ["db"]

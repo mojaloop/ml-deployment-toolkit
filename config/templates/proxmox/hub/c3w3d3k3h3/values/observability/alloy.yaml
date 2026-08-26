@@ -1,0 +1,7 @@
+# Template overlay — this template taints its dedicated pools (db, kafka), and
+# the alloy DaemonSet ships without tolerations, so log/metric collection would
+# silently vanish from those nodes. Tolerate everything, like node-exporter
+# does in the distribution (cilium tolerates all by chart default).
+controller:
+  tolerations:
+    - operator: Exists

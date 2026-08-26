@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=../../../../schemas/template.schema.json
+# -----------------------------------------------------------------------------
+# Deployment template — hub/c3w3d3k3 (topology tier 4)
+# Name reads as the pool list: c×3 + w×3 + d(b)×3 + k(afka)×3. Dedicated,
+# tainted MySQL and Kafka pools; those workloads are pinned there (hard
+# nodeAffinity in patches/) and nothing else schedules there (pool taints).
+# Whether d/k land on shared or dedicated PHYSICAL hosts is the environment's
+# choice via its pg-N -> host mapping.
+# -----------------------------------------------------------------------------
+version: 1
+description: "Mojaloop hub: 3 CP + 3 workers + dedicated 3-node MySQL and Kafka pools"

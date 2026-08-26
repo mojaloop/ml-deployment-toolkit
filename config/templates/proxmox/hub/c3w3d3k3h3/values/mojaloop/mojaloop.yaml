@@ -1,0 +1,100 @@
+# Template overlay — placement, not capacity: pin the Mojaloop core services
+# to this template's dedicated, tainted hub pool. Merged over the common layer
+# via the <namespace>-<release>-values-template slot; the environment layer
+# wins last. The pool taint (node-role=hub:NoSchedule, see placement.yaml)
+# keeps everything else off those nodes; the nodeSelector + toleration here
+# keep the core ONLY there. Both sides live in this one template, so templates
+# without a hub pool are untouched.
+#
+# Deliberately NOT pinned to hub (they stay on the general workers):
+# ml-testing-toolkit (test tooling, not switch core) and the disabled charts.
+
+x-hub-placement:
+  nodeSelector: &hubNodeSelector
+    ${P_NODE_ROLE_LABEL_KEY}: hub
+  tolerations: &hubTolerations
+    - key: ${P_NODE_ROLE_LABEL_KEY}
+      operator: Equal
+      value: hub
+      effect: NoSchedule
+
+centralledger:
+  centralledger-service:
+    nodeSelector: *hubNodeSelector
+    tolerations: *hubTolerations
+  centralledger-handler-transfer-prepare:
+    nodeSelector: *hubNodeSelector
+    tolerations: *hubTolerations
+  centralledger-handler-transfer-position-batch:
+    nodeSelector: *hubNodeSelector
+    tolerations: *hubTolerations
+  centralledger-handler-transfer-get:
+    nodeSelector: *hubNodeSelector
+    tolerations: *hubTolerations
+  centralledger-handler-transfer-fulfil:
+    nodeSelector: *hubNodeSelector
+    tolerations: *hubTolerations
+  centralledger-handler-timeout:
+    nodeSelector: *hubNodeSelector
+    tolerations: *hubTolerations
+  centralledger-handler-admin-transfer:
+    nodeSelector: *hubNodeSelector
+    tolerations: *hubTolerations
+quoting-service:
+  quoting-service:
+    nodeSelector: *hubNodeSelector
+    tolerations: *hubTolerations
+  quoting-service-handler:
+    nodeSelector: *hubNodeSelector
+    tolerations: *hubTolerations
+centralsettlement:
+  centralsettlement-service:
+    nodeSelector: *hubNodeSelector
+    tolerations: *hubTolerations
+  centralsettlement-handler-deferredsettlement:
+    nodeSelector: *hubNodeSelector
+    tolerations: *hubTolerations
+  centralsettlement-handler-rules:
+    nodeSelector: *hubNodeSelector
+    tolerations: *hubTolerations
+account-lookup-service:
+  account-lookup-service:
+    nodeSelector: *hubNodeSelector
+    tolerations: *hubTolerations
+  account-lookup-service-admin:
+    nodeSelector: *hubNodeSelector
+    tolerations: *hubTolerations
+als-msisdn-oracle:
+  nodeSelector: *hubNodeSelector
+  tolerations: *hubTolerations
+transaction-requests-service:
+  nodeSelector: *hubNodeSelector
+  tolerations: *hubTolerations
+ml-api-adapter:
+  ml-api-adapter-service:
+    nodeSelector: *hubNodeSelector
+    tolerations: *hubTolerations
+  ml-api-adapter-handler-notification:
+    nodeSelector: *hubNodeSelector
+    tolerations: *hubTolerations
+mojaloop-bulk:
+  bulk-api-adapter:
+    bulk-api-adapter-service:
+      nodeSelector: *hubNodeSelector
+      tolerations: *hubTolerations
+    bulk-api-adapter-handler-notification:
+      nodeSelector: *hubNodeSelector
+      tolerations: *hubTolerations
+  bulk-centralledger:
+    cl-handler-bulk-transfer-prepare:
+      nodeSelector: *hubNodeSelector
+      tolerations: *hubTolerations
+    cl-handler-bulk-transfer-fulfil:
+      nodeSelector: *hubNodeSelector
+      tolerations: *hubTolerations
+    cl-handler-bulk-transfer-processing:
+      nodeSelector: *hubNodeSelector
+      tolerations: *hubTolerations
+    cl-handler-bulk-transfer-get:
+      nodeSelector: *hubNodeSelector
+      tolerations: *hubTolerations

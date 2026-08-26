@@ -38,9 +38,19 @@ classes:
     talos_type: "worker"
     talos_patches:
       - patch-cilium-install.yaml
+      # Strimzi brokers claim PVCs; without a provisioner on the node they
+      # stay Pending on a dedicated (tainted) kafka pool.
+      - patch-openebs.yaml
 
   worker-db:
     talos_type: "worker"
     talos_patches:
       - patch-cilium-install.yaml
       - patch-openebs.yaml
+
+  # Mojaloop core services (central-ledger, quoting, ALS, ml-api-adapter,
+  # settlement, bulk): stateless and CPU-bound — no local PVs, so no openebs.
+  worker-hub:
+    talos_type: "worker"
+    talos_patches:
+      - patch-cilium-install.yaml

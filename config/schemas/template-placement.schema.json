@@ -42,7 +42,8 @@
               "worker-general",
               "mixed-plane",
               "worker-kafka",
-              "worker-db"
+              "worker-db",
+              "worker-hub"
             ]
           },
           "count": {

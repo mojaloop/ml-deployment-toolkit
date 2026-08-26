@@ -1,0 +1,76 @@
+# yaml-language-server: $schema=../../../../schemas/template-placement.schema.json
+# -----------------------------------------------------------------------------
+# Template placement — the SHAPE this template deploys: node pools, sizing,
+# default topology. The environment owns the INSTANCE: its placement.yaml maps
+# pg-N groups to physical nodes and may override pools by name (count, sizes,
+# extra pools, enabled: false to drop one).
+#
+# The db, kafka and hub pools reference their own placement groups (pg-4..
+# pg-12) so each environment decides isolation: map them to the same hosts as
+# pg-1..3 to share 3 machines, or to dedicated machines for physical isolation.
+# Pool names are load-bearing: gitops tolerations/affinity key on node-role=db,
+# node-role=kafka and node-role=hub, so these pools MUST keep those names.
+# -----------------------------------------------------------------------------
+version: 1
+
+# --- Infrastructure topology ---
+# Each group expands to <count> nodes named <cluster>-<name>-<index>.
+# placement is index-aligned (node i -> placement[i]); shorter lists wrap around.
+node_groups:
+  - name: c
+    class: control-plane
+    count: 3
+    cores: 4
+    memory: 8192         # MB
+    disks: [32]          # GB
+    placement: [pg-1, pg-2, pg-3]
+
+  - name: w
+    class: worker-general
+    count: 3
+    cores: 8
+    memory: 16384        # MB
+    disks: [64, 64]      # GB
+    placement: [pg-1, pg-2, pg-3]
+
+  # Dedicated MySQL/MongoDB pool. Taint key mirrors P_NODE_ROLE_LABEL_KEY
+  # (config/templates/proxmox/params.yaml); the label itself derives from the
+  # pool name mechanically.
+  - name: db
+    class: worker-db
+    count: 3
+    cores: 4
+    memory: 16384        # MB, memory-biased (innodb buffer pool)
+    disks: [32, 128]     # GB: OS + openebs data disk
+    placement: [pg-4, pg-5, pg-6]
+    taints:
+      - key: node-role
+        value: db
+        effect: NoSchedule
+
+  # Dedicated Kafka pool (Strimzi brokers/controllers).
+  - name: kafka
+    class: worker-kafka
+    count: 3
+    cores: 6
+    memory: 12288        # MB
+    disks: [32, 128]     # GB: OS + openebs data disk
+    placement: [pg-7, pg-8, pg-9]
+    taints:
+      - key: node-role
+        value: kafka
+        effect: NoSchedule
+
+  # Dedicated Mojaloop-core pool: stateless, CPU-biased, no data disk (the
+  # worker-hub class carries no openebs).
+  - name: hub
+    class: worker-hub
+    count: 3
+    cores: 8
+    memory: 16384        # MB
+    disks: [32]          # GB
+    placement: [pg-10, pg-11, pg-12]
+    taints:
+      - key: node-role
+        value: hub
+        effect: NoSchedule
