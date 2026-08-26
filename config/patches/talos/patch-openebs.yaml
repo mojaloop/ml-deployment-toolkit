@@ -1,35 +1,27 @@
-# openebs-storage-patch.yaml
-machine:
-  # # Enable HugePages for Mayastor (minimum 1024 pages = 2GiB)
-  # sysctls:
-  #   vm.nr_hugepages: "1024"
-
-  # Mount the second disk for Mayastor WITHOUT formatting
-  # Talos will make it available but won't partition/format it
-  disks:
-    - device: /dev/sdb
-
-  # Configure kubelet mounts and labels
-  kubelet:
-    extraMounts:
-      # Mount for OpenEBS hostpath (first disk)
-      - destination: /var/openebs/local
-        type: bind
-        source: /var/openebs/local
-        options:
-          - bind
-          - rshared
-          - rw
-
-      # Mount for Mayastor data plane
-      - destination: /var/local
-        type: bind
-        source: /var/local
-        options:
-          - rbind
-          - rshared
-          - rw
-
-    # Label nodes for Mayastor
-    extraArgs:
-      node-labels: "openebs.io/engine=mayastor"
+# patch-openebs.yaml — node-side storage for OpenEBS LocalPV hostpath.
+#
+# The second VM disk (scsi1 -> /dev/sdb, sized by the pool's disks[1] in
+# placement.yaml) is provisioned as a dedicated XFS user volume, mounted by
+# Talos at /var/mnt/openebs. PV data therefore never shares the EPHEMERAL
+# partition of the OS disk. The gitops values point the localpv provisioner
+# at /var/mnt/openebs/local (values/openebs-system/openebs.yaml).
+#
+# No kubelet extraMounts: Talos propagates user-volume mounts into the
+# kubelet container automatically (extraMounts is the legacy pattern for
+# paths Talos does not manage).
+#
+# dev_path is deliberate for now: single virtio-scsi controller with fixed
+# target IDs enumerates deterministically. Revisit (disk.serial or
+# !system_disk) if pools ever mix buses or controllers.
+apiVersion: v1alpha1
+kind: UserVolumeConfig
+name: openebs # mounts at /var/mnt/openebs
+provisioning:
+  diskSelector:
+    match: disk.dev_path == "/dev/sdb"
+  # No maxSize: take all available space on the disk; grow follows a
+  # placement.yaml disk resize.
+  minSize: 10GiB
+  grow: true
+filesystem:
+  type: xfs
