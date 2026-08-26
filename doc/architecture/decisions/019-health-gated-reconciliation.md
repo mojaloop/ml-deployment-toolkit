@@ -28,7 +28,7 @@ The Kustomization chain — `platform → dns → platform-config → vendor →
 - Operator webhooks (cert-manager, external-secrets) gate on their Deployments becoming ready before anything submits resources to them.
 - `hub-data-mysql` gates on the Percona cluster reporting `status.state == ready` — the state the operator sets only after users exist.
 - `hub-data-kafka` and `hub-data-mongodb` gate on their operators' CR health checks. Redis has no CR status worth gating on and is applied ungated.
-- `hub-auth` gates on `hub-data-mysql`; `hub-app` gates on `hub-auth-config` and the data stores.
+- `hub-vault` gates on `hub-data-mysql`; `hub-iam` gates on `hub-vault`; `hub-app` gates on `hub-iam-config` and the data stores.
 
 Health is expressed with `healthCheckExprs` on CR status fields where a status exists, and standard Deployment readiness elsewhere. Helm remediation retries remain as a second line, absorbing whatever the gates cannot see.
 

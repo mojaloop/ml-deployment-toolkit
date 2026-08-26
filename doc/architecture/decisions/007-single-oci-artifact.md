@@ -21,7 +21,7 @@ The `gitops/` directory contains multiple kustomization roots spanning platform 
 
 Single OCI artifact containing the entire `gitops/` directory. Flux Kustomizations select specific paths within the artifact based on environment configuration (provider, DNS provider, cluster role). The `flux-config` Terraform module creates the appropriate set of Kustomizations for each environment.
 
-Dependency chain within the artifact: `platform` -> `dns/{provider}` -> `platform-config` -> vendor (`talos`|`aws`|`gcp`) -> role-specific (`tooling`|`tooling-config`|`tooling-routes`|`hub`|`hub-data`|`hub-auth`|`hub-app`).
+Dependency chain within the artifact: `platform` -> `dns/{provider}` -> `platform-config` -> vendor (`talos`|`aws`|`gcp`) -> role-specific (`tooling`|`tooling-config`|`tooling-routes`|`hub`|`hub-data`|`hub-vault`|`hub-iam`|`hub-app`).
 
 ## Consequences
 

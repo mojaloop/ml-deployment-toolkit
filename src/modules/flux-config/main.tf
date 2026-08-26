@@ -9,8 +9,6 @@
 #   tooling: tooling -> tooling-config -> {tooling-routes, tooling-observability -> tooling-observability-routes}
 #   hub: hub -> hub-data-common -> hub-data-<store>... -> hub-vault -> hub-iam -> hub-iam-config -> hub-app
 #        hub-observability-agent (parallel, after platform-config)
-#        hub-auth / hub-auth-config: legacy combined form, suspended (prune off)
-#        pending removal — see _/hub-auth-split-plan.md phase B
 
 locals {
   s = var.secrets
@@ -855,32 +853,6 @@ locals {
         health_checks      = []
         health_check_exprs = []
       }
-      # Legacy combined form of hub-vault + hub-iam: suspended so only the new
-      # Kustomizations own the (identical) objects — two live owners would
-      # fight over the kustomize.toolkit.fluxcd.io labels. prune off makes the
-      # phase-B removal of these entries a guaranteed no-op on live objects.
-      "hub-auth" = {
-        enabled            = local.is_hub
-        path               = "./hub-auth"
-        depends_on         = local.auth_depends
-        timeout            = "20m"
-        wait               = false
-        health_checks      = []
-        health_check_exprs = []
-        prune              = false
-        suspend            = true
-      }
-      "hub-auth-config" = {
-        enabled            = local.is_hub
-        path               = "./hub-auth-config"
-        depends_on         = ["hub-auth"]
-        timeout            = "10m"
-        wait               = false
-        health_checks      = []
-        health_check_exprs = []
-        prune              = false
-        suspend            = true
-      }
       "hub-app" = {
         enabled    = local.is_hub
         path       = "./hub-app"
@@ -908,8 +880,8 @@ locals {
   )
 
   # Per-entry prune/suspend, defaulted here (prune on, not suspended) so
-  # entries only state deviations — currently the suspended legacy
-  # hub-auth/hub-auth-config pair pending phase-B removal.
+  # entries only state deviations — e.g. a superseded entry kept suspended
+  # with prune off for one release during an additive-then-remove migration.
   kustomizations = {
     for k, v in local.all_kustomizations :
     k => merge({ prune = true, suspend = false }, v) if v.enabled

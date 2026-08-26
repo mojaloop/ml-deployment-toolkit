@@ -63,31 +63,35 @@
   <!-- ================= Hub lane ================= -->
   <rect x="530" y="350" width="606" height="200" rx="10" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
   <text x="548" y="378" font-size="15" font-weight="700" fill="#3730a3">Hub</text>
-  <text x="548" y="396" font-size="11" fill="#4f46e5">role: hub · adds six stages</text>
+  <text x="548" y="396" font-size="11" fill="#4f46e5">role: hub · adds seven stages</text>
 
-  <rect x="548" y="410" width="56" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
-  <text x="576" y="436" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">hub</text>
+  <rect x="548" y="410" width="52" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
+  <text x="574" y="436" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">hub</text>
 
-  <rect x="638" y="410" width="84" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
-  <text x="680" y="436" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">hub-data</text>
+  <rect x="614" y="410" width="78" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
+  <text x="653" y="436" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">hub-data</text>
 
-  <rect x="756" y="410" width="84" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
-  <text x="798" y="436" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">hub-auth</text>
+  <rect x="706" y="410" width="78" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
+  <text x="745" y="436" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">hub-vault</text>
 
-  <rect x="874" y="410" width="116" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
-  <text x="932" y="436" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">hub-auth-config</text>
+  <rect x="798" y="410" width="70" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
+  <text x="833" y="436" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">hub-iam</text>
 
-  <rect x="1024" y="410" width="76" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
-  <text x="1062" y="436" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">hub-app</text>
+  <rect x="882" y="410" width="108" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
+  <text x="936" y="436" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">hub-iam-config</text>
+
+  <rect x="1004" y="410" width="70" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
+  <text x="1039" y="436" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">hub-app</text>
 
   <rect x="548" y="494" width="170" height="44" rx="6" fill="#ffffff" stroke="#a5b4fc"/>
   <text x="633" y="520" font-size="11.5" font-weight="700" fill="#3730a3" text-anchor="middle">hub-observability-agent</text>
 
   <!-- Hub arrows -->
-  <line x1="604" y1="432" x2="634" y2="432" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
-  <line x1="722" y1="432" x2="752" y2="432" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
-  <line x1="840" y1="432" x2="870" y2="432" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
-  <line x1="990" y1="432" x2="1020" y2="432" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="600" y1="432" x2="610" y2="432" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="692" y1="432" x2="702" y2="432" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="784" y1="432" x2="794" y2="432" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="868" y1="432" x2="878" y2="432" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="990" y1="432" x2="1000" y2="432" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
 
   <!-- talos fork into the two lanes -->
   <path d="M468 300 H506 V192 H540" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>

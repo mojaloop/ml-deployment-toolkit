@@ -3,7 +3,7 @@
 #   permission:<perm>#granted@(role:opsui#member)
 # tuples; membership in the role is what the ops-ui oathkeeper rules check.
 # The hub admin is seeded into the role by keto-hub-admin-bootstrap
-# (hub-auth-config); grant further operators with a role:opsui#member tuple.
+# (hub-iam-config); grant further operators with a role:opsui#member tuple.
 apiVersion: mojaloop.io/v1
 kind: MojaloopRole
 metadata:

@@ -27,7 +27,7 @@ Match the reconciliation stage to the dependency. A service needing the database
 
 ## Adding a platform service
 
-Each service lives in its own subdirectory of the Kustomization root — `platform/cert-manager/`, `hub-auth/vault/` — holding its HelmRelease and its values file:
+Each service lives in its own subdirectory of the Kustomization root — `platform/cert-manager/`, `hub-vault/vault/` — holding its HelmRelease and its values file:
 
 1. **Create `<root>/<service>/`** with the manifest — a `HelmRelease` referencing a `HelmRepository`, or plain YAML — as `<service>/helmrelease.yaml`.
 2. **Put the chart's values in `<root>/values/<namespace>/<release>.yaml`** — never in `spec.values`. See the rule below. The `values/<namespace>/<release>.yaml` path suffix is the same one the template and environment layers use for the same release, so an override's base is always found by path.

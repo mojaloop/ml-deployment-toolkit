@@ -68,3 +68,14 @@ Three choices within that are load-bearing:
 **Token audience is not validated.** The Mojaloop MCM client omits the `audience` parameter, so requiring it would reject every machine call. Trust rests on issuer and signature. Worth revisiting if the client changes.
 
 **Migration was one-way.** Keycloak realms were not exported, and no rollback path exists. Remnants of the previous design survive in the repository — an empty namespace, a stale dashboard, unused Terraform variables — pending cleanup.
+
+## Addendum (2026-08-26) — IAM as a swappable unit
+
+The Ory stack originally shipped inside the combined `hub-auth` Kustomization,
+entangled with Vault. The gitops layer now splits it into `hub-vault` (secrets
+infrastructure) and `hub-iam` / `hub-iam-config` (the Ory stack and its
+bootstrap), a pure refactor with no workload change. The point is isolation:
+IAM is one swappable unit behind a Vault it merely consumes, so a later
+migration to the upstream `mojaloop-iam` chart — or any other IAM packaging —
+replaces `hub-iam` without touching secrets infrastructure. See
+[Gitops structure](../gitops-structure.md).

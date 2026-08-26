@@ -47,8 +47,9 @@ gitops/
   hub/                       # Hub: namespaces, database operators
   hub-data/                  #   One root per store: common/, mysql/, kafka/,
                              #   mongodb/, redis/
-  hub-auth/                  #   Vault, Ory (Kratos, Hydra, Keto, Oathkeeper)
-  hub-auth-config/           #   Bootstrap jobs, Oathkeeper maester seed
+  hub-vault/                 #   Vault (secrets infra, backup, PKI issuer)
+  hub-iam/                   #   Ory IAM (Kratos, Hydra, Keto, Oathkeeper)
+  hub-iam-config/            #   Bootstrap jobs, Oathkeeper maester seed
   hub-app/                   #   Mojaloop, MCM, Finance Portal, extapi Envoy,
                              #   Oathkeeper access rules (apps, ops UIs, intapi)
   hub-observability-agent/   #   Alloy, kube-state-metrics, node-exporter
@@ -123,7 +124,8 @@ Kustomizations declare `dependsOn` and health gates rather than applying in para
 | `platform` before everything | cert-manager and ESO webhooks live, or dependent resources are rejected |
 | `dns` before `platform-config` | Gateways need a working issuer to obtain certificates |
 | vendor before role layers | CNI and storage exist before workloads schedule |
-| `hub-data-mysql` before `hub-auth` | Ory migrations need their databases and users to exist — the gate is the MySQL cluster reporting `ready`, which the operator sets only once users do |
-| `hub-auth-config` before `hub-app` | Applications expect bootstrapped identities and the seeded Oathkeeper rule store |
+| `hub-data-mysql` before `hub-vault` | Ory migrations further down the chain need their databases and users to exist — the gate is the MySQL cluster reporting `ready`, which the operator sets only once users do |
+| `hub-vault` before `hub-iam` | The Ory ExternalSecrets resolve through the Vault-backed ClusterSecretStore |
+| `hub-iam-config` before `hub-app` | Applications expect bootstrapped identities and the seeded Oathkeeper rule store |
 
 A stalled Kustomization blocks everything behind it. When diagnosing, find the **earliest** failing one — later failures are usually consequences, not causes.

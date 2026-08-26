@@ -73,7 +73,7 @@ There is no `keycloak` database. Any reference to one is stale ([ADR-010](decisi
 
 A single cluster hosts all seven rather than one cluster per service ([ADR-009](decisions/009-single-mysql-cluster.md)).
 
-**Users are created asynchronously by the operator**, taking roughly 7–10 minutes after the cluster is created. The reconciliation chain gates `hub-auth` on the cluster reporting `ready` — the state the operator sets only once users exist ([ADR-019](decisions/019-health-gated-reconciliation.md)) — see [System overview](system-overview.md#reconciliation-order).
+**Users are created asynchronously by the operator**, taking roughly 7–10 minutes after the cluster is created. The reconciliation chain gates `hub-vault` — and the IAM stack behind it — on the cluster reporting `ready` — the state the operator sets only once users exist ([ADR-019](decisions/019-health-gated-reconciliation.md)) — see [System overview](system-overview.md#reconciliation-order).
 
 ## Kafka
 

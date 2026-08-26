@@ -107,7 +107,7 @@ oathkeeper:
           enabled: true
           config:
             # The self-service UI is prefix-routed at /ui on the auth host
-            # (see hub-auth/routes/auth-httproute.yaml) — its login page is
+            # (see hub-iam/routes/auth-httproute.yaml) — its login page is
             # /ui/login, not /login.
             to: https://auth.int.${DOMAIN}/ui/login
             code: 302

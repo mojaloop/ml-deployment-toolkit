@@ -104,9 +104,9 @@ Every role shares the same four-stage prefix — `platform` → `dns` → `platf
 
 The **Tooling Cluster** adds five stages. `tooling-config` gates on Harbor and MinIO. `tooling-observability` gates on Thanos receive and query, plus Loki, Tempo, and Grafana.
 
-The **Hub** adds a gated chain at every step: `hub` waits for the PXC, PSMDB, and Strimzi operators; `hub-data-common` fans out into one Kustomization per in-cluster store — `hub-data-mysql` waits for the MySQL cluster to report `ready`, Kafka and MongoDB for their custom resources to be healthy, while Redis has no status worth gating on and applies ungated; `hub-auth` waits for Vault, Kratos, Keto, and Hydra; `hub-app` waits for Mojaloop, MCM, and Finance Portal.
+The **Hub** adds a gated chain at every step: `hub` waits for the PXC, PSMDB, and Strimzi operators; `hub-data-common` fans out into one Kustomization per in-cluster store — `hub-data-mysql` waits for the MySQL cluster to report `ready`, Kafka and MongoDB for their custom resources to be healthy, while Redis has no status worth gating on and applies ungated; `hub-vault` waits for Vault; `hub-iam` waits for Kratos, Keto, and Hydra; `hub-app` waits for Mojaloop, MCM, and Finance Portal.
 
-A store bound to `external-unmanaged` gets no Kustomization at all — the fan-out is built from the stores that are actually in-cluster, so `hub-auth` and `hub-app` gate only on what this deployment runs. See [Configuration → Data modes](../adopter/deploy/configuration.md#data-modes).
+A store bound to `external-unmanaged` gets no Kustomization at all — the fan-out is built from the stores that are actually in-cluster, so `hub-vault` and `hub-app` gate only on what this deployment runs. See [Configuration → Data modes](../adopter/deploy/configuration.md#data-modes).
 
 Each link gates on the *health* of what the previous one produced, not on its application ([ADR-019](decisions/019-health-gated-reconciliation.md)) — so a Hub converges serially, and an early failure blocks everything downstream. `hub-observability-agent` is a parallel branch off `platform-config` and does not block the application chain.
 
