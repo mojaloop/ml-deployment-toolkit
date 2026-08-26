@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - vault/vault.yaml
+  - vault/vault-backup.yaml
+  - vault/backup-s3-credentials.yaml
+  - vault/secretstore.yaml
+  - vault/vault-pki-issuer.yaml
+  - routes/vault-httproute.yaml

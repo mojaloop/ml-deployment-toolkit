@@ -1,0 +1,47 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: hydra
+  namespace: flux-system
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: hydra
+      version: "0.62.1"
+      sourceRef:
+        kind: HelmRepository
+        name: ory
+      interval: 12h
+  targetNamespace: ory
+  timeout: 15m
+  install:
+    createNamespace: false
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      retries: -1
+      strategy: uninstall
+  valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: hydra-values
+      valuesKey: values.yaml
+    # Secret half of the distribution values (credential-bearing keys) —
+    # merged right after them; template/environment overrides still win.
+    - kind: Secret
+      name: hydra-values-secret
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: ory-hydra-values-template
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
+      name: ory-hydra-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: ory-hydra-values-override
+      valuesKey: values.yaml
+      optional: true

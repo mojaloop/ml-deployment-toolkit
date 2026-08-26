@@ -7,8 +7,10 @@
 # Kustomization graph (Flux dependsOn, role-gated):
 #   platform -> dns/<provider> -> platform-config -> <vendor> -> <role>
 #   tooling: tooling -> tooling-config -> {tooling-routes, tooling-observability -> tooling-observability-routes}
-#   hub: hub -> hub-data-common -> hub-data-<store>... -> hub-auth -> hub-auth-config -> hub-app
+#   hub: hub -> hub-data-common -> hub-data-<store>... -> hub-vault -> hub-iam -> hub-iam-config -> hub-app
 #        hub-observability-agent (parallel, after platform-config)
+#        hub-auth / hub-auth-config: legacy combined form, suspended (prune off)
+#        pending removal — see _/hub-auth-split-plan.md phase B
 
 locals {
   s = var.secrets
@@ -588,7 +590,7 @@ locals {
   # Auth needs MySQL (Ory/MCM databases); apps additionally need every other store.
   auth_depends = contains(local.in_cluster_stores, "mysql") ? ["hub-data-mysql"] : ["hub"]
   app_depends = concat(
-    ["hub-auth-config"],
+    ["hub-iam-config"],
     [for store in local.in_cluster_stores : "hub-data-${store}" if store != "mysql"],
   )
 
@@ -653,7 +655,7 @@ locals {
           name    = "mojaloop-db"
         }
       }]
-      "hub-auth" = [{
+      "hub-vault" = [{
         patch = yamlencode({
           apiVersion = "batch/v1"
           kind       = "CronJob"
@@ -820,19 +822,53 @@ locals {
         health_check_exprs = []
       }
       # --- hub chain ---
-      "hub-auth" = {
+      "hub-vault" = {
         enabled    = local.is_hub
-        path       = "./hub-auth"
+        path       = "./hub-vault"
         depends_on = local.auth_depends
-        timeout    = "20m"
+        timeout    = "10m"
         wait       = false
         health_checks = [
           { apiVersion = "vault.banzaicloud.com/v1alpha1", kind = "Vault", name = "vault", namespace = "vault" },
+        ]
+        health_check_exprs = []
+      }
+      "hub-iam" = {
+        enabled    = local.is_hub
+        path       = "./hub-iam"
+        depends_on = ["hub-vault"]
+        timeout    = "20m"
+        wait       = false
+        health_checks = [
           { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "kratos", namespace = var.flux_namespace },
           { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "keto", namespace = var.flux_namespace },
           { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "hydra", namespace = var.flux_namespace },
         ]
         health_check_exprs = []
+      }
+      "hub-iam-config" = {
+        enabled            = local.is_hub
+        path               = "./hub-iam-config"
+        depends_on         = ["hub-iam"]
+        timeout            = "10m"
+        wait               = false
+        health_checks      = []
+        health_check_exprs = []
+      }
+      # Legacy combined form of hub-vault + hub-iam: suspended so only the new
+      # Kustomizations own the (identical) objects — two live owners would
+      # fight over the kustomize.toolkit.fluxcd.io labels. prune off makes the
+      # phase-B removal of these entries a guaranteed no-op on live objects.
+      "hub-auth" = {
+        enabled            = local.is_hub
+        path               = "./hub-auth"
+        depends_on         = local.auth_depends
+        timeout            = "20m"
+        wait               = false
+        health_checks      = []
+        health_check_exprs = []
+        prune              = false
+        suspend            = true
       }
       "hub-auth-config" = {
         enabled            = local.is_hub
@@ -842,6 +878,8 @@ locals {
         wait               = false
         health_checks      = []
         health_check_exprs = []
+        prune              = false
+        suspend            = true
       }
       "hub-app" = {
         enabled    = local.is_hub
@@ -869,7 +907,13 @@ locals {
     local.data_kustomizations,
   )
 
-  kustomizations = { for k, v in local.all_kustomizations : k => v if v.enabled }
+  # Per-entry prune/suspend, defaulted here (prune on, not suspended) so
+  # entries only state deviations — currently the suspended legacy
+  # hub-auth/hub-auth-config pair pending phase-B removal.
+  kustomizations = {
+    for k, v in local.all_kustomizations :
+    k => merge({ prune = true, suspend = false }, v) if v.enabled
+  }
 
   # Layer order: distribution patches, then template patches, then deployer
   # (environment) patches — kustomize applies the list in order, so later
@@ -922,7 +966,7 @@ resource "kubectl_manifest" "kustomization" {
       {
         interval = "10m"
         path     = each.value.path
-        prune    = true
+        prune    = each.value.prune
         sourceRef = {
           kind = "OCIRepository"
           name = "ml-gitops"
@@ -941,6 +985,7 @@ resource "kubectl_manifest" "kustomization" {
       length(each.value.depends_on) > 0 ? {
         dependsOn = [for d in each.value.depends_on : { name = d }]
       } : {},
+      each.value.suspend ? { suspend = true } : {},
       each.value.timeout != "" ? { timeout = each.value.timeout } : {},
       each.value.wait ? { wait = true } : {},
       length(each.value.health_checks) > 0 ? {

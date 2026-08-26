@@ -1,0 +1,43 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kratos-selfservice-ui
+  namespace: flux-system
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: kratos-selfservice-ui-node
+      version: "0.62.1"
+      sourceRef:
+        kind: HelmRepository
+        name: ory
+      interval: 12h
+  targetNamespace: ory
+  install:
+    createNamespace: false
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      retries: -1
+      strategy: uninstall
+  dependsOn:
+    - name: kratos
+  valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: kratos-selfservice-ui-values
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: ory-kratos-selfservice-ui-values-template
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
+      name: ory-kratos-selfservice-ui-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: ory-kratos-selfservice-ui-values-override
+      valuesKey: values.yaml
+      optional: true

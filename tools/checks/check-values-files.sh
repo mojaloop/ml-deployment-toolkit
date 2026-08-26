@@ -31,6 +31,9 @@ tooling-routes
 tooling-observability
 tooling-observability-routes
 hub
+hub-vault
+hub-iam
+hub-iam-config
 hub-auth
 hub-auth-config
 hub-app

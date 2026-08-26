@@ -1,0 +1,90 @@
+# Distribution values for the hydra HelmRelease.
+# Adopter overrides go in environments/<env>/values/hydra.yaml,
+# which is merged after this file and therefore wins.
+replicaCount: 1
+fullnameOverride: "hydra"
+
+secret:
+  enabled: false
+  nameOverride: hydra-secret
+
+deployment:
+  extraInitContainers: |
+    - name: wait-for-db
+      image: percona/percona-xtradb-cluster:8.0.44-35.1
+      command: [sh, -c]
+      args:
+        - |
+          DB_USER=$(echo "$DSN" | sed 's|mysql://\([^:]*\):.*|\1|')
+          DB_PASS=$(echo "$DSN" | sed 's|mysql://[^:]*:\([^@]*\)@.*|\1|')
+          HOST=$(echo "$DSN" | sed 's|.*tcp(\([^:]*\):.*|\1|')
+          PORT=$(echo "$DSN" | sed 's|.*tcp([^:]*:\([^)]*\)).*|\1|')
+          DB=$(echo "$DSN" | sed 's|.*/\([^?]*\).*|\1|')
+          echo "Waiting for MySQL connectivity to $DB..."
+          until mysql -h "$HOST" -P "$PORT" -u "$DB_USER" -p"$DB_PASS" -e "SELECT 1" "$DB" 2>/dev/null; do
+            echo "Waiting for $DB database..."
+            sleep 5
+          done
+          echo "MySQL reachable. Verifying DDL readiness..."
+          STABLE=0
+          while [ $STABLE -lt 3 ]; do
+            if mysql -h "$HOST" -P "$PORT" -u "$DB_USER" -p"$DB_PASS" "$DB" \
+              -e "CREATE TABLE IF NOT EXISTS __init_check (id INT PRIMARY KEY) ENGINE=InnoDB; DROP TABLE IF EXISTS __init_check;" 2>/dev/null; then
+              STABLE=$((STABLE + 1))
+              echo "DDL check passed ($STABLE/3)"
+            else
+              STABLE=0
+              echo "DDL not ready, retrying..."
+            fi
+            sleep 2
+          done
+          echo "Database ready!"
+      env:
+        - name: DSN
+          valueFrom:
+            secretKeyRef:
+              name: hydra-secret
+              key: dsn
+
+service:
+  admin:
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "4445"
+      prometheus.io/path: "/admin/metrics/prometheus"
+
+hydra:
+  automigration:
+    enabled: true
+    type: initContainer
+  config:
+    # dsn carries the DB password — supplied via hydra-values-secret
+    # (ory/values-secrets.yaml), merged after this file.
+
+    serve:
+      public:
+        port: 4444
+        cors:
+          enabled: true
+          allowed_origins:
+            - "https://*.${DOMAIN}"
+      admin:
+        port: 4445
+
+    urls:
+      self:
+        issuer: "https://hydra.ext.${DOMAIN}"
+
+    oauth2:
+      expose_internal_errors: false
+
+    strategies:
+      access_token: jwt
+
+    ttl:
+      access_token: 1h
+      refresh_token: 720h
+
+    log:
+      level: info
+      format: json

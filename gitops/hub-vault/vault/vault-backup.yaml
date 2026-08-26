@@ -1,0 +1,96 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-backup
+  namespace: vault
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vault-raft-snapshot
+  namespace: vault
+spec:
+  schedule: "*/15 * * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: vault-backup
+          restartPolicy: OnFailure
+          volumes:
+            - name: snapshots
+              emptyDir: {}
+          initContainers:
+            - name: snapshot
+              image: hashicorp/vault:1.21.4
+              volumeMounts:
+                - name: snapshots
+                  mountPath: /snapshots
+              env:
+                - name: VAULT_ADDR
+                  value: http://vault.vault:8200
+              command:
+                - /bin/sh
+                - -ec
+                - |
+                  # Authenticate to Vault via Kubernetes auth
+                  VAULT_TOKEN=$$(vault write -field=token auth/kubernetes/login \
+                    role=vault-backup \
+                    jwt="$$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)")
+                  export VAULT_TOKEN
+
+                  # Take Raft snapshot
+                  vault operator raft snapshot save /snapshots/vault-raft.snap
+                  echo "Snapshot saved ($$(du -h /snapshots/vault-raft.snap | cut -f1))"
+          containers:
+            - name: upload
+              image: amazon/aws-cli:2.36.11
+              volumeMounts:
+                - name: snapshots
+                  mountPath: /snapshots
+              env:
+                - name: CLUSTER_NAME
+                  value: "${CLUSTER_NAME}"
+                - name: S3_ENDPOINT
+                  value: "${BACKUP_S3_ENDPOINT}"
+                - name: S3_BUCKET
+                  value: "${BACKUP_S3_BUCKET}"
+                - name: AWS_DEFAULT_REGION
+                  value: "${BACKUP_S3_REGION}"
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backup-s3-credentials
+                      key: AWS_ACCESS_KEY_ID
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backup-s3-credentials
+                      key: AWS_SECRET_ACCESS_KEY
+              command:
+                - /bin/sh
+                - -ec
+                - |
+                  TIMESTAMP=$$(date +%Y-%m-%d_%H%M%S)
+                  S3_KEY="$${CLUSTER_NAME}/vault/vault-raft-$${TIMESTAMP}.snap"
+
+                  # Upload snapshot to S3
+                  aws --endpoint-url "$${S3_ENDPOINT}" \
+                    s3 cp /snapshots/vault-raft.snap "s3://$${S3_BUCKET}/$${S3_KEY}"
+                  echo "Uploaded to s3://$${S3_BUCKET}/$${S3_KEY}"
+
+                  # Prune old snapshots — keep last 7
+                  aws --endpoint-url "$${S3_ENDPOINT}" \
+                    s3api list-objects-v2 \
+                    --bucket "$${S3_BUCKET}" \
+                    --prefix "$${CLUSTER_NAME}/vault/" \
+                    --query "reverse(sort_by(Contents,&LastModified))[7:].Key" \
+                    --output text | tr '\t' '\n' | while read -r key; do
+                      [ -n "$${key}" ] && [ "$${key}" != "None" ] && \
+                        aws --endpoint-url "$${S3_ENDPOINT}" \
+                          s3api delete-object --bucket "$${S3_BUCKET}" --key "$${key}" && \
+                        echo "Pruned: $${key}"
+                  done

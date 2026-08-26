@@ -1,0 +1,66 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kratos-hub-admin-bootstrap
+  namespace: ory
+  annotations:
+    kustomize.toolkit.fluxcd.io/force: "enabled"
+spec:
+  backoffLimit: 10
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: curlimages/curl:8.21.0
+          command: [sh, -c]
+          args:
+            - |
+              set -e
+
+              echo "Waiting for Kratos admin API..."
+              until curl -sf http://kratos-admin.ory.svc.cluster.local/health/ready > /dev/null 2>&1; do
+                echo "  not ready, retrying in 5s..."
+                sleep 5
+              done
+              echo "Kratos admin API is ready."
+
+              # Hub admin identity.
+              #  traits.roles            → Finance Portal portal/menu (read via whoami)
+              #  metadata_public.role    → MCM X-Roles header ("hub-admin") for list scoping
+              echo "Creating hub admin identity ($HUB_ADMIN_EMAIL)..."
+              HTTP_CODE=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
+                -X POST http://kratos-admin.ory.svc.cluster.local/admin/identities \
+                -H "Content-Type: application/json" \
+                -d "{\"schema_id\":\"default\",\"traits\":{\"email\":\"$HUB_ADMIN_EMAIL\",\"name\":\"Hub Admin\",\"roles\":[\"hub-admin\"]},\"metadata_public\":{\"role\":\"hub-admin\"},\"credentials\":{\"password\":{\"config\":{\"password\":\"$HUB_ADMIN_PASSWORD\"}}}}")
+
+              echo "HTTP $HTTP_CODE: $(cat /tmp/resp.json)"
+              case "$HTTP_CODE" in
+                201) echo "Identity created." ;;
+                409) echo "Identity already exists." ;;
+                *) echo "Unexpected status $HTTP_CODE"; exit 1 ;;
+              esac
+
+              echo "Resolving identity id..."
+              IDENTITY_ID=$(curl -sf \
+                "http://kratos-admin.ory.svc.cluster.local/admin/identities?credentials_identifier=$HUB_ADMIN_EMAIL" \
+                | grep -o '"id":"[^"]*"' | head -1 | sed 's/"id":"//;s/"//')
+              echo "Identity ID: $IDENTITY_ID"
+
+              # Idempotent re-assert of role traits + metadata_public (covers the 409 path).
+              echo "Patching identity (traits.roles + metadata_public.role)..."
+              HTTP_CODE=$(curl -s -o /tmp/patch-resp.json -w "%{http_code}" \
+                -X PATCH "http://kratos-admin.ory.svc.cluster.local/admin/identities/$IDENTITY_ID" \
+                -H "Content-Type: application/json" \
+                -d '[{"op":"add","path":"/traits/roles","value":["hub-admin"]},{"op":"add","path":"/metadata_public","value":{"role":"hub-admin"}}]')
+              echo "Patch HTTP $HTTP_CODE: $(cat /tmp/patch-resp.json)"
+              case "$HTTP_CODE" in
+                2*) echo "Patch succeeded." ;;
+                *) echo "Patch failed with $HTTP_CODE"; exit 1 ;;
+              esac
+          env:
+            - name: HUB_ADMIN_EMAIL
+              value: "${HUB_ADMIN_EMAIL}"
+            - name: HUB_ADMIN_PASSWORD
+              value: "${HUB_ADMIN_PASSWORD}"
