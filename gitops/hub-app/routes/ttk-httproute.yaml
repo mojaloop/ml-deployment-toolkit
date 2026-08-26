@@ -1,4 +1,10 @@
 # TTK frontend + UI
+#
+# AUTH BYPASSED (2026-08-26, temporary): bypassed together with
+# ttk-backend — see ttk-backend-httproute.yaml for the full rationale.
+# Both TTK hosts are deliberately routed straight to their services
+# (visibly unprotected — no cosmetic login anywhere). End-state:
+# single-origin collapse, then restore the oathkeeper backendRef below.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -11,11 +17,14 @@ spec:
   hostnames:
     - "ttk.int.${DOMAIN}"
   rules:
-    # Through oathkeeper (cookie_session + Keto opsui permission) — the
-    # matching Rule in hub-app/ops-ui/oathkeeper-rules.yaml carries the
-    # upstream; this route only decides that NOTHING reaches the backend
-    # without passing the proxy.
     - backendRefs:
-        - name: oathkeeper-proxy
-          namespace: ory
-          port: 4455
+        # --- protected config: restore this backendRef to re-enable auth ---
+        # (through oathkeeper: cookie_session + Keto opsui permission; the
+        # matching Rule in hub-app/ops-ui/oathkeeper-rules.yaml carries the
+        # upstream)
+        # - name: oathkeeper-proxy
+        #   namespace: ory
+        #   port: 4455
+        # --- bypass: direct to service ---
+        - name: moja-ml-testing-toolkit-frontend
+          port: 6060
