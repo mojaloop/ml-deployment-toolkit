@@ -20,8 +20,12 @@ locals {
 
   has_oci_credentials = lookup(local.s, "OCI_REPO_USERNAME", "") != "" && lookup(local.s, "OCI_REPO_PASSWORD", "") != ""
 
-  is_talos    = contains(["proxmox", "openstack"], var.infra_provider)
-  has_vendor  = contains(["proxmox", "openstack", "aws", "gcp"], var.infra_provider)
+  # Bounded by the infra.provider schema enum. has_vendor lists exactly the
+  # providers with a gitops vendor layer directory — a name here without a
+  # matching gitops/ dir makes Flux chase a path that does not exist (the old
+  # "gcp" entry was exactly that standing mismatch).
+  is_talos    = var.infra_provider == "proxmox"
+  has_vendor  = contains(["proxmox", "aws"], var.infra_provider)
   is_hub      = var.cluster_role == "hub"
   is_tooling  = var.cluster_role == "tooling"
   vendor_name = local.is_talos ? "talos" : var.infra_provider

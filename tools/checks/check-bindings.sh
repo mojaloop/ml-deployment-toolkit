@@ -28,19 +28,17 @@ for a in "$@"; do
   esac
 done
 
-# Template roots move with the provider-package regroup; probe both layouts.
 template_glob() {
-  # prints existing template dirs: <root>/<provider>/<role>/<name>
-  for d in providers/*/templates/*/* config/templates/*/*/*; do
+  # prints existing template dirs: providers/<provider>/templates/<role>/<name>
+  for d in providers/*/templates/*/*; do
     [ -d "$d" ] && printf '%s\n' "$d"
   done
 }
 
 template_dir_for() {
   # template_dir_for <provider> <role> <template>
-  for d in "providers/$1/templates/$2/$3" "config/templates/$1/$2/$3"; do
-    [ -d "$d" ] && { printf '%s' "$d"; return 0; }
-  done
+  d="providers/$1/templates/$2/$3"
+  [ -d "$d" ] && { printf '%s' "$d"; return 0; }
   return 1
 }
 

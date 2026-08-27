@@ -23,7 +23,7 @@ cluster:
       gw-ext:
         lan: "192.168.0.212"
 
-# Deployment template — config/templates/<provider>/<role>/<template>/
+# Deployment template — providers/<provider>/templates/<role>/<template>/
 template: "medium"
 
 infra:

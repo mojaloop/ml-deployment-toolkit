@@ -27,7 +27,7 @@ cluster:
       gw-intapi:
         lan: "192.168.0.218"
 
-# Deployment template — config/templates/<provider>/<role>/<template>/
+# Deployment template — providers/<provider>/templates/<role>/<template>/
 template: "tps-10"
 
 infra:

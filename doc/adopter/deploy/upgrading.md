@@ -79,6 +79,8 @@ Kubernetes and Talos versions are set centrally in the platform definitions, not
 An environment deployed before the two-stack split holds a single `terraform.tfstate` under its artifacts directory. Splitting it is a one-time state operation — no VM is recreated ([ADR-015](../../architecture/decisions/015-two-stack-capability-config.md)). The split lands directly in the current layout: the script reads and writes `../artifacts/<env>/state/`, so a migrated environment comes out on the `state/` + `plans/` arrangement with nothing further to move.
 
 ```bash
+# Run from the DTK tag that shipped the split (the script was removed once the
+# migration window closed — matched versions only: check out that tag first):
 tools/migrate-state.sh <env>            # dry run — prints every operation, changes nothing
 tools/migrate-state.sh <env> --apply
 ```
@@ -127,6 +129,8 @@ An environment deployed before the config-layering release ([design record](../.
 5. **Migrate the state keys.** The generated internal passwords are keyed by UPPER_SNAKE names now; without a state move, the next apply would regenerate every one of them — rotating live database and service credentials:
 
    ```bash
+   # Run from the DTK tag that shipped the rename (script removed once the
+   # migration window closed — check out that tag first):
    tools/migrate-uppercase-state.sh <env>            # dry run — prints every state mv, changes nothing
    tools/migrate-uppercase-state.sh <env> --apply
    ```

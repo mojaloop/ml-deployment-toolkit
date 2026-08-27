@@ -23,8 +23,8 @@
 # committable.
 #
 # Environment knobs:
-#   ENVIRONMENTS_ROOT (../environments)   ARTIFACTS_ROOT (../artifacts)
-#   RENDER_ROOT (../rendered)             OUT (override output dir; explain uses it)
+#   ENVIRONMENTS_ROOT (../environments)   RENDER_ROOT (../rendered)
+#   OUT (override output dir; explain uses it)
 #   MASK=environment|template  — render with that layer's override surfaces
 #     masked (tools/explain.sh diffs it against the full render):
 #       environment: env values/ + talos/ skipped; placement.yaml pool
@@ -66,12 +66,8 @@ if [ -z "$provider" ] || [ -z "$role" ] || [ -z "$template" ]; then
   echo "error: $CFG must set infra.provider, cluster.role and template (got '$provider'/'$role'/'$template')" >&2
   exit 2
 fi
-# Template roots move with the provider-package regroup; probe both layouts.
-TPL_DIR=""
-for d in "providers/$provider/templates/$role/$template" "config/templates/$provider/$role/$template"; do
-  [ -d "$d" ] && { TPL_DIR="$d"; break; }
-done
-[ -n "$TPL_DIR" ] || { echo "error: template directory not found for $provider/$role/$template" >&2; exit 2; }
+TPL_DIR="providers/$provider/templates/$role/$template"
+[ -d "$TPL_DIR" ] || { echo "error: template directory not found: $TPL_DIR" >&2; exit 2; }
 
 OUT="${OUT:-$RENDER_ROOT/$ENV}"
 if [ -z "${MASK}" ] && [ ! -d "$RENDER_ROOT/.git" ]; then

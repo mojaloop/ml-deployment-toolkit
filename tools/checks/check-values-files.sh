@@ -24,7 +24,6 @@ KUSTOMIZATIONS="platform
 platform-config
 talos
 aws
-gcp
 tooling
 tooling-config
 tooling-routes

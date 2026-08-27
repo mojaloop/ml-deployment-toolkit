@@ -68,7 +68,8 @@ locals {
   # Read raw config for provider selection (before module.config expands it)
   config_raw    = yamldecode(file(local.env_config_path))
   provider_name = local.config_raw.infra.provider
-  is_talos      = contains(["proxmox", "openstack"], local.provider_name)
+  # Bounded by the infra.provider schema enum (proxmox | aws | digitalocean).
+  is_talos = local.provider_name == "proxmox"
 
   config = module.config.config
 

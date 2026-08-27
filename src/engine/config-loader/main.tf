@@ -30,10 +30,10 @@ locals {
   provider_name = local.config.infra.provider
 
   # Provider parameters: the interface symbols (params, P_*) plus the
-  # Terraform-consumed provider config (infra — formerly the mapping file).
+  # Terraform-consumed provider infra facts (params.yaml `infra` block).
   provider_params_file = yamldecode(file("${var.providers_path}/${local.provider_name}/params.yaml"))
   provider_params      = try(local.provider_params_file.params, {})
-  mapping              = try(local.provider_params_file.infra, {})
+  provider_infra       = try(local.provider_params_file.infra, {})
 
   # Structural capabilities the provider declares (params.schema.json requires
   # every capability stated explicitly). Consumers gate on these, never on
@@ -56,8 +56,11 @@ locals {
   # capacity: template.yaml (identity + tuning), placement.yaml (the shape:
   # node pools, default topology), values/ and patches/ (gitops deltas),
   # talos/<pool>.yaml (per-pool machine-config fragments).
-  template_dir       = "${var.providers_path}/${local.provider_name}/templates/${local.cluster_role}/${local.config.template}"
-  template           = yamldecode(file("${local.template_dir}/template.yaml"))
+  template_dir = "${var.providers_path}/${local.provider_name}/templates/${local.cluster_role}/${local.config.template}"
+  # Deliberately loaded and otherwise unused: template.yaml is identity-only
+  # (no knobs), and this assert makes a missing or unparseable identity file
+  # fail the plan by path instead of the template silently half-existing.
+  template_identity  = yamldecode(file("${local.template_dir}/template.yaml"))
   template_placement = yamldecode(file("${local.template_dir}/placement.yaml"))
 
   # --- VM pools: match by name, shallow per-field replacement ---------------
@@ -80,7 +83,8 @@ locals {
   node_groups = [for name, g in local.merged_pools : g if try(g.enabled, true)]
 
   # On-prem providers render one VM per node and need real placement targets.
-  is_talos_provider = contains(["proxmox", "openstack"], local.provider_name)
+  # Bounded by the infra.provider schema enum (proxmox | aws | digitalocean).
+  is_talos_provider = local.provider_name == "proxmox"
 
   # --- LB IPAM (on-prem): one dedicated single-IP pool per gateway ----------
   # dns_target is what external-dns publishes for everything attached to the
@@ -102,8 +106,8 @@ locals {
   kubernetes_version = local.workload_classes.kubernetes_version
   talos_version      = local.workload_classes.talos_version
 
-  # Talos image URL — only for on-prem providers whose mapping defines talos.platform
-  talos_image_platform  = try(local.mapping.talos.platform, "")
+  # Talos image URL — only for on-prem providers whose infra block defines talos.platform
+  talos_image_platform  = try(local.provider_infra.talos.platform, "")
   talos_image_schematic = try(local.workload_classes.talos_image.schematic, "")
   # Stated in the platform definitions file, not defaulted here.
   talos_image_arch = local.workload_classes.talos_image.arch
