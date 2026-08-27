@@ -340,9 +340,20 @@ Per-environment state directories make cross-environment interference structural
 two environments cannot touch the same state file, so a concurrent apply on one cannot damage
 the other.
 
-**Local state only for now.** An object storage backend is a separate feature. Two things keep
-that addition cheap: the state path stays a config parameter rather than a hardcoded default,
-and nothing else in the design assumes state is a local file.
+**State backend is declared per environment** (implemented 2026-08-27). `<env>/state-backend.yaml`
+(operator plane, sibling of `.env` — not a capability: no provider role, no gitops consumer)
+names an S3-compatible backend for the environment's two state files; the engine generates the
+actual backend config per stack (`tools/generate-backend.sh`, run by every Makefile bind —
+backend blocks cannot interpolate). An absent file means local state under
+`artifacts/<env>/state/`, the historical layout. Hub environments use the tooling MinIO (same
+trust domain as backups; declare the bucket via the tooling env's `object_storage.buckets`);
+the tooling environment cannot store state in the MinIO it creates — external S3 or
+local-with-mandatory-backup. State is more sensitive than backups (all secrets in plaintext):
+private + versioned bucket; locking via the S3-native lockfile (Terraform >= 1.10 conditional
+writes — verify the deployed MinIO release honors If-None-Match PUT). Credentials are
+`STATE_S3_ACCESS_KEY`/`STATE_S3_SECRET_KEY` in `.env`. Switching an existing environment never
+moves state automatically: `CONFIRM=yes tools/migrate-state-backend.sh <env>` is the operator
+command.
 
 ## Delivery
 
@@ -542,9 +553,9 @@ default branch — not on the default branch directly. What actually changes:
 Out of scope for this refactor; recorded so the deferrals stay visible decisions rather than
 omissions.
 
-- **Object-storage Terraform state backend.** Local state on one workstation is an accepted
-  interim risk. The addition stays cheap by design: the state path is a parameter and nothing
-  assumes state is a local file.
+- **Object-storage Terraform state backend.** DONE 2026-08-27 — see "Artifacts and state"
+  above: per-env `state-backend.yaml`, engine-generated backend config, operator-run
+  migration script.
 - **Secrets custody beyond `.env`.** Evaluate SOPS with age: secrets live encrypted and
   versioned in the env repo, and out-of-band custody shrinks from every secret to one age key
   (password manager, or a cloud KMS where no local key exists). It does not remove local

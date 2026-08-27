@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Terraform state backend",
+  "description": "Schema for <env>/state-backend.yaml — the environment's Terraform state location (operator plane, sibling of .env; NOT a capability — it has no provider role and no gitops consumer). Absent file = local state under artifacts/<env>/state/ (the historical layout). The engine generates the actual backend config per stack from this file (backend blocks cannot interpolate). Credentials come from .env: STATE_S3_ACCESS_KEY / STATE_S3_SECRET_KEY. Hub environments use the tooling MinIO (same trust domain as backups); the tooling environment cannot store state in the MinIO it creates — it uses external S3 or stays local with mandatory backup. State is more sensitive than backups (all secrets in plaintext): private + versioned bucket; locking via the S3-native lockfile (Terraform >= 1.10 conditional writes — verify the serving MinIO release supports If-None-Match PUT).",
+  "type": "object",
+  "required": [
+    "version",
+    "type"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "description": "State-backend format version",
+      "type": "integer",
+      "minimum": 1
+    },
+    "type": {
+      "description": "Backend type. 'local' keeps the two state files under artifacts/<env>/state/ (must then be backed up out of band); 's3' stores them in the named S3-compatible bucket.",
+      "enum": [
+        "local",
+        "s3"
+      ]
+    },
+    "s3": {
+      "description": "Required when type is s3.",
+      "type": "object",
+      "required": [
+        "bucket",
+        "region"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "description": "S3-compatible endpoint URL, stated outright (e.g. the tooling MinIO: https://s3.int.<tooling-domain>). Omit or leave empty for real AWS S3 (the region selects the endpoint).",
+          "type": "string"
+        },
+        "bucket": {
+          "description": "Bucket name — private and versioned; state carries every platform secret in plaintext. On a tooling MinIO, declare it via the tooling env's object_storage.buckets (access key = bucket name; 'make secrets' prints the secret key to copy into STATE_S3_ACCESS_KEY/SECRET_KEY).",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+        },
+        "region": {
+          "description": "Region for SigV4 signing. MinIO accepts its configured region (commonly us-east-1); AWS S3 needs the bucket's real region.",
+          "type": "string"
+        },
+        "key_prefix": {
+          "description": "Object key prefix for the two state files (<prefix>/infra.tfstate, <prefix>/config.tfstate). Defaults to the environment name.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._/-]+$"
+        },
+        "use_lockfile": {
+          "description": "S3-native lockfile locking (Terraform >= 1.10). Default true. Requires the endpoint to honor conditional writes (If-None-Match) — verify against the deployed MinIO release.",
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

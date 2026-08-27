@@ -34,10 +34,16 @@ INFRA_DIR := src/infra
 CONFIG_DIR := src/config
 INFRA_PLAN := $(PLANS_DIR)/tfplan-infra
 CONFIG_PLAN := $(PLANS_DIR)/tfplan-config
-# abspath keeps overrides working whether the roots are given relative (to the
-# repo root, where make runs) or absolute; terraform init runs in src/<stack>.
-INFRA_BACKEND := path=$(abspath $(STATE_DIR))/infra.tfstate
-CONFIG_BACKEND := path=$(abspath $(STATE_DIR))/config.tfstate
+# Backend config is ENGINE-GENERATED per environment (design: backend blocks
+# cannot interpolate). tools/generate-backend.sh reads <env>/state-backend.yaml
+# (absent = local state under artifacts/<env>/state/, the historical layout;
+# type s3 = the declared S3-compatible bucket, credentials STATE_S3_* in .env)
+# and writes both the -backend-config payload and the backend-type override
+# file into the stack directory. abspath keeps overrides working whether the
+# roots are given relative or absolute; terraform init runs in src/<stack>.
+INFRA_BACKEND := $(abspath $(STATE_DIR))/backend-infra.hcl
+CONFIG_BACKEND := $(abspath $(STATE_DIR))/backend-config.hcl
+GEN_BACKEND = ENVIRONMENTS_ROOT=$(abspath $(ENVIRONMENTS_ROOT)) ARTIFACTS_ROOT=$(abspath $(ARTIFACTS_ROOT)) $(abspath tools/generate-backend.sh)
 
 # External credential names read from .env into the TF_VAR_secrets map.
 # UPPER_CASE password names double as generation overrides (migrating envs /
@@ -111,9 +117,11 @@ endef
 # reuses whichever backend was last initialized there. Any target that runs
 # terraform MUST rebind the backend to $(ENV) first — otherwise `make destroy
 # ENV=a` happily operates on environment b's state, reporting success.
+# The bind regenerates the backend files every time (the override file in the
+# shared stack dir must match the CURRENT env), then re-inits.
 # -reconfigure (not -upgrade) keeps this cheap enough to do every time.
-BIND_INFRA  = terraform init -reconfigure -input=false -backend-config="$(INFRA_BACKEND)" >/dev/null
-BIND_CONFIG = terraform init -reconfigure -input=false -backend-config="$(CONFIG_BACKEND)" >/dev/null
+BIND_INFRA  = $(GEN_BACKEND) $(ENV) infra "$(abspath $(STATE_DIR))" >/dev/null && terraform init -reconfigure -input=false -backend-config="$(INFRA_BACKEND)" >/dev/null
+BIND_CONFIG = $(GEN_BACKEND) $(ENV) config "$(abspath $(STATE_DIR))" >/dev/null && terraform init -reconfigure -input=false -backend-config="$(CONFIG_BACKEND)" >/dev/null
 
 # State files are secret-bearing (Talos machine secrets, credentials in
 # resources). Terraform rewrites them 0644 on every apply/destroy — re-tighten
@@ -127,7 +135,7 @@ GITOPS_DIR := gitops
 OCI_REPO = $(shell yq -r '.artifact.url' $(ENV_DIR)/config.yaml 2>/dev/null | sed 's|^oci://||')
 GITOPS_VERSION ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "latest")
 
-.PHONY: help init init-infra init-config validate fmt plan plan-infra plan-config \
+.PHONY: help init init-infra init-config state-backend validate fmt plan plan-infra plan-config \
 	apply apply-infra apply-config plan-apply destroy destroy-fast clean secrets \
 	list show render render-all explain render-diff render-thanos render-cilium \
 	push-gitops tag-gitops list-artifacts release
@@ -206,6 +214,10 @@ validate:
 	 echo "Validating $(ENV_DIR)/talos.yaml against schema..."; \
 	 yq -o json e '.' $(ENV_DIR)/talos.yaml | python3 tools/validate.py config/schemas/talos-env.schema.json; \
 	fi
+	@if [ -f "$(ENV_DIR)/state-backend.yaml" ]; then \
+	 echo "Validating $(ENV_DIR)/state-backend.yaml against schema..."; \
+	 yq -o json e '.' $(ENV_DIR)/state-backend.yaml | python3 tools/validate.py config/schemas/state-backend.schema.json; \
+	fi
 	@if [ -d "$(INFRA_DIR)/.terraform" ]; then \
 		cd $(INFRA_DIR) && $(LOAD_ENV) && terraform validate && cd ../../$(CONFIG_DIR) && $(LOAD_ENV) && terraform validate; \
 	else \
@@ -248,18 +260,26 @@ init-infra:
 	@mkdir -p $(STATE_DIR) $(PLANS_DIR)
 	@chmod 700 $(STATE_DIR)
 	@$(ENSURE_KUBECONFIG)
-	@cd $(INFRA_DIR) && $(LOAD_ENV) && terraform init -upgrade -reconfigure \
-		-backend-config="$(INFRA_BACKEND)"
+	@cd $(INFRA_DIR) && $(LOAD_ENV) && $(GEN_BACKEND) $(ENV) infra "$(abspath $(STATE_DIR))" && \
+		terraform init -upgrade -reconfigure -backend-config="$(INFRA_BACKEND)"
 
 init-config:
 	$(CHECK_ENV)
 	@mkdir -p $(STATE_DIR) $(PLANS_DIR)
 	@chmod 700 $(STATE_DIR)
 	@$(ENSURE_KUBECONFIG)
-	@cd $(CONFIG_DIR) && $(LOAD_ENV) && terraform init -upgrade -reconfigure \
-		-backend-config="$(CONFIG_BACKEND)"
+	@cd $(CONFIG_DIR) && $(LOAD_ENV) && $(GEN_BACKEND) $(ENV) config "$(abspath $(STATE_DIR))" && \
+		terraform init -upgrade -reconfigure -backend-config="$(CONFIG_BACKEND)"
 
 init: init-infra init-config
+
+# Show the resolved state backend for an environment (credentials elided).
+state-backend:
+	$(CHECK_ENV)
+	@$(GEN_BACKEND) $(ENV) infra "$(abspath $(STATE_DIR))"
+	@$(GEN_BACKEND) $(ENV) config "$(abspath $(STATE_DIR))"
+	@echo "Generated: $(INFRA_BACKEND), $(CONFIG_BACKEND) (0600; s3 configs carry STATE_S3_* credentials)"
+	@echo "To migrate an existing env's local state: CONFIRM=yes tools/migrate-state-backend.sh $(ENV)"
 
 plan-infra: init-infra
 	$(CHECK_ENV)
