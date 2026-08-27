@@ -193,9 +193,11 @@ output "data_stores" {
 output "artifact" {
   description = "Distribution gitops artifact (resolved)"
   value = {
-    active  = local.artifact_active
-    url     = local.artifact_url
-    version = local.artifact_version
+    active        = local.artifact_active
+    url           = local.artifact_url
+    version       = local.artifact_version
+    verify        = local.artifact_verify
+    verify_secret = local.artifact_verify_secret
   }
 }
 

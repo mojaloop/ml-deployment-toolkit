@@ -67,9 +67,20 @@ variable "artifact_url" {
 }
 
 variable "artifact_version" {
-  description = "OCI tag of the gitops artifact"
+  description = "OCI tag of the gitops artifact — a pinned version, never defaulted (config-loader requires it stated)"
   type        = string
-  default     = "latest"
+}
+
+variable "artifact_verify" {
+  description = "Cosign signature verification on the OCIRepository (spec.verify, provider cosign). Default false — signing infrastructure does not exist yet"
+  type        = bool
+  default     = false
+}
+
+variable "artifact_verify_secret" {
+  description = "Secret name (flux-system) holding cosign public keys; empty = keyless verification. Only used with artifact_verify"
+  type        = string
+  default     = ""
 }
 
 # --- Capability resolutions (from config-loader) ---------------------------

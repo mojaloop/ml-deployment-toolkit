@@ -382,6 +382,12 @@ locals {
   artifact_url     = try(local.config.artifact.url, "")
   artifact_version = try(local.config.artifact.version, "")
   artifact_active  = try(local.config.artifact.active, local.artifact_url != "")
+  # Cosign verification — flag defaults OFF: the distribution's signing
+  # infrastructure does not exist yet. Once artifacts are signed, verify: true
+  # makes Flux reject unsigned/tampered artifacts (keyless unless
+  # verify_secret names a cosign public-key Secret).
+  artifact_verify        = try(local.config.artifact.verify, false)
+  artifact_verify_secret = try(local.config.artifact.verify_secret, "")
 
   # --- app / hub parameters -------------------------------------------------
   # Hub parameters are stated, never defaulted, on hub clusters (preconditions

@@ -549,6 +549,17 @@ resource "kubectl_manifest" "oci_repository" {
         secretRef = {
           name = kubernetes_secret_v1.oci_credentials[0].metadata[0].name
         }
+      } : {},
+      # Cosign verification, behind a flag defaulting OFF (signing infra does
+      # not exist yet). With no verify_secret the check is keyless; a
+      # secretRef names an adopter-created Secret of cosign public keys.
+      var.artifact_verify ? {
+        verify = merge(
+          { provider = "cosign" },
+          var.artifact_verify_secret != "" ? {
+            secretRef = { name = var.artifact_verify_secret }
+          } : {}
+        )
       } : {}
     )
   })

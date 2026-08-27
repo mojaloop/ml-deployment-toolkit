@@ -268,6 +268,15 @@
         "active": {
           "type": "boolean",
           "description": "Enable Flux OCI reconciliation (default: true when url is set)"
+        },
+        "verify": {
+          "type": "boolean",
+          "description": "Cosign signature verification on the OCIRepository (spec.verify, provider cosign). Default false — the distribution's signing infrastructure does not exist yet; flip it on once artifacts are signed. Keyless verification unless verify_secret names a Secret of cosign public keys."
+        },
+        "verify_secret": {
+          "type": "string",
+          "description": "Name of a Secret (flux-system namespace, adopter-created) holding cosign public keys for verification; only meaningful with verify: true. Absent = keyless verification.",
+          "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
         }
       }
     },

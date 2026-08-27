@@ -167,8 +167,10 @@ module "flux_config" {
   domain          = module.config.dns.domain
   lb_ipam_pools   = module.config.lb_ipam_pools
 
-  artifact_url     = module.config.artifact.url
-  artifact_version = module.config.artifact.version
+  artifact_url           = module.config.artifact.url
+  artifact_version       = module.config.artifact.version
+  artifact_verify        = module.config.artifact.verify
+  artifact_verify_secret = module.config.artifact.verify_secret
 
   cert           = module.config.cert
   email          = module.config.email
