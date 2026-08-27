@@ -30,6 +30,14 @@ locals {
     for inst in local.instances_with_specs :
     inst.name => inst
   }
+
+  # Resolved VM shape per instance: the merged class/template/env override
+  # chain (var.vm_overrides) over the provider-wide vm_defaults. Every knob
+  # keeps its historical default when no layer overrides it.
+  vm_ov = {
+    for inst in local.instances_with_specs :
+    inst.name => lookup(var.vm_overrides, inst.name, {})
+  }
 }
 
 # Create VMs on Proxmox Virtual Environment
@@ -40,13 +48,16 @@ resource "proxmox_virtual_environment_vm" "instance" {
   node_name = local.nodes_map[each.value.name]
 
   cpu {
-    type    = local.provider_config.vm_defaults.cpu_type
+    type    = try(local.vm_ov[each.value.name].cpu_type, local.provider_config.vm_defaults.cpu_type)
     cores   = each.value.cores
     sockets = each.value.sockets
   }
 
   memory {
     dedicated = each.value.memory
+    # Ballooning: floating minimum from the override chain; unset keeps the
+    # provider default (no ballooning).
+    floating = try(local.vm_ov[each.value.name].balloon, null)
   }
 
   scsi_hardware = local.provider_config.vm_defaults.scsihw
@@ -65,8 +76,11 @@ resource "proxmox_virtual_environment_vm" "instance" {
       file_id      = disk.key == 0 ? local.instance_image_ids[each.value.name] : null
       interface    = disk.value.interface
       size         = disk.value.size
-      discard      = local.provider_config.vm_defaults.disk.discard ? "on" : "ignore"
-      file_format  = local.provider_config.vm_defaults.disk.format
+      cache        = try(local.vm_ov[each.value.name].disk.cache, null)
+      iothread     = try(local.vm_ov[each.value.name].disk.iothread, null)
+      ssd          = try(local.vm_ov[each.value.name].disk.ssd, null)
+      discard      = try(local.vm_ov[each.value.name].disk.discard, local.provider_config.vm_defaults.disk.discard) ? "on" : "ignore"
+      file_format  = try(local.vm_ov[each.value.name].disk.format, local.provider_config.vm_defaults.disk.format)
     }
   }
 

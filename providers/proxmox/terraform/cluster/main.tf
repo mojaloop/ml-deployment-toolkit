@@ -57,6 +57,26 @@ locals {
       ntp_servers = var.ntp_servers
     })
   ] : []
+
+  # Per-instance VM shape overrides, resolved over the declared chain (later
+  # wins): infra.vm_defaults (applied in the vm module) <- class vm seat
+  # (classes.yaml) <- template proxmox/<pool>.yaml <- env proxmox/<pool>.yaml.
+  # Top-level keys merge shallow; the nested disk block deep-merges by key so
+  # an env override of disk.cache keeps a template's disk.iothread.
+  vm_override_layers = {
+    for inst in var.instances : inst.name => [
+      try(var.provider_classes[inst.workload_class].vm, {}),
+      lookup(var.template_vm_pool_overrides, inst.group, {}),
+      lookup(var.env_vm_pool_overrides, inst.group, {}),
+    ]
+  }
+  vm_overrides = {
+    for name, layers in local.vm_override_layers :
+    name => merge(
+      merge(layers...),
+      { disk = merge([for l in layers : try(l.disk, {})]...) },
+    )
+  }
 }
 
 # Generate Talos configurations
@@ -105,6 +125,8 @@ module "infrastructure" {
   provider_image_config = local.provider_config.talos.image
 
   talos_configs = module.talos_config.instance_configs
+
+  vm_overrides = local.vm_overrides
 
   network_bridge_override = var.network_bridge_override
   storage_override        = var.storage_override

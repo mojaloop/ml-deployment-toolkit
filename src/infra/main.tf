@@ -49,6 +49,22 @@ locals {
     ])
   }
 
+  # Per-pool VM shape overrides: proxmox/<pool>.yaml in the selected template
+  # directory (the shape), then in the environment (the instance) — the same
+  # pool-keyed slot pattern as talos/<pool>.yaml. proxmox.yaml is the env-wide
+  # provider sidecar, not a pool file. Resolution happens in the proxmox
+  # package (vm_defaults -> class vm -> template pool -> env pool).
+  template_vm_pool_overrides = {
+    for f in try(fileset("${module.config.template_dir}/proxmox", "*.yaml"), []) :
+    trimsuffix(f, ".yaml") => yamldecode(file("${module.config.template_dir}/proxmox/${f}"))
+    if f != "proxmox.yaml"
+  }
+  env_vm_pool_overrides = {
+    for f in try(fileset("${local.env_dir}/proxmox", "*.yaml"), []) :
+    trimsuffix(f, ".yaml") => yamldecode(file("${local.env_dir}/proxmox/${f}"))
+    if f != "proxmox.yaml"
+  }
+
   # Read raw config for provider selection (before module.config expands it)
   config_raw    = yamldecode(file(local.env_config_path))
   provider_name = local.config_raw.infra.provider
@@ -97,6 +113,18 @@ resource "terraform_data" "binding_validation" {
       ])
       error_message = "environment talos/ fragment(s) name no effective pool: ${join(", ", [for k in keys(local.env_pool_patches) : k if !contains(module.config.pool_names, k)])}. A fragment keyed on a nonexistent (or enabled: false) pool silently never applies. Effective pools: ${join(", ", module.config.pool_names)}."
     }
+    precondition {
+      condition = alltrue([
+        for k in keys(local.template_vm_pool_overrides) : contains(module.config.template_pool_names, k)
+      ])
+      error_message = "template proxmox/ VM override(s) name no pool of the selected template: ${join(", ", [for k in keys(local.template_vm_pool_overrides) : k if !contains(module.config.template_pool_names, k)])}. Template pools: ${join(", ", module.config.template_pool_names)}."
+    }
+    precondition {
+      condition = alltrue([
+        for k in keys(local.env_vm_pool_overrides) : contains(module.config.pool_names, k)
+      ])
+      error_message = "environment proxmox/ VM override(s) name no effective pool: ${join(", ", [for k in keys(local.env_vm_pool_overrides) : k if !contains(module.config.pool_names, k)])}. Effective pools: ${join(", ", module.config.pool_names)}."
+    }
   }
 }
 
@@ -136,6 +164,11 @@ module "proxmox" {
   oci_proxy_url      = module.config.registry.url
   oci_proxy_username = lookup(var.secrets, "OCI_PROXY_USERNAME", "")
   oci_proxy_password = lookup(var.secrets, "OCI_PROXY_PASSWORD", "")
+
+  # Per-pool VM shape overrides (template layer then environment layer);
+  # resolved in the package against vm_defaults and the per-class vm seat.
+  template_vm_pool_overrides = local.template_vm_pool_overrides
+  env_vm_pool_overrides      = local.env_vm_pool_overrides
 
   nameservers             = try(local.talos_env.nameservers, [])
   ntp_servers             = try(local.talos_env.ntp_servers, [])

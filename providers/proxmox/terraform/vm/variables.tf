@@ -29,6 +29,12 @@ variable "talos_configs" {
   default     = {}
 }
 
+variable "vm_overrides" {
+  description = "Per-instance resolved VM shape overrides (instance name -> {cpu_type?, balloon?, disk?{cache,iothread,ssd,discard,format}}) — the class/template/env chain already merged; keys absent here fall back to provider_config.vm_defaults"
+  type        = any
+  default     = {}
+}
+
 variable "talos_image" {
   description = "Talos image URL and file name (constructed by config-loader)"
   type = object({

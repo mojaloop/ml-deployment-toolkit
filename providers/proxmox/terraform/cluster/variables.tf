@@ -28,6 +28,18 @@ variable "provider_classes" {
   default     = {}
 }
 
+variable "template_vm_pool_overrides" {
+  description = "Per-pool VM shape overrides from the selected template's proxmox/<pool>.yaml files (pool name -> override map, proxmox-pool.schema.json surface)"
+  type        = any
+  default     = {}
+}
+
+variable "env_vm_pool_overrides" {
+  description = "Per-pool VM shape overrides from the environment's proxmox/<pool>.yaml files (pool name -> override map, proxmox-pool.schema.json surface)"
+  type        = any
+  default     = {}
+}
+
 variable "talos_version" {
   description = "Talos version (from workload-classes.yaml)"
   type        = string

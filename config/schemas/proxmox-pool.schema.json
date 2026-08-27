@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Proxmox per-pool VM overrides",
+  "description": "Schema for proxmox/<pool>.yaml — per-pool VM shape overrides, in the selected template directory (the shape) and in the environment (the instance). The same surface is accepted per CLASS under providers/proxmox/classes.yaml classes.<class>.vm. Resolution order (later wins, maps deep-merge): params.yaml infra.vm_defaults -> class vm -> template proxmox/<pool>.yaml -> environment proxmox/<pool>.yaml. The filename is the binding: it must name a pool (check-bindings.sh + a plan-time precondition — an orphaned name fails, it never no-ops). proxmox/proxmox.yaml is the env-wide provider sidecar (proxmox-env.schema.json) and is not a pool file. Tuning values enter from measured need only.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "cpu_type": {
+      "description": "QEMU CPU model for this pool's VMs (e.g. host, x86-64-v3). Default from infra.vm_defaults.cpu_type.",
+      "type": "string"
+    },
+    "balloon": {
+      "description": "Minimum ballooned memory in MB (Proxmox 'floating' memory). 0 disables ballooning; unset keeps the provider default (no ballooning).",
+      "type": "integer",
+      "minimum": 0
+    },
+    "disk": {
+      "description": "Disk knobs applied to every disk of the pool's VMs.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cache": {
+          "description": "QEMU cache mode.",
+          "enum": [
+            "none",
+            "writethrough",
+            "writeback",
+            "unsafe",
+            "directsync"
+          ]
+        },
+        "iothread": {
+          "description": "Dedicated I/O thread per disk.",
+          "type": "boolean"
+        },
+        "ssd": {
+          "description": "Present disks as SSDs to the guest.",
+          "type": "boolean"
+        },
+        "discard": {
+          "description": "Pass discard/TRIM through to the storage. Default from infra.vm_defaults.disk.discard.",
+          "type": "boolean"
+        },
+        "format": {
+          "description": "Disk image format. Default from infra.vm_defaults.disk.format.",
+          "enum": [
+            "raw",
+            "qcow2"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -39,7 +39,10 @@ infra:
       datastore: "local"
       decompression: "gz"
 
-  # VM defaults applied to every rendered node
+  # VM defaults — the BASE of the per-node VM shape chain (later wins, disk
+  # block deep-merges): vm_defaults -> classes.yaml <class>.vm ->
+  # template proxmox/<pool>.yaml -> environment proxmox/<pool>.yaml
+  # (override surface: config/schemas/proxmox-pool.schema.json).
   vm_defaults:
     cpu_type: "host"
     scsihw: "virtio-scsi-pci"

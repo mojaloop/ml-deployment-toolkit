@@ -214,6 +214,18 @@ validate:
 	 echo "Validating $(ENV_DIR)/proxmox/proxmox.yaml against schema..."; \
 	 yq -o json e '.' $(ENV_DIR)/proxmox/proxmox.yaml | python3 tools/validate.py config/schemas/proxmox-env.schema.json; \
 	fi
+	@role=$$(yq -r '.cluster.role' $(ENV_DIR)/config.yaml); \
+	 tmpl=$$(yq -r '.template' $(ENV_DIR)/config.yaml); \
+	 provider=$$(yq -r '.infra.provider' $(ENV_DIR)/config.yaml); \
+	 for d in "providers/$$provider/templates/$$role/$$tmpl/proxmox" "$(ENV_DIR)/proxmox"; do \
+	  [ -d "$$d" ] || continue; \
+	  for f in "$$d"/*.yaml; do \
+	   [ -f "$$f" ] || continue; \
+	   [ "$$(basename $$f)" = "proxmox.yaml" ] && continue; \
+	   echo "Validating $$f against pool-override schema..."; \
+	   yq -o json e '.' "$$f" | python3 tools/validate.py config/schemas/proxmox-pool.schema.json || exit 1; \
+	  done; \
+	 done
 	@if [ -f "$(ENV_DIR)/talos.yaml" ]; then \
 	 echo "Validating $(ENV_DIR)/talos.yaml against schema..."; \
 	 yq -o json e '.' $(ENV_DIR)/talos.yaml | python3 tools/validate.py config/schemas/talos-env.schema.json; \
