@@ -151,7 +151,7 @@
       }
     },
     "template": {
-      "description": "Deployment template name — config/templates/{role}/{template}.yaml",
+      "description": "Deployment template name — providers/<infra.provider>/templates/<cluster.role>/<template>/",
       "type": "string"
     },
     "infra": {

@@ -26,9 +26,9 @@ fi
 
 # --- Direction 1: every required P_* symbol present in each provider params.yaml
 if [ "$have_schema" = "1" ]; then
-  provider_params=$(find config/templates -mindepth 2 -maxdepth 2 -name 'params.yaml' 2>/dev/null | sort)
+  provider_params=$(find providers -mindepth 2 -maxdepth 2 -name 'params.yaml' 2>/dev/null | sort)
   if [ -z "$provider_params" ]; then
-    echo "warning: no config/templates/<provider>/params.yaml files exist yet — skipping required-symbol check" >&2
+    echo "warning: no providers/<provider>/params.yaml files exist yet — skipping required-symbol check" >&2
   else
     for pf in $provider_params; do
       keys=$(yq eval '.params | keys | .[]' "$pf" 2>/dev/null) || { echo "$pf:1: YAML parse error"; findings=$((findings+1)); continue; }

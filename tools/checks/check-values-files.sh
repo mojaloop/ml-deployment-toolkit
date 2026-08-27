@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Usage: check-values-files.sh — every values/<ns>/<release>.yaml in the three override layers
-# (gitops/*/values/, config/templates/<provider>/<role>/<template>/values/,
+# (gitops/*/values/, providers/<provider>/templates/<role>/<template>/values/,
 # <ENVIRONMENTS_ROOT>/*/values/) must correspond to an existing HelmRelease in gitops/
 # (spec.targetNamespace = <ns>, metadata.name = <release>) — a values file that binds to no
 # HelmRelease is a silently unused override. Every patches/<name>.yaml under templates and
@@ -16,7 +16,7 @@ cd "$ROOT"
 ENVS_ROOT="${ENVIRONMENTS_ROOT:-../environments}"
 
 # Flux Kustomization names — mirrors the Kustomization graph declared in
-# src/modules/flux-config/main.tf. Patch files are named <kustomization>.yaml;
+# src/engine/flux-config/main.tf. Patch files are named <kustomization>.yaml;
 # a name outside this list patches nothing. Keep in sync when adding layers.
 # (check-token-resolution.sh and check-all.sh rely on this file being the one
 # shared place the list lives in tools/checks/.)
@@ -109,7 +109,7 @@ for d in gitops/*/values; do
 done
 
 # (b) template overrides + patches
-for t in config/templates/*/*/*; do
+for t in providers/*/templates/*/*; do
   [ -d "$t" ] || continue
   check_values_root "$t/values"
   check_patches_root "$t/patches"

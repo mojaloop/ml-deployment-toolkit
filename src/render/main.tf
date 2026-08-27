@@ -17,11 +17,11 @@ locals {
 }
 
 module "config" {
-  source = "../modules/config-loader"
+  source = "../engine/config-loader"
 
   config_path           = "${local.env_dir}/config.yaml"
   workload_classes_path = "../../config/definitions/workload-classes.yaml"
-  templates_path        = "../../config/templates"
+  providers_path        = "../../providers"
   env_name              = var.env_name
   env_dir               = local.env_dir
   dtk_tag               = var.dtk_tag

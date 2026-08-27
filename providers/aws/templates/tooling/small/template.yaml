@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=../../../../config/schemas/template.schema.json
+# -----------------------------------------------------------------------------
+# Deployment template — cc/small (Tooling Cluster, 1-2 environments)
+# Full-overlay template: identity here; topology in placement.yaml; tuning
+# as values/ and patches/ overlays. No talos/ fragments on AWS.
+# -----------------------------------------------------------------------------
+version: 1
+description: "Single mixed-plane node tooling cluster"

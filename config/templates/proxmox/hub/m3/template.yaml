@@ -1,8 +1,0 @@
-# yaml-language-server: $schema=../../../../schemas/template.schema.json
-# -----------------------------------------------------------------------------
-# Deployment template — hub/m3 (topology tier 2)
-# Name reads as the pool list: m×3. HA control plane in the minimum footprint;
-# every node is control plane AND worker, everything co-scheduled everywhere.
-# -----------------------------------------------------------------------------
-version: 1
-description: "Mojaloop hub: 3 mixed control-plane/worker nodes, HA in minimum footprint"

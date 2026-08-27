@@ -1,0 +1,207 @@
+# Outputs from Config Loader Module
+
+output "config" {
+  description = "Complete environment configuration (config.yaml)"
+  value       = local.config
+}
+
+output "provider_name" {
+  description = "Infrastructure provider name"
+  value       = local.provider_name
+}
+
+output "template_dir" {
+  description = "Directory of the selected template — the stacks read its values/, patches/ and talos/ overlay surfaces from here"
+  value       = local.template_dir
+}
+
+output "provider_params" {
+  description = "Provider interface symbols (P_*) from providers/<provider>/params.yaml — merged into the cluster-config ConfigMap for Flux substitution"
+  value       = local.provider_params
+}
+
+output "cluster" {
+  description = "Cluster configuration (name, role, vip, lb_ipam, flux)"
+  value       = local.cluster
+}
+
+output "cluster_role" {
+  description = "Cluster role: tooling | hub | bare"
+  value       = local.cluster_role
+}
+
+output "dns" {
+  description = "DNS configuration"
+  value       = local.config.dns
+}
+
+output "flux_version" {
+  description = "Flux distribution version"
+  value       = local.flux_version
+}
+
+# --- Topology -------------------------------------------------------------
+
+output "instances" {
+  description = "Expanded per-node instances with resolved placement (on-prem)"
+  value       = local.instances
+}
+
+output "control_plane_instances" {
+  description = "Control-plane instances (includes mixed-plane)"
+  value       = local.control_plane_instances
+}
+
+output "worker_instances" {
+  description = "Worker instances"
+  value       = local.worker_instances
+}
+
+output "pools" {
+  description = "Merged pool map (template shape + environment overrides via shallow per-field replacement), keyed by pool name; includes enabled: false entries so the render/explain tooling can show deliberate removals."
+  value       = local.merged_pools
+}
+
+output "pool_names" {
+  description = "Effective pool set: template pools minus enabled:false env overrides plus env-added pools. Pool-keyed file bindings (talos/<pool>.yaml, proxmox/<pool>.yaml) must name a member — an orphaned binding fails the plan, it never no-ops."
+  value       = [for g in local.node_groups : g.name]
+}
+
+output "template_pool_names" {
+  description = "Pool names the selected template itself declares (before environment overrides) — the binding set for template-layer pool-keyed fragments."
+  value       = keys(local.template_pools)
+}
+
+output "capabilities" {
+  description = "Structural capabilities the provider declares in params.yaml (e.g. in_cluster_data)"
+  value = {
+    in_cluster_data = local.cap_in_cluster_data
+  }
+}
+
+output "aws_node_groups" {
+  description = "EKS node groups derived from template node groups"
+  value       = local.aws_node_groups
+}
+
+output "do_node_pools" {
+  description = "DOKS node pools derived from template node groups"
+  value       = local.do_node_pools
+}
+
+output "workload_classes" {
+  description = "Workload classes configuration"
+  value       = local.workload_classes.classes
+}
+
+output "talos_version" {
+  description = "Talos version (from workload-classes.yaml)"
+  value       = local.talos_version
+}
+
+output "kubernetes_version" {
+  description = "Kubernetes version (from workload-classes.yaml)"
+  value       = local.kubernetes_version
+}
+
+output "talos_image" {
+  description = "Talos image URL and file name"
+  value = {
+    url       = local.talos_image_url
+    file_name = local.talos_image_file_name
+  }
+}
+
+output "label_taint_patches" {
+  description = "Per-POOL Talos machine-config patch: mechanically derived node label (<P_NODE_ROLE_LABEL_KEY>=<pool>) plus the taints the pool declares in placement.yaml"
+  value       = local.pool_label_taint_patches
+}
+
+# --- Resolved capabilities ------------------------------------------------
+
+output "lb_ipam_pools" {
+  description = "Per-gateway LB IPAM pools (resolved): name => { lan, wan, dns_target }"
+  value       = local.lb_ipam_pools
+}
+
+output "registry" {
+  description = "Image pull-through cache (resolved)"
+  value = {
+    active = local.registry_active
+    url    = local.registry_url
+    robots = local.registry_robots
+  }
+}
+
+output "object_storage" {
+  description = "Backup S3 target (resolved)"
+  value = {
+    active   = local.object_storage_active
+    endpoint = local.backup_s3_endpoint
+    bucket   = local.backup_s3_bucket
+    region   = local.backup_s3_region
+    buckets  = local.object_storage_buckets
+  }
+}
+
+output "observability" {
+  description = "Telemetry push sink URLs + served ingest accounts (resolved)"
+  value = {
+    loki_url     = local.loki_url
+    mimir_url    = local.mimir_url
+    tempo_url    = local.tempo_url
+    ingest_users = local.observability_ingest_users
+  }
+}
+
+output "cert" {
+  description = "ACME parameters (resolved)"
+  value = {
+    acme_email              = local.acme_email
+    acme_server             = local.acme_server
+    acme_account_key_secret = local.acme_account_key_secret
+  }
+}
+
+output "email" {
+  description = "Transactional SMTP parameters (non-secret)"
+  value = {
+    host = local.smtp_host
+    port = local.smtp_port
+    from = local.email_from
+  }
+}
+
+output "alerting" {
+  description = "Alert delivery parameters (non-secret)"
+  value = {
+    email_to         = local.alert_email_to
+    telegram_chat_id = local.telegram_chat_id
+  }
+}
+
+output "data_stores" {
+  description = "Per-store data layer resolution: mode, in_cluster, host, port"
+  value       = local.data_stores
+}
+
+output "artifact" {
+  description = "Distribution gitops artifact (resolved)"
+  value = {
+    active  = local.artifact_active
+    url     = local.artifact_url
+    version = local.artifact_version
+  }
+}
+
+output "app" {
+  description = "Application / hub parameters"
+  value = {
+    api_type                 = local.api_type
+    hub_participant_name     = local.hub_participant_name
+    hub_admin_email          = local.hub_admin_email
+    onboarding_funds_in      = local.onboarding_funds_in
+    onboarding_net_debit_cap = local.onboarding_net_debit_cap
+  }
+}
+

@@ -1,8 +1,0 @@
-# yaml-language-server: $schema=../../../../schemas/template.schema.json
-# -----------------------------------------------------------------------------
-# Deployment template — env/tps-1 (minimal Mojaloop Hub, ~1 TPS)
-# Provider-independent capacity template: identity only — tuning moved to values/ and patches/ overlays.
-# as values/ and patches/ overlays. No talos/ fragments on AWS.
-# -----------------------------------------------------------------------------
-version: 1
-description: "Minimal Mojaloop switch: 1 control-plane + 3 general workers"

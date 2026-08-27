@@ -102,11 +102,11 @@ resource "terraform_data" "binding_validation" {
 
 # Load and resolve configuration
 module "config" {
-  source = "../modules/config-loader"
+  source = "../engine/config-loader"
 
   config_path           = local.env_config_path
   workload_classes_path = "../../config/definitions/workload-classes.yaml"
-  templates_path        = "../../config/templates"
+  providers_path        = "../../providers"
   env_name              = var.env_name
   env_dir               = local.env_dir
   dtk_tag               = var.dtk_tag
@@ -115,7 +115,7 @@ module "config" {
 # Proxmox Cluster (Talos VMs)
 module "proxmox" {
   count  = local.provider_name == "proxmox" ? 1 : 0
-  source = "../modules/proxmox"
+  source = "../../providers/proxmox/terraform/cluster"
 
   instances           = module.config.instances
   cluster             = module.config.cluster
@@ -125,9 +125,9 @@ module "proxmox" {
   talos_image         = module.config.talos_image
   label_taint_patches = module.config.label_taint_patches
 
-  patches_path         = module.config.paths.patches
+  patches_path         = "../../providers/proxmox/patches"
   artifacts_path       = local.artifacts_path
-  provider_config_path = "../../config/templates/proxmox/params.yaml"
+  provider_config_path = "../../providers/proxmox/params.yaml"
   extra_pool_patches   = local.extra_pool_patches
 
   # registry capability (image pull-through cache -> Talos machine mirrors)
@@ -149,14 +149,14 @@ module "proxmox" {
 # DigitalOcean Cluster (DOKS Managed Kubernetes)
 module "digitalocean" {
   count  = local.provider_name == "digitalocean" ? 1 : 0
-  source = "../modules/digitalocean"
+  source = "../../providers/digitalocean/terraform/cluster"
 
   cluster            = module.config.cluster
   kubernetes_version = module.config.kubernetes_version
   node_pools         = module.config.do_node_pools
 
   artifacts_path       = local.artifacts_path
-  provider_config_path = "../../config/templates/digitalocean/params.yaml"
+  provider_config_path = "../../providers/digitalocean/params.yaml"
 
   region = try(local.config_raw.infra.digitalocean.region, "nyc1")
 }
@@ -164,14 +164,14 @@ module "digitalocean" {
 # AWS Cluster (EKS Managed Kubernetes)
 module "aws" {
   count  = local.provider_name == "aws" ? 1 : 0
-  source = "../modules/aws"
+  source = "../../providers/aws/terraform/cluster"
 
   cluster            = module.config.cluster
   kubernetes_version = module.config.kubernetes_version
   node_groups        = module.config.aws_node_groups
 
   artifacts_path       = local.artifacts_path
-  provider_config_path = "../../config/templates/aws/params.yaml"
+  provider_config_path = "../../providers/aws/params.yaml"
 
   region            = try(local.config_raw.infra.aws.region, "us-east-1")
   api_allowed_cidrs = try(local.config_raw.infra.aws.api_allowed_cidrs, [])
@@ -189,7 +189,7 @@ module "aws" {
 # Talos equivalent of all of this rides machine-config extraManifests.
 module "aws_bootstrap" {
   count  = local.provider_name == "aws" ? 1 : 0
-  source = "../modules/aws-bootstrap"
+  source = "../../providers/aws/terraform/bootstrap"
 
   cluster_name       = module.aws[0].cluster_name
   kubernetes_version = module.aws[0].kubernetes_version
@@ -200,7 +200,7 @@ module "aws_bootstrap" {
 # FluxCD Bootstrap — install controllers (always)
 module "flux_bootstrap" {
   count  = local.provider_name != "" ? 1 : 0
-  source = "../modules/flux-bootstrap"
+  source = "../engine/flux-bootstrap"
 
   flux_version = module.config.flux_version
 

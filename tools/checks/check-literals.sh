@@ -22,7 +22,7 @@ findings=0
 
 # PARAMETERIZED map: config.yaml path -> substitution token (bash 3.2 — no assoc
 # arrays, one "path token" pair per line). These values have a canonical ${TOKEN}
-# in cluster-config (src/modules/flux-config/main.tf), so a literal occurrence in
+# in cluster-config (src/engine/flux-config/main.tf), so a literal occurrence in
 # an overlay is a drift bug waiting to happen.
 PARAM_MAP='.cluster.name CLUSTER_NAME
 .dns.domain DOMAIN

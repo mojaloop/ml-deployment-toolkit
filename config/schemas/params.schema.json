@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Provider interface parameters",
-  "description": "Schema for config/templates/<provider>/params.yaml — the provider interface. The `params` block declares every P_* substitution symbol the gitops layer may reference; a provider must supply all of them, and gitops must reference only symbols declared here. P_* symbols resolve from params.yaml only — config.yaml can never define or shadow them. The `infra` block carries Terraform-consumed provider configuration (VM defaults, images, instance shapes) and is provider-shaped by design. Symbols from the design enumeration resolved elsewhere by decision: LB pools and the registry are multi-consumer network facts in config.yaml; the DNS mechanism is the config.yaml dns.provider structural selector; the secrets backend is fixed (in-cluster Vault via ESO) and becomes a symbol only when a second backend exists.",
+  "description": "Schema for providers/<provider>/params.yaml — the provider interface. The `params` block declares every P_* substitution symbol the gitops layer may reference; a provider must supply all of them, and gitops must reference only symbols declared here. P_* symbols resolve from params.yaml only — config.yaml can never define or shadow them. The `infra` block carries Terraform-consumed provider configuration (VM defaults, images, instance shapes) and is provider-shaped by design. Symbols from the design enumeration resolved elsewhere by decision: LB pools and the registry are multi-consumer network facts in config.yaml; the DNS mechanism is the config.yaml dns.provider structural selector; the secrets backend is fixed (in-cluster Vault via ESO) and becomes a symbol only when a second backend exists.",
   "type": "object",
   "required": [
     "version",
@@ -75,7 +75,7 @@
       }
     },
     "infra": {
-      "description": "Terraform-consumed provider configuration (formerly config/templates/mappings/<provider>.yaml content). Provider-shaped; validated by the provider module's own preconditions.",
+      "description": "Terraform-consumed provider configuration (provider package infra facts). Provider-shaped; validated by the provider module's own preconditions.",
       "type": "object",
       "additionalProperties": true
     }

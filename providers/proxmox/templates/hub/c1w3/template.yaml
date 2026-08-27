@@ -1,0 +1,7 @@
+# yaml-language-server: $schema=../../../../config/schemas/template.schema.json
+# -----------------------------------------------------------------------------
+# Deployment template — hub/c1w3 (topology tier 1)
+# Name reads as the pool list: c×1 + w×3. All workloads on the workers.
+# -----------------------------------------------------------------------------
+version: 1
+description: "Mojaloop hub: 1 control-plane + 3 general workers, all workloads co-scheduled on workers"

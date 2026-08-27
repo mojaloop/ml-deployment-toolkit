@@ -3,7 +3,7 @@
 # Node labels derive mechanically from pool names (<P_NODE_ROLE_LABEL_KEY>=<pool>, see
 # config/definitions/workload-classes.yaml), so every node-role value gitops selects on must be a
 # pool that actually exists for the environment. Per env config the effective pool set is:
-#   names in config/templates/<infra.provider>/<cluster.role>/<template>/placement.yaml node_groups
+#   names in providers/<infra.provider>/templates/<cluster.role>/<template>/placement.yaml node_groups
 #   MINUS env placement.yaml pools overridden with enabled: false
 #   PLUS  env placement.yaml pools keys not in the template (enabled != false)
 # gitops references where the label key is ${P_NODE_ROLE_LABEL_KEY} or literal node-role:
@@ -106,7 +106,7 @@ if [ $# -eq 0 ]; then
   # Fallback: no environment context — union of every template's pool names,
   # warning-only (a value alien to ALL templates is at best suspicious).
   union=""
-  for t in config/templates/*/*/*/placement.yaml; do
+  for t in providers/*/templates/*/*/placement.yaml; do
     [ -f "$t" ] || continue
     union="$union
 $(yq eval '.node_groups[].name' "$t" 2>/dev/null || true)"
@@ -133,7 +133,7 @@ else
       findings=$((findings+1))
       continue
     fi
-    tpl="config/templates/$provider/$role/$template/placement.yaml"
+    tpl="providers/$provider/templates/$role/$template/placement.yaml"
     if [ ! -f "$tpl" ]; then
       echo "$cfg:1: selected template has no placement.yaml ($tpl)"
       findings=$((findings+1))

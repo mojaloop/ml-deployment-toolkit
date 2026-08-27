@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Usage: check-token-resolution.sh — role-aware undefined-token check: every ${UPPER} substitution
-# token referenced in gitops/ must be resolvable from what src/modules/flux-config/main.tf actually
+# token referenced in gitops/ must be resolvable from what src/engine/flux-config/main.tf actually
 # puts in cluster-config/cluster-secrets for the cluster role that applies the layer. Tokens that
 # only exist on hub clusters (the is_hub block) may not be referenced from non-hub layers
 # (top-level gitops dirs not starting with "hub"), and a token resolvable nowhere is always a
@@ -8,7 +8,7 @@
 #
 # Parsing limits (deliberate, marker-driven — keep in sync when editing main.tf):
 #   - cluster-config keys come from the marker comments "# TOKEN-KEYS: common" and
-#     "# TOKEN-KEYS: hub-only" in src/modules/flux-config/main.tf; the hub-only region ends at the
+#     "# TOKEN-KEYS: hub-only" in src/engine/flux-config/main.tf; the hub-only region ends at the
 #     conditional's closing "} : {},". Keys are matched as `^\s+UPPER_SNAKE\s*=` assignments.
 #   - secret keys are best-effort: the Makefile SECRET_KEYS list, P_* provider symbols from
 #     config/schemas/params.schema.json, UPPER_SNAKE string literals in main.tf (generated
@@ -23,7 +23,7 @@ cd "$ROOT"
 
 [ $# -eq 0 ] || { echo "usage: $0 (no arguments)" >&2; exit 2; }
 
-TF="src/modules/flux-config/main.tf"
+TF="src/engine/flux-config/main.tf"
 SCHEMA="config/schemas/params.schema.json"
 [ -f "$TF" ] || { echo "error: $TF not found" >&2; exit 2; }
 [ -d gitops ] || { echo "error: gitops/ not found" >&2; exit 2; }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Usage: check-talos-fragments.sh — every talos patch fragment (config/patches/talos/,
-# config/templates/<provider>/<role>/<name>/talos/, <env>/talos/) must:
+# Usage: check-talos-fragments.sh — every talos patch fragment (providers/proxmox/patches/,
+# providers/<provider>/templates/<role>/<name>/talos/, <env>/talos/) must:
 #   1. parse as YAML once ${...} tokens are stubbed
 #   2. not be a JSON6902 patch (strategic-merge fragments only; Talos rejects
 #      JSON6902 on multi-document configs)
@@ -62,7 +62,7 @@ check_fragment() {
 }
 
 # Fixed root + target-state roots (silently absent until later phases).
-for dir in config/patches/talos config/templates/*/*/*/talos "${ENVIRONMENTS_ROOT:-../environments}"/*/talos; do
+for dir in providers/*/patches providers/*/templates/*/*/talos "${ENVIRONMENTS_ROOT:-../environments}"/*/talos; do
   [ -d "$dir" ] || continue
   while IFS= read -r f; do
     check_fragment "$f"
@@ -147,13 +147,13 @@ def compare(fa, pa, fb, pb, ctx):
         else:
             warnings.append(f"{ctx}: both {fa} and {fb} append to '{p}' — verify entries stay disjoint")
 
-base_files = sorted(glob.glob("config/patches/talos/*.yaml") + glob.glob("config/patches/talos/*.tpl"))
+base_files = sorted(glob.glob("providers/*/patches/*.yaml") + glob.glob("providers/*/patches/*.tpl"))
 base_paths = [(f, paths_of(f)) for f in base_files]
 for f, _ in base_paths:
     identity_check(f, load(f))
 
 pool_sources = {}  # pool -> [(file, paths)]
-for f in sorted(glob.glob("config/templates/*/*/*/talos/*.yaml") + glob.glob(f"{env_root}/*/talos/*.yaml")):
+for f in sorted(glob.glob("providers/*/templates/*/*/talos/*.yaml") + glob.glob(f"{env_root}/*/talos/*.yaml")):
     pool = os.path.splitext(os.path.basename(f))[0]
     docs = load(f)
     identity_check(f, docs)

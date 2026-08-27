@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Capacity template",
-  "description": "Schema for config/templates/<provider>/<role>/<name>/template.yaml — template identity only. Topology lives in placement.yaml; service tuning is expressed as values/ and patches/ overlays (composition), never as parameter blocks (no knobs).",
+  "description": "Schema for providers/<provider>/templates/<role>/<name>/template.yaml — template identity only. Topology lives in placement.yaml; service tuning is expressed as values/ and patches/ overlays (composition), never as parameter blocks (no knobs).",
   "type": "object",
   "required": [
     "version"

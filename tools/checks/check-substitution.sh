@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Usage: check-substitution.sh [--tf <dir>]... [<dir>]...  — lint ${...} substitution token syntax in gitops/, config/patches/talos/ and any extra dirs (--tf marks a dir as Terraform-substituted, where %{ is also forbidden).
+# Usage: check-substitution.sh [--tf <dir>]... [<dir>]...  — lint ${...} substitution token syntax in gitops/, providers/proxmox/patches/ and any extra dirs (--tf marks a dir as Terraform-substituted, where %{ is also forbidden).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -7,7 +7,7 @@ cd "$ROOT"
 
 # Scan roots: "tf:<dir>" or "plain:<dir>", one per line (bash 3.2 — no assoc arrays).
 SCAN_LIST="plain:gitops
-plain:config/patches/talos"
+plain:providers/proxmox/patches"
 
 while [ $# -gt 0 ]; do
   case "$1" in

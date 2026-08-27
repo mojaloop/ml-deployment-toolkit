@@ -1,9 +1,0 @@
-# yaml-language-server: $schema=../../../../schemas/template.schema.json
-# -----------------------------------------------------------------------------
-# Deployment template — base/small (DFSP simulator / lightweight cluster)
-# Provider-independent capacity template: node groups only.
-# Base clusters deploy platform services only — no app/data/cc sections needed.
-# as values/ and patches/ overlays; per-pool Talos fragments in talos/.
-# -----------------------------------------------------------------------------
-version: 1
-description: "Single mixed-plane node lightweight cluster (DFSP simulator)"
