@@ -92,7 +92,8 @@ locals {
   # Talos image URL — only for on-prem providers whose mapping defines talos.platform
   talos_image_platform  = try(local.mapping.talos.platform, "")
   talos_image_schematic = try(local.workload_classes.talos_image.schematic, "")
-  talos_image_arch      = try(local.workload_classes.talos_image.arch, "amd64")
+  # Stated in the platform definitions file, not defaulted here.
+  talos_image_arch = local.workload_classes.talos_image.arch
   talos_image_url = local.talos_image_platform != "" ? (
     "https://factory.talos.dev/image/${local.talos_image_schematic}/${local.talos_version}/${local.talos_image_platform}-${local.talos_image_arch}.raw.gz"
   ) : ""
@@ -173,14 +174,20 @@ locals {
     ]
   }
 
-  aws_node_groups = flatten([
+  # Only materialized on the aws provider — the class -> instance-type index
+  # below is a hard lookup that must not be evaluated against another
+  # provider's (empty) instance_types map.
+  aws_node_groups = local.provider_name != "aws" ? [] : flatten([
     for g in local.node_groups : [
       for pg, slots in { for s in local.aws_pool_slots[g.name] : s => s... } : {
         # Suffixed by placement group, not AZ: remapping pg -> AZ later moves
         # the subnet without renaming the Terraform address.
-        name           = pg != "" ? "${g.name}-${pg}" : g.name
-        az             = pg != "" ? lookup(local.placement_map, pg, "") : ""
-        instance_types = [lookup(local.instance_types, g.class, "m5.xlarge")]
+        name = pg != "" ? "${g.name}-${pg}" : g.name
+        az   = pg != "" ? lookup(local.placement_map, pg, "") : ""
+        # Direct index, no fallback default: a class the provider does not
+        # map must fail the plan (precondition below names it), never
+        # silently become some other instance type.
+        instance_types = [local.instance_types[g.class]]
         desired_size   = length(slots)
         min_size       = length(slots)
         max_size       = length(slots) + 1
@@ -194,10 +201,12 @@ locals {
     ]
   ])
 
-  do_node_pools = [
+  do_node_pools = local.provider_name != "digitalocean" ? [] : [
     for g in local.node_groups : {
-      name  = g.name
-      size  = lookup(local.instance_types, g.class, "s-4vcpu-8gb")
+      name = g.name
+      # Hard lookup — an unmapped class fails the plan (precondition below),
+      # never silently becomes a default droplet size.
+      size  = local.instance_types[g.class]
       count = g.count
       tags  = distinct(concat(["ml"], try(g.tags, [])))
     }
@@ -208,7 +217,9 @@ locals {
   # pool name (<P_NODE_ROLE_LABEL_KEY>=<pool>) — never typed by hand, so the
   # Talos side and the gitops selectors cannot drift. Taints are declared by
   # the pool itself in placement.yaml, once.
-  node_role_label_key = try(local.provider_params.P_NODE_ROLE_LABEL_KEY, "node-role")
+  # Direct reference, no fallback: P_NODE_ROLE_LABEL_KEY is schema-required in
+  # every provider params.yaml — a try() default here would hide its absence.
+  node_role_label_key = local.provider_params.P_NODE_ROLE_LABEL_KEY
   pool_label_taint_patches = {
     for name, g in local.merged_pools :
     name => yamlencode({
@@ -297,12 +308,23 @@ locals {
   acme_account_key_secret = "acme-account-key-${substr(sha256(local.acme_server), 0, 8)}"
 
   # --- email (transactional SMTP) ------------------------------------------
+  # Stated, never derived: host, port and from are schema-required together
+  # when the email block exists. port used to default to "587" and from to
+  # noreply@<dns.domain> — an invented sender that breaks SPF/DMARC silently.
+  # The empty defaults below only exist for environments without the
+  # capability (no email block at all).
   smtp_host  = try(local.config.email.host, "")
-  smtp_port  = tostring(try(local.config.email.port, "587"))
-  email_from = try(local.config.email.from, "noreply@${local.config.dns.domain}")
+  smtp_port  = tostring(try(local.config.email.port, ""))
+  email_from = try(local.config.email.from, "")
 
   # --- alerting (delivery channels) ----------------------------------------
-  alert_email_to   = try(local.config.alerting.email.to, "alerts@example.invalid")
+  # alerting.email.to used to default to alerts@example.invalid — alerts
+  # routed to a mailbox that cannot exist, silently. Now schema-required when
+  # the alerting.email block exists; empty means the channel is absent.
+  # telegram chat_id "0" is the DISABLED sentinel for an absent telegram
+  # block (Grafana provisioning tolerates it, like the "unset" bot token);
+  # when the block exists, chat_id is schema-required.
+  alert_email_to   = try(local.config.alerting.email.to, "")
   telegram_chat_id = tostring(try(local.config.alerting.telegram.chat_id, "0"))
 
   # --- data (per-store mode) -----------------------------------------------
@@ -326,27 +348,42 @@ locals {
         ? defaults.host
         : tostring(try(local.config.data[store].host, ""))
       )
+      # External stores state host AND port outright — the port used to fall
+      # back to the store's conventional port, which is exactly the kind of
+      # silent default that breaks when an external endpoint is non-standard.
       port = (
         try(local.config.data[store].mode, "in-cluster-managed") == "in-cluster-managed"
         ? defaults.port
-        : tostring(try(local.config.data[store].port, defaults.port))
+        : tostring(try(local.config.data[store].port, ""))
       )
     }
   }
 
   # --- artifact (distribution gitops source) -------------------------------
+  # version is pinned, never "latest" (schema pattern) and never defaulted:
+  # a defaulted moving tag is unauditable and contradicts matched-versions-only.
   artifact_url     = try(local.config.artifact.url, "")
-  artifact_version = try(local.config.artifact.version, "latest")
+  artifact_version = try(local.config.artifact.version, "")
   artifact_active  = try(local.config.artifact.active, local.artifact_url != "")
 
   # --- app / hub parameters -------------------------------------------------
-  api_type                 = try(local.config.app.api_type, "fspiop")
-  hub_participant_name     = try(local.config.app.hub.participant_name, "Hub")
+  # Hub parameters are stated, never defaulted, on hub clusters (preconditions
+  # below). api_type used to default to fspiop, participant_name to "Hub" and
+  # the onboarding amounts to 100000/1000 — financial and protocol facts an
+  # adopter must consciously set. Empty defaults exist only so the
+  # preconditions can report the missing field by name on hub clusters, and
+  # so non-hub roles (which never consume them) resolve cleanly.
+  api_type                 = try(local.config.app.api_type, "")
+  hub_participant_name     = try(local.config.app.hub.participant_name, "")
   hub_admin_email          = try(local.config.app.hub.admin_email, "")
-  onboarding_funds_in      = tostring(try(local.config.app.hub.onboarding.funds_in, "100000"))
-  onboarding_net_debit_cap = tostring(try(local.config.app.hub.onboarding.net_debit_cap, "1000"))
+  onboarding_funds_in      = tostring(try(local.config.app.hub.onboarding.funds_in, ""))
+  onboarding_net_debit_cap = tostring(try(local.config.app.hub.onboarding.net_debit_cap, ""))
 
-  flux_version = try(local.cluster.flux.version, "2.9.3")
+  # Flux distribution version is a platform definition (single-sourced in
+  # workload-classes.yaml beside talos/kubernetes versions), not adopter
+  # config — the old cluster.flux.version override was a silent default and
+  # is gone from the environment schema.
+  flux_version = local.workload_classes.flux_version
 }
 
 # Cross-field validation that JSON Schema cannot express.
@@ -394,13 +431,38 @@ resource "terraform_data" "validation" {
     precondition {
       condition = alltrue([
         for store, cfg in local.data_stores :
-        cfg.mode == "in-cluster-managed" || cfg.host != ""
+        cfg.mode == "in-cluster-managed" || (cfg.host != "" && cfg.port != "")
       ])
-      error_message = "external-unmanaged data stores must set data.<store>.host."
+      error_message = "external-unmanaged data stores must set data.<store>.host AND data.<store>.port. The port is no longer defaulted to the store's conventional port — external endpoints are stated outright."
     }
     precondition {
       condition     = local.cluster_role != "hub" || contains(["fspiop", "iso20022"], local.api_type)
-      error_message = "app.api_type must be fspiop or iso20022."
+      error_message = "app.api_type must be set on hub clusters: fspiop or iso20022. It is no longer defaulted to fspiop — the API dialect is set once at deploy time and switching mid-flight breaks in-progress transfers, so it must be a conscious choice."
+    }
+    precondition {
+      condition = local.cluster_role != "hub" || alltrue([
+        for v in [local.hub_participant_name, local.hub_admin_email, local.onboarding_funds_in, local.onboarding_net_debit_cap] : v != ""
+      ])
+      error_message = "hub clusters must state app.hub.participant_name, app.hub.admin_email and app.hub.onboarding.{funds_in,net_debit_cap} outright. The old defaults (participant 'Hub', funds_in 100000, net_debit_cap 1000) were financial facts filled in silently."
+    }
+    precondition {
+      condition     = !local.artifact_active || (local.artifact_url != "" && local.artifact_version != "")
+      error_message = "artifact.url and artifact.version must both be set when the gitops artifact is active. version is a pinned vX.Y.Z — it is no longer defaulted to 'latest', which is unauditable and contradicts matched-versions-only."
+    }
+    # Every workload class the topology uses must be mapped to an instance
+    # shape by the provider — a missing entry used to silently become a
+    # default instance type.
+    precondition {
+      condition = !contains(["aws", "digitalocean"], local.provider_name) || alltrue([
+        for g in local.node_groups : contains(keys(local.instance_types), g.class)
+      ])
+      error_message = "provider '${local.provider_name}' does not map every used workload class to an instance type: missing ${join(", ", [for g in local.node_groups : g.class if !contains(keys(local.instance_types), g.class)])}. Add the class to the provider's instance-type map."
+    }
+    # email and alerting are internally complete when present (schema enforces
+    # the same; this reports by name when the schema was bypassed).
+    precondition {
+      condition     = local.smtp_host == "" || (local.smtp_port != "" && local.email_from != "")
+      error_message = "email.host is set but email.port/email.from are not all set. State all three outright — 'from' is no longer invented as noreply@<domain> (breaks SPF/DMARC silently) and the port is no longer assumed 587."
     }
 
     # The pools are the cluster's entire LB address supply; without them no

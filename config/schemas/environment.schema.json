@@ -147,17 +147,6 @@
           "required": [
             "pools"
           ]
-        },
-        "flux": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "version": {
-              "type": "string",
-              "description": "Flux distribution version"
-            }
-          },
-          "description": "Flux configuration"
         }
       }
     },
@@ -259,9 +248,13 @@
       }
     },
     "artifact": {
-      "description": "Distribution gitops artifact consumed by Flux. Credentials OCI_REPO_* in .env.",
+      "description": "Distribution gitops artifact consumed by Flux. Credentials OCI_REPO_* in .env. url and version are both required — the version is a pin, never defaulted.",
       "type": "object",
       "additionalProperties": false,
+      "required": [
+        "url",
+        "version"
+      ],
       "properties": {
         "url": {
           "description": "OCI repository URL, e.g. oci://ghcr.io/org/repo",
@@ -491,9 +484,14 @@
       }
     },
     "email": {
-      "description": "Transactional email (SMTP). Credentials SMTP_USER/SMTP_PASSWORD in .env.",
+      "description": "Transactional email (SMTP). Credentials SMTP_USER/SMTP_PASSWORD in .env. When the block exists, host, port and from are all required — the sender address is never invented (the old noreply@<domain> default silently broke SPF/DMARC) and the port is never assumed.",
       "type": "object",
       "additionalProperties": false,
+      "required": [
+        "host",
+        "port",
+        "from"
+      ],
       "properties": {
         "host": {
           "type": "string"
@@ -503,18 +501,22 @@
           "pattern": "^[0-9]+$"
         },
         "from": {
+          "description": "Sender address, stated outright — must be a mailbox/domain the SMTP account may send as.",
           "type": "string"
         }
       }
     },
     "alerting": {
-      "description": "Alert delivery channels (Grafana contact points). Telegram token in .env.",
+      "description": "Alert delivery channels (Grafana contact points). Telegram token in .env. Each declared channel states its endpoint outright — the old alerts@example.invalid default routed alerts to a mailbox that cannot exist.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "email": {
           "type": "object",
           "additionalProperties": false,
+          "required": [
+            "to"
+          ],
           "properties": {
             "to": {
               "type": "string"
@@ -524,6 +526,9 @@
         "telegram": {
           "type": "object",
           "additionalProperties": false,
+          "required": [
+            "chat_id"
+          ],
           "properties": {
             "chat_id": {
               "type": "string"
@@ -545,8 +550,14 @@
           ]
         },
         "hub": {
+          "description": "Hub identity and onboarding amounts — required in full on hub clusters (Terraform precondition; this schema requires the keys whenever the block exists). The old defaults (participant 'Hub', funds_in 100000, net_debit_cap 1000) were financial facts filled in silently.",
           "type": "object",
           "additionalProperties": false,
+          "required": [
+            "participant_name",
+            "admin_email",
+            "onboarding"
+          ],
           "properties": {
             "participant_name": {
               "type": "string"
@@ -557,6 +568,10 @@
             "onboarding": {
               "type": "object",
               "additionalProperties": false,
+              "required": [
+                "funds_in",
+                "net_debit_cap"
+              ],
               "properties": {
                 "funds_in": {
                   "type": "string",

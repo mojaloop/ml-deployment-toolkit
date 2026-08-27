@@ -1,7 +1,6 @@
 variable "flux_version" {
-  description = "Flux distribution version (e.g. 2.7.2)"
+  description = "Flux distribution version — single-sourced from config/definitions/workload-classes.yaml via config-loader; no default here so the platform definition is the only source."
   type        = string
-  default     = "2.9.3"
 }
 
 variable "operator_version" {

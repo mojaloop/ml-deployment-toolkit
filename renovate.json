@@ -49,9 +49,9 @@
     },
     {
       "customType": "regex",
-      "description": "Flux distribution fallback version",
-      "fileMatch": ["^src/modules/config-loader/main\\.tf$"],
-      "matchStrings": ["flux_version = try\\([^,]+, \"(?<currentValue>[0-9.]+)\"\\)"],
+      "description": "Flux distribution version (platform definition)",
+      "fileMatch": ["^config/definitions/workload-classes\\.yaml$"],
+      "matchStrings": ["flux_version: \"(?<currentValue>[0-9.]+)\""],
       "depNameTemplate": "fluxcd/flux2",
       "datasourceTemplate": "github-releases",
       "extractVersionTemplate": "^v(?<version>.+)$"
