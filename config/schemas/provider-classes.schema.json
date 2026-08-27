@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Provider workload-class materializations",
+  "description": "Schema for providers/<provider>/classes.yaml — the provider package's per-class dimension (design §7). Class IDENTITY (names, intent, talos_type) stays in config/definitions/workload-classes.yaml; this file materializes each class on one provider: Talos machine-config fragments and VM shape overrides (proxmox), instance type and node OS config (aws), droplet size (digitalocean). Every class the platform defines must have an entry in every provider's file — completeness is asserted by check-interface.sh and by a config-loader precondition; an empty entry ({}) is a valid materialization. Machine SHAPE (vm/instance_type, consumed by Terraform) and node OS CONFIG (talos_fragments/node_config, consumed by machine config or launch-template user data) are separate seats within a class — different owners, different execution paths.",
+  "type": "object",
+  "required": [
+    "version",
+    "classes"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "description": "Classes format version",
+      "type": "integer",
+      "minimum": 1
+    },
+    "classes": {
+      "description": "One entry per workload class, keyed by the class names defined in config/definitions/workload-classes.yaml (key membership is cross-checked by check-interface.sh and a config-loader precondition — this schema validates each entry's shape).",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "talos_fragments": {
+              "description": "proxmox: Talos machine-config fragment files under the package's patches/ directory, applied in list order before the engine's label/taint patch and per-pool fragments. *.tpl entries are rendered with {interface, vip_address}.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]+\\.(yaml|yml|yaml\\.tpl|yml\\.tpl)$"
+              }
+            },
+            "vm": {
+              "description": "proxmox: per-class VM shape overrides, deep-merged onto infra.vm_defaults (per-pool proxmox/<pool>.yaml overrides win over these). Same surface as the pool-level override — see proxmox-pool.schema.json.",
+              "type": "object",
+              "additionalProperties": true
+            },
+            "instance_type": {
+              "description": "aws/digitalocean: EC2 instance type or Droplet size slug for this class. Required on cloud providers — an unmapped class fails the plan by name.",
+              "type": "string"
+            },
+            "node_config": {
+              "description": "aws: nodeadm NodeConfig fragment file under the package's node-config/ directory, merged into the class's per-node-group launch template user data (MIME multipart, application/node.eks.aws).",
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]+\\.(yaml|yml)$"
+            }
+          }
+      }
+    }
+  }
+}

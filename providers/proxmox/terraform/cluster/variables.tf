@@ -17,7 +17,13 @@ variable "cluster" {
 }
 
 variable "workload_classes" {
-  description = "Workload classes configuration"
+  description = "Workload class IDENTITY (talos_type per class) from config/definitions/workload-classes.yaml"
+  type        = any
+  default     = {}
+}
+
+variable "provider_classes" {
+  description = "Per-class provider MATERIALIZATIONS from providers/proxmox/classes.yaml: talos_fragments (files under patches_path, *.tpl rendered with {interface, vip_address}) and vm shape overrides"
   type        = any
   default     = {}
 }

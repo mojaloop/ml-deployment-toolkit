@@ -201,7 +201,11 @@ validate:
 	 pfile="providers/$$provider/params.yaml"; \
 	 if [ ! -f "$$pfile" ]; then echo "ERROR: provider params $$pfile not found"; exit 1; fi; \
 	 echo "Validating $$pfile against schema..."; \
-	 yq -o json e '.' "$$pfile" | python3 tools/validate.py config/schemas/params.schema.json
+	 yq -o json e '.' "$$pfile" | python3 tools/validate.py config/schemas/params.schema.json; \
+	 cfile="providers/$$provider/classes.yaml"; \
+	 if [ ! -f "$$cfile" ]; then echo "ERROR: provider classes $$cfile not found"; exit 1; fi; \
+	 echo "Validating $$cfile against schema..."; \
+	 yq -o json e '.' "$$cfile" | python3 tools/validate.py config/schemas/provider-classes.schema.json
 	@if [ -f "$(ENV_DIR)/placement.yaml" ]; then \
 	 echo "Validating $(ENV_DIR)/placement.yaml against schema..."; \
 	 yq -o json e '.' $(ENV_DIR)/placement.yaml | python3 tools/validate.py config/schemas/placement.schema.json; \

@@ -16,17 +16,24 @@ locals {
     inst.workload_class
   ])
 
-  # Load workload-specific patches from config/patches/talos/
+  # Per-class Talos fragments from the provider package's materialization
+  # seat (providers/proxmox/classes.yaml), applied in declared order. *.tpl
+  # fragments are templates over the provider facts (VIP, interface) — the
+  # control-plane/mixed-plane VIP fragment is DECLARED per class there, not
+  # special-cased here (the old "also apply control-plane provider patches
+  # to mixed-plane" hardcode is gone).
   workload_class_patches = {
     for wc in local.used_workload_classes :
-    wc => try([
-      for patch_name in var.workload_classes[wc].talos_patches :
-      file("${var.patches_path}/${patch_name}")
-    ], [])
+    wc => [
+      for patch_name in try(var.provider_classes[wc].talos_fragments, []) :
+      endswith(patch_name, ".tpl")
+      ? templatefile("${var.patches_path}/${patch_name}", {
+        interface   = "eth0"
+        vip_address = local.vip_address
+      })
+      : file("${var.patches_path}/${patch_name}")
+    ]
   }
-
-  # Render provider-specific VIP patch
-  provider_patches_config = try(local.provider_config.talos-patches, {})
 
   # Registry mirror patch (applied to all instances when proxy is active)
   registry_mirror_patch = var.oci_proxy_active ? [
@@ -50,30 +57,6 @@ locals {
       ntp_servers = var.ntp_servers
     })
   ] : []
-
-  # Build provider patches by class, also apply control-plane patches to mixed-plane
-  provider_patches_by_class = merge(
-    {
-      for patch_key, patch_file in local.provider_patches_config :
-      replace(patch_key, "config-patch-", "") => [
-        templatefile("${dirname(var.provider_config_path)}/${patch_file}", {
-          interface   = "eth0"
-          vip_address = local.vip_address
-        })
-      ]
-    },
-    # Also apply control-plane provider patches to mixed-plane
-    contains(local.used_workload_classes, "mixed-plane") ? {
-      "mixed-plane" = [
-        for patch_key, patch_file in local.provider_patches_config :
-        templatefile("${dirname(var.provider_config_path)}/${patch_file}", {
-          interface   = "eth0"
-          vip_address = local.vip_address
-        })
-        if patch_key == "config-patch-control-plane"
-      ]
-    } : {}
-  )
 }
 
 # Generate Talos configurations
@@ -98,7 +81,6 @@ module "talos_config" {
       talos_type     = var.workload_classes[inst.workload_class].talos_type
       workload_patches = concat(
         lookup(local.workload_class_patches, inst.workload_class, []),
-        lookup(local.provider_patches_by_class, inst.workload_class, []),
         # Pool-keyed: the label derives from the pool name and the taints come
         # from the pool's own placement.yaml declaration.
         try([var.label_taint_patches[inst.group]], []),

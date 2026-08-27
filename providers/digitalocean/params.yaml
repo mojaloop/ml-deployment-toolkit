@@ -35,13 +35,3 @@ infra:
   # VPC defaults
   vpc:
     ip_range: "10.10.0.0/16"
-
-  # Workload class -> Droplet size slug.
-  # Sized against the capacity templates (control-plane 4-6 cores / 8 GB,
-  # workers 6-8 cores / 12-16 GB, db nodes memory-heavy).
-  instance_types:
-    control-plane: "s-4vcpu-8gb"    # 4 vCPU / 8 GB
-    mixed-plane: "s-8vcpu-16gb"     # 8 vCPU / 16 GB
-    worker-general: "s-8vcpu-16gb"  # 8 vCPU / 16 GB
-    worker-kafka: "s-8vcpu-16gb"    # 8 vCPU / 16 GB
-    worker-db: "m-4vcpu-32gb"       # 4 vCPU / 32 GB (memory-optimized)

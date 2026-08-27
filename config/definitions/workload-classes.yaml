@@ -1,5 +1,12 @@
-# Workload classes for Talos Kubernetes nodes
-# Global versions are the single source of truth for Talos/Kubernetes versions
+# Workload classes — class IDENTITY only (platform-owned, provider-neutral).
+# Global versions are the single source of truth for Talos/Kubernetes/Flux versions.
+#
+# A class here is a name + intent + role identity (talos_type). Its
+# MATERIALIZATION — how the class manifests on a provider: Talos config
+# fragments, VM shape, instance type, node OS config — lives in the provider
+# package's per-class seat (providers/<provider>/classes.yaml), which must
+# cover every class named here. Anything provider-shaped in this file is the
+# old drift-prone pattern reintroduced and is rejected at plan time.
 
 # Global Talos/Kubernetes/Flux versions
 talos_version: "v1.13.7"
@@ -15,46 +22,27 @@ talos_image:
   arch: "amd64"
 
 # --- Workload classes ---
+# Node labels are NOT declared here: they derive mechanically from the pool
+# name (<P_NODE_ROLE_LABEL_KEY>=<pool>). Taints are declared by the pool
+# itself in the template's placement.yaml. A pool meant for Kafka is simply
+# NAMED kafka — that name becomes its label, and gitops selects on it.
 classes:
   control-plane:
     talos_type: "controlplane"
-    talos_patches:
-      - patch-cilium-install.yaml
 
   worker-general:
     talos_type: "worker"
-    talos_patches:
-      - patch-cilium-install.yaml
-      - patch-openebs.yaml  
 
   mixed-plane:
     talos_type: "controlplane"
-    talos_patches:
-      - patch-cilium-install.yaml
-      - patch-openebs.yaml
-      - patch-allow-scheduling-on-cp.yaml
 
-  # Node labels are NOT declared here: they derive mechanically from the pool
-  # name (<P_NODE_ROLE_LABEL_KEY>=<pool>). Taints are declared by the pool
-  # itself in the template's placement.yaml. A pool meant for Kafka is simply
-  # NAMED kafka — that name becomes its label, and gitops selects on it.
   worker-kafka:
     talos_type: "worker"
-    talos_patches:
-      - patch-cilium-install.yaml
-      # Strimzi brokers claim PVCs; without a provisioner on the node they
-      # stay Pending on a dedicated (tainted) kafka pool.
-      - patch-openebs.yaml
 
   worker-db:
     talos_type: "worker"
-    talos_patches:
-      - patch-cilium-install.yaml
-      - patch-openebs.yaml
 
   # Mojaloop core services (central-ledger, quoting, ALS, ml-api-adapter,
-  # settlement, bulk): stateless and CPU-bound — no local PVs, so no openebs.
+  # settlement, bulk): stateless and CPU-bound.
   worker-hub:
     talos_type: "worker"
-    talos_patches:
-      - patch-cilium-install.yaml

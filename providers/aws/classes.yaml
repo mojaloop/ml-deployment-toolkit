@@ -1,0 +1,31 @@
+# yaml-language-server: $schema=../../config/schemas/provider-classes.schema.json
+# -----------------------------------------------------------------------------
+# Workload-class MATERIALIZATIONS — AWS (EKS).
+#
+# Class IDENTITY lives in config/definitions/workload-classes.yaml (L1). This
+# file is the provider's per-class dimension: EC2 instance type (machine
+# SHAPE, consumed by Terraform) and node OS config (nodeadm NodeConfig
+# fragment under node-config/<file>, baked into the node group's launch
+# template user data) — the CAPI InfraMachineTemplate/BootstrapConfig split.
+# Every class the platform defines MUST have an entry here (schema-checked and
+# asserted at plan/render time). An unmapped class fails the plan by name —
+# it never silently becomes a default instance type.
+#
+# Sized against the capacity templates (control-plane 4-6 cores / 8 GB,
+# workers 6-8 cores / 12-16 GB, db nodes memory-heavy). Node OS tuning enters
+# FROM MEASURED NEED ONLY — the seat exists before the sysctls do.
+# -----------------------------------------------------------------------------
+version: 1
+classes:
+  control-plane:
+    instance_type: "m5.xlarge" # 4 vCPU / 16 GiB
+  mixed-plane:
+    instance_type: "m5.2xlarge" # 8 vCPU / 32 GiB
+  worker-general:
+    instance_type: "m5.2xlarge" # 8 vCPU / 32 GiB
+  worker-kafka:
+    instance_type: "m5.2xlarge" # 8 vCPU / 32 GiB
+  worker-db:
+    instance_type: "r5.xlarge" # 4 vCPU / 32 GiB (memory-optimized)
+  worker-hub:
+    instance_type: "c5.2xlarge" # 8 vCPU / 16 GiB (compute-optimized, stateless hub core)

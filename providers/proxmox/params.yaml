@@ -59,8 +59,3 @@ infra:
   # Storage configuration
   storage:
     default_pool: "local-lvm"
-
-  # Provider-specific Talos patches (paths relative to this file's directory)
-  talos-patches:
-    config-patch-control-plane:
-      patches/patch-vip.yaml.tpl

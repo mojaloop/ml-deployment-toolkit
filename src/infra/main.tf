@@ -120,6 +120,7 @@ module "proxmox" {
   instances           = module.config.instances
   cluster             = module.config.cluster
   workload_classes    = module.config.workload_classes
+  provider_classes    = module.config.provider_classes
   talos_version       = module.config.talos_version
   kubernetes_version  = module.config.kubernetes_version
   talos_image         = module.config.talos_image

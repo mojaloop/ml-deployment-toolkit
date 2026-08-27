@@ -90,8 +90,13 @@ output "do_node_pools" {
 }
 
 output "workload_classes" {
-  description = "Workload classes configuration"
+  description = "Workload class IDENTITY (names, intent, talos_type) from config/definitions/workload-classes.yaml"
   value       = local.workload_classes.classes
+}
+
+output "provider_classes" {
+  description = "Workload-class MATERIALIZATIONS from providers/<provider>/classes.yaml — the per-class provider seat (talos fragments / VM shape / instance type / node OS config)"
+  value       = local.provider_classes
 }
 
 output "talos_version" {

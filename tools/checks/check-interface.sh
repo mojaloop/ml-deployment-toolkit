@@ -56,7 +56,46 @@ if [ "$have_schema" = "1" ] && [ -d gitops ]; then
   done
 fi
 
-# --- Direction 3: no P_* keys in environment config.yaml files (namespaces disjoint)
+# --- Direction 3: every provider materializes every workload class ----------
+# Class identity lives in config/definitions/workload-classes.yaml; each
+# provider package's classes.yaml must have an entry for every class (an empty
+# entry is valid — the SEAT must exist). A missing entry is what a renamed
+# class looks like. Cloud providers must additionally set instance_type.
+WC="config/definitions/workload-classes.yaml"
+if [ -f "$WC" ]; then
+  platform_classes=$(yq eval '.classes | keys | .[]' "$WC" 2>/dev/null | sort)
+  for cf in providers/*/classes.yaml; do
+    [ -f "$cf" ] || continue
+    prov=$(basename "$(dirname "$cf")")
+    pclasses=$(yq eval '.classes | keys | .[]' "$cf" 2>/dev/null) || { echo "$cf:1: YAML parse error"; findings=$((findings+1)); continue; }
+    for c in $platform_classes; do
+      if ! printf '%s\n' "$pclasses" | grep -qxF "$c"; then
+        echo "$cf: does not materialize workload class '$c' (declared in $WC)"
+        findings=$((findings+1))
+      fi
+    done
+    if [ "$prov" = "aws" ] || [ "$prov" = "digitalocean" ]; then
+      for c in $platform_classes; do
+        it=$(yq eval ".classes.\"$c\".instance_type // \"\"" "$cf" 2>/dev/null)
+        if [ -z "$it" ]; then
+          echo "$cf: class '$c' has no instance_type (required on cloud providers)"
+          findings=$((findings+1))
+        fi
+      done
+    fi
+  done
+  for pdir in providers/*/; do
+    [ -f "$pdir/params.yaml" ] || continue
+    if [ ! -f "$pdir/classes.yaml" ]; then
+      echo "${pdir}classes.yaml: missing — every provider package must carry the per-class materialization seat"
+      findings=$((findings+1))
+    fi
+  done
+else
+  echo "warning: $WC not found — class materialization completeness not verified" >&2
+fi
+
+# --- Direction 4: no P_* keys in environment config.yaml files (namespaces disjoint)
 for cf in "$@"; do
   if [ ! -f "$cf" ]; then
     echo "usage error: config file not found: $cf" >&2

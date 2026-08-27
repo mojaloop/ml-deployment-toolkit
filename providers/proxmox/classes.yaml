@@ -1,0 +1,64 @@
+# yaml-language-server: $schema=../../config/schemas/provider-classes.schema.json
+# -----------------------------------------------------------------------------
+# Workload-class MATERIALIZATIONS — Proxmox (Talos).
+#
+# Class IDENTITY (names, intent, talos_type) lives in
+# config/definitions/workload-classes.yaml (L1 — gitops selectors and placement
+# checks reference it). This file is the provider's per-class dimension: how
+# each class materializes on Proxmox — Talos machine-config fragments and VM
+# shape overrides. Every class the platform defines MUST have an entry here
+# (schema-checked and asserted at plan/render time); an empty entry ({}) is a
+# valid materialization.
+#
+# talos_fragments: files under providers/proxmox/patches/, applied in list
+# order BEFORE the engine-derived label/taint patch and the per-pool
+# template/environment fragments (which therefore win on merge). *.tpl
+# fragments are rendered with {interface, vip_address}.
+#
+# vm: per-class VM shape overrides, deep-merged onto infra.vm_defaults from
+# params.yaml (see config/schemas/proxmox-pool.schema.json for the surface);
+# per-pool proxmox/<pool>.yaml overrides win over these.
+#
+# Tuning values enter classes FROM MEASURED NEED ONLY — the seat exists before
+# the sysctls do, not the other way around.
+# -----------------------------------------------------------------------------
+version: 1
+classes:
+  control-plane:
+    talos_fragments:
+      - patch-cilium-install.yaml
+      # Shared VIP for the Kubernetes API (control-plane classes only).
+      - patch-vip.yaml.tpl
+
+  worker-general:
+    talos_fragments:
+      - patch-cilium-install.yaml
+      - patch-openebs.yaml
+
+  mixed-plane:
+    talos_fragments:
+      - patch-cilium-install.yaml
+      - patch-openebs.yaml
+      - patch-allow-scheduling-on-cp.yaml
+      # Mixed-plane serves the API too — the VIP fragment is declared here,
+      # not special-cased in the module (it used to be hardcoded as "also
+      # apply control-plane provider patches to mixed-plane").
+      - patch-vip.yaml.tpl
+
+  worker-kafka:
+    talos_fragments:
+      - patch-cilium-install.yaml
+      # Strimzi brokers claim PVCs; without a provisioner on the node they
+      # stay Pending on a dedicated (tainted) kafka pool.
+      - patch-openebs.yaml
+
+  worker-db:
+    talos_fragments:
+      - patch-cilium-install.yaml
+      - patch-openebs.yaml
+
+  # Mojaloop core services (central-ledger, quoting, ALS, ml-api-adapter,
+  # settlement, bulk): stateless and CPU-bound — no local PVs, so no openebs.
+  worker-hub:
+    talos_fragments:
+      - patch-cilium-install.yaml

@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=../../config/schemas/provider-classes.schema.json
+# -----------------------------------------------------------------------------
+# Workload-class MATERIALIZATIONS — DigitalOcean (DOKS).
+#
+# Class IDENTITY lives in config/definitions/workload-classes.yaml (L1). This
+# file is the provider's per-class dimension: Droplet size slug per class.
+# Every class the platform defines MUST have an entry here (schema-checked and
+# asserted at plan/render time). An unmapped class fails the plan by name.
+#
+# Sized against the capacity templates (control-plane 4-6 cores / 8 GB,
+# workers 6-8 cores / 12-16 GB, db nodes memory-heavy).
+# -----------------------------------------------------------------------------
+version: 1
+classes:
+  control-plane:
+    instance_type: "s-4vcpu-8gb" # 4 vCPU / 8 GB
+  mixed-plane:
+    instance_type: "s-8vcpu-16gb" # 8 vCPU / 16 GB
+  worker-general:
+    instance_type: "s-8vcpu-16gb" # 8 vCPU / 16 GB
+  worker-kafka:
+    instance_type: "s-8vcpu-16gb" # 8 vCPU / 16 GB
+  worker-db:
+    instance_type: "m-4vcpu-32gb" # 4 vCPU / 32 GB (memory-optimized)
+  worker-hub:
+    instance_type: "s-8vcpu-16gb" # 8 vCPU / 16 GB (was missing pre-seat — the old
+    # silent s-4vcpu-8gb lookup default would have under-sized it)

@@ -39,6 +39,14 @@ locals {
   provider_capabilities = try(local.provider_params_file.capabilities, {})
   cap_in_cluster_data   = try(local.provider_capabilities.in_cluster_data, false)
 
+  # Workload-class MATERIALIZATIONS — the provider package's per-class seat
+  # (providers/<p>/classes.yaml). Identity stays in workload-classes.yaml;
+  # how a class materializes (talos fragments, VM shape, instance type, node
+  # OS config) is the provider's business. Completeness is asserted below:
+  # every platform class must have an entry.
+  provider_classes_file = yamldecode(file("${var.providers_path}/${local.provider_name}/classes.yaml"))
+  provider_classes      = local.provider_classes_file.classes
+
   # A template is a directory — the full overlay for one provider, role and
   # capacity: template.yaml (identity + tuning), placement.yaml (the shape:
   # node pools, default topology), values/ and patches/ (gitops deltas),
@@ -153,7 +161,10 @@ locals {
   ]
 
   # --- Cloud shapes (managed Kubernetes: one pool per node group) ----------
-  instance_types = try(local.mapping.instance_types, {})
+  # Instance types come from the per-class materialization seat
+  # (providers/<p>/classes.yaml), no longer from a free-floating
+  # infra.instance_types map in params.yaml.
+  instance_types = { for name, c in local.provider_classes : name => try(c.instance_type, "") }
 
   # AWS placement: EKS has no per-instance placement — a managed node group is
   # only constrained by which subnets (= AZs) it may use, and a multi-AZ group
@@ -449,14 +460,24 @@ resource "terraform_data" "validation" {
       condition     = !local.artifact_active || (local.artifact_url != "" && local.artifact_version != "")
       error_message = "artifact.url and artifact.version must both be set when the gitops artifact is active. version is a pinned vX.Y.Z — it is no longer defaulted to 'latest', which is unauditable and contradicts matched-versions-only."
     }
+    # The provider package must materialize EVERY class the platform defines
+    # (schema-checked repo-wide by check-interface.sh; asserted here for the
+    # active provider) — an entry may be empty, but it must exist: a class
+    # missing from the seat is exactly what a renamed class looks like.
+    precondition {
+      condition = alltrue([
+        for name, _ in try(local.workload_classes.classes, {}) : contains(keys(local.provider_classes), name)
+      ])
+      error_message = "providers/${local.provider_name}/classes.yaml does not materialize every workload class: missing ${join(", ", [for name, _ in try(local.workload_classes.classes, {}) : name if !contains(keys(local.provider_classes), name)])}."
+    }
     # Every workload class the topology uses must be mapped to an instance
-    # shape by the provider — a missing entry used to silently become a
+    # shape on cloud providers — a missing entry used to silently become a
     # default instance type.
     precondition {
       condition = !contains(["aws", "digitalocean"], local.provider_name) || alltrue([
-        for g in local.node_groups : contains(keys(local.instance_types), g.class)
+        for g in local.node_groups : try(local.instance_types[g.class], "") != ""
       ])
-      error_message = "provider '${local.provider_name}' does not map every used workload class to an instance type: missing ${join(", ", [for g in local.node_groups : g.class if !contains(keys(local.instance_types), g.class)])}. Add the class to the provider's instance-type map."
+      error_message = "provider '${local.provider_name}' does not map every used workload class to an instance type: missing ${join(", ", [for g in local.node_groups : g.class if try(local.instance_types[g.class], "") == ""])}. Set instance_type in providers/${local.provider_name}/classes.yaml."
     }
     # email and alerting are internally complete when present (schema enforces
     # the same; this reports by name when the schema was bypassed).
