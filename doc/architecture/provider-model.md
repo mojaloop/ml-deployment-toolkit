@@ -134,16 +134,36 @@ Node labels derive mechanically from pool names: every node of a pool is labelle
 
 `params.yaml` is the contract between a provider and the shared layers above it. Its `params` section defines exactly the `P_*` variables the shared manifests substitute — `P_GATEWAY_CLASS`, `P_STORAGE_CLASS`, `P_NODE_ROLE_LABEL_KEY`, `P_L2_INTERFACE_REGEX`, `P_KUBE_API_HOST`, `P_KUBE_API_PORT` — validated against `config/schemas/params.schema.json` in both directions: a provider must supply every interface variable, and may supply nothing outside it. The `P_*` namespace is disjoint from `config.yaml`'s: `P_*` values resolve from `params.yaml` only, and a `config.yaml` that defines or shadows one fails validation. An adopter editing `params.yaml` is forking the distribution, and the pristine check reports it.
 
+**The contract is versioned** (2026-08-27): `config/definitions/provider-contract.yaml` declares the release's `contract_version`, every package states the version it implements in `params.yaml`, and equality is asserted plainly — a config-loader precondition plus `check-interface` — never a compatibility matrix (providers are in-repo; one contract version per DTK release).
+
 The interface is proven by a second provider consuming it. The `aws` and `digitalocean` template directories exist and pass schema validation, but their interface values are marked **UNVALIDATED** until a second provider is brought up against them — Proxmox is the only validated set today.
+
+### The per-class materialization seat
+
+Class **identity** (name, intent, `talos_type`) lives in `config/definitions/workload-classes.yaml` and carries nothing provider-shaped — enforced by schema and a plan-time precondition. How a class **materializes** is each package's per-class seat, `providers/<provider>/classes.yaml`, which must cover every platform class (`check-interface` + precondition):
+
+- proxmox: `talos_fragments` (files under the package's `patches/`; the control-plane/mixed-plane VIP fragment is declared per class, not special-cased) and `vm` shape overrides;
+- aws: `instance_type` plus `node_config` — a nodeadm NodeConfig fragment under `node-config/`, baked into that class's per-node-group launch template user data;
+- digitalocean: `instance_type`.
+
+Machine **shape** (vm/instance_type, Terraform-consumed) and node **OS config** (talos fragments / NodeConfig, machine-config-consumed) are separate seats within a class — different owners, different execution paths. VM shape resolves per node over a declared chain, later wins: `infra.vm_defaults` → class `vm` → template `proxmox/<pool>.yaml` → environment `proxmox/<pool>.yaml` (surface: `config/schemas/proxmox-pool.schema.json`). Tuning values enter classes **from measured need only** — the seat exists before the sysctls do.
+
+### The provider-wide gitops delta slot
+
+`providers/<provider>/gitops-delta/{values,patches}/` is the provider layer's one sanctioned escape hatch: a delta applying to all of the provider's templates that the contract cannot express. It occupies the second slot of every HelmRelease's generated `valuesFrom` chain (common → provider → template → environment) and of the kustomize patch order. Loud by design: `make check` reports every non-empty slot, and frequent use is the signal to extend the contract instead.
 
 ## Where provider differences live
 
-Four places, and nowhere else:
+One provider package plus two gitops seams, and nowhere else:
 
 | Location | Contains |
 |----------|----------|
-| `providers/<provider>/terraform/` | Cluster provisioning |
-| `providers/<provider>/templates/` | Full template overlays per role and tier; the package root also holds `params.yaml` — the `P_*` interface and Terraform-consumed infra constants |
+| `providers/<provider>/terraform/` | Cluster provisioning modules |
+| `providers/<provider>/params.yaml` | Contract implementation: `P_*` symbols, capabilities, infra constants (contract-versioned) |
+| `providers/<provider>/classes.yaml` | Per-class materializations (talos fragments / VM shape / instance type / node OS config) |
+| `providers/<provider>/templates/` | Full template overlays per role and tier |
+| `providers/<provider>/patches/`, `node-config/` | Provider-owned machine-config / node OS fragment files |
+| `providers/<provider>/gitops-delta/` | The one sanctioned provider-wide gitops delta slot (loud, normally empty) |
 | `gitops/talos/` | Vendor layer — self-managed clusters only |
 | `gitops/dns/<provider>/` | cert-manager issuer and external-dns config |
 
