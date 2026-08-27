@@ -439,11 +439,31 @@ resource "kubernetes_secret_v1" "minio_buckets_values" {
   type = "Opaque"
 }
 
+# Provider-wide gitops delta values — one ConfigMap per
+# values/<namespace>/<release>.yaml under providers/<p>/gitops-delta/, named
+# <namespace>-<release>-values-provider. The provider slot of the valuesFrom
+# chain (common -> provider -> template -> environment); DTK-authored, secrets
+# forbidden. Empty on a healthy tree — this is the provider layer's one loud
+# escape hatch.
+resource "kubernetes_config_map_v1" "helm_value_providers" {
+  for_each = { for k, v in var.provider_value_overrides : k => v if v != "" }
+
+  metadata {
+    name      = "${each.key}-values-provider"
+    namespace = var.flux_namespace
+  }
+
+  data = {
+    "values.yaml" = each.value
+  }
+}
+
 # Template-layer Helm values — one ConfigMap per values/<namespace>/<release>.yaml
 # in the selected template directory, named <namespace>-<release>-values-template.
-# The middle slot of every HelmRelease's three-layer valuesFrom chain
-# (common -> template -> environment), optional because most templates
-# override nothing. Templates are DTK-authored: secrets are forbidden here.
+# The template slot of every HelmRelease's four-layer valuesFrom chain
+# (common -> provider -> template -> environment), optional because most
+# templates override nothing. Templates are DTK-authored: secrets are
+# forbidden here.
 resource "kubernetes_config_map_v1" "helm_value_templates" {
   for_each = { for k, v in var.template_value_overrides : k => v if v != "" }
 
@@ -887,15 +907,17 @@ locals {
     k => merge({ prune = true, suspend = false }, v) if v.enabled
   }
 
-  # Layer order: distribution patches, then template patches, then deployer
-  # (environment) patches — kustomize applies the list in order, so later
-  # layers win. A patches/<name>.yaml naming no enabled Kustomization FAILS
-  # the plan (terraform_data.patch_binding_validation below) — an orphaned
-  # binding name is what a renamed Kustomization looks like after an upgrade.
+  # Layer order: distribution patches, then the provider-wide delta, then
+  # template patches, then deployer (environment) patches — kustomize applies
+  # the list in order, so later layers win. A patches/<name>.yaml naming no
+  # enabled Kustomization FAILS the plan
+  # (terraform_data.patch_binding_validation below) — an orphaned binding
+  # name is what a renamed Kustomization looks like after an upgrade.
   effective_patches = {
     for k, _ in local.kustomizations : k => concat(
       lookup(local.backup_disabled_patches, k, []),
       lookup(local.eab_patches, k, []),
+      lookup(var.provider_patches, k, []),
       lookup(var.template_patches, k, []),
       lookup(var.kustomize_patches, k, []),
     )
@@ -921,6 +943,12 @@ resource "terraform_data" "obs_ingest_validation" {
 # would never be applied — a misspelled or stale filename must fail loudly.
 resource "terraform_data" "patch_binding_validation" {
   lifecycle {
+    precondition {
+      condition = alltrue([
+        for k in keys(var.provider_patches) : contains(keys(local.kustomizations), k)
+      ])
+      error_message = "provider gitops-delta patches/ file(s) name no enabled Flux Kustomization on this cluster: ${join(", ", [for k in keys(var.provider_patches) : k if !contains(keys(local.kustomizations), k)])} — an orphaned patch silently never applies. Enabled Kustomizations: ${join(", ", sort(keys(local.kustomizations)))}."
+    }
     precondition {
       condition = alltrue([
         for k in keys(var.template_patches) : contains(keys(local.kustomizations), k)

@@ -23,12 +23,25 @@ for c in examples/environments/*/config.yaml.sample; do
   [ -f "$c" ] && SAMPLE_CONFIGS="$SAMPLE_CONFIGS $c"
 done
 
-# Environment-layer dirs are Terraform-substituted (templatefile) — %{ directives
-# are forbidden there on top of the plain token rules (--tf in check-substitution).
+# Environment-layer dirs and the provider-wide gitops delta slots are
+# Terraform-substituted (templatefile) — %{ directives are forbidden there on
+# top of the plain token rules (--tf in check-substitution).
 TF_DIRS=""
 for d in "$ENVS_ROOT"/*/values "$ENVS_ROOT"/*/patches "$ENVS_ROOT"/*/talos \
+         providers/*/gitops-delta/values providers/*/gitops-delta/patches \
          examples/environments/*/values examples/environments/*/patches examples/environments/*/talos; do
   [ -d "$d" ] && TF_DIRS="$TF_DIRS --tf $d"
+done
+
+# The provider-wide gitops delta is the provider layer's ONE escape hatch —
+# loud by design: report every non-empty slot so its use can never normalize
+# silently (frequent use is the signal to extend the contract instead).
+for d in providers/*/gitops-delta; do
+  [ -d "$d" ] || continue
+  n=$(find "$d" -type f \( -name '*.yaml' -o -name '*.yml' \) | wc -l | tr -d ' ')
+  if [ "$n" -gt 0 ]; then
+    echo "NOTICE: provider-wide gitops delta slot IN USE: $d carries $n file(s) — a delta inexpressible through the contract; frequent use means the contract needs extending." >&2
+  fi
 done
 
 SUMMARY=""

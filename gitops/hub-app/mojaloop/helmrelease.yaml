@@ -48,6 +48,10 @@ spec:
       name: mojaloop-values-secret
       valuesKey: values.yaml
     - kind: ConfigMap
+      name: mojaloop-mojaloop-values-provider
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: mojaloop-mojaloop-values-template
       valuesKey: values.yaml
       optional: true

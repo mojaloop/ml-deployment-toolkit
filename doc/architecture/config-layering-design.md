@@ -401,7 +401,8 @@ it.
 
 ### Requirement on the published artifact
 
-Every HelmRelease carries its full `valuesFrom` chain — common, template, environment — with the
+Every HelmRelease carries its full `valuesFrom` chain — common, provider (the provider-wide
+gitops delta slot, added 2026-08-27), template, environment — with the
 environment entry `optional: true` so an environment that overrides nothing still reconciles.
 **Generated mechanically, never hand-written.** A missing slot is a component the adopter cannot
 override without forking the clone. CI asserts the chain is complete for every release.

@@ -28,6 +28,10 @@ spec:
       name: oathkeeper-values
       valuesKey: values.yaml
     - kind: ConfigMap
+      name: ory-oathkeeper-values-provider
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: ory-oathkeeper-values-template
       valuesKey: values.yaml
       optional: true

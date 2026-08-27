@@ -37,6 +37,10 @@ spec:
       name: bof-values
       valuesKey: values.yaml
     - kind: ConfigMap
+      name: ory-bof-values-provider
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: ory-bof-values-template
       valuesKey: values.yaml
       optional: true

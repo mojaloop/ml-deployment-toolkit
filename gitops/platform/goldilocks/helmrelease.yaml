@@ -29,6 +29,10 @@ spec:
       name: goldilocks-values
       valuesKey: values.yaml
     - kind: ConfigMap
+      name: goldilocks-goldilocks-values-provider
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: goldilocks-goldilocks-values-template
       valuesKey: values.yaml
       optional: true

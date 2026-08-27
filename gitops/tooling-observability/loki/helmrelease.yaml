@@ -48,6 +48,10 @@ spec:
       valuesKey: secretKey
       targetPath: loki.structuredConfig.storage_config.aws.secret_access_key
     - kind: ConfigMap
+      name: observability-loki-values-provider
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: observability-loki-values-template
       valuesKey: values.yaml
       optional: true

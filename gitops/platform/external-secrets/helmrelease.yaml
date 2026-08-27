@@ -38,6 +38,10 @@ spec:
       name: external-secrets-values
       valuesKey: values.yaml
     - kind: ConfigMap
+      name: external-secrets-external-secrets-values-provider
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: external-secrets-external-secrets-values-template
       valuesKey: values.yaml
       optional: true

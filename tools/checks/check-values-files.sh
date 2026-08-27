@@ -108,14 +108,21 @@ for d in gitops/*/values; do
   check_values_root "$d"
 done
 
-# (b) template overrides + patches
+# (b) provider-wide gitops delta slots
+for d in providers/*/gitops-delta; do
+  [ -d "$d" ] || continue
+  check_values_root "$d/values"
+  check_patches_root "$d/patches"
+done
+
+# (c) template overrides + patches
 for t in providers/*/templates/*/*; do
   [ -d "$t" ] || continue
   check_values_root "$t/values"
   check_patches_root "$t/patches"
 done
 
-# (c) environment overrides + patches
+# (d) environment overrides + patches
 if [ -d "$ENVS_ROOT" ]; then
   for e in "$ENVS_ROOT"/*; do
     [ -d "$e" ] || continue

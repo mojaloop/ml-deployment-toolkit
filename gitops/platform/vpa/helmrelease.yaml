@@ -36,6 +36,10 @@ spec:
       name: vpa-values
       valuesKey: values.yaml
     - kind: ConfigMap
+      name: vpa-vpa-values-provider
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: vpa-vpa-values-template
       valuesKey: values.yaml
       optional: true

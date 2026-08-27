@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# Usage: generate-valuesfrom.sh — regenerate the three-layer valuesFrom chain tail
+# Usage: generate-valuesfrom.sh — regenerate the four-layer valuesFrom chain tail
 # on every HelmRelease in gitops/. The chain is generated mechanically, never
 # hand-written (tools/checks/check-valuesfrom.sh only verifies it). For each
 # HelmRelease (tns = spec.targetNamespace // metadata.namespace, rel =
 # metadata.name) this removes any existing entries named
-# <tns>-<rel>-values-template / <tns>-<rel>-values-override and appends the
-# canonical tail:
+# <tns>-<rel>-values-provider / <tns>-<rel>-values-template /
+# <tns>-<rel>-values-override and appends the canonical tail
+# (common -> provider -> template -> environment; the provider slot is the
+# provider-wide gitops delta, providers/<p>/gitops-delta/values/):
+#   - ConfigMap <tns>-<rel>-values-provider  (optional)
 #   - ConfigMap <tns>-<rel>-values-template  (optional)
 #   - ConfigMap <tns>-<rel>-values-override  (optional)
 #   - Secret    <tns>-<rel>-values-override  (optional)
@@ -47,10 +50,11 @@ def scalar(lines, top_key, sub_key):
 
 
 def canonical_tail(tns, rel):
+    p = f'{tns}-{rel}-values-provider'
     t = f'{tns}-{rel}-values-template'
     o = f'{tns}-{rel}-values-override'
     out = []
-    for kind, name in (('ConfigMap', t), ('ConfigMap', o), ('Secret', o)):
+    for kind, name in (('ConfigMap', p), ('ConfigMap', t), ('ConfigMap', o), ('Secret', o)):
         out += [f'    - kind: {kind}',
                 f'      name: {name}',
                 '      valuesKey: values.yaml',
@@ -69,7 +73,7 @@ def process_doc(lines):
     if not rel or not tns:
         print(f'warning: HelmRelease without resolvable name/namespace skipped', file=sys.stderr)
         return lines, None
-    managed = {f'{tns}-{rel}-values-template', f'{tns}-{rel}-values-override'}
+    managed = {f'{tns}-{rel}-values-provider', f'{tns}-{rel}-values-template', f'{tns}-{rel}-values-override'}
 
     # Locate the `  valuesFrom:` block (2-space key under spec; entries at 4).
     start = None

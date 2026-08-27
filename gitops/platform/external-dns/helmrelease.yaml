@@ -39,6 +39,10 @@ spec:
     - kind: ConfigMap
       name: external-dns-provider-values
     - kind: ConfigMap
+      name: external-dns-external-dns-values-provider
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: external-dns-external-dns-values-template
       valuesKey: values.yaml
       optional: true

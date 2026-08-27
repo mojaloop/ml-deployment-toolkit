@@ -50,11 +50,32 @@ locals {
   # keys must be usable in for_each.
   secret_keys = nonsensitive(keys(var.secrets))
 
-  # Template-layer gitops deltas — the middle slot of the three-layer chain
-  # (common -> template -> environment). Same layout and templating as the
-  # environment's values/ and patches/, but DTK-authored: secrets are
-  # forbidden, so files are templated with override_vars only and any secret
-  # reference hard-fails at plan.
+  # Provider-wide gitops delta slot — the provider layer's ONE sanctioned
+  # escape hatch (providers/<p>/gitops-delta/): a delta applying to ALL of the
+  # provider's templates that the contract cannot express. Sits between
+  # common and template in the chain. DTK-authored: secrets forbidden,
+  # override_vars only. Loud by design: make check reports non-empty slots.
+  provider_delta_dir = "../../providers/${module.config.provider_name}/gitops-delta"
+  provider_value_overrides = {
+    for f in try(fileset("${local.provider_delta_dir}/values", "*/*.yaml"), []) :
+    replace(trimsuffix(f, ".yaml"), "/", "-") => templatefile("${local.provider_delta_dir}/values/${f}", local.override_vars)
+  }
+  provider_patches = {
+    for f in try(fileset("${local.provider_delta_dir}/patches", "*.yaml"), []) :
+    trimsuffix(f, ".yaml") => [
+      for doc in yamldecode(templatefile("${local.provider_delta_dir}/patches/${f}", local.override_vars)) :
+      merge(
+        { patch = try(tostring(doc.patch), yamlencode(doc.patch), yamlencode(doc)) },
+        can(doc.target) ? { target = doc.target } : {},
+      )
+    ]
+  }
+
+  # Template-layer gitops deltas — the template slot of the four-layer chain
+  # (common -> provider -> template -> environment). Same layout and
+  # templating as the environment's values/ and patches/, but DTK-authored:
+  # secrets are forbidden, so files are templated with override_vars only and
+  # any secret reference hard-fails at plan.
   template_values_dir = "${module.config.template_dir}/values"
   template_value_overrides = {
     for f in try(fileset(local.template_values_dir, "*/*.yaml"), []) :
@@ -163,6 +184,8 @@ module "flux_config" {
   # Provider symbols (P_*, already UPPER_SNAKE) for cluster-config.
   params = module.config.provider_params
 
+  provider_value_overrides    = local.provider_value_overrides
+  provider_patches            = local.provider_patches
   template_value_overrides    = local.template_value_overrides
   template_patches            = local.template_patches
   helm_value_overrides        = local.helm_value_overrides

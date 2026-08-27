@@ -36,6 +36,10 @@ spec:
       name: openebs-values
       valuesKey: values.yaml
     - kind: ConfigMap
+      name: openebs-system-openebs-values-provider
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
       name: openebs-system-openebs-values-template
       valuesKey: values.yaml
       optional: true

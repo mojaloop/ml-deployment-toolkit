@@ -181,6 +181,12 @@ variable "params" {
   default     = {}
 }
 
+variable "provider_value_overrides" {
+  description = "Provider-wide gitops delta Helm values (<namespace>-<release> -> templated values.yaml content from providers/<p>/gitops-delta/values/), delivered as ConfigMaps named *-values-provider — the slot between common and template"
+  type        = map(string)
+  default     = {}
+}
+
 variable "template_value_overrides" {
   description = "Template-layer Helm values (<namespace>-<release> -> templated values.yaml content from the selected template's values/), delivered as ConfigMaps named *-values-template"
   type        = map(string)
@@ -209,8 +215,14 @@ variable "kustomize_patches" {
   default     = {}
 }
 
+variable "provider_patches" {
+  description = "Provider-wide gitops delta kustomize patches (kustomization name -> list of Flux spec.patches entries), applied after distribution patches and before template patches"
+  type        = any
+  default     = {}
+}
+
 variable "template_patches" {
-  description = "Template-layer kustomize patches (kustomization name -> list of Flux spec.patches entries), applied after distribution patches and before environment patches"
+  description = "Template-layer kustomize patches (kustomization name -> list of Flux spec.patches entries), applied after provider-wide delta patches and before environment patches"
   type        = any
   default     = {}
 }
