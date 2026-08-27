@@ -57,6 +57,16 @@ output "worker_instances" {
   value       = local.worker_instances
 }
 
+output "pool_names" {
+  description = "Effective pool set: template pools minus enabled:false env overrides plus env-added pools. Pool-keyed file bindings (talos/<pool>.yaml, proxmox/<pool>.yaml) must name a member — an orphaned binding fails the plan, it never no-ops."
+  value       = [for g in local.node_groups : g.name]
+}
+
+output "template_pool_names" {
+  description = "Pool names the selected template itself declares (before environment overrides) — the binding set for template-layer pool-keyed fragments."
+  value       = keys(local.template_pools)
+}
+
 output "capabilities" {
   description = "Structural capabilities the provider declares in params.yaml (e.g. in_cluster_data)"
   value = {

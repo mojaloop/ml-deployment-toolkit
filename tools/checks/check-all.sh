@@ -58,6 +58,7 @@ run_check check-secret-placement.sh
 run_check check-literals.sh $ENV_CONFIGS $SAMPLE_CONFIGS
 run_check check-values-files.sh
 run_check check-placement.sh $ENV_CONFIGS
+run_check check-bindings.sh $ENV_CONFIGS $SAMPLE_CONFIGS
 run_check check-talos-fragments.sh
 run_check check-token-resolution.sh
 run_check check-engine-parity.sh

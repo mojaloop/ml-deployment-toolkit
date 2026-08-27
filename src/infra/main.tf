@@ -77,6 +77,29 @@ locals {
   active_provider = try(local.provider_outputs[local.provider_name], null)
 }
 
+# Binding names are validated, never silently no-op'd: a talos/<pool>.yaml
+# fragment is matched via lookup by instance group, so a typo'd filename would
+# otherwise never apply to any node — exactly what a renamed pool looks like
+# after an upgrade. Template fragments must name a pool of the template itself;
+# environment fragments must name a pool of the EFFECTIVE set (enabled: false
+# drops a pool from it). check-bindings.sh enforces the same contract pre-plan.
+resource "terraform_data" "binding_validation" {
+  lifecycle {
+    precondition {
+      condition = alltrue([
+        for k in keys(local.template_pool_patches) : contains(module.config.template_pool_names, k)
+      ])
+      error_message = "template talos/ fragment(s) name no pool of the selected template: ${join(", ", [for k in keys(local.template_pool_patches) : k if !contains(module.config.template_pool_names, k)])}. A fragment keyed on a nonexistent pool silently never applies. Template pools: ${join(", ", module.config.template_pool_names)}."
+    }
+    precondition {
+      condition = alltrue([
+        for k in keys(local.env_pool_patches) : contains(module.config.pool_names, k)
+      ])
+      error_message = "environment talos/ fragment(s) name no effective pool: ${join(", ", [for k in keys(local.env_pool_patches) : k if !contains(module.config.pool_names, k)])}. A fragment keyed on a nonexistent (or enabled: false) pool silently never applies. Effective pools: ${join(", ", module.config.pool_names)}."
+    }
+  }
+}
+
 # Load and resolve configuration
 module "config" {
   source = "../modules/config-loader"

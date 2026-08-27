@@ -889,8 +889,9 @@ locals {
 
   # Layer order: distribution patches, then template patches, then deployer
   # (environment) patches — kustomize applies the list in order, so later
-  # layers win. A patches/<name>.yaml naming no enabled Kustomization is
-  # ignored — nothing here validates the filename.
+  # layers win. A patches/<name>.yaml naming no enabled Kustomization FAILS
+  # the plan (terraform_data.patch_binding_validation below) — an orphaned
+  # binding name is what a renamed Kustomization looks like after an upgrade.
   effective_patches = {
     for k, _ in local.kustomizations : k => concat(
       lookup(local.backup_disabled_patches, k, []),
@@ -911,6 +912,26 @@ resource "terraform_data" "obs_ingest_validation" {
       # rejected once the open ingest routes are gone.
       condition     = var.cluster_role != "hub" || (lookup(local.s, "OBS_INGEST_USERNAME", "") != "" && lookup(local.s, "OBS_INGEST_PASSWORD", "") != "")
       error_message = "OBS_INGEST_USERNAME and OBS_INGEST_PASSWORD must both be set in a hub environment's .env. Username = the account declared for this hub on the Tooling Cluster under observability.ingest_users; password from make secrets ENV=<your-cc-env> -> obs_ingest_<name>_password. For a third-party sink, use that sink's credentials."
+    }
+  }
+}
+
+# Binding names are validated, never silently no-op'd: a patches/<name>.yaml
+# whose name matches no ENABLED Kustomization for this cluster's role/provider
+# would never be applied — a misspelled or stale filename must fail loudly.
+resource "terraform_data" "patch_binding_validation" {
+  lifecycle {
+    precondition {
+      condition = alltrue([
+        for k in keys(var.template_patches) : contains(keys(local.kustomizations), k)
+      ])
+      error_message = "template patches/ file(s) name no enabled Flux Kustomization on this cluster: ${join(", ", [for k in keys(var.template_patches) : k if !contains(keys(local.kustomizations), k)])} — an orphaned patch silently never applies. Enabled Kustomizations: ${join(", ", sort(keys(local.kustomizations)))}."
+    }
+    precondition {
+      condition = alltrue([
+        for k in keys(var.kustomize_patches) : contains(keys(local.kustomizations), k)
+      ])
+      error_message = "environment patches/ file(s) name no enabled Flux Kustomization on this cluster: ${join(", ", [for k in keys(var.kustomize_patches) : k if !contains(keys(local.kustomizations), k)])} — an orphaned patch silently never applies. Enabled Kustomizations: ${join(", ", sort(keys(local.kustomizations)))}."
     }
   }
 }

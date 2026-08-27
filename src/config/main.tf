@@ -142,9 +142,9 @@ module "flux_config" {
   infra_provider  = module.config.provider_name
   in_cluster_data = module.config.capabilities.in_cluster_data
   k8s_api         = local.k8s_api
-  dns_provider   = module.config.dns.provider
-  domain         = module.config.dns.domain
-  lb_ipam_pools  = module.config.lb_ipam_pools
+  dns_provider    = module.config.dns.provider
+  domain          = module.config.dns.domain
+  lb_ipam_pools   = module.config.lb_ipam_pools
 
   artifact_url     = module.config.artifact.url
   artifact_version = module.config.artifact.version
