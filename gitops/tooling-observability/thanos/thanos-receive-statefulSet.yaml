@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/name: thanos-receive
     app.kubernetes.io/version: v0.42.2
   name: thanos-receive
-  namespace: observability
+  namespace: t7y-backend
 spec:
   minReadySeconds: 0
   replicas: 1

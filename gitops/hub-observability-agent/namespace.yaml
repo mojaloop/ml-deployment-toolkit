@@ -1,0 +1,15 @@
+# t7y = telemetry (numeronym). Agent half of the telemetry stack: Alloy,
+# node-exporter, kube-state-metrics. Declared here — and only here — by the
+# layer that owns it. Privileged is required: node-exporter mounts host
+# filesystems and runs with hostPID/hostNetwork. The backend half
+# (t7y-backend, tooling clusters) does not inherit this and runs baseline.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: t7y-agents
+  labels:
+    name: t7y-agents
+    app.kubernetes.io/part-of: mojaloop
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged

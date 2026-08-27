@@ -10,7 +10,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: grafana-alerting-contact-points
-  namespace: observability
+  namespace: t7y-backend
   labels:
     grafana_alert: "1"
 stringData:

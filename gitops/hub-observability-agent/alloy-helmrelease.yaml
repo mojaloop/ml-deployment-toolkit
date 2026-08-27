@@ -15,7 +15,7 @@ spec:
         namespace: flux-system
       interval: 12h
   releaseName: alloy
-  targetNamespace: observability
+  targetNamespace: t7y-agents
   install:
     createNamespace: false
     timeout: 10m
@@ -31,18 +31,18 @@ spec:
       name: alloy-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: observability-alloy-values-provider
+      name: t7y-agents-alloy-values-provider
       valuesKey: values.yaml
       optional: true
     - kind: ConfigMap
-      name: observability-alloy-values-template
+      name: t7y-agents-alloy-values-template
       valuesKey: values.yaml
       optional: true
     - kind: ConfigMap
-      name: observability-alloy-values-override
+      name: t7y-agents-alloy-values-override
       valuesKey: values.yaml
       optional: true
     - kind: Secret
-      name: observability-alloy-values-override
+      name: t7y-agents-alloy-values-override
       valuesKey: values.yaml
       optional: true

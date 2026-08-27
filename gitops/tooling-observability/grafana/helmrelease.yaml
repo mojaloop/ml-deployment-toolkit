@@ -14,7 +14,7 @@ spec:
         name: grafana
       interval: 12h
   releaseName: grafana
-  targetNamespace: observability
+  targetNamespace: t7y-backend
   install:
     createNamespace: false
     timeout: 10m
@@ -38,18 +38,18 @@ spec:
       name: grafana-values-secret
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: observability-grafana-values-provider
+      name: t7y-backend-grafana-values-provider
       valuesKey: values.yaml
       optional: true
     - kind: ConfigMap
-      name: observability-grafana-values-template
+      name: t7y-backend-grafana-values-template
       valuesKey: values.yaml
       optional: true
     - kind: ConfigMap
-      name: observability-grafana-values-override
+      name: t7y-backend-grafana-values-override
       valuesKey: values.yaml
       optional: true
     - kind: Secret
-      name: observability-grafana-values-override
+      name: t7y-backend-grafana-values-override
       valuesKey: values.yaml
       optional: true

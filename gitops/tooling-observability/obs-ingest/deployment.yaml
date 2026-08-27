@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/instance: obs-ingest
     app.kubernetes.io/name: obs-ingest
   name: obs-ingest
-  namespace: observability
+  namespace: t7y-backend
 spec:
   replicas: 1
   selector:

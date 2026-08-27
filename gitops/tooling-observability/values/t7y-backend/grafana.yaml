@@ -45,7 +45,7 @@ datasources:
         type: prometheus
         uid: thanos
         access: proxy
-        url: http://thanos-query.observability.svc.cluster.local:9090
+        url: http://thanos-query.t7y-backend.svc.cluster.local:9090
         isDefault: true
         editable: false
         jsonData:
@@ -57,7 +57,7 @@ datasources:
         type: loki
         uid: loki
         access: proxy
-        url: http://loki-gateway.observability.svc.cluster.local
+        url: http://loki-gateway.t7y-backend.svc.cluster.local
         editable: false
         jsonData:
           maxLines: 1000
@@ -73,7 +73,7 @@ datasources:
         type: tempo
         uid: tempo
         access: proxy
-        url: http://tempo.observability.svc.cluster.local:3200
+        url: http://tempo.t7y-backend.svc.cluster.local:3200
         editable: false
         jsonData:
           httpMethod: GET
@@ -104,7 +104,7 @@ sidecar:
     label: grafana_dashboard
     labelValue: "1"
     folderAnnotation: grafana_folder
-    searchNamespace: observability
+    searchNamespace: t7y-backend
     provider:
       # Required for folderAnnotation to materialize as Grafana folders:
       # the sidecar writes per-annotation subdirectories, this makes the
@@ -116,7 +116,7 @@ sidecar:
     enabled: true
     label: grafana_alert
     labelValue: "1"
-    searchNamespace: observability
+    searchNamespace: t7y-backend
     resource: both
 
 # Plugins to install (grafana-piechart-panel removed — Angular plugins unsupported in Grafana 11.x)

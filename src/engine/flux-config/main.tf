@@ -837,8 +837,8 @@ locals {
         timeout    = "20m"
         wait       = false
         health_checks = [
-          { apiVersion = "apps/v1", kind = "StatefulSet", name = "thanos-receive", namespace = "observability" },
-          { apiVersion = "apps/v1", kind = "Deployment", name = "thanos-query", namespace = "observability" },
+          { apiVersion = "apps/v1", kind = "StatefulSet", name = "thanos-receive", namespace = "t7y-backend" },
+          { apiVersion = "apps/v1", kind = "Deployment", name = "thanos-query", namespace = "t7y-backend" },
           { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "loki", namespace = var.flux_namespace },
           { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "tempo", namespace = var.flux_namespace },
           { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "grafana", namespace = var.flux_namespace },

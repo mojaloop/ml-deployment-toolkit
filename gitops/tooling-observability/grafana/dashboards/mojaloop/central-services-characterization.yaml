@@ -10,7 +10,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: dashboard-cs-characterization
-  namespace: observability
+  namespace: t7y-backend
   labels:
     grafana_dashboard: "1"
   annotations:

@@ -25,7 +25,7 @@ spec:
         namespace: flux-system
       interval: 12h
   releaseName: kube-state-metrics
-  targetNamespace: observability
+  targetNamespace: t7y-agents
   install:
     createNamespace: false
     timeout: 5m
@@ -41,18 +41,18 @@ spec:
       name: kube-state-metrics-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: observability-kube-state-metrics-values-provider
+      name: t7y-agents-kube-state-metrics-values-provider
       valuesKey: values.yaml
       optional: true
     - kind: ConfigMap
-      name: observability-kube-state-metrics-values-template
+      name: t7y-agents-kube-state-metrics-values-template
       valuesKey: values.yaml
       optional: true
     - kind: ConfigMap
-      name: observability-kube-state-metrics-values-override
+      name: t7y-agents-kube-state-metrics-values-override
       valuesKey: values.yaml
       optional: true
     - kind: Secret
-      name: observability-kube-state-metrics-values-override
+      name: t7y-agents-kube-state-metrics-values-override
       valuesKey: values.yaml
       optional: true
