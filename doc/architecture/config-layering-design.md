@@ -374,7 +374,7 @@ Talos and Proxmox never leave Terraform.
 
 **Flux Kustomization CRs are Terraform-authored, never shipped in the artifact.** The artifact
 contains only content — manifests and kustomize build files — never Flux topology. This is the
-incumbent arrangement (`src/modules/flux-config/main.tf:765`) and it is load-bearing: env patch
+incumbent arrangement (`src/engine/flux-config/main.tf`) and it is load-bearing: env patch
 injection, the `substituteFrom` wiring and the `valuesFrom` chains all assume Terraform owns the
 CR specs. The common Flux idiom of self-managed topology (Kustomization CRs living in the
 artifact) would make Flux revert Terraform's patch injection on every reconcile — adopter

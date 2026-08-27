@@ -15,7 +15,7 @@ Where the integrator can customize, and what each layer costs at upgrade time. T
 
 ## The layers
 
-The surface has exactly two sides. On one side is the **environment layer** — everything in the adopter-owned `../environments/<env>/` repository, which lives beside the clone and never touches it. On the other is **forking** — any edit to the clone itself, `config/templates/<provider>/params.yaml` and the template files included, which is forking public software and is visible by design: `make check-pristine` verifies the clone is clean and at an exact release tag, and reports any divergence.
+The surface has exactly two sides. On one side is the **environment layer** — everything in the adopter-owned `../environments/<env>/` repository, which lives beside the clone and never touches it. On the other is **forking** — any edit to the clone itself, `providers/<provider>/params.yaml` and the template files included, which is forking public software and is visible by design: `make check-pristine` verifies the clone is clean and at an exact release tag, and reports any divergence.
 
 From cheapest to most expensive to maintain:
 
@@ -57,9 +57,9 @@ See [Configuration → Manifest patches](../adopter/deploy/configuration.md#mani
 
 When the environment layer genuinely cannot express the need — a new provider, a changed module, a service the distribution does not include, a different provider interface value — the integrator forks and changes the code. The mechanics are the [Platform guide](../platform/index.md): the same module pipeline, the same "add a provider / add a service" procedures.
 
-The boundary sits closer than it may look: `config/templates/<provider>/params.yaml` and the role/capacity template files are part of the clone, so editing them is a fork, not configuration. And a fork is a **visible** act — the clone is meant to sit pristine at an exact release tag, `make check-pristine` verifies exactly that, and any local edit makes the divergence report. That visibility is by design: a derivative is forked public software, maintained and published openly as such, never a quietly patched clone.
+The boundary sits closer than it may look: `providers/<provider>/params.yaml` and the role/capacity template files are part of the clone, so editing them is a fork, not configuration. And a fork is a **visible** act — the clone is meant to sit pristine at an exact release tag, `make check-pristine` verifies exactly that, and any local edit makes the divergence report. That visibility is by design: a derivative is forked public software, maintained and published openly as such, never a quietly patched clone.
 
-What is different for an integrator is the **cost model**. Every line the integrator changes in `src/`, `gitops/`, or `config/templates/` is a line the integrator reconciles against upstream at every update. A fork is not a one-time cost; it is a recurring one, paid at each rebase. This is why the discipline is to fork as narrowly as possible — change the least that meets the need, and prefer a clean addition (a new file, a new module) over an edit to an existing one, because additions rebase more cleanly than edits.
+What is different for an integrator is the **cost model**. Every line the integrator changes in `src/`, `gitops/`, or `providers/` is a line the integrator reconciles against upstream at every update. A fork is not a one-time cost; it is a recurring one, paid at each rebase. This is why the discipline is to fork as narrowly as possible — change the least that meets the need, and prefer a clean addition (a new file, a new module) over an edit to an existing one, because additions rebase more cleanly than edits.
 
 ## Deciding
 

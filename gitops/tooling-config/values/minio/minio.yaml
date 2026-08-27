@@ -12,7 +12,7 @@ resources:
 # System buckets. When object_storage.buckets declares extra buckets, the
 # deployer-rendered minio-buckets-values Secret replaces this list with the
 # union (Helm merges lists by replacement) — keep the two in sync with
-# minio_system_buckets in src/modules/flux-config/main.tf.
+# minio_system_buckets in src/engine/flux-config/main.tf.
 buckets:
   - name: harbor
     policy: none

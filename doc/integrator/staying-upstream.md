@@ -39,7 +39,7 @@ Upstream changes fall into a few classes, in rough order of how much attention t
 |--------|---------------|----------------|
 | Configuration schema change | An adopter-facing field moved or renamed | `config-loader`, the config schema |
 | Substitution variable added/renamed | A manifest expects a value `flux-config` must now provide | `flux-config`, `cluster-config`/`cluster-secrets` |
-| Provider interface change | A forked or added `params.yaml` must define the new `P_*` symbol | `config/templates/<provider>/params.yaml`, `check-interface` |
+| Provider interface change | A forked or added `params.yaml` must define the new `P_*` symbol | `providers/<provider>/params.yaml`, `check-interface` |
 | A shared manifest the fork also edited | Merge conflict | Wherever the fork diverged |
 | A rendered source version bump | Stale committed manifest | Re-render |
 | A new health gate or reconciliation reorder | A fork-added service may need gating too | `flux-config` |

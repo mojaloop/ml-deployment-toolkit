@@ -113,7 +113,7 @@ placement:
   pg-3: "node2"   # only if the template uses three
 ```
 
-Which groups a template references is in `config/templates/proxmox/{tooling,hub,bare}/<template>/placement.yaml`, in each node pool's `placement:` list. Provide a node mapping for every group named there; an unmapped `pg-N` fails the plan before anything is created.
+Which groups a template references is in `providers/proxmox/templates/{tooling,hub,bare}/<template>/placement.yaml`, in each node pool's `placement:` list. Provide a node mapping for every group named there; an unmapped `pg-N` fails the plan before anything is created.
 
 On AWS the same file maps placement groups to **availability zones** instead of physical nodes (`pg-1: "eu-west-1a"`). Each pool then materializes as one single-AZ EKS managed node group per distinct placement entry — EKS has no per-instance placement, so the split is how the on-prem wrapping rule (node *i* takes `placement[i]`) is honored with a guarantee. The file is optional on AWS: without it, every pool is a single node group spread best-effort by the autoscaling group across the region's first three AZs. Once present, every group the template references must be mapped, exactly as on-prem. Adding or removing the file on a live cluster renames the node groups and therefore rolls their nodes — decide before first deploy where possible.
 

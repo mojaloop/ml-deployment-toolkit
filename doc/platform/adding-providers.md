@@ -22,7 +22,7 @@ Use the existing modules as references — `proxmox` for a self-managed cluster 
 
 ## 1. Write the module
 
-Create `src/modules/<provider>/`. It must:
+Create `providers/<provider>/terraform/cluster/`. It must:
 
 - Accept the merged configuration from config-loader
 - Provision the cluster
@@ -41,9 +41,9 @@ The provider name must be known everywhere the toolkit enumerates providers. Mis
 | `infra.<provider>` block | same schema | No place for provider-specific keys; the root is `additionalProperties: false` |
 | `required_providers` entry | `src/infra/versions.tf` | `terraform init` cannot resolve the provider plugin |
 | `provider "<name>" {}` block | `src/infra/providers.tf` | The module has no configured provider to run under |
-| Node-shape output | `src/modules/config-loader/` (the pattern of `aws_node_groups` / `do_node_pools`) | The module has no expanded machine shapes to consume |
+| Node-shape output | `src/engine/config-loader/` (the pattern of `aws_node_groups` / `do_node_pools`) | The module has no expanded machine shapes to consume |
 | Provider classification | `is_talos_provider` in `config-loader`, `is_talos` / `has_vendor` in `flux-config` | On-prem behaviour (VM expansion, LB-IPAM, per-VM placement) keys off these hardcoded lists; AWS consumes the same placement map as AZ pinning (`aws_placement_active`) |
-| `capabilities` block | `config/templates/<provider>/params.yaml` (schema-required) | Capability-gated features stay off: `in_cluster_data: false` forces every hub data store to `external-unmanaged` |
+| `capabilities` block | `providers/<provider>/params.yaml` (schema-required) | Capability-gated features stay off: `in_cluster_data: false` forces every hub data store to `external-unmanaged` |
 
 That last row is also where the config stack *is* provider-aware — `flux-config` is part of the config stack, and its provider lists must match reality or Flux references a vendor directory that does not exist.
 
@@ -63,12 +63,12 @@ After all four, `local.kubeconfig_paths[<provider>]` resolves and `flux_bootstra
 
 ## 4. Create the provider's template directory
 
-Templates are provider-specific full overlays — there is no shared capacity tier and no mapping layer to bridge one. A new provider means creating `config/templates/<provider>/` complete:
+Templates are provider-specific full overlays — there is no shared capacity tier and no mapping layer to bridge one. A new provider means creating `providers/<provider>/templates/` complete:
 
 - **`params.yaml`** — the provider interface, validated against `config/schemas/params.schema.json`. It must define **every required `P_*` symbol**: `P_GATEWAY_CLASS`, `P_STORAGE_CLASS`, `P_NODE_ROLE_LABEL_KEY`, `P_L2_INTERFACE_REGEX`, `P_KUBE_API_HOST`, `P_KUBE_API_PORT` — plus the `infra` section Terraform consumes (VM shapes, instance types, storage, and similar provider constants). `P_*` symbols resolve from `params.yaml` *only*; `config.yaml` cannot define or shadow them, and `check-interface` enforces both directions — a symbol the schema requires but the file omits, and a symbol the file invents that nothing consumes.
 - **The full set of role/capacity template files** — `<role>/<name>/` directories for every role and size the provider supports: `bare/small`, `hub/{dev,tps-1,tps-10}`, `tooling/{dev,small,medium}`. Each holds `template.yaml` (identity only), `placement.yaml` (the shape: node pools with their taints, default topology), and `values/`, `patches/`, `talos/` overlay surfaces — the tuning lives in those overlays, never as template variables. Each is a complete overlay with no knobs or conditionals. Duplication across providers is accepted by design — copying another provider's role files and adjusting them is the intended workflow, not a shortcut.
 
-`config/templates/mappings/` no longer exists; selection is `config.yaml`'s `template` + the cluster's role + `infra.provider`, resolving to `config/templates/<provider>/<role>/<name>/`. `make validate` validates `params.yaml` against its schema alongside the environment config.
+`config/templates/mappings/` no longer exists; selection is `config.yaml`'s `template` + the cluster's role + `infra.provider`, resolving to `providers/<provider>/templates/<role>/<name>/`. `make validate` validates `params.yaml` against its schema alongside the environment config.
 
 One honest caveat: the `aws` and `digitalocean` interface values are marked **UNVALIDATED** — the interface's shape is checked, but its values have only ever been proven against Proxmox. Interface validation truly lands with the first real second provider; whoever adds it should expect to correct interface values, not just fill them in.
 
@@ -76,7 +76,7 @@ One honest caveat: the `aws` and `digitalocean` interface values are marked **UN
 
 A self-managed cluster needs cluster-level resources a managed service would provide — CNI, Gateway API CRDs, LB-IPAM, storage. Those live in a vendor Kustomization.
 
-`gitops/talos/` and `gitops/aws/` are the existing examples — the second shows the managed-Kubernetes shape of the layer: Cilium replaces the vendor CNI (ENI mode, kube-proxy replacement), the Gateway API CRDs are vendored, a default StorageClass fronts the cloud CSI, and there is no LB-IPAM because the cloud controller provisions LBs for the gateways. A provider whose bootstrap needs cluster access before Flux exists also gets a `src/modules/<provider>-bootstrap` module (`aws-bootstrap`: CNI, CRDs, managed addons) — the out-of-band counterpart of Talos `extraManifests`. If the new provider is fully served by its managed defaults it needs no vendor layer — and `has_vendor` must say so, or Flux will look for a directory that does not exist. `gcp` is currently listed in `has_vendor` with no matching `gitops/` directory — a standing mismatch of exactly this kind; do not replicate it.
+`gitops/talos/` and `gitops/aws/` are the existing examples — the second shows the managed-Kubernetes shape of the layer: Cilium replaces the vendor CNI (ENI mode, kube-proxy replacement), the Gateway API CRDs are vendored, a default StorageClass fronts the cloud CSI, and there is no LB-IPAM because the cloud controller provisions LBs for the gateways. A provider whose bootstrap needs cluster access before Flux exists also gets a `providers/<provider>/terraform/bootstrap` module (`aws-bootstrap`: CNI, CRDs, managed addons) — the out-of-band counterpart of Talos `extraManifests`. If the new provider is fully served by its managed defaults it needs no vendor layer — and `has_vendor` must say so, or Flux will look for a directory that does not exist. `gcp` is currently listed in `has_vendor` with no matching `gitops/` directory — a standing mismatch of exactly this kind; do not replicate it.
 
 ## What not to touch
 
@@ -86,4 +86,4 @@ If adding a provider means editing any of these, reconsider the design:
 - DNS, cert-manager, or observability configuration
 - Application manifests
 
-A new provider is a new module, its registration entries (including the `infra.provider` enum addition in `config/schemas/environment.schema.json`), its `config/templates/<provider>/` directory — `params.yaml` plus the full role/capacity overlays — and possibly a vendor Kustomization. Nothing else. If a shared manifest would need to change, the provider-specific part of it belongs in a substituted variable or the vendor layer instead.
+A new provider is a new module, its registration entries (including the `infra.provider` enum addition in `config/schemas/environment.schema.json`), its `providers/<provider>/templates/` tree — `params.yaml` plus the full role/capacity overlays — and possibly a vendor Kustomization. Nothing else. If a shared manifest would need to change, the provider-specific part of it belongs in a substituted variable or the vendor layer instead.

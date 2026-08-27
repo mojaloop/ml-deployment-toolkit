@@ -3,7 +3,7 @@
 # which is merged after this file and therefore wins.
 #
 # Every datapath-shaping value here must agree with the bootstrap install
-# (src/modules/aws-bootstrap/values/cilium-bootstrap.yaml.tpl) or the Flux
+# (providers/aws/terraform/cluster/values/cilium-bootstrap.yaml.tpl) or the Flux
 # takeover rolls the datapath on first reconcile.
 
 # Kube-proxy replacement (Cilium handles all service routing; kube-proxy is

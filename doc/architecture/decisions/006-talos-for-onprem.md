@@ -6,7 +6,7 @@
 **Status:** accepted
 **Audiences:** architect, platform developer, infrastructure engineer
 
-> Still accepted. Since [ADR-015](015-two-stack-capability-config.md) the provisioning pipeline described here is the **infra stack** (`src/infra`); the machine-config patches live in `config/patches/talos/`, and node counts and shapes come from a capacity template rather than a per-provider profile.
+> Still accepted. Since [ADR-015](015-two-stack-capability-config.md) the provisioning pipeline described here is the **infra stack** (`src/infra`); the machine-config patches live in `providers/proxmox/patches/`, and node counts and shapes come from a capacity template rather than a per-provider profile.
 
 ## Context
 

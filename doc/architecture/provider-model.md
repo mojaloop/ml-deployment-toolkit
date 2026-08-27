@@ -119,8 +119,8 @@ A template is a **provider-specific full overlay directory** — with no knobs, 
 
 | File | Contents | Owner |
 |------|----------|-------|
-| `config/templates/<provider>/<role>/<name>/` | Full overlay directory — `template.yaml` identity, `placement.yaml` topology, `values/`/`patches/`/`talos/` surfaces | Distribution, one directory per provider, role, and tier |
-| `config/templates/<provider>/params.yaml` | The provider interface: a `params` section (`P_*` values) and an `infra` section consumed by Terraform | Distribution, one file per provider |
+| `providers/<provider>/templates/<role>/<name>/` | Full overlay directory — `template.yaml` identity, `placement.yaml` topology, `values/`/`patches/`/`talos/` surfaces | Distribution, one directory per provider, role, and tier |
+| `providers/<provider>/params.yaml` | The provider interface: a `params` section (`P_*` values) and an `infra` section consumed by Terraform | Distribution, one file per provider |
 
 On Proxmox a node pool expands into `count` individually-placed VMs; on a managed service it becomes a node group or pool of that size.
 
@@ -142,8 +142,8 @@ Four places, and nowhere else:
 
 | Location | Contains |
 |----------|----------|
-| `src/modules/<provider>/` | Cluster provisioning |
-| `config/templates/<provider>/` | Full template overlays per role and tier, plus `params.yaml` — the `P_*` interface and Terraform-consumed infra constants |
+| `providers/<provider>/terraform/` | Cluster provisioning |
+| `providers/<provider>/templates/` | Full template overlays per role and tier; the package root also holds `params.yaml` — the `P_*` interface and Terraform-consumed infra constants |
 | `gitops/talos/` | Vendor layer — self-managed clusters only |
 | `gitops/dns/<provider>/` | cert-manager issuer and external-dns config |
 

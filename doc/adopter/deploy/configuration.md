@@ -110,7 +110,7 @@ State and generated artifacts land under `../artifacts/<env>/` — a sibling of 
 | `version` | yes | `1` | — |
 | `dtk_version` | no | the exact DTK release tag this environment is written against, e.g. `v0.19.0` | none — when set, the plan fails unless the clone is checked out at that tag |
 | `cluster` | yes | `name`, `role`, `vip`, `lb_ipam.pools` (per-gateway `lan`/`wan`), `flux.version` | Flux `2.9.3` |
-| `template` | yes | a name under `config/templates/<provider>/<role>/` | — |
+| `template` | yes | a name under `providers/<provider>/templates/<role>/` | — |
 | `infra` | yes | `provider` (`proxmox` \| `aws` \| `digitalocean`), `aws.region`, `digitalocean` — placement, bridge, storage, and the Talos node OS facts live in the sidecar files `placement.yaml`, `proxmox/proxmox.yaml`, and `talos.yaml`, not here | — |
 | `dns` | yes | `provider` (`digitalocean` \| `cloudflare` \| `route53`), `domain` | — |
 | `cert` | yes | `email` (ACME contact), `server` (ACME directory URL) — both required, neither defaulted | — |
@@ -154,7 +154,7 @@ cluster:
       gw-ext:
         lan: "192.168.0.212"
 
-template: "medium"                    # config/templates/proxmox/tooling/medium/
+template: "medium"                    # providers/proxmox/templates/tooling/medium/
 
 infra:
   provider: "proxmox"                 # proxmox | aws | digitalocean
@@ -263,7 +263,7 @@ cluster:
       gw-intapi:
         lan: "192.168.0.218"
 
-template: "tps-10"                    # config/templates/proxmox/hub/tps-10/
+template: "tps-10"                    # providers/proxmox/templates/hub/tps-10/
 
 # Supporting services — each independent, each may point anywhere.
 # All three are required; endpoints are stated outright, never derived.
@@ -323,7 +323,7 @@ With all three supporting-service sections at `enabled: false`, a Hub is standal
 
 ## Deployment templates
 
-`template` names a directory under `config/templates/<provider>/<role>/` — the directory read is `config/templates/<provider>/<role>/<name>/`, selected by `infra.provider`, `cluster.role`, and `template` together. Each provider carries its own complete set: a template is a full overlay for that provider, with no knobs or conditionals inside it. There are **no template-supplied substitution variables**: `template.yaml` carries identity only (`version`, `description`), the topology lives in the template's `placement.yaml`, and any service tuning that must scale with the topology ships as ordinary `values/<namespace>/<release>.yaml` and `patches/<kustomization>.yaml` overlays inside the template directory — the same file kinds the environment uses, merged between the distribution's defaults and the environment's own overrides. Per-pool Talos machine-config fragments sit in the template's `talos/`.
+`template` names a directory under `providers/<provider>/templates/<role>/` — the directory read is `providers/<provider>/templates/<role>/<name>/`, selected by `infra.provider`, `cluster.role`, and `template` together. Each provider carries its own complete set: a template is a full overlay for that provider, with no knobs or conditionals inside it. There are **no template-supplied substitution variables**: `template.yaml` carries identity only (`version`, `description`), the topology lives in the template's `placement.yaml`, and any service tuning that must scale with the topology ships as ordinary `values/<namespace>/<release>.yaml` and `patches/<kustomization>.yaml` overlays inside the template directory — the same file kinds the environment uses, merged between the distribution's defaults and the environment's own overrides. Per-pool Talos machine-config fragments sit in the template's `talos/`.
 
 | Role | Templates |
 |------|-----------|
@@ -354,7 +354,7 @@ Every node carries the tags `ml` and the cluster name; `tags` on a group adds to
 
 ### The provider interface: `params.yaml`
 
-Beside each provider's templates sits `config/templates/<provider>/params.yaml`, in two parts:
+Beside each provider's templates sits `providers/<provider>/params.yaml`, in two parts:
 
 - **`params`** — the provider interface: the `P_*` symbols the shared gitops manifests may reference — `P_GATEWAY_CLASS`, `P_STORAGE_CLASS`, `P_NODE_ROLE_LABEL_KEY`, `P_L2_INTERFACE_REGEX`, `P_KUBE_API_HOST`, `P_KUBE_API_PORT`. They resolve from `params.yaml` **only**; `config.yaml` can neither define nor shadow a `P_*` symbol, and a check enforces it. The GatewayClass is one of them: the former `cluster.gateway_class_name` key is gone, replaced by the provider's `P_GATEWAY_CLASS`.
 - **`infra`** — Terraform-consumed provider configuration: VM defaults on Proxmox, instance types on AWS and DigitalOcean.
@@ -477,7 +477,7 @@ The adopter can override the platform's Helm values for **any** chart the distri
 
 Every HelmRelease's `valuesFrom` chain ends with the same three-layer tail of optional entries — a ConfigMap named `<targetNamespace>-<release>-values-template` (the selected template's tuning), then a ConfigMap and a Secret both named `<targetNamespace>-<release>-values-override` (the adopter's file). The tail is generated mechanically by `tools/generate-valuesfrom.sh`, never hand-written, and its completeness is verified by `tools/checks/check-valuesfrom.sh` (`make check`). The adopter's file becomes one of the two override objects, so a missing file changes nothing. The path must match the HelmRelease and its target namespace, not the chart's upstream name: `values/hub-system/psmdb-operator.yaml`, not `percona-mongodb.yaml`.
 
-The same `values/<namespace>/<release>.yaml` path suffix names a release's values at every layer — the distribution's defaults at `gitops/<layer>/values/<namespace>/<release>.yaml`, the template's tuning at `config/templates/<provider>/<role>/<name>/values/<namespace>/<release>.yaml`, and the adopter's override in the environment — so diffing an override against the layer beneath it is a direct path comparison.
+The same `values/<namespace>/<release>.yaml` path suffix names a release's values at every layer — the distribution's defaults at `gitops/<layer>/values/<namespace>/<release>.yaml`, the template's tuning at `providers/<provider>/templates/<role>/<name>/values/<namespace>/<release>.yaml`, and the adopter's override in the environment — so diffing an override against the layer beneath it is a direct path comparison.
 
 **The adopter's file is merged last, so it wins** ([ADR-022](../../architecture/decisions/022-helm-values-layering.md)). No HelmRelease uses inline `spec.values`; the distribution's own values ship as a ConfigMap listed *first* in `valuesFrom`, and the tail follows. Flux merges `valuesFrom` entries in order, later overwriting earlier, so the effective precedence is chart defaults → distribution values → template values → the adopter's file. Setting a key the distribution also sets is the normal case, and it takes effect. One merge rule to remember: maps merge, **lists replace** — overriding one element of a list means restating the whole list.
 
@@ -586,7 +586,7 @@ Deleting a patch file and re-applying reverts the field — the patch disappears
 make validate ENV=<env>
 ```
 
-This checks, in order: `config.yaml` against the JSON Schema, the selected template's `template.yaml` and `placement.yaml` (`config/templates/<provider>/<role>/<name>/`) against theirs, the provider's `params.yaml` against the params schema, the environment's `placement.yaml`, `proxmox/proxmox.yaml`, and `talos.yaml` (when present) against theirs, and then `terraform validate` on both stacks (skipped until `make init` has run).
+This checks, in order: `config.yaml` against the JSON Schema, the selected template's `template.yaml` and `placement.yaml` (`providers/<provider>/templates/<role>/<name>/`) against theirs, the provider's `params.yaml` against the params schema, the environment's `placement.yaml`, `proxmox/proxmox.yaml`, and `talos.yaml` (when present) against theirs, and then `terraform validate` on both stacks (skipped until `make init` has run).
 
 Three more gates sit beside it:
 
