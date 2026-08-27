@@ -235,6 +235,39 @@ locals {
   }
 }
 
+# Per-class node OS config (nodeadm NodeConfig): the class materialization
+# seat's node OS half on EKS — providers/aws/classes.yaml names a fragment
+# under providers/aws/node-config/, and it becomes the node group's launch
+# template user data. EKS AL2023 merges a MIME multipart part of type
+# application/node.eks.aws with its own generated NodeConfig, so fragments
+# carry only the class's deltas (kubelet config/flags, sysctls via
+# instance/containerd settings) — never cluster wiring.
+locals {
+  node_config_dir = "${dirname(var.provider_config_path)}/node-config"
+  node_group_user_data = {
+    for ng in var.node_groups :
+    ng.name => (
+      try(var.provider_classes[ng.class].node_config, "") != ""
+      ? base64encode(<<-EOT
+          MIME-Version: 1.0
+          Content-Type: multipart/mixed; boundary="//"
+
+          --//
+          Content-Type: application/node.eks.aws
+
+          ${indent(10, file("${local.node_config_dir}/${var.provider_classes[ng.class].node_config}"))}
+          --//--
+        EOT
+      )
+      : null
+    )
+  }
+}
+
+# One launch template PER NODE GROUP (was: one shared, IMDS-only template) —
+# the seat for per-class node OS config; groups whose class declares none get
+# a template identical to the old shared one.
+#
 # IMDS hop limit 2 — the one deviation from the EKS node defaults, and load-
 # bearing for the whole no-IRSA credential model: pod-networked components
 # that use the node role (the EBS CSI controller) sit one network hop from
@@ -244,14 +277,22 @@ locals {
 # on the node read the node role's credentials — acceptable while the node
 # role holds only EBS/ENI/ECR-read, revisit with IRSA under cluster
 # hardening (todo #21).
+#
+# MIGRATION NOTE: on an existing cluster the shared-template resource is
+# replaced by per-group ones — the node groups pick up a new launch template
+# and EKS rolls their nodes. Plan before applying on a live environment.
 resource "aws_launch_template" "node" {
-  name_prefix = "${var.cluster.name}-node-"
+  for_each = { for ng in var.node_groups : ng.name => ng }
+
+  name_prefix = "${var.cluster.name}-${each.key}-"
 
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
     http_put_response_hop_limit = 2
   }
+
+  user_data = local.node_group_user_data[each.key]
 }
 
 resource "aws_eks_node_group" "this" {
@@ -262,8 +303,8 @@ resource "aws_eks_node_group" "this" {
   node_role_arn   = aws_iam_role.node.arn
 
   launch_template {
-    id      = aws_launch_template.node.id
-    version = aws_launch_template.node.latest_version
+    id      = aws_launch_template.node[each.key].id
+    version = aws_launch_template.node[each.key].latest_version
   }
   # AZ-pinned groups get exactly their zone's subnet — the only placement
   # control EKS offers; per-instance placement does not exist. Unpinned

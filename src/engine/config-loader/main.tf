@@ -193,8 +193,9 @@ locals {
       for pg, slots in { for s in local.aws_pool_slots[g.name] : s => s... } : {
         # Suffixed by placement group, not AZ: remapping pg -> AZ later moves
         # the subnet without renaming the Terraform address.
-        name = pg != "" ? "${g.name}-${pg}" : g.name
-        az   = pg != "" ? lookup(local.placement_map, pg, "") : ""
+        name  = pg != "" ? "${g.name}-${pg}" : g.name
+        az    = pg != "" ? lookup(local.placement_map, pg, "") : ""
+        class = g.class
         # Direct index, no fallback default: a class the provider does not
         # map must fail the plan (precondition below names it), never
         # silently become some other instance type.

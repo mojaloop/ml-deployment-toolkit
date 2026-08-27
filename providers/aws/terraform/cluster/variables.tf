@@ -14,6 +14,7 @@ variable "node_groups" {
   description = "Node group definitions from deployment template"
   type = list(object({
     name           = string
+    class          = string
     instance_types = list(string)
     desired_size   = number
     min_size       = number
@@ -39,6 +40,12 @@ variable "artifacts_path" {
 variable "provider_config_path" {
   description = "Path to AWS provider config.yaml"
   type        = string
+}
+
+variable "provider_classes" {
+  description = "Per-class provider MATERIALIZATIONS from providers/aws/classes.yaml — node_config names a nodeadm NodeConfig fragment under the package's node-config/ directory, baked into the class's launch-template user data"
+  type        = any
+  default     = {}
 }
 
 variable "region" {

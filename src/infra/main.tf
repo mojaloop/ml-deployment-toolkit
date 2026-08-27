@@ -203,6 +203,7 @@ module "aws" {
   cluster            = module.config.cluster
   kubernetes_version = module.config.kubernetes_version
   node_groups        = module.config.aws_node_groups
+  provider_classes   = module.config.provider_classes
 
   artifacts_path       = local.artifacts_path
   provider_config_path = "../../providers/aws/params.yaml"
