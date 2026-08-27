@@ -57,6 +57,11 @@ output "worker_instances" {
   value       = local.worker_instances
 }
 
+output "pools" {
+  description = "Merged pool map (template shape + environment overrides via shallow per-field replacement), keyed by pool name; includes enabled: false entries so the render/explain tooling can show deliberate removals."
+  value       = local.merged_pools
+}
+
 output "pool_names" {
   description = "Effective pool set: template pools minus enabled:false env overrides plus env-added pools. Pool-keyed file bindings (talos/<pool>.yaml, proxmox/<pool>.yaml) must name a member — an orphaned binding fails the plan, it never no-ops."
   value       = [for g in local.node_groups : g.name]

@@ -19,6 +19,10 @@ ENV ?=
 #   make plan ENV=x ENVIRONMENTS_ROOT=/path/to/envs ARTIFACTS_ROOT=/path/to/artifacts
 ENVIRONMENTS_ROOT ?= ../environments
 ARTIFACTS_ROOT ?= ../artifacts
+# Rendered merge results live APART from secret-bearing artifacts/<env>/
+# (design doc §3): artifacts holds talos-secrets/kubeconfigs/state, rendered/
+# holds committable golden files.
+RENDER_ROOT ?= ../rendered
 ENV_DIR := $(ENVIRONMENTS_ROOT)/$(ENV)
 ENV_FILE := $(ENV_DIR)/.env
 # State gets a visible boundary: it is the NON-REGENERABLE, secret-bearing part
@@ -125,7 +129,8 @@ GITOPS_VERSION ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "latest
 
 .PHONY: help init init-infra init-config validate fmt plan plan-infra plan-config \
 	apply apply-infra apply-config plan-apply destroy destroy-fast clean secrets \
-	list show render render-thanos render-cilium push-gitops tag-gitops list-artifacts release
+	list show render render-all explain render-diff render-thanos render-cilium \
+	push-gitops tag-gitops list-artifacts release
 
 help:
 	@echo "Available targets (all need ENV=<name>, reading $(ENVIRONMENTS_ROOT)/<name>/):"
@@ -159,7 +164,12 @@ help:
 	@echo "  make perf-run ENV=<env> SCENARIO=<name>    - Run a load scenario"
 	@echo "  make perf-index                            - Regenerate perf/INDEX.md"
 	@echo ""
-	@echo "Rendering: make render | render-thanos | render-cilium"
+	@echo "Rendering and audit:"
+	@echo "  make render ENV=<env>                     - Offline three-layer merge -> $(RENDER_ROOT)/<env>/"
+	@echo "  make render-all                           - Render every environment"
+	@echo "  make explain ENV=<env> [LAYER=...]        - What one layer contributes (masked diff)"
+	@echo "  make render-diff ENV=<env>                - Diff render against last committed render"
+	@echo "Vendored manifests: make render-vendored | render-thanos | render-cilium"
 	@echo "Utilities: make fmt | clean | list | show"
 
 # --------------------------------------------------------------------------
@@ -366,13 +376,54 @@ show:
 	@cd $(INFRA_DIR) && $(LOAD_ENV) && $(BIND_INFRA) && terraform show
 
 # --------------------------------------------------------------------------
-# Manifest Rendering (Jsonnet -> YAML)
+# Rendering and audit (design doc §3): the offline, byte-deterministic
+# three-layer merge per environment, and the explain tooling on top of it.
+#
+#   make render ENV=<env>            - full render into $(RENDER_ROOT)/<env>/
+#   make render-all                  - render every environment
+#   make explain ENV=<env> [LAYER=environment|template]
+#                                    - what one layer contributes (masked diff)
+#   make render-diff ENV=<env>       - re-render and diff against the last
+#                                      committed render (the review artifact
+#                                      for template changes / dtk_version
+#                                      bumps — wire this into the Renovate
+#                                      bump PR flow)
+# --------------------------------------------------------------------------
+
+render:
+	$(CHECK_ENV)
+	@ENVIRONMENTS_ROOT=$(ENVIRONMENTS_ROOT) RENDER_ROOT=$(RENDER_ROOT) tools/render.sh $(ENV)
+
+render-all:
+	@for d in $(ENVIRONMENTS_ROOT)/*/; do \
+		e=$$(basename $$d); \
+		[ -f "$$d/config.yaml" ] || continue; \
+		echo "--- render $$e"; \
+		ENVIRONMENTS_ROOT=$(ENVIRONMENTS_ROOT) RENDER_ROOT=$(RENDER_ROOT) tools/render.sh $$e || exit 1; \
+	done
+
+explain:
+	$(CHECK_ENV)
+	@ENVIRONMENTS_ROOT=$(ENVIRONMENTS_ROOT) RENDER_ROOT=$(RENDER_ROOT) tools/explain.sh $(ENV) $(or $(LAYER),environment)
+
+render-diff:
+	$(CHECK_ENV)
+	@ENVIRONMENTS_ROOT=$(ENVIRONMENTS_ROOT) RENDER_ROOT=$(RENDER_ROOT) tools/render.sh $(ENV)
+	@if [ -d "$(RENDER_ROOT)/.git" ]; then \
+		git -C $(RENDER_ROOT) --no-pager diff -- $(ENV) && \
+		git -C $(RENDER_ROOT) diff --quiet -- $(ENV) && echo "render-diff($(ENV)): no drift against committed render" || true; \
+	else \
+		echo "warning: $(RENDER_ROOT) is not a git repository — nothing committed to diff against"; \
+	fi
+
+# --------------------------------------------------------------------------
+# Vendored manifest generation (Jsonnet -> YAML)
 # --------------------------------------------------------------------------
 
 CILIUM_VERSION ?= 1.20.0
 CILIUM_MANIFEST := config/manifests/cilium-$(CILIUM_VERSION).yaml
 
-render: render-thanos render-cilium
+render-vendored: render-thanos render-cilium
 
 render-thanos:
 	@echo "Rendering Thanos manifests..."
