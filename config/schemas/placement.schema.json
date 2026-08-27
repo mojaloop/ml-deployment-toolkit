@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Environment placement",
-  "description": "Schema for <env>/placement.yaml — adopter facts about node placement. `placement` maps the template's placement groups (pg-N) to provider failure domains: physical node names on on-prem providers, availability zones on AWS. `pools` overrides template node pools BY NAME (merge semantics: maps deep-merge; an override changing count inherits everything else; enabled: false drops a default pool — greppable, a visible decision rather than an absence; unknown names add extra pools).",
+  "description": "Schema for <env>/placement.yaml — adopter facts about node placement. `placement` maps the template's placement groups (pg-N) to provider failure domains: physical node names on on-prem providers, availability zones on AWS. `pools` overrides template node pools BY NAME with SHALLOW per-top-level-field replacement (the declared semantics): each field the override names replaces the template pool's field WHOLESALE — lists included, so overriding `taints` or `disks` restates the whole list. Fields the override omits are inherited (an override changing count inherits everything else). enabled: false drops a default pool — greppable, a visible decision rather than an absence; unknown names add extra pools and must carry the full pool shape. Rationale: list deep-merge is ambiguous for disks/taints; explicit wholesale replacement is legible.",
   "type": "object",
   "required": [
     "version",
@@ -20,7 +20,7 @@
       "additionalProperties": true
     },
     "pools": {
-      "description": "Per-pool overrides merged by name onto the template's node_groups: partial keys (count, cores, memory, disks, placement, tags, class) plus enabled: false to remove a pool. New names define extra pools and must then carry the full pool shape.",
+      "description": "Per-pool overrides matched by name onto the template's node_groups. Semantics: shallow per-top-level-field replacement — a named field (count, cores, memory, disks, placement, tags, taints, class) replaces the template's field wholesale (lists are restated in full, never merged); omitted fields are inherited. enabled: false removes a pool. New names define extra pools and must then carry the full pool shape.",
       "type": "object",
       "additionalProperties": true
     }

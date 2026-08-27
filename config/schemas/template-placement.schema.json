@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Template placement",
-  "description": "Schema for config/templates/<provider>/<role>/<name>/placement.yaml — the shape this template deploys: node pools, sizing, default topology. Environments override pools by name in their own placement.yaml (count, sizes, extra pools, enabled: false).",
+  "description": "Schema for config/templates/<provider>/<role>/<name>/placement.yaml — the shape this template deploys: node pools, sizing, default topology. Environments override pools by name in their own placement.yaml with shallow per-top-level-field replacement: each field an override names replaces the template pool's field wholesale (lists included — taints/disks are restated in full), omitted fields are inherited, enabled: false drops the pool.",
   "type": "object",
   "required": [
     "version",

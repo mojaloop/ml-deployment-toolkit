@@ -197,8 +197,13 @@ document, not an error — the offline render runs `talosctl validate` on the me
 a lint flags unmatched patch documents. (Semantics verified 2026-08-14 against the Talos
 1.8–1.10 docs and machinery source, closing the earlier open question.)
 
-**VM pools merge by name.** Pools are keyed entities, so an environment changing the worker
-count inherits the control-plane and every other pool untouched. Removing a default pool is
+**VM pools match by name; overrides replace whole top-level fields.** Pools are keyed
+entities, so an environment changing the worker count inherits the control-plane and every
+other pool untouched. Within a matched pool the merge is deliberately SHALLOW: each field the
+override names replaces the template's field wholesale — lists included, so overriding
+`taints` or `disks` restates the whole list, and nothing inside a field is deep-merged.
+Fields the override omits are inherited. (Decided 2026-08-27: list deep-merge is ambiguous
+for disks/taints; explicit wholesale replacement is legible.) Removing a default pool is
 expressed as `enabled: false` on that pool — greppable, and visible in the environment file as
 a deliberate decision rather than an absence.
 

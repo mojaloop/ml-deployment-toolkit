@@ -47,12 +47,17 @@ locals {
   template           = yamldecode(file("${local.template_dir}/template.yaml"))
   template_placement = yamldecode(file("${local.template_dir}/placement.yaml"))
 
-  # --- VM pools merge by name ---------------------------------------------
+  # --- VM pools: match by name, shallow per-field replacement ---------------
   # Template owns the shape; the environment owns the instance. Environment
-  # placement.yaml `pools:` entries deep-merge onto the template pool of the
-  # same name (changing count inherits everything else), unknown names add
-  # extra pools, and `enabled: false` drops a default pool — visible in the
-  # environment file as a deliberate decision rather than an absence.
+  # placement.yaml `pools:` entries match the template pool of the same name;
+  # each top-level field the override names REPLACES the template's field
+  # wholesale — lists included (overriding taints or disks restates the whole
+  # list; nothing is deep-merged). Omitted fields are inherited, so changing
+  # count inherits everything else. Unknown names add extra pools, and
+  # `enabled: false` drops a default pool — visible in the environment file as
+  # a deliberate decision rather than an absence. This shallow merge() IS the
+  # declared semantics (see placement.schema.json): list deep-merge is
+  # ambiguous for disks/taints, wholesale replacement is legible.
   template_pools     = { for g in try(local.template_placement.node_groups, []) : g.name => g }
   env_pool_overrides = try(local.placement_doc.pools, {})
   merged_pools = merge(
