@@ -1,0 +1,12 @@
+# Provider contract version — the version of the narrow generic seam between
+# L1 and L2 (design §5): the P_* symbol set (params.schema.json), the
+# capability vocabulary, and the pool/class identity rules. Bump it whenever
+# any of those changes shape.
+#
+# Because providers are in-repo this stays simple: ONE contract version per
+# DTK release, every provider package must declare the same version in its
+# params.yaml, asserted as a plain equality (like dtk_version) — deliberately
+# NOT a compatibility matrix (CAPI needs deprecation windows because its
+# providers are out-of-tree; ours are not, and we should not build that
+# machinery).
+contract_version: 1

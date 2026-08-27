@@ -56,7 +56,26 @@ if [ "$have_schema" = "1" ] && [ -d gitops ]; then
   done
 fi
 
-# --- Direction 3: every provider materializes every workload class ----------
+# --- Direction 3: contract version equality ---------------------------------
+# One contract version per DTK release (config/definitions/provider-contract.yaml);
+# every provider package must declare exactly it — plain equality, no matrix.
+CONTRACT="config/definitions/provider-contract.yaml"
+if [ -f "$CONTRACT" ]; then
+  cv=$(yq eval '.contract_version' "$CONTRACT")
+  for pf in providers/*/params.yaml; do
+    [ -f "$pf" ] || continue
+    pcv=$(yq eval '.contract_version // "unset"' "$pf")
+    if [ "$pcv" != "$cv" ]; then
+      echo "$pf: contract_version '$pcv' != release contract '$cv' ($CONTRACT) — the package must implement the release's contract"
+      findings=$((findings+1))
+    fi
+  done
+else
+  echo "$CONTRACT: not found — contract version equality cannot be verified"
+  findings=$((findings+1))
+fi
+
+# --- Direction 4: every provider materializes every workload class ----------
 # Class identity lives in config/definitions/workload-classes.yaml; each
 # provider package's classes.yaml must have an entry for every class (an empty
 # entry is valid — the SEAT must exist). A missing entry is what a renamed
@@ -95,7 +114,7 @@ else
   echo "warning: $WC not found — class materialization completeness not verified" >&2
 fi
 
-# --- Direction 4: no P_* keys in environment config.yaml files (namespaces disjoint)
+# --- Direction 5: no P_* keys in environment config.yaml files (namespaces disjoint)
 for cf in "$@"; do
   if [ ! -f "$cf" ]; then
     echo "usage error: config file not found: $cf" >&2

@@ -12,6 +12,9 @@
 # infra facts).
 # -----------------------------------------------------------------------------
 version: 1
+# Contract version implemented — must equal config/definitions/provider-contract.yaml
+# (plain equality assert, one contract version per DTK release).
+contract_version: 1
 description: "Proxmox VE + Talos Linux, bare-metal networking (Cilium LB-IPAM/L2)"
 
 # Structural facts consulted by config-loader/flux-config instead of

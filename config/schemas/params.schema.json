@@ -1,10 +1,11 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Provider interface parameters",
-  "description": "Schema for providers/<provider>/params.yaml — the provider interface. The `params` block declares every P_* substitution symbol the gitops layer may reference; a provider must supply all of them, and gitops must reference only symbols declared here. P_* symbols resolve from params.yaml only — config.yaml can never define or shadow them. The `infra` block carries Terraform-consumed provider configuration (VM defaults, images, instance shapes) and is provider-shaped by design. Symbols from the design enumeration resolved elsewhere by decision: LB pools and the registry are multi-consumer network facts in config.yaml; the DNS mechanism is the config.yaml dns.provider structural selector; the secrets backend is fixed (in-cluster Vault via ESO) and becomes a symbol only when a second backend exists.",
+  "description": "Schema for providers/<provider>/params.yaml \u2014 the provider interface. The `params` block declares every P_* substitution symbol the gitops layer may reference; a provider must supply all of them, and gitops must reference only symbols declared here. P_* symbols resolve from params.yaml only \u2014 config.yaml can never define or shadow them. The `infra` block carries Terraform-consumed provider configuration (VM defaults, images, instance shapes) and is provider-shaped by design. Symbols from the design enumeration resolved elsewhere by decision: LB pools and the registry are multi-consumer network facts in config.yaml; the DNS mechanism is the config.yaml dns.provider structural selector; the secrets backend is fixed (in-cluster Vault via ESO) and becomes a symbol only when a second backend exists.",
   "type": "object",
   "required": [
     "version",
+    "contract_version",
     "params",
     "capabilities"
   ],
@@ -15,11 +16,16 @@
       "type": "integer",
       "minimum": 1
     },
+    "contract_version": {
+      "description": "Provider contract version this package implements. Must equal config/definitions/provider-contract.yaml contract_version \u2014 a plain equality assert (config-loader precondition + check-interface.sh), one contract version per DTK release, no compatibility matrix.",
+      "type": "integer",
+      "minimum": 1
+    },
     "description": {
       "type": "string"
     },
     "capabilities": {
-      "description": "Structural facts about what the toolkit can deploy on this provider. Unlike params (substitution symbols), capabilities gate Terraform behavior: config-loader preconditions and flux-config Kustomization sets consult them instead of hardcoded provider-name lists. Every provider must state every capability explicitly — absence is not false, it is a schema error.",
+      "description": "Structural facts about what the toolkit can deploy on this provider. Unlike params (substitution symbols), capabilities gate Terraform behavior: config-loader preconditions and flux-config Kustomization sets consult them instead of hardcoded provider-name lists. Every provider must state every capability explicitly \u2014 absence is not false, it is a schema error.",
       "type": "object",
       "required": [
         "in_cluster_data"

@@ -11,6 +11,9 @@
 # infra facts).
 # -----------------------------------------------------------------------------
 version: 1
+# Contract version implemented — must equal config/definitions/provider-contract.yaml
+# (plain equality assert, one contract version per DTK release).
+contract_version: 1
 description: "AWS EKS managed Kubernetes (interface unvalidated)"
 
 # Structural facts consulted by config-loader/flux-config instead of

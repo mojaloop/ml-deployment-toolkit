@@ -13,6 +13,11 @@ locals {
   # --- Raw inputs ---------------------------------------------------------
   config           = yamldecode(file(var.config_path))
   workload_classes = yamldecode(file(var.workload_classes_path))
+  # The provider contract version (L1 platform definition, sibling of
+  # workload-classes.yaml). Every provider package declares the contract
+  # version it implements; equality is asserted below — plainly, like
+  # dtk_version, never as a compatibility matrix.
+  provider_contract = yamldecode(file("${dirname(var.workload_classes_path)}/provider-contract.yaml"))
 
   cluster = local.config.cluster
   # cluster.name is optional and defaults to the environment directory name.
@@ -404,6 +409,12 @@ resource "terraform_data" "validation" {
     precondition {
       condition     = try(local.config.version, 0) == 1
       error_message = "config.yaml must declare 'version: 1' (schema version)."
+    }
+    # Contract versioning (design §5): one contract version per DTK release,
+    # every package must match — a plain equality assert, like dtk_version.
+    precondition {
+      condition     = try(local.provider_params_file.contract_version, 0) == local.provider_contract.contract_version
+      error_message = "providers/${local.provider_name}/params.yaml declares contract_version '${try(local.provider_params_file.contract_version, "(unset)")}' but this DTK release's provider contract is version '${local.provider_contract.contract_version}' (config/definitions/provider-contract.yaml). The package must implement the release's contract."
     }
     precondition {
       condition     = local.acme_server != ""
