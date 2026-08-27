@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/name: thanos-query
     app.kubernetes.io/version: v0.42.2
   name: thanos-query
-  namespace: observability
+  namespace: t7y-backend
 spec:
   replicas: 1
   selector:
@@ -43,8 +43,8 @@ spec:
             - --log.level=info
             - --log.format=logfmt
             - --query.replica-label=replica
-            - --endpoint=dnssrv+_grpc._tcp.thanos-receive.observability.svc.cluster.local
-            - --endpoint=dnssrv+_grpc._tcp.thanos-store.observability.svc.cluster.local
+            - --endpoint=dnssrv+_grpc._tcp.thanos-receive.t7y-backend.svc.cluster.local
+            - --endpoint=dnssrv+_grpc._tcp.thanos-store.t7y-backend.svc.cluster.local
             - --query.auto-downsampling
           env:
             - name: HOST_IP_ADDRESS

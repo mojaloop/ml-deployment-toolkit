@@ -1,6 +1,9 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
+  # Namespace (t7y = telemetry) — owned by this layer, declared nowhere else
+  - namespace.yaml
+
   # Shared HelmRepository
   - grafana-helmrepo.yaml
 
@@ -101,14 +104,14 @@ configMapGenerator:
   - name: grafana-values
     namespace: flux-system
     files:
-      - values.yaml=values/observability/grafana.yaml
+      - values.yaml=values/t7y-backend/grafana.yaml
   - name: loki-values
     namespace: flux-system
     files:
-      - values.yaml=values/observability/loki.yaml
+      - values.yaml=values/t7y-backend/loki.yaml
   - name: tempo-values
     namespace: flux-system
     files:
-      - values.yaml=values/observability/tempo.yaml
+      - values.yaml=values/t7y-backend/tempo.yaml
 generatorOptions:
   disableNameSuffixHash: true

@@ -2,10 +2,11 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 # NO kustomization-wide namespace here: it would rewrite EVERY resource's
 # namespace, including obs-push-credentials, which must live in
-# observability beside the Alloy pod that env-mounts it (a secretKeyRef
+# t7y-agents beside the Alloy pod that env-mounts it (a secretKeyRef
 # cannot cross namespaces). Every flux-system resource in this layer
 # declares its namespace explicitly instead.
 resources:
+  - namespace.yaml
   - grafana-helmrepo.yaml
   - kube-state-metrics-helmrelease.yaml
   - node-exporter-helmrelease.yaml
@@ -19,14 +20,14 @@ configMapGenerator:
   - name: alloy-values
     namespace: flux-system
     files:
-      - values.yaml=values/observability/alloy.yaml
+      - values.yaml=values/t7y-agents/alloy.yaml
   - name: kube-state-metrics-values
     namespace: flux-system
     files:
-      - values.yaml=values/observability/kube-state-metrics.yaml
+      - values.yaml=values/t7y-agents/kube-state-metrics.yaml
   - name: node-exporter-values
     namespace: flux-system
     files:
-      - values.yaml=values/observability/node-exporter.yaml
+      - values.yaml=values/t7y-agents/node-exporter.yaml
 generatorOptions:
   disableNameSuffixHash: true

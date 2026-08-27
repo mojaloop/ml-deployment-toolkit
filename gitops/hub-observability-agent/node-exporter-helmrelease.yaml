@@ -15,7 +15,7 @@ spec:
         namespace: flux-system
       interval: 12h
   releaseName: node-exporter
-  targetNamespace: observability
+  targetNamespace: t7y-agents
   install:
     createNamespace: false
     timeout: 5m
@@ -31,18 +31,18 @@ spec:
       name: node-exporter-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: observability-node-exporter-values-provider
+      name: t7y-agents-node-exporter-values-provider
       valuesKey: values.yaml
       optional: true
     - kind: ConfigMap
-      name: observability-node-exporter-values-template
+      name: t7y-agents-node-exporter-values-template
       valuesKey: values.yaml
       optional: true
     - kind: ConfigMap
-      name: observability-node-exporter-values-override
+      name: t7y-agents-node-exporter-values-override
       valuesKey: values.yaml
       optional: true
     - kind: Secret
-      name: observability-node-exporter-values-override
+      name: t7y-agents-node-exporter-values-override
       valuesKey: values.yaml
       optional: true

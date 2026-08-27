@@ -25,9 +25,9 @@ metadata:
   namespace: mojaloop
 spec:
   # Alloy is the collector — not an OpenTelemetryCollector CR.
-  # See gitops/hub-observability-agent/values/observability/alloy.yaml.
+  # See gitops/hub-observability-agent/values/t7y-agents/alloy.yaml.
   exporter:
-    endpoint: http://alloy.observability.svc.cluster.local:4318
+    endpoint: http://alloy.t7y-agents.svc.cluster.local:4318
   propagators:
     - tracecontext
     - baggage
@@ -38,7 +38,7 @@ spec:
     # (design-authority-project#121). Raise toward 1.0 for a diagnosis window.
     type: parentbased_traceidratio
     # 1.0 is DELIBERATE and COUPLED to otelcol.processor.tail_sampling in
-    # gitops/hub-observability-agent/values/observability/alloy.yaml. Sampling now happens at
+    # gitops/hub-observability-agent/values/t7y-agents/alloy.yaml. Sampling now happens at
     # the tail, where the whole trace is visible, so every error and every
     # >1000ms (SLO-breaching) trace is kept and only the boring 90% is dropped.
     # Head sampling at 0.1 would discard rare failures before Alloy ever saw

@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: grafana-alerting-rules-data-layer
-  namespace: observability
+  namespace: t7y-backend
   labels:
     grafana_alert: "1"
 data:

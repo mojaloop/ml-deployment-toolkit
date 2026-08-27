@@ -1,0 +1,16 @@
+# t7y = telemetry (numeronym). Backend half of the telemetry stack: Thanos,
+# Loki, Tempo, Grafana and the obs-ingest front. Declared here — and only
+# here — by the layer that owns it. Agents live in t7y-agents (privileged);
+# nothing in this namespace needs host access, so enforcement is baseline
+# with restricted audit/warn to keep the remaining gap visible.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: t7y-backend
+  labels:
+    name: t7y-backend
+    app.kubernetes.io/part-of: mojaloop
+    mojaloop.io/layer: tooling
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

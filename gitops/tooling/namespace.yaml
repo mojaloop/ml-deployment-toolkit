@@ -35,11 +35,3 @@ metadata:
   labels:
     app.kubernetes.io/part-of: mojaloop
     mojaloop.io/layer: tooling
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: observability
-  labels:
-    app.kubernetes.io/part-of: mojaloop
-    mojaloop.io/layer: tooling

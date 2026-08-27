@@ -14,7 +14,7 @@ spec:
         name: grafana
       interval: 12h
   releaseName: loki
-  targetNamespace: observability
+  targetNamespace: t7y-backend
   install:
     createNamespace: false
     timeout: 15m
@@ -48,18 +48,18 @@ spec:
       valuesKey: secretKey
       targetPath: loki.structuredConfig.storage_config.aws.secret_access_key
     - kind: ConfigMap
-      name: observability-loki-values-provider
+      name: t7y-backend-loki-values-provider
       valuesKey: values.yaml
       optional: true
     - kind: ConfigMap
-      name: observability-loki-values-template
+      name: t7y-backend-loki-values-template
       valuesKey: values.yaml
       optional: true
     - kind: ConfigMap
-      name: observability-loki-values-override
+      name: t7y-backend-loki-values-override
       valuesKey: values.yaml
       optional: true
     - kind: Secret
-      name: observability-loki-values-override
+      name: t7y-backend-loki-values-override
       valuesKey: values.yaml
       optional: true
