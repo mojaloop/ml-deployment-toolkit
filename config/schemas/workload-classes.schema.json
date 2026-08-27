@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Workload class identity + platform versions",
+  "description": "Schema for config/definitions/workload-classes.yaml — L1 platform definitions: the single source for Talos/Kubernetes/Flux versions and workload-class IDENTITY (name + intent + talos_type). Deliberately narrow: a class here carries NOTHING provider-shaped — no talos_patches (moved to providers/proxmox/classes.yaml talos_fragments), no node_labels/node_taints (labels derive from pool names, taints are declared by pools), no instance types. talos_type stays: it is role identity (which Talos machine type a class boots as), not tuning. Provider materializations live in providers/<p>/classes.yaml, which must cover every class named here.",
+  "type": "object",
+  "required": [
+    "talos_version",
+    "kubernetes_version",
+    "flux_version",
+    "talos_image",
+    "classes"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "talos_version": {
+      "type": "string",
+      "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "kubernetes_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "flux_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "talos_image": {
+      "type": "object",
+      "required": [
+        "schematic",
+        "arch"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schematic": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "arch": {
+          "enum": [
+            "amd64",
+            "arm64"
+          ]
+        }
+      }
+    },
+    "classes": {
+      "description": "Class identity: name (the key) + talos_type only. Anything else is provider-shaped and belongs in providers/<p>/classes.yaml.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "talos_type"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "talos_type": {
+            "enum": [
+              "controlplane",
+              "worker"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

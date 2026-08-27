@@ -75,7 +75,19 @@ else
   findings=$((findings+1))
 fi
 
-# --- Direction 4: every provider materializes every workload class ----------
+# --- Direction 4a: class identity file is identity-only ----------------------
+# workload-classes.yaml carries versions + class identity (talos_type) and
+# nothing provider-shaped — the schema rejects talos_patches, node_labels,
+# instance types and any other materialization content by additionalProperties.
+WCSCHEMA="config/schemas/workload-classes.schema.json"
+if [ -f "config/definitions/workload-classes.yaml" ] && [ -f "$WCSCHEMA" ]; then
+  if ! out=$(yq -o json e '.' config/definitions/workload-classes.yaml | python3 tools/validate.py "$WCSCHEMA" 2>&1); then
+    printf '%s\n' "$out" | sed 's|^|config/definitions/workload-classes.yaml: |'
+    findings=$((findings + $(printf '%s\n' "$out" | sed '/^$/d' | wc -l | tr -d ' ')))
+  fi
+fi
+
+# --- Direction 4b: every provider materializes every workload class ----------
 # Class identity lives in config/definitions/workload-classes.yaml; each
 # provider package's classes.yaml must have an entry for every class (an empty
 # entry is valid — the SEAT must exist). A missing entry is what a renamed

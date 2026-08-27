@@ -564,15 +564,17 @@ resource "terraform_data" "validation" {
       error_message = "config.yaml declares dtk_version '${try(local.config.dtk_version, "")}' but the clone is at '${var.dtk_tag != "" ? var.dtk_tag : "(no exact tag)"}'. Check out the matching DTK tag or update dtk_version."
     }
 
-    # Node labels derive mechanically from pool names, so nothing may declare
-    # them by hand — a workload class carrying node_labels/node_taints is the
-    # old drift-prone pattern reintroduced.
+    # Class identity is identity ONLY: talos_type (role identity) and nothing
+    # else. Labels derive from pool names; taints are declared by pools;
+    # provider-shaped content (talos_patches, instance types, VM knobs)
+    # belongs in providers/<p>/classes.yaml — anything extra here is the old
+    # drift-prone pattern reintroduced.
     precondition {
       condition = alltrue([
         for name, class in try(local.workload_classes.classes, {}) :
-        !can(class.node_labels) && !can(class.node_taints)
+        length(setsubtract(keys(class), ["talos_type"])) == 0
       ])
-      error_message = "workload-classes.yaml declares node_labels/node_taints on a class. Labels derive from pool names; taints are declared by the pool in placement.yaml."
+      error_message = "workload-classes.yaml declares non-identity keys on a class: ${join("; ", [for name, class in try(local.workload_classes.classes, {}) : "${name}: ${join(", ", setsubtract(keys(class), ["talos_type"]))}" if length(setsubtract(keys(class), ["talos_type"])) > 0])}. Class identity carries only talos_type — materializations live in providers/<provider>/classes.yaml."
     }
 
     # An environment-added pool (a name the template does not define) must
