@@ -1,13 +1,11 @@
-# Mojaloop DTK Test Environment on PVE — Resource Requirements
+# DTK Test Environment on PVE — Resource Requirements
 
 **Audience:** adopter infrastructure, network, and security teams
 **Purpose:** everything to provision and confirm before deployment can begin
 **Status:** draft for review
 **Date:** 2026-08-31
 
-Each item is marked **[R]** Required or **[REC]** Recommended. Section 11 is the
-sign-off checklist; the environment is "ready for deployment" when every item
-there is confirmed.
+Each item is marked **[R]** Required or **[REC]** Recommended. Section 11 is the sign-off checklist; the environment is "ready for deployment" when every item there is confirmed.
 
 ---
 
@@ -32,16 +30,15 @@ there is confirmed.
 This document specifies the resources needed to host a **test environment** of
 the Mojaloop Deployment Toolkit (DTK). The environment is for functional and
 integration testing — participant onboarding over mTLS and end-to-end
-transfers — not for performance benchmarking or disaster-recovery drills.
+transfers.
 
 The deployment consists of:
 
-- **1 Tooling Cluster** — shared services: container registry mirror (Harbor),
-  secrets (Vault), object storage (MinIO), observability (Grafana/Thanos/Loki/Tempo).
+- **1 Tooling Cluster** — shared services: container registry mirror (Harbor), object storage (MinIO), Telemetry (Grafana/Thanos/Loki/Tempo).
 - **1 Mojaloop Hub** — the switch: Mojaloop core services, connection manager
   (MCM), Finance Portal, identity (Ory), and an in-cluster data layer
   (MySQL, Kafka, MongoDB, Redis).
-- **3 Participant (DFSP) hosts** — simulated banks running the integration
+- **3 Participant (DFSP) hosts** — simulated participants running the integration
   toolkit under Docker Compose, connected to the hub over mTLS.
 - **Support VMs** — SSH bastion, deployment driver ("util"), and DHCP service
   if the adopter network does not provide one.
@@ -61,44 +58,21 @@ The environment is complete when:
 - an end-to-end transfer between two participants completes successfully;
 - operator UIs (MCM, Finance Portal, Grafana, testing toolkit) are reachable
   through the bastion with valid public TLS certificates;
-- optionally, alerts are delivered to a Telegram channel (§1.2, §9).
 
-At handover the adopter receives operator credentials and access
-documentation; day-2 operation is out of scope for this document.
 
 ### 1.2 Limitations
 
-Stated up front so no requirement below comes as a surprise:
 
 - **Test tier only** — sized for functional testing, not performance
   benchmarking, high availability, or disaster recovery.
 - **Not publicly reachable** — all access is through the SSH bastion; the
   only inbound exposure is one SSH port on the firewall.
-- **Public ACME CA required** — TLS certificates come from Let's Encrypt (or
-  another public ACME CA). A private/offline CA is **not supported**.
-- **Supported DNS providers only** — Route53, Cloudflare, or DigitalOcean.
-  Zone records are fully managed by the toolkit.
-- **DHCP is mandatory** on the node subnet (Proxmox provides none).
-- **Password SSH to Proxmox nodes** is required by the provisioning tooling
-  (key-agent auth unsupported).
-- **Email (SMTP) is mandatory** — participant onboarding cannot complete
-  without it (§9). **Telegram alerting is optional** but requested for this
-  test.
-- Cloud platforms (EKS, DOKS) exist in the toolkit but are unvalidated and
-  out of scope for this test.
 
 ## 2. Design overview
 
 ### 2.1 Physical topology
 
-```
-                          ┌──────────┐      ┌────────────────┐      ┌─────────────────────┐
-   Internet  ◄──────────► │ Firewall │ ◄──► │ Network switch │ ◄──► │ Proxmox server(s)   │
-                          └──────────┘      └────────────────┘      │  (all VMs, one L2)  │
-   inbound: SSH → bastion   DNAT/port-fwd      node subnet          └─────────────────────┘
-   outbound: 443, 53, 123,  one rule            + DHCP service
-             587
-```
+![Physical topology: Internet ↔ Firewall (1 inbound DNAT rule, outbound 443/53/123/587) ↔ Network switch (node subnet + DHCP) ↔ Proxmox VE 9 server(s), all VMs on one L2 segment](diagrams/physical-topology.svg)
 
 **Server capacity — invariants.** Any hardware layout must satisfy:
 
@@ -111,8 +85,7 @@ Stated up front so no requirement below comes as a surprise:
   cluster.
 
 **Reference layouts.** Either of the following is acceptable; so is any other
-layout meeting the invariants — include the proposed layout with the §11
-sign-off.
+layout meeting the invariants.
 
 *Layout A — single host.* Simplest to provide and operate. Caveat: a host
 failure takes down the entire environment (acceptable at test tier).
@@ -153,31 +126,8 @@ control planes — pointless with a single one).
 
 ### 2.2 Logical design (HLD)
 
-```mermaid
-flowchart LR
-    subgraph internet [Internet]
-        op[Operators]
-        acme[ACME CA / DNS provider / registries]
-    end
-    subgraph adopter [Adopter network — one L2 segment]
-        bastion[Bastion<br/>SSH only inbound]
-        util[Util VM<br/>runs Terraform]
-        subgraph cc [Tooling Cluster — 1 node]
-            harbor[Harbor / Vault / MinIO / Observability]
-        end
-        subgraph hub [Hub — 4–6 nodes per §3 profile]
-            gw[Gateways: gw-int, gw-ext,<br/>gw-intapi :443 TLS<br/>gw-extapi :443 mTLS]
-            core[Mojaloop core + data layer]
-        end
-        d1[DFSP-1] & d2[DFSP-2] & d3[DFSP-3]
-    end
-    op -->|SSH :2222| bastion
-    bastion --> util
-    util -->|PVE API :8006, SSH :22<br/>k8s :6443, talos :50000/1| hub
-    hub <-->|mTLS :443| d1 & d2 & d3
-    hub -.->|images, backups,<br/>metrics, logs| cc
-    hub -->|egress :443| acme
-```
+![High-level design: Hub-Ops reach the environment by SSH through the bastion; the util VM manages both clusters; the Hub Cluster (4–6 nodes: gateways ×4 on 443, Mojaloop application, data layer) serves dfsp-101/102/103 over mTLS 443 and uses the Tooling Cluster for images, backups, and telemetry; egress goes to registries, ACME, DNS API, NTP, SMTP, and optionally Telegram; DFSP-Ops operate their DFSP VMs via the bastion and the MCM UI](diagrams/deployed-system.svg)
+
 
 Traffic model:
 
@@ -233,10 +183,6 @@ Notes:
 
 - **[R]** A Proxmox disk pool supporting **raw** images (`local-lvm`, ZFS, or
   Ceph RBD) with ≈700–780 GB available (per §3 profile).
-- **[R]** The **second disk** on the tooling node and each hub worker
-  (64 GB each) is consumed whole as the Kubernetes data volume (OpenEBS
-  LocalPV): provided **unformatted**, formatted and mounted automatically by
-  the node OS.
 - **[R]** SSD-backed storage for the data disks. Guideline: ≥3,000 sustained
   IOPS and p99 write latency < 5 ms for data volumes; ≥500 IOPS
   general-purpose.

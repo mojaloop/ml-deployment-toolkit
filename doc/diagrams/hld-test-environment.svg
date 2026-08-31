@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 660" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5f6b76"/>
+    </marker>
+  </defs>
+
+  <!-- background card -->
+  <rect x="1" y="1" width="1238" height="658" rx="10" fill="#f8fafc" stroke="#d0d7de"/>
+
+  <!-- ===== external actors (dashed = outside the deployment) ===== -->
+  <g>
+    <rect x="30" y="100" width="150" height="76" rx="8" fill="#fbfcfd" stroke="#8a95a0" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="105" y="130" text-anchor="middle" font-size="14" font-weight="600" fill="#24292f">Hub-Ops</text>
+    <text x="105" y="149" text-anchor="middle" font-size="10.5" fill="#57606a">deploy team &amp;</text>
+    <text x="105" y="163" text-anchor="middle" font-size="10.5" fill="#57606a">hub operators</text>
+  </g>
+  <g>
+    <rect x="30" y="410" width="150" height="120" rx="8" fill="#fbfcfd" stroke="#8a95a0" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="105" y="440" text-anchor="middle" font-size="14" font-weight="600" fill="#24292f">Internet services</text>
+    <text x="105" y="461" text-anchor="middle" font-size="10.5" fill="#57606a">image registries &#183; ACME CA</text>
+    <text x="105" y="476" text-anchor="middle" font-size="10.5" fill="#57606a">DNS provider API &#183; NTP</text>
+    <text x="105" y="491" text-anchor="middle" font-size="10.5" fill="#57606a">SMTP relay</text>
+    <text x="105" y="506" text-anchor="middle" font-size="10.5" fill="#57606a">Telegram (optional)</text>
+  </g>
+  <g>
+    <rect x="1060" y="180" width="150" height="76" rx="8" fill="#fbfcfd" stroke="#8a95a0" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="1135" y="210" text-anchor="middle" font-size="14" font-weight="600" fill="#24292f">DFSP-Ops</text>
+    <text x="1135" y="229" text-anchor="middle" font-size="10.5" fill="#57606a">participant operators</text>
+    <text x="1135" y="243" text-anchor="middle" font-size="10.5" fill="#57606a">(one team per DFSP)</text>
+  </g>
+
+  <!-- ===== adopter network boundary ===== -->
+  <rect x="220" y="40" width="800" height="570" rx="10" fill="#ffffff" stroke="#57606a" stroke-width="1.8"/>
+  <text x="240" y="66" font-size="14" font-weight="600" fill="#24292f">Adopter network &#8212; one L2 segment</text>
+
+  <!-- ===== Supporting VMs ===== -->
+  <g>
+    <rect x="250" y="88" width="270" height="170" rx="8" fill="#eef2f6" stroke="#6a7480" stroke-width="1.5"/>
+    <text x="385" y="110" text-anchor="middle" font-size="13" font-weight="600" fill="#24292f">Supporting VMs</text>
+    <rect x="264" y="122" width="242" height="34" rx="5" fill="#ffffff" stroke="#98a2ad"/>
+    <text x="385" y="139" text-anchor="middle" font-size="11.5" font-weight="600" fill="#24292f">bastion <tspan font-weight="400" fill="#57606a">&#8212; only SSH entry</tspan></text>
+    <rect x="264" y="164" width="242" height="34" rx="5" fill="#ffffff" stroke="#98a2ad"/>
+    <text x="385" y="181" text-anchor="middle" font-size="11.5" font-weight="600" fill="#24292f">util <tspan font-weight="400" fill="#57606a">&#8212; runs Terraform / make</tspan></text>
+    <rect x="264" y="206" width="242" height="34" rx="5" fill="#ffffff" stroke="#98a2ad" stroke-dasharray="4 3"/>
+    <text x="385" y="223" text-anchor="middle" font-size="11.5" font-weight="600" fill="#24292f">dhcp <tspan font-weight="400" fill="#57606a">&#8212; if network provides none</tspan></text>
+  </g>
+
+  <!-- ===== Tooling Cluster ===== -->
+  <g>
+    <rect x="250" y="310" width="270" height="120" rx="8" fill="#fdf8ec" stroke="#b08a3e" stroke-width="1.5"/>
+    <text x="385" y="335" text-anchor="middle" font-size="13" font-weight="600" fill="#24292f">Tooling Cluster</text>
+    <text x="385" y="352" text-anchor="middle" font-size="10.5" fill="#57606a">1 node</text>
+    <text x="385" y="378" text-anchor="middle" font-size="11" fill="#3d434a">Harbor registry mirror &#183; MinIO backups</text>
+    <text x="385" y="396" text-anchor="middle" font-size="11" fill="#3d434a">observability backend (Grafana &#183; Loki &#183; Thanos)</text>
+  </g>
+
+  <!-- ===== Hub Cluster ===== -->
+  <g>
+    <rect x="570" y="88" width="300" height="320" rx="8" fill="#f4f5fb" stroke="#5c6bc0" stroke-width="1.5"/>
+    <text x="720" y="112" text-anchor="middle" font-size="13" font-weight="600" fill="#24292f">Hub Cluster</text>
+    <text x="720" y="128" text-anchor="middle" font-size="10.5" fill="#57606a">4&#8211;6 nodes per &#167;3 profile</text>
+
+    <rect x="586" y="140" width="268" height="46" rx="5" fill="#e3e7f8" stroke="#5c6bc0"/>
+    <text x="720" y="158" text-anchor="middle" font-size="11.5" font-weight="600" fill="#3f51a5">Gateways &#215;4 &#8212; :443</text>
+    <text x="720" y="175" text-anchor="middle" font-size="10" fill="#57606a">gw-int &#183; gw-ext &#183; gw-intapi (TLS) &#183; extapi (mTLS)</text>
+
+    <rect x="586" y="198" width="268" height="60" rx="5" fill="#ffffff" stroke="#8a93c9"/>
+    <text x="720" y="222" text-anchor="middle" font-size="11.5" font-weight="600" fill="#24292f">Mojaloop application</text>
+    <text x="720" y="241" text-anchor="middle" font-size="10" fill="#57606a">core services &#183; MCM &#183; Finance Portal</text>
+
+    <rect x="586" y="270" width="268" height="60" rx="5" fill="#e6f4ea" stroke="#34865a"/>
+    <text x="720" y="294" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1d5c3c">Data layer</text>
+    <text x="720" y="313" text-anchor="middle" font-size="10" fill="#57606a">MySQL &#183; Kafka &#183; MongoDB &#183; Redis</text>
+
+    <text x="720" y="356" text-anchor="middle" font-size="10" fill="#57606a">IAM (Ory) &#183; Vault &#183; Flux GitOps &#183; observability agent</text>
+    <text x="720" y="372" text-anchor="middle" font-size="10" fill="#57606a">TLS certs via ACME &#183; DNS via external-dns</text>
+  </g>
+
+  <!-- ===== DFSPs ===== -->
+  <g>
+    <rect x="890" y="140" width="112" height="60" rx="8" fill="#fdf1ec" stroke="#c0704f" stroke-width="1.5"/>
+    <text x="946" y="165" text-anchor="middle" font-size="12.5" font-weight="600" fill="#24292f">dfsp-101</text>
+    <text x="946" y="183" text-anchor="middle" font-size="9.5" fill="#57606a">Docker Compose</text>
+    <rect x="890" y="220" width="112" height="60" rx="8" fill="#fdf1ec" stroke="#c0704f" stroke-width="1.5"/>
+    <text x="946" y="245" text-anchor="middle" font-size="12.5" font-weight="600" fill="#24292f">dfsp-102</text>
+    <text x="946" y="263" text-anchor="middle" font-size="9.5" fill="#57606a">Docker Compose</text>
+    <rect x="890" y="300" width="112" height="60" rx="8" fill="#fdf1ec" stroke="#c0704f" stroke-width="1.5"/>
+    <text x="946" y="325" text-anchor="middle" font-size="12.5" font-weight="600" fill="#24292f">dfsp-103</text>
+    <text x="946" y="343" text-anchor="middle" font-size="9.5" fill="#57606a">Docker Compose</text>
+    <text x="946" y="382" text-anchor="middle" font-size="10" fill="#57606a">Debian VMs &#183; static IPs</text>
+  </g>
+
+  <!-- ===== infrastructure footer strip ===== -->
+  <rect x="250" y="555" width="750" height="32" rx="5" fill="#e7ebef" stroke="#98a2ad"/>
+  <text x="625" y="575" text-anchor="middle" font-size="11" fill="#3d434a">Cluster nodes: Kubernetes &#183; Cilium CNI &#183; Talos Linux &#8212; all VMs on Proxmox VE 9</text>
+
+  <!-- ===== flows ===== -->
+  <!-- hub-ops -> bastion -->
+  <line x1="182" y1="138" x2="248" y2="138" stroke="#5f6b76" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="213" y="127" text-anchor="middle" font-size="10" fill="#57606a">SSH</text>
+
+  <!-- util -> hub (management) -->
+  <line x1="522" y1="180" x2="568" y2="180" stroke="#5f6b76" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="545" y="168" text-anchor="middle" font-size="9.5" fill="#57606a">mgmt</text>
+
+  <!-- hub -> tooling (dashed service flow) -->
+  <line x1="568" y1="370" x2="522" y2="370" stroke="#5f6b76" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+  <text x="545" y="358" text-anchor="middle" font-size="9.5" fill="#57606a">images</text>
+  <text x="545" y="388" text-anchor="middle" font-size="9.5" fill="#57606a">backups &#183;</text>
+  <text x="545" y="400" text-anchor="middle" font-size="9.5" fill="#57606a">telemetry</text>
+
+  <!-- dfsps <-> hub mTLS -->
+  <line x1="872" y1="170" x2="888" y2="170" stroke="#5f6b76" stroke-width="2" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <line x1="872" y1="250" x2="888" y2="250" stroke="#5f6b76" stroke-width="2" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <line x1="872" y1="330" x2="888" y2="330" stroke="#5f6b76" stroke-width="2" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <text x="880" y="128" text-anchor="middle" font-size="10" font-weight="600" fill="#3f51a5">mTLS :443</text>
+
+  <!-- dfsp-ops -> dfsps -->
+  <line x1="1058" y1="235" x2="1004" y2="248" stroke="#5f6b76" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="1135" y="272" text-anchor="middle" font-size="9.5" fill="#57606a">SSH via bastion &#183; MCM UI (gw-ext)</text>
+
+  <!-- egress -->
+  <line x1="248" y1="470" x2="182" y2="470" stroke="#5f6b76" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="213" y="459" text-anchor="middle" font-size="10" fill="#57606a">egress</text>
+  <text x="213" y="486" text-anchor="middle" font-size="9" fill="#57606a">443 &#183; 587 &#183; 53 &#183; 123</text>
+
+  <!-- ===== legend ===== -->
+  <g font-size="10" fill="#57606a">
+    <rect x="250" y="622" width="26" height="14" rx="4" fill="#fbfcfd" stroke="#8a95a0" stroke-dasharray="5 3"/>
+    <text x="284" y="633">outside the deployment</text>
+    <line x1="440" y1="629" x2="470" y2="629" stroke="#5f6b76" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+    <text x="478" y="633">internal service flow</text>
+    <text x="620" y="633">arrows start at the acting component</text>
+  </g>
+</svg>

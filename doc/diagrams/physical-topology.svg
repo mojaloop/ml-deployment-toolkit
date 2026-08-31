@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 320" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5f6b76"/>
+    </marker>
+  </defs>
+
+  <!-- background card (keeps the diagram legible on dark-mode pages) -->
+  <rect x="1" y="1" width="978" height="318" rx="10" fill="#f8fafc" stroke="#d0d7de"/>
+
+  <!-- ===== Internet cloud ===== -->
+  <path d="M150,190 H60 a28,28 0 0 1 -4,-55 a36,36 0 0 1 68,-16 a30,30 0 0 1 44,24 a24,24 0 0 1 -18,47 z"
+        fill="#dde7f1" stroke="#7d92a8" stroke-width="2"/>
+  <text x="107" y="165" text-anchor="middle" font-size="14" font-weight="600" fill="#24292f">Internet</text>
+
+  <!-- link: internet <-> firewall -->
+  <line x1="196" y1="160" x2="326" y2="160" stroke="#5f6b76" stroke-width="2" marker-start="url(#arr)" marker-end="url(#arr)"/>
+
+  <!-- ===== Firewall (brick wall) ===== -->
+  <g>
+    <rect x="330" y="105" width="90" height="110" rx="4" fill="#e2574c" stroke="#b03a2e" stroke-width="2"/>
+    <g stroke="#ffffff" stroke-width="1.6" opacity="0.85">
+      <line x1="330" y1="127" x2="420" y2="127"/>
+      <line x1="330" y1="149" x2="420" y2="149"/>
+      <line x1="330" y1="171" x2="420" y2="171"/>
+      <line x1="330" y1="193" x2="420" y2="193"/>
+      <line x1="360" y1="105" x2="360" y2="127"/> <line x1="390" y1="105" x2="390" y2="127"/>
+      <line x1="345" y1="127" x2="345" y2="149"/> <line x1="375" y1="127" x2="375" y2="149"/> <line x1="405" y1="127" x2="405" y2="149"/>
+      <line x1="360" y1="149" x2="360" y2="171"/> <line x1="390" y1="149" x2="390" y2="171"/>
+      <line x1="345" y1="171" x2="345" y2="193"/> <line x1="375" y1="171" x2="375" y2="193"/> <line x1="405" y1="171" x2="405" y2="193"/>
+      <line x1="360" y1="193" x2="360" y2="215"/> <line x1="390" y1="193" x2="390" y2="215"/>
+    </g>
+  </g>
+
+  <!-- link: firewall <-> switch -->
+  <line x1="424" y1="160" x2="526" y2="160" stroke="#5f6b76" stroke-width="2" marker-start="url(#arr)" marker-end="url(#arr)"/>
+
+  <!-- ===== Network switch ===== -->
+  <g>
+    <rect x="530" y="130" width="140" height="60" rx="7" fill="#3f7cbf" stroke="#2c5a8c" stroke-width="2"/>
+    <g stroke="#ffffff" stroke-width="3" fill="#ffffff">
+      <line x1="546" y1="147" x2="584" y2="147"/> <path d="M584,142 L594,147 L584,152 z" stroke="none"/>
+      <line x1="606" y1="147" x2="644" y2="147"/> <path d="M644,142 L654,147 L644,152 z" stroke="none"/>
+      <line x1="616" y1="173" x2="654" y2="173"/> <path d="M616,168 L606,173 L616,178 z" stroke="none"/>
+      <line x1="556" y1="173" x2="594" y2="173"/> <path d="M556,168 L546,173 L556,178 z" stroke="none"/>
+    </g>
+  </g>
+
+  <!-- link: switch <-> servers -->
+  <line x1="674" y1="160" x2="776" y2="160" stroke="#5f6b76" stroke-width="2" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <text x="725" y="147" text-anchor="middle" font-size="11" fill="#57606a">10 GbE</text>
+
+  <!-- ===== Proxmox server rack ===== -->
+  <g>
+    <rect x="780" y="90" width="150" height="140" rx="5" fill="#55606b" stroke="#3a424a" stroke-width="2"/>
+    <g>
+      <rect x="790" y="102" width="130" height="32" rx="3" fill="#6b7681" stroke="#8a95a0"/>
+      <circle cx="802" cy="118" r="3.5" fill="#9fd468"/> <circle cx="814" cy="118" r="3.5" fill="#f0c419"/>
+      <line x1="856" y1="112" x2="910" y2="112" stroke="#c8d0d8" stroke-width="2"/>
+      <line x1="856" y1="118" x2="910" y2="118" stroke="#c8d0d8" stroke-width="2"/>
+      <line x1="856" y1="124" x2="910" y2="124" stroke="#c8d0d8" stroke-width="2"/>
+    </g>
+    <g>
+      <rect x="790" y="144" width="130" height="32" rx="3" fill="#6b7681" stroke="#8a95a0"/>
+      <circle cx="802" cy="160" r="3.5" fill="#9fd468"/> <circle cx="814" cy="160" r="3.5" fill="#f0c419"/>
+      <line x1="856" y1="154" x2="910" y2="154" stroke="#c8d0d8" stroke-width="2"/>
+      <line x1="856" y1="160" x2="910" y2="160" stroke="#c8d0d8" stroke-width="2"/>
+      <line x1="856" y1="166" x2="910" y2="166" stroke="#c8d0d8" stroke-width="2"/>
+    </g>
+    <g>
+      <rect x="790" y="186" width="130" height="32" rx="3" fill="#6b7681" stroke="#8a95a0"/>
+      <circle cx="802" cy="202" r="3.5" fill="#9fd468"/> <circle cx="814" cy="202" r="3.5" fill="#f0c419"/>
+      <line x1="856" y1="196" x2="910" y2="196" stroke="#c8d0d8" stroke-width="2"/>
+      <line x1="856" y1="202" x2="910" y2="202" stroke="#c8d0d8" stroke-width="2"/>
+      <line x1="856" y1="208" x2="910" y2="208" stroke="#c8d0d8" stroke-width="2"/>
+    </g>
+  </g>
+
+  <!-- ===== component names ===== -->
+  <text x="375" y="245" text-anchor="middle" font-size="14" font-weight="600" fill="#24292f">Firewall</text>
+  <text x="600" y="245" text-anchor="middle" font-size="14" font-weight="600" fill="#24292f">Network switch</text>
+  <text x="855" y="245" text-anchor="middle" font-size="14" font-weight="600" fill="#24292f">Proxmox VE 9 server(s)</text>
+
+  <!-- ===== annotations ===== -->
+  <text x="375" y="266" text-anchor="middle" font-size="11" fill="#57606a">1 inbound DNAT rule (SSH &#8594; bastion)</text>
+  <text x="375" y="282" text-anchor="middle" font-size="11" fill="#57606a">outbound 443, 53, 123/udp, 587</text>
+  <text x="600" y="266" text-anchor="middle" font-size="11" fill="#57606a">node subnet</text>
+  <text x="600" y="282" text-anchor="middle" font-size="11" fill="#57606a">+ DHCP service</text>
+  <text x="855" y="266" text-anchor="middle" font-size="11" fill="#57606a">all VMs &#8212; one L2 segment</text>
+  <text x="855" y="282" text-anchor="middle" font-size="11" fill="#57606a">1 or 5 hosts (&#167;2.1 layouts)</text>
+</svg>
