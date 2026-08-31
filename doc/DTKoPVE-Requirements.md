@@ -5,7 +5,7 @@
 **Status:** draft for review
 **Date:** 2026-08-31
 
-Each item is marked **[R]** Required or **[REC]** Recommended. Section 11 is the sign-off checklist; the environment is "ready for deployment" when every item there is confirmed.
+Each item is marked **[R]** Required or **[REC]** Recommended. Section 11 is the acceptance checklist — the complete list of what is expected to be in place; the environment is "ready for deployment" when every item there is confirmed.
 
 ---
 
@@ -21,7 +21,7 @@ Each item is marked **[R]** Required or **[REC]** Recommended. Section 11 is the
 8. [Participant (DFSP) hosts](#8-participant-dfsp-hosts)
 9. [Access and credentials](#9-access-and-credentials-supplied-by-the-adopter) — security summary (§9.1)
 10. [People and process](#10-people-and-process)
-11. [Acceptance checklist](#11-acceptance-checklist) — sign-off
+11. [Acceptance checklist](#11-acceptance-checklist)
 
 ---
 
@@ -122,11 +122,12 @@ control planes — pointless with a single one).
 | Network switch / L2 segment | all VMs and Proxmox hosts on one L2 segment; **10 GbE** between hosts | [R] |
 | Firewall / router | one inbound DNAT rule (public IP:port → bastion SSH); outbound 443, 53, 123/UDP, 587 per §6.3; hairpin NAT or split DNS if operators sit inside the same network | [R] |
 | DHCP service | on the node subnet, from network equipment or the dnsmasq VM (§3, §6.1) | [R] |
-| Internet uplink | stable; image pulls during deployment total tens of GB | [R] |
+| Internet uplink | stable; **≥50 Mbps** downstream recommended — total downloads during deployment exceed 10 GB | [R] |
+| Out-of-band management | IPMI / iLO / iDRAC or console access to the Proxmox hosts — not mandatory, but useful for host-level recovery (e.g. a host unreachable after a network or storage change) | [REC] |
 
 ### 2.2 Logical design (HLD)
 
-![High-level design: Hub-Ops reach the environment by SSH through the bastion; the util VM manages both clusters; the Hub Cluster (4–6 nodes: gateways ×4 on 443, Mojaloop application, data layer) serves dfsp-101/102/103 over mTLS 443 and uses the Tooling Cluster for images, backups, and telemetry; egress goes to registries, ACME, DNS API, NTP, SMTP, and optionally Telegram; DFSP-Ops operate their DFSP VMs via the bastion and the MCM UI](diagrams/deployed-system.svg)
+![Deployed system view: the Hub cluster with four gateways (intapi, extapi mTLS, gw-ext, gw-int), Mojaloop application (core services, MCM, Finance Portal), data layer (MySQL, Kafka, MongoDB, Redis), IAM (Ory), Vault, and platform services, on Kubernetes/Cilium over Talos Linux on Proxmox VE; the Tooling Cluster with MinIO object storage, observability backend, and Harbor OCI registry proxying upstream registries; participant ITK and operators connect from outside](diagrams/deployed-system.svg)
 
 
 Traffic model:
@@ -147,8 +148,8 @@ Traffic model:
 
 ## 3. VM inventory
 
-**[R]** Two profiles are offered; the adopter selects one at sign-off
-(checklist row 14). The only functional difference is that **Minimum runs a
+**[R]** Two profiles are offered; the adopter selects one (declared in the
+§11 checklist). The only functional difference is that **Minimum runs a
 single hub control plane** (no control-plane HA — acceptable at test tier)
 with smaller cluster RAM; everything in §§4–10 is identical for both.
 Intermediate combinations are not offered.
@@ -158,10 +159,10 @@ Intermediate combinations are not offered.
 | Tooling | node (mixed-plane) | 1 | 8 | 12 / 16 GB | 64 + 64 GB | Talos | toolkit |
 | Hub | control plane | **1 / 3** | 6 | 5 / 8 GB | 32 GB | Talos | toolkit |
 | Hub | worker | 3 | 6 | 11 / 16 GB | 64 + 64 GB | Talos | toolkit |
-| Participants | DFSP host | 3 | 2 | 4 GB | 32 GB | Debian 13 | deploy team |
-| Support | bastion | 1 | 2 | 2 GB | 20 GB | Debian 13 | deploy team |
-| Support | util (driver) | 1 | 4 | 4 GB | 40 GB | Debian 13 | deploy team |
-| Support | DHCP (only if not network-provided) | 0–1 | 1 | 1 GB | 10 GB | Debian 13 | deploy team |
+| Participants | DFSP host | 3 | 2 | 4 GB | 32 GB | Debian 13 | adopter |
+| Support | bastion | 1 | 2 | 2 GB | 20 GB | Debian 13 | adopter |
+| Support | util (driver) | 1 | 4 | 4 GB | 40 GB | Debian 13 | adopter |
+| Support | DHCP (only if not network-provided) | 0–1 | 1 | 1 GB | 10 GB | Debian 13 | adopter |
 
 | Profile | VMs | vCPU | RAM | Disk |
 |---|---|---|---|---|
@@ -177,6 +178,8 @@ Notes:
   adopter provides capacity and network, not the VMs themselves.
 - Debian VMs are cloned from a cloud-init template (~3 GB) built once on the
   cluster; allow for it in storage.
+- All Debian VMs (support and participant) use **SSH key authentication
+  only** — password authentication disabled.
 - CPU type is passed through as `host`; nested virtualization is not required.
 
 ## 4. Storage
@@ -202,6 +205,10 @@ Notes:
 - **[R]** A network bridge (e.g. `vmbr0`) shared by all VMs, on one L2
   segment.
 - **[R]** QEMU guest agent permitted (enabled per-VM by the toolkit).
+- **[R]** The **util VM** (the machine driving the deployment) carries the
+  toolchain: terraform ≥ 1.9, flux, helm, talosctl, kubectl,
+  yq (mikefarah v4 — not the python one), jq, python3, make. (The toolkit's
+  `make check` re-verifies these at deploy time.)
 
 ## 6. Network
 
@@ -230,7 +237,7 @@ All addresses on the same L2 segment / subnet as the nodes.
 
 | Port | To | From | Purpose |
 |---|---|---|---|
-| 22/TCP (or adopter-chosen, e.g. 2222) | bastion **public IP** | deploy-team source ranges | only path into the environment |
+| 22/TCP (or adopter-chosen, e.g. 2222) | bastion **public IP** | operator source ranges | only path into the environment |
 | 443/TCP | 6 LB addresses | operator + participant networks (LAN) | all application traffic; TLS, and mTLS on the FSPIOP endpoint |
 | 6443/TCP | 2 API VIPs | util VM / bastion | Kubernetes API |
 | 50000–50001/TCP | cluster nodes | util VM / bastion | Talos node management |
@@ -238,7 +245,8 @@ All addresses on the same L2 segment / subnet as the nodes.
 | 443/TCP | each DFSP host | hub LB addresses | inbound mTLS callbacks |
 
 - **[R]** One **public IP (or port-forward)** for the bastion, SSH allowed
-  from the deploy team's source ranges. No other inbound exposure is needed.
+  from the operators' source ranges (add the DTK support team's ranges if
+  remote assistance is wanted). No other inbound exposure is needed.
 - **[REC]** Optionally, the adopter may front the six gateway addresses with a
   **physical/hardware load balancer** (or border-firewall NAT) carrying public
   addresses. It must run in **L4/TCP passthrough** mode — no TLS termination
@@ -247,6 +255,11 @@ All addresses on the same L2 segment / subnet as the nodes.
   can declare a WAN address that is 1:1 forwarded to its LAN address, and DNS
   records are then published for the WAN side automatically. LAN-side clients
   need hairpin NAT or split DNS in that arrangement.
+- Selected services (operator UIs, the FSPIOP endpoint) **can be exposed
+  externally later** purely through network configuration — the DNAT/LB
+  arrangement above — if the adopter desires, subject to the adopter's
+  security policy. The baseline deployment exposes only the bastion's SSH
+  port.
 
 ### 6.3 Egress (from cluster nodes, util VM, and DFSP hosts)
 
@@ -258,7 +271,7 @@ All addresses on the same L2 segment / subnet as the nodes.
 - **[R]** **DNS 53** and **NTP 123/UDP** from every node — mandatory;
   certificate validation and token lifetimes depend on time sync. If the
   adopter network blocks outbound 53, a permitted internal resolver must be
-  provided (state which at sign-off).
+  provided (state which in the §11 checklist).
 - **[R]** SMTP submission (587/TCP) to the adopter-provided mail relay (§9) —
   participant onboarding sends activation email.
 - **[REC]** HTTPS (443) to `api.telegram.org` — alert delivery to the
@@ -280,8 +293,11 @@ All addresses on the same L2 segment / subnet as the nodes.
   raise it now: it is a design-level blocker, not a configuration option.
 - Participant mTLS certificates come from a scheme CA inside the hub's Vault —
   no adopter action needed.
-- **[R]** One DNS FQDN per participant host (may live in an adopter zone),
-  resolving to its static IP, published **before** participant enrolment.
+- **[R]** One DNS FQDN per participant (DFSP) host, resolving to its static
+  IP, published **before** participant enrolment. These records live
+  **outside** the two toolkit-managed zones — typically in a **third zone**
+  of the adopter's choosing — and are **managed manually**; the toolkit never
+  creates or modifies them.
 
 ## 8. Participant (DFSP) hosts
 
@@ -304,9 +320,9 @@ Three Debian hosts running the integration toolkit under **Docker Compose v2**.
 | SSH to each Proxmox node | **username + password** (image and snippet upload; key-agent auth is not supported by the tooling — flag to security team) | [R] |
 | DNS provider credentials | Route53 keys, Cloudflare token (`Zone:DNS:Edit`), or DigitalOcean token, scoped to the delegated zones | [R] |
 | SMTP account | relay host + credentials for activation mail (any mailbox the adopter controls) | [R] |
-| Bastion accounts | SSH key-based accounts for the deploy team | [R] |
+| Bastion accounts | SSH key-based accounts for the operators (and DTK support, if remote assistance is wanted) | [R] |
 | ACME EAB credentials | only if a CA other than Let's Encrypt is mandated | [REC] |
-| Telegram alert channel | a Telegram group/channel and bot token for alert delivery — may be created by either party; decide ownership at sign-off | [REC] |
+| Telegram alert channel | a Telegram group/channel and bot token for alert delivery | [REC] |
 
 Everything else — roughly twenty internal service passwords, database
 credentials, OIDC secrets — is **generated by the toolkit** and retrievable by
@@ -330,30 +346,64 @@ Kubernetes and Talos APIs from the util VM only.
 
 ## 10. People and process
 
-- **[R]** A named **technical contact** authorized to action firewall, DNS,
-  and Proxmox changes, with an agreed turnaround (**[REC]** ≤ 2 business days
-  for network/DNS changes during deployment week).
-- **[R]** Confirmation of any adopter security-review or change-approval
-  process that applies, with lead times, before the deployment window is set.
+- **[R]** The adopter team running the deployment must be able to action
+  firewall, DNS, and Proxmox changes itself, or reach whoever can with a short
+  turnaround (**[REC]** ≤ 2 business days during deployment week) — several
+  checklist items depend on network/DNS changes.
+- **[R]** Any internal security-review or change-approval process that applies
+  should be cleared before the deployment window is set, with its lead times
+  known.
 - **[REC]** Maintenance-window rules, if any, for the test environment.
 
 ## 11. Acceptance checklist
 
-Deployment starts when every row is confirmed by the adopter contact.
+The complete list of what is expected to be in place. Deployment starts when
+every applicable row is confirmed.
+
+**Hardware & Proxmox**
 
 | # | Check | How to verify |
 |---|---|---|
-| 1 | Proxmox VE **9.x**, API reachable, token works | `pveversion`; `curl -k https://<pve>:8006` + token auth from util VM |
-| 2 | SSH (user+password) to every PVE node | `ssh <user>@<node>` |
-| 3 | Storage pools: raw-capable pool ≈700–780 GB free (per profile); ISO pool; snippets content type enabled | `pvesm status`, `pvesm list` |
-| 4 | Bridge present, all VMs on one L2 segment | `ip link show vmbr0` |
-| 5 | DHCP serving the node subnet; reserved static block excluded from scope | lease test + scope config |
-| 6 | 11 static IPs allocated (2 VIP, 6 LB, 3 DFSP) and documented | address plan returned with sign-off |
-| 7 | Bastion up with public IP; SSH reachable from deploy-team ranges | `ssh -p <port> <bastion>` from outside |
-| 8 | Two DNS zones delegated to supported provider; no pre-created records | `dig +short NS <zone>` |
-| 9 | DNS provider credentials issued and scoped | API test call |
-| 10 | Egress verified from a host on the node subnet: each §6.3 endpoint, plus DNS 53 and NTP 123 | `curl -sI https://ghcr.io` etc.; `ntpdate -q <ntp>` |
-| 11 | SMTP relay reachable on 587 with supplied credentials | `openssl s_client -starttls smtp` |
-| 12 | Participant FQDNs created, resolving to their static IPs | `dig +short <dfsp-fqdn>` |
-| 13 | Named technical contact + change-turnaround agreed | this document signed |
-| 14 | VM profile (Minimum / Recommended, §3) and hardware layout (A / B / other, §2.1) declared; layout meets the invariants | profile + layout returned with sign-off |
+| 1 | VM profile (Minimum / Recommended, §3) and hardware layout (A / B / other, §2.1) chosen | documented choice |
+| 2 | Physical CPU cores, RAM, and disk on each host meet the chosen layout's per-host minimums (§2.1); aggregate ≈45–57 vCPU / ≈70–107 GB VM RAM (no RAM overcommit) / ≈700–780 GB SSD per profile | `lscpu`, `free -h`, `pvesm status` on each host |
+| 3 | Proxmox VE **9.x** on every host, one PVE cluster if several; API reachable | `pveversion`; `curl -k https://<pve>:8006` |
+| 3 | Proxmox API token issued and working | token auth test from util VM |
+| 5 | SSH (user+password) to every PVE node | `ssh <user>@<node>` |
+| 6 | Storage pools: raw-capable pool ≈700–780 GB free (per profile); ISO pool; **Snippets** content type enabled; SSD meets §4 IOPS guideline | `pvesm status`, `pvesm list` |
+| 7 | Bridge (`vmbr0`) on every host; all hosts and VMs on one L2 segment; 10 GbE between hosts (multi-host layouts) | `ip link show vmbr0`; `iperf3` host-to-host |
+| 8 | *(optional)* Out-of-band management access to the hosts | IPMI/iLO/iDRAC login |
+
+**Network**
+
+| # | Check | How to verify |
+|---|---|---|
+| 9 | DHCP serving the node subnet; reserved static block excluded from scope | lease test + scope config |
+| 10 | Static IPs allocated and documented: 2 API VIPs, 6 LB addresses, 3 DFSP hosts, support VMs | address plan document |
+| 11 | Internet uplink stable, ≥50 Mbps downstream | speed test from node subnet |
+| 12 | Egress verified from a host on the node subnet: every §6.3 endpoint, plus DNS 53 and NTP 123/UDP (or the designated internal resolver stated) | `curl -sI https://ghcr.io` etc.; `ntpdate -q <ntp>` |
+| 13 | Bastion VM up with public IP (or port-forward); SSH reachable from all operator ranges; operator accounts (SSH keys) created | `ssh -p <port> <bastion>` from outside |
+| 14 | SMTP relay reachable on 587 with the prepared credentials | `openssl s_client -starttls smtp` |
+| 15 | *(optional)* Telegram channel + bot token prepared, if alerting is enabled | test message via bot API |
+
+**DNS & TLS**
+
+| # | Check | How to verify |
+|---|---|---|
+| 16 | Two DNS zones delegated to a supported provider (Route53 / Cloudflare / DigitalOcean); **no pre-created records** | `dig +short NS <zone>` |
+| 17 | DNS provider credentials issued and scoped to those zones | API test call |
+| 18 | Participant FQDNs manually created in the adopter-chosen zone (§7), resolving to their static IPs | `dig +short <dfsp-fqdn>` |
+| 19 | *(conditional)* ACME EAB credentials, only if a CA other than Let's Encrypt is mandated | issued by the CA |
+
+**VMs & tooling**
+
+| # | Check | How to verify |
+|---|---|---|
+| 20 | Support VMs provisioned: bastion, util (Debian 13), **SSH key auth only — password auth disabled**; DHCP VM if the network provides no DHCP | key-based `ssh` to each |
+| 21 | Participant VMs provisioned: 3 × Debian 13 with Docker Compose v2, static IPs, SSH key auth only | `docker compose version` on each |
+| 22 | Util VM toolchain complete (§5) | `terraform version`, `talosctl version`, `kubectl version --client`, `flux -v`, `helm version`, `yq --version` (must print mikefarah v4), `jq --version` |
+
+**Process**
+
+| # | Check | How to verify |
+|---|---|---|
+| 23 | Firewall/DNS/Proxmox change turnaround workable during deployment week; any security-review process cleared (§10) | confirmed by the adopter team |
