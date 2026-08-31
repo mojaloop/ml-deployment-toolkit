@@ -1,0 +1,413 @@
+# Mojaloop DTK Test Environment on PVE — Resource Requirements
+
+**Audience:** adopter infrastructure, network, and security teams
+**Purpose:** everything to provision and confirm before deployment can begin
+**Status:** draft for review
+**Date:** 2026-08-31
+
+Each item is marked **[R]** Required or **[REC]** Recommended. Section 11 is the
+sign-off checklist; the environment is "ready for deployment" when every item
+there is confirmed.
+
+---
+
+## Contents
+
+1. [Purpose and scope](#1-purpose-and-scope) — end state (§1.1), limitations (§1.2)
+2. [Design overview](#2-design-overview) — physical topology & hardware layouts (§2.1), logical design (§2.2)
+3. [VM inventory](#3-vm-inventory) — Minimum vs. Recommended profiles
+4. [Storage](#4-storage)
+5. [Proxmox prerequisites](#5-proxmox-prerequisites)
+6. [Network](#6-network) — IP plan (§6.1), inbound (§6.2), egress (§6.3)
+7. [DNS and TLS](#7-dns-and-tls)
+8. [Participant (DFSP) hosts](#8-participant-dfsp-hosts)
+9. [Access and credentials](#9-access-and-credentials-supplied-by-the-adopter) — security summary (§9.1)
+10. [People and process](#10-people-and-process)
+11. [Acceptance checklist](#11-acceptance-checklist) — sign-off
+
+---
+
+## 1. Purpose and scope
+
+This document specifies the resources needed to host a **test environment** of
+the Mojaloop Deployment Toolkit (DTK). The environment is for functional and
+integration testing — participant onboarding over mTLS and end-to-end
+transfers — not for performance benchmarking or disaster-recovery drills.
+
+The deployment consists of:
+
+- **1 Tooling Cluster** — shared services: container registry mirror (Harbor),
+  secrets (Vault), object storage (MinIO), observability (Grafana/Thanos/Loki/Tempo).
+- **1 Mojaloop Hub** — the switch: Mojaloop core services, connection manager
+  (MCM), Finance Portal, identity (Ory), and an in-cluster data layer
+  (MySQL, Kafka, MongoDB, Redis).
+- **3 Participant (DFSP) hosts** — simulated banks running the integration
+  toolkit under Docker Compose, connected to the hub over mTLS.
+- **Support VMs** — SSH bastion, deployment driver ("util"), and DHCP service
+  if the adopter network does not provide one.
+
+**Platform: Proxmox VE 9** is the supported and validated infrastructure. The
+toolkit provisions the cluster VMs itself through the Proxmox API; nodes run
+Talos Linux (immutable, no SSH, no packages) and are not managed as
+conventional servers.
+
+### 1.1 End state
+
+The environment is complete when:
+
+- both clusters are deployed, healthy, and reconciled by GitOps;
+- all three participants are onboarded over mTLS through the connection
+  manager;
+- an end-to-end transfer between two participants completes successfully;
+- operator UIs (MCM, Finance Portal, Grafana, testing toolkit) are reachable
+  through the bastion with valid public TLS certificates;
+- optionally, alerts are delivered to a Telegram channel (§1.2, §9).
+
+At handover the adopter receives operator credentials and access
+documentation; day-2 operation is out of scope for this document.
+
+### 1.2 Limitations
+
+Stated up front so no requirement below comes as a surprise:
+
+- **Test tier only** — sized for functional testing, not performance
+  benchmarking, high availability, or disaster recovery.
+- **Not publicly reachable** — all access is through the SSH bastion; the
+  only inbound exposure is one SSH port on the firewall.
+- **Public ACME CA required** — TLS certificates come from Let's Encrypt (or
+  another public ACME CA). A private/offline CA is **not supported**.
+- **Supported DNS providers only** — Route53, Cloudflare, or DigitalOcean.
+  Zone records are fully managed by the toolkit.
+- **DHCP is mandatory** on the node subnet (Proxmox provides none).
+- **Password SSH to Proxmox nodes** is required by the provisioning tooling
+  (key-agent auth unsupported).
+- **Email (SMTP) is mandatory** — participant onboarding cannot complete
+  without it (§9). **Telegram alerting is optional** but requested for this
+  test.
+- Cloud platforms (EKS, DOKS) exist in the toolkit but are unvalidated and
+  out of scope for this test.
+
+## 2. Design overview
+
+### 2.1 Physical topology
+
+```
+                          ┌──────────┐      ┌────────────────┐      ┌─────────────────────┐
+   Internet  ◄──────────► │ Firewall │ ◄──► │ Network switch │ ◄──► │ Proxmox server(s)   │
+                          └──────────┘      └────────────────┘      │  (all VMs, one L2)  │
+   inbound: SSH → bastion   DNAT/port-fwd      node subnet          └─────────────────────┘
+   outbound: 443, 53, 123,  one rule            + DHCP service
+             587
+```
+
+**Server capacity — invariants.** Any hardware layout must satisfy:
+
+- **[R]** Aggregate capacity for the chosen §3 profile — Minimum: ≈45 vCPU,
+  ≈70 GB VM RAM, ≈700 GB SSD; Recommended: ≈57 vCPU, ≈107 GB VM RAM,
+  ≈780 GB SSD. 2:1 CPU overcommit is acceptable at test tier; **RAM is never
+  overcommitted**.
+- **[R]** All Proxmox hosts and VMs on **one L2 segment**.
+- **[R]** Proxmox VE 9 on every host; multiple hosts joined in one PVE
+  cluster.
+
+**Reference layouts.** Either of the following is acceptable; so is any other
+layout meeting the invariants — include the proposed layout with the §11
+sign-off.
+
+*Layout A — single host.* Simplest to provide and operate. Caveat: a host
+failure takes down the entire environment (acceptable at test tier).
+
+| Host | Min spec |
+|---|---|
+| 1 × all VMs | 32+ physical cores, **128–192 GB RAM** (96 GB suffices with the Minimum profile), ≈1 TB SSD |
+
+*Layout B — five hosts* **[REC]**. Management, hub, and tooling/participant
+workloads separated:
+
+| Host | Runs | Min spec per host |
+|---|---|---|
+| 1 × management | bastion, util, DHCP VM, VM template | 4+ cores, 16 GB RAM, 100 GB |
+| 3 × hub | 1 hub control plane + 1 hub worker each | 8+ cores, 32 GB RAM, 200 GB SSD |
+| 1 × tooling + participants | tooling node, 3 DFSP VMs | 8+ cores, 32 GB RAM, 250 GB SSD |
+
+Layout B is recommended for a concrete reason, not preference: the toolkit
+maps its placement groups to specific Proxmox hosts, so with three hub hosts
+the three control planes and three workers get **real anti-affinity** — losing
+one host leaves the control-plane quorum and two workers intact. On a single
+host, placement groups provide no isolation. Layout B makes the inter-host
+network load-bearing — the 10 GbE requirement (see components table below)
+matters most here.
+
+**Profile pairing:** Layout A fits either §3 profile; Layout B assumes the
+**Recommended** profile (its three-host hub exists to protect the three
+control planes — pointless with a single one).
+
+**Other physical components the adopter provides:**
+
+| Component | Requirement | Req |
+|---|---|---|
+| Network switch / L2 segment | all VMs and Proxmox hosts on one L2 segment; **10 GbE** between hosts | [R] |
+| Firewall / router | one inbound DNAT rule (public IP:port → bastion SSH); outbound 443, 53, 123/UDP, 587 per §6.3; hairpin NAT or split DNS if operators sit inside the same network | [R] |
+| DHCP service | on the node subnet, from network equipment or the dnsmasq VM (§3, §6.1) | [R] |
+| Internet uplink | stable; image pulls during deployment total tens of GB | [R] |
+
+### 2.2 Logical design (HLD)
+
+```mermaid
+flowchart LR
+    subgraph internet [Internet]
+        op[Operators]
+        acme[ACME CA / DNS provider / registries]
+    end
+    subgraph adopter [Adopter network — one L2 segment]
+        bastion[Bastion<br/>SSH only inbound]
+        util[Util VM<br/>runs Terraform]
+        subgraph cc [Tooling Cluster — 1 node]
+            harbor[Harbor / Vault / MinIO / Observability]
+        end
+        subgraph hub [Hub — 4–6 nodes per §3 profile]
+            gw[Gateways: gw-int, gw-ext,<br/>gw-intapi :443 TLS<br/>gw-extapi :443 mTLS]
+            core[Mojaloop core + data layer]
+        end
+        d1[DFSP-1] & d2[DFSP-2] & d3[DFSP-3]
+    end
+    op -->|SSH :2222| bastion
+    bastion --> util
+    util -->|PVE API :8006, SSH :22<br/>k8s :6443, talos :50000/1| hub
+    hub <-->|mTLS :443| d1 & d2 & d3
+    hub -.->|images, backups,<br/>metrics, logs| cc
+    hub -->|egress :443| acme
+```
+
+Traffic model:
+
+- **North–south:** all application traffic enters on **443/TCP** at four hub
+  gateway addresses. Participant FSPIOP traffic terminates with **mTLS** at a
+  dedicated endpoint (`extapi.<domain>`); operator and portal UIs use standard
+  TLS on `*.int.<domain>` / `*.ext.<domain>` hostnames.
+- **East–west:** intra-cluster traffic is transparently encrypted (Cilium
+  WireGuard). This is internal to the cluster — no VPN or mesh component for
+  the adopter to operate.
+- **Egress:** clusters pull images and artifacts from public registries over
+  443 (optionally via the Harbor pull-through mirror on the Tooling Cluster),
+  and reach the DNS-provider API and ACME CA for certificate automation.
+- **Operator access:** the environment is **not publicly reachable**. The
+  bastion is the only inbound path; all operations (SSH, kubectl, talosctl,
+  web UIs) tunnel through it.
+
+## 3. VM inventory
+
+**[R]** Two profiles are offered; the adopter selects one at sign-off
+(checklist row 14). The only functional difference is that **Minimum runs a
+single hub control plane** (no control-plane HA — acceptable at test tier)
+with smaller cluster RAM; everything in §§4–10 is identical for both.
+Intermediate combinations are not offered.
+
+| Group | VM | Qty (min / rec) | vCPU | RAM (min / rec) | Disk(s) | OS | Provisioned by |
+|---|---|---|---|---|---|---|---|
+| Tooling | node (mixed-plane) | 1 | 8 | 12 / 16 GB | 64 + 64 GB | Talos | toolkit |
+| Hub | control plane | **1 / 3** | 6 | 5 / 8 GB | 32 GB | Talos | toolkit |
+| Hub | worker | 3 | 6 | 11 / 16 GB | 64 + 64 GB | Talos | toolkit |
+| Participants | DFSP host | 3 | 2 | 4 GB | 32 GB | Debian 13 | deploy team |
+| Support | bastion | 1 | 2 | 2 GB | 20 GB | Debian 13 | deploy team |
+| Support | util (driver) | 1 | 4 | 4 GB | 40 GB | Debian 13 | deploy team |
+| Support | DHCP (only if not network-provided) | 0–1 | 1 | 1 GB | 10 GB | Debian 13 | deploy team |
+
+| Profile | VMs | vCPU | RAM | Disk |
+|---|---|---|---|---|
+| **Minimum** | ~11 | ≈45 | ≈70 GB | ≈700 GB |
+| **Recommended** | ~13 | ≈57 | ≈107 GB | ≈780 GB |
+
+The Minimum cluster sizes are the toolkit's shipped, lab-validated template
+values; Recommended adds control-plane quorum and RAM headroom on top of them.
+
+Notes:
+
+- The **cluster VMs are created by the toolkit** via the Proxmox API — the
+  adopter provides capacity and network, not the VMs themselves.
+- Debian VMs are cloned from a cloud-init template (~3 GB) built once on the
+  cluster; allow for it in storage.
+- CPU type is passed through as `host`; nested virtualization is not required.
+
+## 4. Storage
+
+- **[R]** A Proxmox disk pool supporting **raw** images (`local-lvm`, ZFS, or
+  Ceph RBD) with ≈700–780 GB available (per §3 profile).
+- **[R]** The **second disk** on the tooling node and each hub worker
+  (64 GB each) is consumed whole as the Kubernetes data volume (OpenEBS
+  LocalPV): provided **unformatted**, formatted and mounted automatically by
+  the node OS.
+- **[R]** SSD-backed storage for the data disks. Guideline: ≥3,000 sustained
+  IOPS and p99 write latency < 5 ms for data volumes; ≥500 IOPS
+  general-purpose.
+- **[REC]** Thin provisioning is acceptable; test-tier database/broker volumes
+  are small (≤10 GiB each).
+
+## 5. Proxmox prerequisites
+
+- **[R]** **Proxmox VE 9.x** (one node is sufficient for this footprint),
+  API reachable on **8006/TCP** from the util VM.
+- **[R]** A storage pool with **`ISO image`** content type (Talos image
+  upload).
+- **[R]** A storage pool with the **`Snippets`** content type **enabled**
+  (`pvesm set local --content iso,vztmpl,backup,snippets` — note the content
+  list is absolute, not additive). This is off by default and deployment fails
+  without it.
+- **[R]** A network bridge (e.g. `vmbr0`) shared by all VMs, on one L2
+  segment.
+- **[R]** QEMU guest agent permitted (enabled per-VM by the toolkit).
+
+## 6. Network
+
+### 6.1 IP plan
+
+All addresses on the same L2 segment / subnet as the nodes.
+
+| Purpose | Count | Allocation |
+|---|---|---|
+| Kubernetes API VIP (tooling + hub) | 2 | **static, outside DHCP scope** |
+| Load-balancer addresses (2 tooling + 4 hub gateways) | 6 | **static, outside DHCP scope** |
+| Participant (DFSP) host IPs | 3 | **static, never DHCP** (see §8) |
+| Bastion, util, DHCP VM | 2–3 | static or reserved lease |
+| Cluster node IPs | 5 (Minimum) / 7 (Recommended) | **DHCP lease** |
+
+- **[R]** **DHCP service on the node subnet.** Proxmox provides none; the
+  adopter network must supply it, or approve a small dnsmasq VM (§3). Cluster
+  nodes obtain their addresses by DHCP.
+- **[R]** A contiguous reserved block outside the DHCP scope covering the 11
+  static addresses above simplifies the firewall rules and the address plan.
+- Cluster-internal ranges `100.64.0.0/16` (pods) and `172.20.0.0/16`
+  (services) are never routed outside the clusters; flag any conflict with
+  adopter ranges.
+
+### 6.2 Inbound
+
+| Port | To | From | Purpose |
+|---|---|---|---|
+| 22/TCP (or adopter-chosen, e.g. 2222) | bastion **public IP** | deploy-team source ranges | only path into the environment |
+| 443/TCP | 6 LB addresses | operator + participant networks (LAN) | all application traffic; TLS, and mTLS on the FSPIOP endpoint |
+| 6443/TCP | 2 API VIPs | util VM / bastion | Kubernetes API |
+| 50000–50001/TCP | cluster nodes | util VM / bastion | Talos node management |
+| 8006/TCP, 22/TCP | Proxmox nodes | util VM | provisioning |
+| 443/TCP | each DFSP host | hub LB addresses | inbound mTLS callbacks |
+
+- **[R]** One **public IP (or port-forward)** for the bastion, SSH allowed
+  from the deploy team's source ranges. No other inbound exposure is needed.
+- **[REC]** Optionally, the adopter may front the six gateway addresses with a
+  **physical/hardware load balancer** (or border-firewall NAT) carrying public
+  addresses. It must run in **L4/TCP passthrough** mode — no TLS termination
+  or re-encryption — because the participant FSPIOP endpoint authenticates
+  clients by mTLS end-to-end. The toolkit supports this natively: each gateway
+  can declare a WAN address that is 1:1 forwarded to its LAN address, and DNS
+  records are then published for the WAN side automatically. LAN-side clients
+  need hairpin NAT or split DNS in that arrangement.
+
+### 6.3 Egress (from cluster nodes, util VM, and DFSP hosts)
+
+- **[R]** HTTPS (443) to: `factory.talos.dev`, `github.com`,
+  `raw.githubusercontent.com`, `ghcr.io`, `docker.io`, `quay.io`,
+  `registry.k8s.io`, `registry.terraform.io`, the DNS-provider API
+  (Route53 / Cloudflare / DigitalOcean), and the ACME directory
+  (Let's Encrypt by default).
+- **[R]** **DNS 53** and **NTP 123/UDP** from every node — mandatory;
+  certificate validation and token lifetimes depend on time sync. If the
+  adopter network blocks outbound 53, a permitted internal resolver must be
+  provided (state which at sign-off).
+- **[R]** SMTP submission (587/TCP) to the adopter-provided mail relay (§9) —
+  participant onboarding sends activation email.
+- **[REC]** HTTPS (443) to `api.telegram.org` — alert delivery to the
+  Telegram channel (§1.2); required once alerting is enabled.
+
+## 7. DNS and TLS
+
+- **[R]** **Two delegated DNS zones** (one per cluster, e.g.
+  `sw1.test.<adopter-domain>` and `cc1.test.<adopter-domain>`), delegated to a
+  supported DNS provider: **Route53, Cloudflare, or DigitalOcean** (hard
+  constraint — records are managed by the toolkit via provider API). Verify
+  delegation with `dig +short NS <zone>` before deployment.
+- **[R]** **Do not pre-create records** in these zones — the toolkit owns all
+  records; hand-created ones cause ownership conflicts.
+- **[R]** Public TLS certificates are issued automatically via **ACME with
+  DNS-01 challenges** — Let's Encrypt by default; any other **public** CA
+  needs ACME + External Account Binding credentials. **A private/offline CA is
+  not supported** for these certificates — if adopter policy mandates one,
+  raise it now: it is a design-level blocker, not a configuration option.
+- Participant mTLS certificates come from a scheme CA inside the hub's Vault —
+  no adopter action needed.
+- **[R]** One DNS FQDN per participant host (may live in an adopter zone),
+  resolving to its static IP, published **before** participant enrolment.
+
+## 8. Participant (DFSP) hosts
+
+Three Debian hosts running the integration toolkit under **Docker Compose v2**.
+
+- **[R]** **Static IP addresses — never DHCP.** Participant addresses are
+  published as DNS A records and dialled directly by the hub for mTLS; a lease
+  change silently breaks inbound traffic.
+- **[R]** Inbound **443/TCP from the hub** (mTLS endpoint); outbound 443 to
+  the hub.
+- Operator-only service ports, reachable from the util VM/bastion and **not**
+  exposed further: 4001 (SDK outbound API), 3001 (agent health), 3003/3004
+  (simulator backend / test API), 8200 (Vault), 6379 (Redis).
+
+## 9. Access and credentials supplied by the adopter
+
+| Item | Detail | Req |
+|---|---|---|
+| Proxmox API token | e.g. `pveum user token add … --privsep 0` with Administrator role, or scoped to VM/Datastore/SDN privileges | [R] |
+| SSH to each Proxmox node | **username + password** (image and snippet upload; key-agent auth is not supported by the tooling — flag to security team) | [R] |
+| DNS provider credentials | Route53 keys, Cloudflare token (`Zone:DNS:Edit`), or DigitalOcean token, scoped to the delegated zones | [R] |
+| SMTP account | relay host + credentials for activation mail (any mailbox the adopter controls) | [R] |
+| Bastion accounts | SSH key-based accounts for the deploy team | [R] |
+| ACME EAB credentials | only if a CA other than Let's Encrypt is mandated | [REC] |
+| Telegram alert channel | a Telegram group/channel and bot token for alert delivery — may be created by either party; decide ownership at sign-off | [REC] |
+
+Everything else — roughly twenty internal service passwords, database
+credentials, OIDC secrets — is **generated by the toolkit** and retrievable by
+the hub operator; the adopter does not create or manage them.
+
+Note: no SSH exists on the cluster nodes (Talos); node access is via the
+Kubernetes and Talos APIs from the util VM only.
+
+### 9.1 Security summary
+
+| Surface | Protection |
+|---|---|
+| Inbound from internet | one SSH port to the bastion (key-only), nothing else |
+| Application traffic | TLS on all gateways; mTLS on the participant FSPIOP endpoint |
+| Machine APIs | OAuth2-protected (`gw-intapi`) |
+| Intra-cluster traffic | transparently encrypted (WireGuard) |
+| Node OS | immutable Talos: no SSH, no shell, no package manager; API-managed with client certificates |
+| Secrets | internal credentials generated at deploy time, stored in cluster secrets / Vault; adopter supplies only the external credentials in §9 |
+| Certificates | public certs auto-issued/renewed via ACME; participant mTLS certs issued by the in-cluster scheme CA |
+| Known exceptions | password SSH to Proxmox nodes; Proxmox API TLS verification disabled by the tooling (both §1.2 / flagged for security review) |
+
+## 10. People and process
+
+- **[R]** A named **technical contact** authorized to action firewall, DNS,
+  and Proxmox changes, with an agreed turnaround (**[REC]** ≤ 2 business days
+  for network/DNS changes during deployment week).
+- **[R]** Confirmation of any adopter security-review or change-approval
+  process that applies, with lead times, before the deployment window is set.
+- **[REC]** Maintenance-window rules, if any, for the test environment.
+
+## 11. Acceptance checklist
+
+Deployment starts when every row is confirmed by the adopter contact.
+
+| # | Check | How to verify |
+|---|---|---|
+| 1 | Proxmox VE **9.x**, API reachable, token works | `pveversion`; `curl -k https://<pve>:8006` + token auth from util VM |
+| 2 | SSH (user+password) to every PVE node | `ssh <user>@<node>` |
+| 3 | Storage pools: raw-capable pool ≈700–780 GB free (per profile); ISO pool; snippets content type enabled | `pvesm status`, `pvesm list` |
+| 4 | Bridge present, all VMs on one L2 segment | `ip link show vmbr0` |
+| 5 | DHCP serving the node subnet; reserved static block excluded from scope | lease test + scope config |
+| 6 | 11 static IPs allocated (2 VIP, 6 LB, 3 DFSP) and documented | address plan returned with sign-off |
+| 7 | Bastion up with public IP; SSH reachable from deploy-team ranges | `ssh -p <port> <bastion>` from outside |
+| 8 | Two DNS zones delegated to supported provider; no pre-created records | `dig +short NS <zone>` |
+| 9 | DNS provider credentials issued and scoped | API test call |
+| 10 | Egress verified from a host on the node subnet: each §6.3 endpoint, plus DNS 53 and NTP 123 | `curl -sI https://ghcr.io` etc.; `ntpdate -q <ntp>` |
+| 11 | SMTP relay reachable on 587 with supplied credentials | `openssl s_client -starttls smtp` |
+| 12 | Participant FQDNs created, resolving to their static IPs | `dig +short <dfsp-fqdn>` |
+| 13 | Named technical contact + change-turnaround agreed | this document signed |
+| 14 | VM profile (Minimum / Recommended, §3) and hardware layout (A / B / other, §2.1) declared; layout meets the invariants | profile + layout returned with sign-off |
