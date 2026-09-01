@@ -1,0 +1,23 @@
+# Chart sources for the IAM platform: the charts live in git trees so Flux
+# builds them with their file:// dependencies.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: mojaloop-helm
+  namespace: flux-system
+spec:
+  interval: 30m
+  url: https://github.com/mojaloop/helm.git
+  ref:
+    branch: feat/iam-document-authz
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: mojaloop-charts-git
+  namespace: flux-system
+spec:
+  interval: 30m
+  url: https://github.com/mojaloop/charts.git
+  ref:
+    branch: feat/iam-document-authz

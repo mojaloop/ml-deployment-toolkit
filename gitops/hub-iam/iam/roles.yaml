@@ -1,0 +1,298 @@
+# The deployment's role document, fed to the iam HelmRelease as a values
+# fragment. The provisioning service validates every permission id here
+# against the catalog the rollout composed, so a typo or a permission no
+# service offers stops the install.
+#
+# hub-admin runs the hub, every portal surface and the operations UIs, but
+# never mints a DFSP's client credentials: those belong to whoever operates
+# that DFSP.
+# dfsp-operator and dfsp-client take a dfspId, which binds their grants to one
+# participant; a DFSP's creation instantiates them for that participant.
+# intapi-client is what an operator-tool machine client holds: create its
+# Hydra client, then assign this role to the client id.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: iam-roles-values
+  namespace: flux-system
+data:
+  values.yaml: |
+    global:
+      iamRoles:
+        roles:
+          hub-admin:
+            grants:
+              - { permission: mcm.getHubEndpoints }
+              - { permission: mcm.getHubIngressIps }
+              - { permission: mcm.createHubIngressIp }
+              - { permission: mcm.getHubIngressIpEndpoint }
+              - { permission: mcm.updateHubIngressIpEndpoint }
+              - { permission: mcm.deleteHubIngressIpEndpoint }
+              - { permission: mcm.getHubIngressUrls }
+              - { permission: mcm.createHubIngressUrl }
+              - { permission: mcm.getHubIngressUrlEndpoint }
+              - { permission: mcm.updateHubIngressUrlEndpoint }
+              - { permission: mcm.deleteHubIngressUrlEndpoint }
+              - { permission: mcm.getHubEgressIps }
+              - { permission: mcm.createHubEgressIp }
+              - { permission: mcm.getHubEgressIpEndpoint }
+              - { permission: mcm.updateHubEgressIpEndpoint }
+              - { permission: mcm.deleteHubEgressIpEndpoint }
+              - { permission: mcm.getHubEndpoint }
+              - { permission: mcm.updateHubEndpoint }
+              - { permission: mcm.deleteHubEndpoint }
+              - { permission: mcm.getHubServerCerts }
+              - { permission: mcm.createHubServerCerts }
+              - { permission: mcm.deleteHubServerCerts }
+              - { permission: mcm.getHubCA }
+              - { permission: mcm.createExternalHubCA }
+              - { permission: mcm.createInternalHubCA }
+              - { permission: mcm.deleteHubCA }
+              - { permission: mcm.getHubJWSCerts }
+              - { permission: mcm.setHubJWSCerts }
+              - { permission: mcm.rotateHubJWSCerts }
+              - { permission: mcm.getAllDfspJWSCerts }
+              - { permission: mcm.createDfspExternalJWSCerts }
+              - { permission: mcm.getDFSPs }
+              - { permission: mcm.createDFSP }
+              - { permission: mcm.handleGetDfspsStatesStatus }
+              - { permission: mcm.getUnprocessedEndpointItems }
+              - { permission: mcm.getAllDfspServerCerts }
+              - { permission: mcm.updateDFSP, bind: { dfsps: all } }
+              - { permission: mcm.getDFSPca, bind: { dfsps: all } }
+              - { permission: mcm.setDFSPca, bind: { dfsps: all } }
+              - { permission: mcm.getDFSPInboundEnrollments, bind: { dfsps: all } }
+              - { permission: mcm.createDFSPInboundEnrollment, bind: { dfsps: all } }
+              - { permission: mcm.getDFSPInboundEnrollment, bind: { dfsps: all } }
+              - { permission: mcm.signDFSPInboundEnrollment, bind: { dfsps: all } }
+              - { permission: mcm.getDFSPOutboundEnrollments, bind: { dfsps: all } }
+              - { permission: mcm.createCSRAndDFSPOutboundEnrollment, bind: { dfsps: all } }
+              - { permission: mcm.onboardDFSP, bind: { dfsps: all } }
+              - { permission: mcm.getDFSPOutboundEnrollment, bind: { dfsps: all } }
+              - { permission: mcm.addDFSPOutboundEnrollmentCertificate, bind: { dfsps: all } }
+              - { permission: mcm.validateDFSPOutboundEnrollmentCertificate, bind: { dfsps: all } }
+              - { permission: mcm.getDFSPEndpoints, bind: { dfsps: all } }
+              - { permission: mcm.getUnprocessedDfspItems, bind: { dfsps: all } }
+              - { permission: mcm.getDFSPIngress, bind: { dfsps: all } }
+              - { permission: mcm.createDFSPIngress, bind: { dfsps: all } }
+              - { permission: mcm.getDFSPIngressIps, bind: { dfsps: all } }
+              - { permission: mcm.createDFSPIngressIp, bind: { dfsps: all } }
+              - { permission: mcm.getDFSPIngressIpEndpoint, bind: { dfsps: all } }
+              - { permission: mcm.updateDFSPIngressIpEndpoint, bind: { dfsps: all } }
+              - { permission: mcm.deleteDFSPIngressIpEndpoint, bind: { dfsps: all } }
+              - { permission: mcm.getDFSPIngressUrls, bind: { dfsps: all } }
+              - { permission: mcm.createDFSPIngressUrl, bind: { dfsps: all } }
+              - { permission: mcm.getDFSPIngressUrlEndpoint, bind: { dfsps: all } }
+              - { permission: mcm.updateDFSPIngressUrlEndpoint, bind: { dfsps: all } }
+              - { permission: mcm.deleteDFSPIngressUrlEndpoint, bind: { dfsps: all } }
+              - { permission: mcm.getDFSPEgress, bind: { dfsps: all } }
+              - { permission: mcm.createDFSPEgress, bind: { dfsps: all } }
+              - { permission: mcm.getDFSPEgressIps, bind: { dfsps: all } }
+              - { permission: mcm.createDFSPEgressIp, bind: { dfsps: all } }
+              - { permission: mcm.getDFSPEgressIpEndpoint, bind: { dfsps: all } }
+              - { permission: mcm.updateDFSPEgressIpEndpoint, bind: { dfsps: all } }
+              - { permission: mcm.deleteDFSPEgressIpEndpoint, bind: { dfsps: all } }
+              - { permission: mcm.getDFSPEndpoint, bind: { dfsps: all } }
+              - { permission: mcm.updateDFSPEndpoint, bind: { dfsps: all } }
+              - { permission: mcm.deleteDFSPEndpoint, bind: { dfsps: all } }
+              - { permission: mcm.confirmEndpointItem, bind: { dfsps: all } }
+              - { permission: mcm.getDfspServerCerts, bind: { dfsps: all } }
+              - { permission: mcm.updateDfspServerCerts, bind: { dfsps: all } }
+              - { permission: mcm.createDfspServerCerts, bind: { dfsps: all } }
+              - { permission: mcm.deleteDfspServerCerts, bind: { dfsps: all } }
+              - { permission: mcm.getDfspJWSCerts, bind: { dfsps: all } }
+              - { permission: mcm.createDfspJWSCerts, bind: { dfsps: all } }
+              - { permission: mcm.deleteDfspJWSCerts, bind: { dfsps: all } }
+              - { permission: mcm.getDfspStatus, bind: { dfsps: all } }
+              - { permission: mcm.uploadDfspStatesStatus, bind: { dfsps: all } }
+              - { permission: mcm.getMonetaryZones }
+              - { permission: mcm.getDfspsByMonetaryZones }
+              - { permission: iam.UsersGet }
+              - { permission: iam.UsersIDGet }
+              - { permission: iam.ResourcesGet }
+              - { permission: iam.RolesGet }
+              - { permission: iam.UsersIDAssignmentsGet }
+              - { permission: iam.UsersIDAssignmentsPatch }
+              - { permission: reports.getReport, bind: { reports: all, participants: all } }
+              - { permission: trxreporting.query, bind: { participants: all } }
+              - { permission: ledger.getParticipants }
+              - { permission: ledger.getParticipantsLimits }
+              - { permission: ledger.getParticipant, bind: { participants: all } }
+              - { permission: ledger.getParticipantAccounts, bind: { participants: all } }
+              - { permission: ledger.getParticipantEndpoints, bind: { participants: all } }
+              - { permission: ledger.getParticipantLimits, bind: { participants: all } }
+              - { permission: ledger.updateParticipantNetDebitCap, bind: { participants: all } }
+              - { permission: ledger.getParticipantPositions, bind: { participants: all } }
+              - { permission: ledger.toggleParticipantAccount, bind: { participants: all } }
+              - { permission: ledger.recordParticipantFunds, bind: { participants: all } }
+              - { permission: ledger.recordParticipantTransfer, bind: { participants: all } }
+              - { permission: ledger.getSettlementModels }
+              - { permission: ledger.getSettlementModel }
+              - { permission: settlement.getSettlementWindowById }
+              - { permission: settlement.closeSettlementWindow }
+              - { permission: settlement.getSettlementWindowsByParams }
+              - { permission: settlement.getSettlementsByParams }
+              - { permission: settlement.createSettlement }
+              - { permission: settlement.getSettlementById }
+              - { permission: settlement.updateSettlementById }
+              - { permission: settlement.getSettlementBySettlementParticipant, bind: { participants: all } }
+              - { permission: settlement.updateSettlementBySettlementParticipant, bind: { participants: all } }
+              - { permission: settlement.getSettlementBySettlementParticipantAccount, bind: { participants: all } }
+              - { permission: settlement.updateSettlementBySettlementParticipantAccount, bind: { participants: all } }
+              - { permission: portalShell.viewShell }
+              - { permission: portalRoles.viewRoles }
+              - { permission: portalTransfers.viewTransfers }
+              - { permission: portalSettlements.viewSettlements }
+              - { permission: portalPositions.viewPositions }
+              - { permission: mcmUi.viewMcmUi }
+              - { permission: ttkUi.view }
+              - { permission: ttkBackend.view }
+              - { permission: ttkBackend.create }
+              - { permission: ttkBackend.update }
+              - { permission: ttkBackend.remove }
+              - { permission: fluxUi.view }
+              - { permission: fluxUi.create }
+              - { permission: fluxUi.update }
+              - { permission: fluxUi.remove }
+              - { permission: goldilocksUi.view }
+              - { permission: hubbleUi.view }
+              - { permission: hubbleUi.create }
+          intapi-client:
+            grants:
+              - { permission: intapi.view }
+              - { permission: intapi.create }
+              - { permission: intapi.update }
+              - { permission: intapi.remove }
+              - { permission: intapi.amend }
+          dfsp-operator:
+            params: [dfspId]
+            onProvision: admin
+            grants:
+              - { permission: mcm.getDFSPs }
+              - { permission: mcm.handleGetDfspsStatesStatus }
+              - { permission: mcm.getMonetaryZones }
+              - { permission: mcm.getDfspsByMonetaryZones }
+              - { permission: mcm.getAllDfspJWSCerts }
+              - { permission: mcm.getHubEndpoints }
+              - { permission: mcm.getHubIngressIps }
+              - { permission: mcm.getHubIngressIpEndpoint }
+              - { permission: mcm.getHubIngressUrls }
+              - { permission: mcm.getHubIngressUrlEndpoint }
+              - { permission: mcm.getHubEgressIps }
+              - { permission: mcm.getHubEgressIpEndpoint }
+              - { permission: mcm.getHubEndpoint }
+              - { permission: mcm.getHubServerCerts }
+              - { permission: mcm.getHubCA }
+              - { permission: mcm.getHubJWSCerts }
+              - { permission: mcm.getDFSPca, bind: { dfsps: $dfspId } }
+              - { permission: mcm.setDFSPca, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPInboundEnrollments, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createDFSPInboundEnrollment, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPInboundEnrollment, bind: { dfsps: $dfspId } }
+              - { permission: mcm.signDFSPInboundEnrollment, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPOutboundEnrollments, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createCSRAndDFSPOutboundEnrollment, bind: { dfsps: $dfspId } }
+              - { permission: mcm.onboardDFSP, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPOutboundEnrollment, bind: { dfsps: $dfspId } }
+              - { permission: mcm.addDFSPOutboundEnrollmentCertificate, bind: { dfsps: $dfspId } }
+              - { permission: mcm.validateDFSPOutboundEnrollmentCertificate, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPEndpoints, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getUnprocessedDfspItems, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPIngress, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createDFSPIngress, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPIngressIps, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createDFSPIngressIp, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPIngressIpEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.updateDFSPIngressIpEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.deleteDFSPIngressIpEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPIngressUrls, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createDFSPIngressUrl, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPIngressUrlEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.updateDFSPIngressUrlEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.deleteDFSPIngressUrlEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPEgress, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createDFSPEgress, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPEgressIps, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createDFSPEgressIp, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPEgressIpEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.updateDFSPEgressIpEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.deleteDFSPEgressIpEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.updateDFSPEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.deleteDFSPEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.confirmEndpointItem, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDfspServerCerts, bind: { dfsps: $dfspId } }
+              - { permission: mcm.updateDfspServerCerts, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createDfspServerCerts, bind: { dfsps: $dfspId } }
+              - { permission: mcm.deleteDfspServerCerts, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDfspJWSCerts, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createDfspJWSCerts, bind: { dfsps: $dfspId } }
+              - { permission: mcm.deleteDfspJWSCerts, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDfspStatus, bind: { dfsps: $dfspId } }
+              - { permission: mcm.uploadDfspStatesStatus, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getCredentials, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createCredentials, bind: { dfsps: $dfspId } }
+              - { permission: mcmUi.viewMcmUi }
+          dfsp-client:
+            params: [dfspId]
+            onProvision: machine
+            grants:
+              - { permission: mcm.getAllDfspJWSCerts }
+              - { permission: mcm.createDfspExternalJWSCerts }
+              - { permission: mcm.getHubEndpoints }
+              - { permission: mcm.getHubIngressIps }
+              - { permission: mcm.getHubIngressIpEndpoint }
+              - { permission: mcm.getHubIngressUrls }
+              - { permission: mcm.getHubIngressUrlEndpoint }
+              - { permission: mcm.getHubEgressIps }
+              - { permission: mcm.getHubEgressIpEndpoint }
+              - { permission: mcm.getHubEndpoint }
+              - { permission: mcm.getHubServerCerts }
+              - { permission: mcm.getHubCA }
+              - { permission: mcm.getHubJWSCerts }
+              - { permission: mcm.getDFSPca, bind: { dfsps: $dfspId } }
+              - { permission: mcm.setDFSPca, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPInboundEnrollments, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createDFSPInboundEnrollment, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPInboundEnrollment, bind: { dfsps: $dfspId } }
+              - { permission: mcm.signDFSPInboundEnrollment, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPOutboundEnrollments, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createCSRAndDFSPOutboundEnrollment, bind: { dfsps: $dfspId } }
+              - { permission: mcm.onboardDFSP, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPOutboundEnrollment, bind: { dfsps: $dfspId } }
+              - { permission: mcm.addDFSPOutboundEnrollmentCertificate, bind: { dfsps: $dfspId } }
+              - { permission: mcm.validateDFSPOutboundEnrollmentCertificate, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPEndpoints, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getUnprocessedDfspItems, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPIngress, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createDFSPIngress, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPIngressIps, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createDFSPIngressIp, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPIngressIpEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.updateDFSPIngressIpEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.deleteDFSPIngressIpEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPIngressUrls, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createDFSPIngressUrl, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPIngressUrlEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.updateDFSPIngressUrlEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.deleteDFSPIngressUrlEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPEgress, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createDFSPEgress, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPEgressIps, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createDFSPEgressIp, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPEgressIpEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.updateDFSPEgressIpEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.deleteDFSPEgressIpEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDFSPEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.updateDFSPEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.deleteDFSPEndpoint, bind: { dfsps: $dfspId } }
+              - { permission: mcm.confirmEndpointItem, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDfspServerCerts, bind: { dfsps: $dfspId } }
+              - { permission: mcm.updateDfspServerCerts, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createDfspServerCerts, bind: { dfsps: $dfspId } }
+              - { permission: mcm.deleteDfspServerCerts, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDfspJWSCerts, bind: { dfsps: $dfspId } }
+              - { permission: mcm.createDfspJWSCerts, bind: { dfsps: $dfspId } }
+              - { permission: mcm.deleteDfspJWSCerts, bind: { dfsps: $dfspId } }
+              - { permission: mcm.getDfspStatus, bind: { dfsps: $dfspId } }
+              - { permission: mcm.uploadDfspStatesStatus, bind: { dfsps: $dfspId } }

@@ -1,0 +1,72 @@
+# The Flux UI's document, declared by the deployment: a third-party image
+# that carries none. The IAM composes it like any registered service's.
+apiVersion: mojaloop.io/v1
+kind: AuthzDocument
+metadata:
+  name: flux-ui
+  namespace: ory
+spec:
+  url:
+    host: flux.int.${DOMAIN}
+  document: |
+    openapi: 3.1.0
+    info:
+      title: Flux UI
+      version: '1.0'
+      description: >-
+        The GitOps dashboard. One permission per verb over the whole mount:
+        reading the cluster state, and the sync, suspend and resume actions
+        the dashboard offers.
+    servers:
+      - url: /
+    x-authz:
+      service: fluxUi
+    paths:
+      /:
+        get:
+          operationId: view
+          summary: Reads the GitOps state
+          x-authz:
+            scopedBy: []
+          security:
+            - session: []
+          responses:
+            '200':
+              description: What was asked for
+        post:
+          operationId: create
+          summary: Triggers syncs and actions
+          x-authz:
+            scopedBy: []
+          security:
+            - session: []
+          responses:
+            '200':
+              description: What was triggered
+        put:
+          operationId: update
+          summary: Updates suspensions and settings
+          x-authz:
+            scopedBy: []
+          security:
+            - session: []
+          responses:
+            '200':
+              description: What was updated
+        delete:
+          operationId: remove
+          summary: Removes what the dashboard offers to remove
+          x-authz:
+            scopedBy: []
+          security:
+            - session: []
+          responses:
+            '200':
+              description: What was removed
+    components:
+      securitySchemes:
+        session:
+          type: apiKey
+          in: cookie
+          name: ory_kratos_session
+          description: A human's browser session

@@ -873,9 +873,7 @@ locals {
         timeout    = "20m"
         wait       = false
         health_checks = [
-          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "kratos", namespace = var.flux_namespace },
-          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "keto", namespace = var.flux_namespace },
-          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "hydra", namespace = var.flux_namespace },
+          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "iam", namespace = var.flux_namespace },
         ]
         health_check_exprs = []
       }

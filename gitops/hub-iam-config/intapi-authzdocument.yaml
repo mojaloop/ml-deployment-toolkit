@@ -1,0 +1,86 @@
+# The operator machine API's document, declared by the deployment: the
+# mirror is a routing construct over the switch's services, so no single
+# image can carry it. A client is admitted by creating its Hydra client and
+# assigning it the intapi-client role from the role document.
+apiVersion: mojaloop.io/v1
+kind: AuthzDocument
+metadata:
+  name: intapi
+  namespace: ory
+spec:
+  url:
+    host: intapi.int.${DOMAIN}
+  document: |
+    openapi: 3.1.0
+    info:
+      title: Mojaloop operator machine API
+      version: '1.0'
+      description: >-
+        The FSPIOP mirror operator tools call with a Hydra machine token:
+        account lookup, quoting, transfers, transaction requests and
+        settlement, each routed to its service behind one host. One
+        permission per verb over the whole mount; a client holds them
+        through the intapi-client role.
+    servers:
+      - url: /
+    x-authz:
+      service: intapi
+    paths:
+      /:
+        get:
+          operationId: view
+          summary: Reads across the mirror
+          x-authz:
+            scopedBy: []
+          security:
+            - machineToken: []
+          responses:
+            '200':
+              description: What was asked for
+        post:
+          operationId: create
+          summary: Creates across the mirror
+          x-authz:
+            scopedBy: []
+          security:
+            - machineToken: []
+          responses:
+            '200':
+              description: What was created
+        put:
+          operationId: update
+          summary: Updates across the mirror
+          x-authz:
+            scopedBy: []
+          security:
+            - machineToken: []
+          responses:
+            '200':
+              description: What was updated
+        delete:
+          operationId: remove
+          summary: Removes across the mirror
+          x-authz:
+            scopedBy: []
+          security:
+            - machineToken: []
+          responses:
+            '200':
+              description: What was removed
+        patch:
+          operationId: amend
+          summary: Amends across the mirror
+          x-authz:
+            scopedBy: []
+          security:
+            - machineToken: []
+          responses:
+            '200':
+              description: What was amended
+    components:
+      securitySchemes:
+        machineToken:
+          type: http
+          scheme: bearer
+          bearerFormat: JWT
+          description: A machine client's access token, issued by Ory Hydra

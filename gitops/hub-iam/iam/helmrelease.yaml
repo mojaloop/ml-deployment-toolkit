@@ -1,19 +1,20 @@
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: oathkeeper
+  name: iam
   namespace: flux-system
 spec:
   interval: 30m
   chart:
     spec:
-      chart: oathkeeper
-      version: "0.62.1"
+      chart: mojaloop-iam
       sourceRef:
-        kind: HelmRepository
-        name: ory
+        kind: GitRepository
+        name: mojaloop-helm
       interval: 12h
+  releaseName: iam
   targetNamespace: ory
+  timeout: 20m
   install:
     createNamespace: false
     remediation:
@@ -25,21 +26,25 @@ spec:
   valuesFrom:
     # Distribution defaults. Adopter override is merged last and wins.
     - kind: ConfigMap
-      name: oathkeeper-values
+      name: iam-values
+      valuesKey: values.yaml
+    # The deployment's role document
+    - kind: ConfigMap
+      name: iam-roles-values
       valuesKey: values.yaml
     - kind: ConfigMap
-      name: ory-oathkeeper-values-provider
+      name: ory-iam-values-provider
       valuesKey: values.yaml
       optional: true
     - kind: ConfigMap
-      name: ory-oathkeeper-values-template
+      name: ory-iam-values-template
       valuesKey: values.yaml
       optional: true
     - kind: ConfigMap
-      name: ory-oathkeeper-values-override
+      name: ory-iam-values-override
       valuesKey: values.yaml
       optional: true
     - kind: Secret
-      name: ory-oathkeeper-values-override
+      name: ory-iam-values-override
       valuesKey: values.yaml
       optional: true
