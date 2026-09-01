@@ -4,17 +4,13 @@
 global:
   # FQDNs, not bare service names: this release runs in the finance-portal namespace and
   # these two services live in mojaloop. The chart interpolates these verbatim into
-  # CENTRAL_ADMIN_URL / CENTRAL_SETTLEMENTS_URL on experience-api-svc, so a bare name
-  # resolves only in-namespace and every Positions and Settlements call fails.
+  # CENTRAL_ADMIN_URL on experience-api-svc, so a bare name resolves only in-namespace.
   adminApiSvc:
     host: moja-centralledger-service.mojaloop.svc.cluster.local
     port: 80
   settlementSvc:
     host: moja-centralsettlement-service.mojaloop.svc.cluster.local
     port: 80
-  keto:
-    readURL: "http://keto-read.ory.svc.cluster.local:80"
-    writeURL: "http://keto-write.ory.svc.cluster.local:80"
   reportingDB:
     host: "${MYSQL_HOST}"
     port: ${MYSQL_PORT}
@@ -31,31 +27,229 @@ global:
     secret:
       name: reporting-events-db-secret
       key: mongodb-password
-  keycloak:
-    url: "https://keycloak.int.${DOMAIN}"
-    user: "role-assign-svc"
-    secret:
-      name: role-assign-svc-secret
-      key: secret
-    realm: "hub-operators"
-  rolePermOperator:
-    apiSvc:
-      host: ory-bof-security-role-perm-operator-svc.ory.svc.cluster.local
-      port: 80
 
-reporting-hub-bop-api-svc:
+  # The shell renders its remote manifest from these portal blocks; hosts and
+  # permissions match the service registry the iam release composes
+  authz:
+    - name: reporting-hub-bop-role-ui
+      url:
+        host: portal-iam.int.${DOMAIN}
+      portal:
+        path: /iam
+        label: Roles
+        scope: reporting_hub_bop_role_ui
+        permission:
+          namespace: PortalRoles
+          object: mojaloop
+          relation: view
+    - name: reporting-hub-bop-trx-ui
+      url:
+        host: portal-transfers.int.${DOMAIN}
+      portal:
+        path: /transfers
+        label: Transfers
+        scope: reporting_hub_bop_trx_ui
+        permission:
+          namespace: PortalTransfers
+          object: mojaloop
+          relation: view
+    - name: reporting-hub-bop-settlements-ui
+      url:
+        host: portal-settlements.int.${DOMAIN}
+      portal:
+        path: /settlements
+        label: Settlements
+        scope: reporting_hub_bop_settlements_ui
+        permission:
+          namespace: PortalSettlements
+          object: mojaloop
+          relation: view
+    - name: reporting-hub-bop-positions-ui
+      url:
+        host: portal-positions.int.${DOMAIN}
+      portal:
+        path: /positions
+        label: Financial Positions
+        scope: reporting_hub_bop_positions_ui
+        permission:
+          namespace: PortalPositions
+          object: mojaloop
+          relation: view
+
+role-assignment-service:
   enabled: true
   image:
-    tag: v4.3.0
-  containerSecurityContext:
-    enabled: false
+    registry: docker.io
+    repository: kirgene/role-assignment-service
+    tag: iam-document-authz
+  # Users come from Kratos, roles and assignments from Keto, and the authz
+  # model from the IAM that composed it
+  configFiles:
+    default.json: {
+        "PORT": 3008,
+        "HOST": "0.0.0.0",
+        "INSPECT": { "DEPTH": 4, "SHOW_HIDDEN": false, "COLOR": true },
+        "ENDPOINT_CACHE_CONFIG": { "expiresIn": 180000, "generateTimeout": 30000 },
+        "CENTRAL_SERVICE_ADMIN_URL": "http://moja-centralledger-service.mojaloop.svc.cluster.local",
+        "ORY_KETO_READ_SERVICE_URL": "http://keto-read.ory.svc.cluster.local",
+        "ORY_KETO_WRITE_SERVICE_URL": "http://keto-write.ory.svc.cluster.local",
+        "ORY_KRATOS_ADMIN_SERVICE_URL": "http://kratos-admin.ory.svc.cluster.local",
+        "AUTHZ_MODELS_DIR": "http://iam-ml-iam-services-provisioning.ory.svc.cluster.local:3003/keto-namespaces.ts",
+        "SCOPE_SIZE_ALARM": 1000,
+        "ERROR_HANDLING": { "includeCauseExtension": true, "truncateExtensions": true },
+        "INSTRUMENTATION": {
+          "METRICS": {
+            "DISABLED": false,
+            "labels": { "eventId": "*" },
+            "config": {
+              "timeout": 5000,
+              "prefix": "moja_ra_api",
+              "defaultLabels": { "serviceName": "role-assignment-service" }
+            }
+          }
+        },
+        "CORS_WHITELIST": ["https://portal.int.${DOMAIN}", "https://portal-iam.int.${DOMAIN}"],
+        "ALLOW_CREDENTIALS": false
+      }
+  gateway:
+    enabled: true
+    host: iam-api.int.${DOMAIN}
+    parentRefs:
+      - name: gw-int
+        namespace: platform-system
+    oathkeeper:
+      serviceNamespace: ory
 
+reporting-hub-bop-shell:
+  enabled: true
+  image:
+    registry: docker.io
+    repository: kirgene/reporting-hub-bop-shell
+    tag: iam-document-authz
+  ingress:
+    enabled: false
+  configFiles:
+    config.json:
+      # Header branding — TITLE uses Flux substitution so each
+      # environment automatically displays its own cluster name.
+      TITLE: "${CLUSTER_NAME}"
+      SUBTITLE: "Finance Portal"
+      TITLE_IMAGE: "https://mojaloop.io/wp-content/uploads/2020/07/mojaloop-foundation-orange.svg"
+      TITLE_BAR_COLOR: "#0C1C8C"
+      AUTH_ENABLED: "true"
+      AUTH_TOKEN_URL: "https://kratos.int.${DOMAIN}/sessions/whoami"
+      LOGIN_URL: "https://kratos.int.${DOMAIN}/self-service/login/browser"
+      LOGOUT_URL: "https://kratos.int.${DOMAIN}/self-service/logout/browser"
+      REMOTE_API_BASE_URL: "/"
+  gateway:
+    enabled: true
+    host: portal.int.${DOMAIN}
+    parentRefs:
+      - name: gw-int
+        namespace: platform-system
+    oathkeeper:
+      serviceNamespace: ory
+
+reporting-hub-bop-role-ui:
+  enabled: true
+  image:
+    registry: docker.io
+    repository: kirgene/reporting-hub-bop-role-ui
+    tag: iam-document-authz
+  ingress:
+    enabled: false
+  configFiles:
+    runtime-env.js: |
+      window.roleEnv = {
+        REACT_APP_API_BASE_URL: 'https://iam-api.int.${DOMAIN}',
+        REACT_APP_MOCK_API: 'false'
+      };
+  gateway:
+    enabled: true
+    host: portal-iam.int.${DOMAIN}
+    parentRefs:
+      - name: gw-int
+        namespace: platform-system
+    oathkeeper:
+      serviceNamespace: ory
+
+reporting-hub-bop-trx-ui:
+  enabled: true
+  image:
+    registry: docker.io
+    repository: kirgene/reporting-hub-bop-trx-ui
+    tag: iam-document-authz
+  ingress:
+    enabled: false
+  configFiles:
+    runtime-env.js: |
+      window.transferEnv = {
+        REACT_APP_API_BASE_URL: 'https://transfers-api.int.${DOMAIN}',
+        REACT_APP_MOCK_API: 'false'
+      };
+  gateway:
+    enabled: true
+    host: portal-transfers.int.${DOMAIN}
+    parentRefs:
+      - name: gw-int
+        namespace: platform-system
+    oathkeeper:
+      serviceNamespace: ory
+
+reporting-hub-bop-settlements-ui:
+  enabled: true
+  image:
+    registry: docker.io
+    repository: kirgene/reporting-hub-bop-settlements-ui
+    tag: iam-document-authz
+  ingress:
+    enabled: false
+  configFiles:
+    runtime-env.js: |
+      window.settlementEnv = {
+        CENTRAL_LEDGER_ENDPOINT: 'https://portal-api.int.${DOMAIN}',
+        CENTRAL_SETTLEMENTS_ENDPOINT: 'https://settlements-api.int.${DOMAIN}',
+        REPORTING_API_ENDPOINT: 'https://transfers-api.int.${DOMAIN}',
+        REPORTING_TEMPLATE_API_ENDPOINT: 'https://reports-api.int.${DOMAIN}/report-bilateral-settlement'
+      };
+  gateway:
+    enabled: true
+    host: portal-settlements.int.${DOMAIN}
+    parentRefs:
+      - name: gw-int
+        namespace: platform-system
+    oathkeeper:
+      serviceNamespace: ory
+
+reporting-hub-bop-positions-ui:
+  enabled: true
+  image:
+    registry: docker.io
+    repository: kirgene/reporting-hub-bop-positions-ui
+    tag: iam-document-authz
+  ingress:
+    enabled: false
+  configFiles:
+    runtime-env.js: |
+      window.positionsEnv = {
+        CENTRAL_LEDGER_ENDPOINT: 'https://portal-api.int.${DOMAIN}'
+      };
+  gateway:
+    enabled: true
+    host: portal-positions.int.${DOMAIN}
+    parentRefs:
+      - name: gw-int
+        namespace: platform-system
+    oathkeeper:
+      serviceNamespace: ory
+
+# The ledger surface: proxies the switch's admin API
 reporting-hub-bop-experience-api-svc:
   enabled: true
   image:
-    tag: v2.0.5
-  sidecar:
-    enabled: false
+    registry: docker.io
+    repository: kirgene/reporting-hub-bop-experience-api-svc
+    tag: iam-document-authz
   configOverride:
     .EVENT_SDKrc:
       AUDIT: kafka
@@ -112,130 +306,31 @@ reporting-hub-bop-experience-api-svc:
                   request.required.acks: all
       LOG: 'off'
       TRACE: 'off'
+  gateway:
+    enabled: true
+    host: portal-api.int.${DOMAIN}
+    parentRefs:
+      - name: gw-int
+        namespace: platform-system
+    oathkeeper:
+      serviceNamespace: ory
 
-reporting-hub-bop-shell:
+reporting-hub-bop-api-svc:
   enabled: true
   image:
-    tag: v2.3.5
-  ingress:
+    registry: docker.io
+    repository: kirgene/reporting-hub-bop-api-svc
+    tag: iam-document-authz
+  containerSecurityContext:
     enabled: false
-  config:
-    env:
-      AUTH_MOCK_API: false
-      REMOTE_API_BASE_URL: ''
-      REMOTE_MOCK_API: false
-      LOGIN_URL: "https://auth.int.${DOMAIN}/kratos/self-service/login/browser"
-      LOGOUT_URL: "/kratos/self-service/logout/browser?return_to=https%3A%2F%2Ffinance-portal.int.${DOMAIN}"
-      LOGIN_PROVIDER: kratos
-      AUTH_TOKEN_URL: "/kratos/sessions/whoami"
-      AUTH_ENABLED: true
-      REMOTE_1_URL: "https://finance-portal.int.${DOMAIN}/uis/iam"
-      REMOTE_2_URL: "https://finance-portal.int.${DOMAIN}/uis/transfers"
-      REMOTE_3_URL: "https://finance-portal.int.${DOMAIN}/uis/settlements"
-      REMOTE_4_URL: "https://finance-portal.int.${DOMAIN}/uis/positions"
-  configFiles:
-    config.json:
-      # Header branding — TITLE uses Flux substitution so each
-      # environment automatically displays its own cluster name.
-      TITLE: "${CLUSTER_NAME}"
-      SUBTITLE: "Finance Portal"
-      TITLE_IMAGE: "https://mojaloop.io/wp-content/uploads/2020/07/mojaloop-foundation-orange.svg"
-      TITLE_BAR_COLOR: "#0C1C8C"
-      AUTH_API_BASE_URL: ''
-      AUTH_MOCK_API: 'false'
-      REMOTE_API_BASE_URL: ''
-      REMOTE_MOCK_API: 'false'
-      AUTH_ENABLED: 'true'
-      LOGIN_URL: "https://auth.int.${DOMAIN}/kratos/self-service/login/browser"
-      LOGIN_PROVIDER: kratos
-      LOGOUT_URL: "/kratos/self-service/logout/browser?return_to=https%3A%2F%2Ffinance-portal.int.${DOMAIN}"
-      AUTH_TOKEN_URL: /kratos/sessions/whoami
-    remotes.json:
-      roles:
-        path: /iam
-        label: Roles
-        menuComponent: Menu
-        appComponent: App
-        baseUrl: "https://finance-portal.int.${DOMAIN}/uis/iam"
-        url: "https://finance-portal.int.${DOMAIN}/uis/iam/app.js"
-        appName: reporting_hub_bop_role_ui
-      transfers:
-        path: /transfers
-        label: Transfers
-        menuComponent: Menu
-        appComponent: App
-        baseUrl: "https://finance-portal.int.${DOMAIN}/uis/transfers"
-        url: "https://finance-portal.int.${DOMAIN}/uis/transfers/app.js"
-        appName: reporting_hub_bop_trx_ui
-      settlements:
-        path: /settlements
-        label: Settlements
-        menuComponent: Menu
-        appComponent: App
-        baseUrl: "https://finance-portal.int.${DOMAIN}/uis/settlements"
-        url: "https://finance-portal.int.${DOMAIN}/uis/settlements/app.js"
-        appName: reporting_hub_bop_settlements_ui
-      positions:
-        path: /positions
-        label: Financial Positions
-        menuComponent: Menu
-        appComponent: App
-        baseUrl: "https://finance-portal.int.${DOMAIN}/uis/positions"
-        url: "https://finance-portal.int.${DOMAIN}/uis/positions/app.js"
-        appName: reporting_hub_bop_positions_ui
-
-reporting-hub-bop-role-ui:
-  enabled: true
-  image:
-    tag: v1.5.10
-  ingress:
-    enabled: false
-  configFiles:
-    runtime-env.js: |
-      window.roleEnv = {
-        REACT_APP_API_BASE_URL: 'https://finance-portal.int.${DOMAIN}/api/iam',
-        REACT_APP_MOCK_API: 'false'
-      };
-
-reporting-hub-bop-trx-ui:
-  enabled: true
-  image:
-    tag: v2.0.7
-  ingress:
-    enabled: false
-  configFiles:
-    runtime-env.js: |
-      window.transferEnv = {
-        REACT_APP_API_BASE_URL: 'https://finance-portal.int.${DOMAIN}/api/transfers',
-        REACT_APP_MOCK_API: 'false'
-      };
-
-reporting-hub-bop-settlements-ui:
-  enabled: true
-  image:
-    tag: v0.0.30
-  ingress:
-    enabled: false
-  configFiles:
-    runtime-env.js: |
-      window.settlementEnv = {
-        CENTRAL_LEDGER_ENDPOINT: 'https://finance-portal.int.${DOMAIN}/api/central-admin',
-        CENTRAL_SETTLEMENTS_ENDPOINT: 'https://finance-portal.int.${DOMAIN}/api/central-settlements',
-        REPORTING_API_ENDPOINT: 'https://finance-portal.int.${DOMAIN}/api/transfers',
-        REPORTING_TEMPLATE_API_ENDPOINT: 'https://finance-portal.int.${DOMAIN}/api/reports/report-bilateral-settlement'
-      };
-
-reporting-hub-bop-positions-ui:
-  enabled: true
-  image:
-    tag: v0.0.16
-  ingress:
-    enabled: false
-  configFiles:
-    runtime-env.js: |
-      window.positionsEnv = {
-        CENTRAL_LEDGER_ENDPOINT: 'https://finance-portal.int.${DOMAIN}/api/central-admin'
-      };
+  gateway:
+    enabled: true
+    host: transfers-api.int.${DOMAIN}
+    parentRefs:
+      - name: gw-int
+        namespace: platform-system
+    oathkeeper:
+      serviceNamespace: ory
 
 reporting-events-processor-svc:
   enabled: true
@@ -277,14 +372,16 @@ reporting-events-processor-svc:
 reporting-legacy-api:
   enabled: true
   image:
-    tag: v12.4.2
+    registry: docker.io
+    repository: kirgene/reporting
+    tag: iam-document-authz
   containerSecurityContext:
     enabled: false
   # Load-bearing: this is the Helm `condition` on the reporting-k8s-templates
   # dependency, and those templates ARE the report routes. reporting-legacy-api
   # registers no routes of its own — src/operator.js watches MojaloopReport CRs
   # and builds its handler map from them. With this false the subchart is
-  # skipped, no CRs are created, and every /api/reports/* URL the finance-portal
+  # skipped, no CRs are created, and every report URL the finance-portal
   # UIs link to returns a bare 404. The CRD itself still installs (Helm applies a
   # subchart's crds/ even when its condition is false), so `kubectl get crd`
   # looks healthy while `get mojaloopreports -A` is empty.
@@ -317,27 +414,14 @@ reporting-legacy-api:
       transaction: true
       transactionDetail: true
       transactionReconciliation: true
-
-role-assignment-service:
-  enabled: false
-  ingress:
-    enabled: false
-  configFiles:
-    default.json: {
-        "ROLES_LIST": [
-          "manager",
-          "operator",
-          "clerk",
-          "financeManager",
-          "dfspReconciliationReports",
-          "audit",
-          "mcmadmin"
-        ],
-        "AUTO_GRANT_PORTAL_ADMIN_ROLES": [
-          "manager",
-          "pta"
-        ]
-      }
+  gateway:
+    enabled: true
+    host: reports-api.int.${DOMAIN}
+    parentRefs:
+      - name: gw-int
+        namespace: platform-system
+    oathkeeper:
+      serviceNamespace: ory
 
 reporting-aggregator-svc:
   # Disabled during the 2026-07-02 perf campaign: its transfer/quote

@@ -8,10 +8,9 @@ spec:
   chart:
     spec:
       chart: connection-manager
-      version: "17.2.0"
       sourceRef:
-        kind: HelmRepository
-        name: mojaloop
+        kind: GitRepository
+        name: mojaloop-helm
       interval: 12h
   releaseName: mcm
   targetNamespace: mcm

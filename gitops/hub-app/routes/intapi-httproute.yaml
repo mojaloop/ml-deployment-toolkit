@@ -1,10 +1,7 @@
 # gw-intapi — operator-tool machine APIs behind oauth2 (Hydra
-# client-credentials, verified by oathkeeper's jwt authenticator; Keto
-# authorizes per client). The API surface — the FSPIOP mirror prefixes and
-# the settlement paths that joined it — is defined by the Rules in
-# hub-app/ops-api/oathkeeper-rules.yaml, which carry the upstreams; this
-# route only decides that NOTHING on this gateway reaches a backend
-# without passing the proxy. Unmatched paths die in oathkeeper with 404.
+# client-credentials). Auth delegates to Oathkeeper against the intapi
+# document (hub-iam-config); the route carries the path dispatch to the
+# mirror's services.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -17,7 +14,153 @@ spec:
   hostnames:
     - "intapi.int.${DOMAIN}"
   rules:
-    - backendRefs:
-        - name: oathkeeper-proxy
-          namespace: ory
-          port: 4455
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /participants
+        - path:
+            type: PathPrefix
+            value: /parties
+      filters:
+        # The scope is the decision endpoint's word, so a client's own copy is
+        # removed at the edge and cannot reach anything behind it
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            remove:
+              - X-Scope
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              name: oathkeeper-api
+              namespace: ory
+              port: 4456
+            http:
+              path: /decisions
+              allowedHeaders:
+                - authorization
+                - accept
+              allowedResponseHeaders:
+                - x-scope
+      backendRefs:
+        - name: moja-account-lookup-service
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /quotes
+        - path:
+            type: PathPrefix
+            value: /fxQuotes
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            remove:
+              - X-Scope
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              name: oathkeeper-api
+              namespace: ory
+              port: 4456
+            http:
+              path: /decisions
+              allowedHeaders:
+                - authorization
+                - accept
+              allowedResponseHeaders:
+                - x-scope
+      backendRefs:
+        - name: moja-quoting-service
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /transfers
+        - path:
+            type: PathPrefix
+            value: /fxTransfers
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            remove:
+              - X-Scope
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              name: oathkeeper-api
+              namespace: ory
+              port: 4456
+            http:
+              path: /decisions
+              allowedHeaders:
+                - authorization
+                - accept
+              allowedResponseHeaders:
+                - x-scope
+      backendRefs:
+        - name: moja-ml-api-adapter-service
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /transactionRequests
+        - path:
+            type: PathPrefix
+            value: /authorizations
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            remove:
+              - X-Scope
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              name: oathkeeper-api
+              namespace: ory
+              port: 4456
+            http:
+              path: /decisions
+              allowedHeaders:
+                - authorization
+                - accept
+              allowedResponseHeaders:
+                - x-scope
+      backendRefs:
+        - name: moja-transaction-requests-service
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /settlements
+        - path:
+            type: PathPrefix
+            value: /settlementWindows
+        - path:
+            type: PathPrefix
+            value: /settlementModels
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            remove:
+              - X-Scope
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              name: oathkeeper-api
+              namespace: ory
+              port: 4456
+            http:
+              path: /decisions
+              allowedHeaders:
+                - authorization
+                - accept
+              allowedResponseHeaders:
+                - x-scope
+      backendRefs:
+        - name: moja-centralsettlement-service
+          port: 80

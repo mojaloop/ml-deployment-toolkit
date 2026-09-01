@@ -1,7 +1,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - ory-rbac-role-permissions.yaml
   - mojaloop/helmrelease.yaml
   # Secret half of the mojaloop distribution values (credential keys)
   - mojaloop/values-secret.yaml
@@ -9,20 +8,13 @@ resources:
   - mojaloop/switch-jws-pubkey-job.yaml
   - mcm/helmrelease.yaml
   - mcm/secrets.yaml
-  - mcm/oathkeeper-rules.yaml
-  - mcm/referencegrant.yaml
   - mcm/rbac.yaml
   - mcm/vault-agent-configmap.yaml
   - mcm/vault-agent-deployment.yaml
   - mcm/vault-agent-rbac.yaml
   - finance-portal/helmrelease.yaml
-  - finance-portal/externalsecret-role-assign-svc.yaml
   - finance-portal/externalsecret-reporting-events-db.yaml
-  - finance-portal/oathkeeper-rules.yaml
-  - finance-portal/referencegrant.yaml
   # gw-ext routes (DFSP-facing — SIMPLE TLS via Cilium Gateway)
-  - routes/mcm-ext-httproute.yaml
-  - routes/hydra-ext-httproute.yaml
   - routes/referencegrant-ext.yaml
   # hub-only LB pools (gw-extapi + gw-intapi; gw-int/gw-ext live in the talos layer)
   - routes/lb-ipam-pools.yaml
@@ -33,29 +25,9 @@ resources:
   - routes/extapi-envoy-deployment.yaml
   - observability/trace-bridge.yaml
   - observability/instrumentation.yaml
-  # gw-intapi (operator-tool machine APIs, oauth2 via oathkeeper — dedicated
-  # gateway + IP; rules and role in ops-api/). The standalone settlement,
-  # tx-requests, and simulator gw-int routes are gone: settlement joined
-  # intapi as a path prefix, tx-requests duplicated the extapi mTLS surface,
-  # and the simulator route was unused.
+  # gw-intapi (operator-tool machine APIs behind oauth2 — dedicated gateway
+  # and IP; the route and its authorization come from the iam release)
   - routes/gateway-intapi.yaml
-  - routes/intapi-httproute.yaml
-  - ops-api/oathkeeper-rules.yaml
-  - ops-api/mojalooprole.yaml
-  # gw-int routes (internal ops)
-  - routes/ttk-httproute.yaml
-  - routes/ttk-backend-httproute.yaml
-  # Platform UI routes, moved here from platform-config/talos: hub-only,
-  # because the tooling cluster has no IAM to gate them behind (operators
-  # port-forward there). Routed through oathkeeper — see ops-ui/.
-  - routes/flux-httproute.yaml
-  - routes/goldilocks-httproute.yaml
-  - routes/hubble-httproute.yaml
-  # Operations UIs behind oathkeeper: catch-all rules, the opsui role, and
-  # the backendRef grant into ory.
-  - ops-ui/oathkeeper-rules.yaml
-  - ops-ui/mojalooprole.yaml
-  - ops-ui/referencegrant.yaml
 
 # Distribution values for each HelmRelease in this kustomization.
 # Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;
