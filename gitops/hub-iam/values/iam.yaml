@@ -92,10 +92,6 @@ global:
         path: /iam
         label: Roles
         scope: reporting_hub_bop_role_ui
-        permission:
-          namespace: PortalRoles
-          object: mojaloop
-          relation: view
     - name: reporting-hub-bop-trx-ui
       image: docker.io/kirgene/reporting-hub-bop-trx-ui:iam-document-authz
       spec: /opt/app/src/api/openapi.yaml
@@ -105,10 +101,6 @@ global:
         path: /transfers
         label: Transfers
         scope: reporting_hub_bop_trx_ui
-        permission:
-          namespace: PortalTransfers
-          object: mojaloop
-          relation: view
     - name: reporting-hub-bop-settlements-ui
       image: docker.io/kirgene/reporting-hub-bop-settlements-ui:iam-document-authz
       spec: /opt/app/src/api/openapi.yaml
@@ -118,10 +110,6 @@ global:
         path: /settlements
         label: Settlements
         scope: reporting_hub_bop_settlements_ui
-        permission:
-          namespace: PortalSettlements
-          object: mojaloop
-          relation: view
     - name: reporting-hub-bop-positions-ui
       image: docker.io/kirgene/reporting-hub-bop-positions-ui:iam-document-authz
       spec: /opt/app/src/api/openapi.yaml
@@ -131,10 +119,6 @@ global:
         path: /positions
         label: Financial Positions
         scope: reporting_hub_bop_positions_ui
-        permission:
-          namespace: PortalPositions
-          object: mojaloop
-          relation: view
 
   # The first identity a fresh deployment logs in with: created while the
   # roles are applied and invited by email to set its password, the same

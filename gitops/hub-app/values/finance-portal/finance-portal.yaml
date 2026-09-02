@@ -38,10 +38,6 @@ global:
         path: /iam
         label: Roles
         scope: reporting_hub_bop_role_ui
-        permission:
-          namespace: PortalRoles
-          object: mojaloop
-          relation: view
     - name: reporting-hub-bop-trx-ui
       url:
         host: portal-transfers.int.${DOMAIN}
@@ -49,10 +45,6 @@ global:
         path: /transfers
         label: Transfers
         scope: reporting_hub_bop_trx_ui
-        permission:
-          namespace: PortalTransfers
-          object: mojaloop
-          relation: view
     - name: reporting-hub-bop-settlements-ui
       url:
         host: portal-settlements.int.${DOMAIN}
@@ -60,10 +52,6 @@ global:
         path: /settlements
         label: Settlements
         scope: reporting_hub_bop_settlements_ui
-        permission:
-          namespace: PortalSettlements
-          object: mojaloop
-          relation: view
     - name: reporting-hub-bop-positions-ui
       url:
         host: portal-positions.int.${DOMAIN}
@@ -71,10 +59,6 @@ global:
         path: /positions
         label: Financial Positions
         scope: reporting_hub_bop_positions_ui
-        permission:
-          namespace: PortalPositions
-          object: mojaloop
-          relation: view
 
 role-assignment-service:
   enabled: true

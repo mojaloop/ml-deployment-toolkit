@@ -9,13 +9,15 @@ global:
     kratos:
       adminUrl: http://kratos-admin.ory.svc.cluster.local
       publicUrl: http://kratos-public.ory.svc.cluster.local
-    keto:
-      readUrl: http://keto-read.ory.svc.cluster.local
-      writeUrl: http://keto-write.ory.svc.cluster.local
     provisioningUrl: http://iam-ml-iam-services-provisioning.ory.svc.cluster.local:3003
 
 iam:
   enabled: true
+  # DFSP onboarding: each DFSP is recorded as a Participant, the invited
+  # admin operates it, the machine client speaks for it
+  dfspResourceName: Participant
+  dfspAdminRole: dfsp-operator
+  dfspClientRole: dfsp-client
 
 db:
   user: mcm
