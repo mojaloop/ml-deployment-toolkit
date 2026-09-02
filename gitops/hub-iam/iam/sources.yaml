@@ -1,15 +1,15 @@
-# Chart sources for the IAM platform: the charts live in git trees so Flux
-# builds them with their file:// dependencies.
+# Chart sources for the IAM platform. The helm charts come from the published
+# chart repo as pre-releases the mojaloop/helm CI packages per branch, pinned
+# by version; finance-portal builds from the charts git tree for its file://
+# dependencies.
 apiVersion: source.toolkit.fluxcd.io/v1
-kind: GitRepository
+kind: HelmRepository
 metadata:
-  name: mojaloop-helm
+  name: mojaloop
   namespace: flux-system
 spec:
-  interval: 30m
-  url: https://github.com/mojaloop/helm.git
-  ref:
-    branch: feat/iam-document-authz
+  interval: 12h
+  url: https://mojaloop.github.io/helm/repo
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository

@@ -9,9 +9,10 @@ spec:
   chart:
     spec:
       chart: mojaloop
+      version: "17.2.1-iam-document-authz.24113"
       sourceRef:
-        kind: GitRepository
-        name: mojaloop-helm
+        kind: HelmRepository
+        name: mojaloop
       interval: 12h
   releaseName: moja
   targetNamespace: mojaloop

@@ -17,8 +17,9 @@ The model and its rules are documented with the chart:
 
 ## What this repository owns
 
-- `gitops/hub-iam/iam/sources.yaml` — the chart sources (mojaloop/helm and
-  mojaloop/charts git trees)
+- `gitops/hub-iam/iam/sources.yaml` — the chart sources (the published
+  mojaloop helm chart repo, consumed at pinned per-branch pre-release
+  versions, and the mojaloop/charts git tree)
 - `gitops/hub-iam/values/iam.yaml` — the `mojaloop-iam` release's
   distribution values: the service registry (`global.authz`, one image+host
   per service), the resource vocabulary (`global.resourceNames`), Ory
