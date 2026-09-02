@@ -302,7 +302,7 @@ oathkeeper:
       authorizers:
         remote_json:
           config:
-            remote: http://iam-ml-iam-services-decision:3002/
+            remote: http://iam-ml-iam-services-decision/
       errors:
         fallback:
           - redirect

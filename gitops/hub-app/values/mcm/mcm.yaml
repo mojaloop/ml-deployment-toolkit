@@ -9,7 +9,7 @@ global:
     kratos:
       adminUrl: http://kratos-admin.ory.svc.cluster.local
       publicUrl: http://kratos-public.ory.svc.cluster.local
-    provisioningUrl: http://iam-ml-iam-services-provisioning.ory.svc.cluster.local:3003
+    provisioningUrl: http://iam-ml-iam-services-provisioning.ory.svc.cluster.local
 
 iam:
   enabled: true
