@@ -78,6 +78,7 @@ role-assignment-service:
         "ORY_KETO_READ_SERVICE_URL": "http://keto-read.ory.svc.cluster.local",
         "ORY_KETO_WRITE_SERVICE_URL": "http://keto-write.ory.svc.cluster.local",
         "ORY_KRATOS_ADMIN_SERVICE_URL": "http://kratos-admin.ory.svc.cluster.local",
+        "IAM_SERVICE_URL": "http://iam-ml-iam-services-provisioning.ory.svc.cluster.local:3003",
         "AUTHZ_MODELS_DIR": "http://iam-ml-iam-services-provisioning.ory.svc.cluster.local:3003/keto-namespaces.ts",
         "SCOPE_SIZE_ALARM": 1000,
         "ERROR_HANDLING": { "includeCauseExtension": true, "truncateExtensions": true },
