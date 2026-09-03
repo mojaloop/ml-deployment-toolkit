@@ -332,6 +332,10 @@ resource "kubernetes_secret_v1" "cluster_secrets" {
       OCI_REPO_PASSWORD = lookup(local.s, "OCI_REPO_PASSWORD", "")
       SMTP_USER         = lookup(local.s, "SMTP_USER", "")
       SMTP_PASSWORD     = lookup(local.s, "SMTP_PASSWORD", "")
+      # The connection URI's userinfo, whole: a mail client offers AUTH only
+      # over an encrypted channel, so a relay without credentials must see a
+      # URI without userinfo rather than empty credentials
+      SMTP_USERINFO = lookup(local.set_secrets, "SMTP_USER", "") != "" ? "${urlencode(local.s.SMTP_USER)}:${urlencode(lookup(local.s, "SMTP_PASSWORD", ""))}@" : ""
       # Grafana Telegram contact point tolerates a dummy token; empty breaks provisioning
       TELEGRAM_BOT_TOKEN = lookup(local.set_secrets, "TELEGRAM_BOT_TOKEN", "unset")
     },
