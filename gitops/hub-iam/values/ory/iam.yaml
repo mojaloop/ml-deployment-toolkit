@@ -202,7 +202,6 @@ kratos:
               default_browser_return_url: https://portal.int.${DOMAIN}/
       courier:
         smtp:
-          from_address: ${SMTP_USER}
           from_name: Mojaloop Hub
 
 keto:

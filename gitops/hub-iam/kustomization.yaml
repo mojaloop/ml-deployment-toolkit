@@ -6,6 +6,7 @@ resources:
   - iam/externalsecret-keto.yaml
   - iam/externalsecret-hydra.yaml
   - iam/roles.yaml
+  - iam/values-secret.yaml
   - iam/helmrelease.yaml
   - routes/referenceGrants.yaml
 
@@ -16,6 +17,6 @@ configMapGenerator:
   - name: iam-values
     namespace: flux-system
     files:
-      - values.yaml=values/iam.yaml
+      - values.yaml=values/ory/iam.yaml
 generatorOptions:
   disableNameSuffixHash: true
