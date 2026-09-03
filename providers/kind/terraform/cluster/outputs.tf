@@ -12,3 +12,8 @@ output "api_endpoint" {
   description = "API server endpoint as the host reaches it"
   value       = kind_cluster.this.endpoint
 }
+
+output "cluster_generation" {
+  description = "Changes when the cluster is rebuilt, so downstream in-cluster resources follow it"
+  value       = sha1(kind_cluster.this.kubeconfig)
+}

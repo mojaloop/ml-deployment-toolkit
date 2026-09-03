@@ -95,4 +95,10 @@ resource "helm_release" "cilium" {
   wait = false
 
   depends_on = [local_sensitive_file.kubeconfig]
+
+  # A rebuilt cluster starts empty while this release still sits in state —
+  # the install has to follow the cluster it lives on
+  lifecycle {
+    replace_triggered_by = [kind_cluster.this]
+  }
 }

@@ -262,6 +262,7 @@ module "kind_bootstrap" {
   source = "../../providers/kind/terraform/bootstrap"
 
   gateway_api_crds_path = "../../gitops/kind/gateway-api/crds.yaml"
+  cluster_generation    = module.kind[0].cluster_generation
 
   depends_on = [module.kind]
 }
@@ -271,7 +272,8 @@ module "flux_bootstrap" {
   count  = local.provider_name != "" ? 1 : 0
   source = "../engine/flux-bootstrap"
 
-  flux_version = module.config.flux_version
+  flux_version       = module.config.flux_version
+  cluster_generation = length(module.kind) > 0 ? module.kind[0].cluster_generation : ""
 
   depends_on = [
     module.proxmox,

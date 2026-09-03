@@ -1,6 +1,12 @@
 # Flux Bootstrap Module
 # Installs Flux Operator + FluxInstance CRD (official OCI-native lifecycle manager)
 
+# A rebuilt cluster starts empty while these resources still sit in state —
+# the generation ties them to the cluster they live on
+resource "terraform_data" "cluster" {
+  input = var.cluster_generation
+}
+
 resource "helm_release" "flux_operator" {
   name             = "flux-operator"
   namespace        = var.flux_namespace
@@ -15,6 +21,10 @@ resource "helm_release" "flux_operator" {
   upgrade_install = true
 
   wait = true
+
+  lifecycle {
+    replace_triggered_by = [terraform_data.cluster]
+  }
 }
 
 resource "kubectl_manifest" "flux_instance" {
@@ -43,4 +53,8 @@ resource "kubectl_manifest" "flux_instance" {
   })
 
   depends_on = [helm_release.flux_operator]
+
+  lifecycle {
+    replace_triggered_by = [terraform_data.cluster]
+  }
 }

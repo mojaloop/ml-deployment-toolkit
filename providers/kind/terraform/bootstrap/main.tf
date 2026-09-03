@@ -16,6 +16,12 @@ locals {
   ]
 }
 
+# A rebuilt cluster starts empty while these manifests still sit in state —
+# the generation ties them to the cluster they live on
+resource "terraform_data" "cluster" {
+  input = var.cluster_generation
+}
+
 resource "kubectl_manifest" "gateway_api" {
   for_each = {
     for doc in local.gateway_api_docs :
@@ -25,4 +31,8 @@ resource "kubectl_manifest" "gateway_api" {
   yaml_body         = each.value
   server_side_apply = true
   wait              = true
+
+  lifecycle {
+    replace_triggered_by = [terraform_data.cluster]
+  }
 }

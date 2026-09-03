@@ -14,3 +14,9 @@ variable "flux_namespace" {
   type        = string
   default     = "flux-system"
 }
+
+variable "cluster_generation" {
+  description = "Changes when the cluster is rebuilt, reinstalling Flux with it; stable on providers whose rebuilds keep state coherent themselves"
+  type        = string
+  default     = ""
+}
