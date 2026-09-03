@@ -53,6 +53,31 @@ resource "kind_cluster" "this" {
   }
 }
 
+# The node image's containerd unit sets LimitNOFILE=infinity, which under a
+# docker parent resolves to 2^31 and reaches every pod — and a workload that
+# walks its fd table on fork (HAProxy external health checks) then burns
+# minutes of CPU per fork. Capped to the standard host default before any
+# workload starts; containerd keeps running containers across the restart.
+resource "terraform_data" "node_fd_limit" {
+  input = kind_cluster.this.id
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      for node in $(docker ps --filter "label=io.x-k8s.kind.cluster=${kind_cluster.this.name}" --format '{{.Names}}'); do
+        docker exec "$node" bash -c '
+          mkdir -p /etc/systemd/system/containerd.service.d &&
+          printf "[Service]\nLimitNOFILE=1048576\n" > /etc/systemd/system/containerd.service.d/nofile.conf &&
+          systemctl daemon-reload && systemctl restart containerd
+        '
+      done
+    EOT
+  }
+
+  lifecycle {
+    replace_triggered_by = [kind_cluster.this]
+  }
+}
+
 # Write kubeconfig to artifacts
 resource "local_sensitive_file" "kubeconfig" {
   filename             = "${var.artifacts_path}/kubernetes/kubeconfig"
@@ -94,7 +119,7 @@ resource "helm_release" "cilium" {
 
   wait = false
 
-  depends_on = [local_sensitive_file.kubeconfig]
+  depends_on = [local_sensitive_file.kubeconfig, terraform_data.node_fd_limit]
 
   # A rebuilt cluster starts empty while this release still sits in state —
   # the install has to follow the cluster it lives on
