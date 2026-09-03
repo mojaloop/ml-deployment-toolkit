@@ -7,7 +7,9 @@
 # Kustomization graph (Flux dependsOn, role-gated):
 #   platform -> dns/<provider> -> platform-config -> <vendor> -> <role>
 #   tooling: tooling -> tooling-config -> {tooling-routes, tooling-observability -> tooling-observability-routes}
-#   hub: hub -> hub-data-common -> hub-data-<store>... -> hub-vault -> hub-iam -> hub-iam-config -> hub-app
+#   hub: hub -> hub-data-common -> hub-data-<store>... -> hub-vault -> hub-iam -> hub-app
+#        hub-iam-config (after hub: the documents feed the IAM composition,
+#        which holds hub-iam readiness until the roles validate against it)
 #        hub-observability-agent (parallel, after platform-config)
 
 locals {
@@ -623,7 +625,7 @@ locals {
   # Auth needs MySQL (Ory/MCM databases); apps additionally need every other store.
   auth_depends = contains(local.in_cluster_stores, "mysql") ? ["hub-data-mysql"] : ["hub"]
   app_depends = concat(
-    ["hub-iam-config"],
+    ["hub-iam"],
     [for store in local.in_cluster_stores : "hub-data-${store}" if store != "mysql"],
   )
 
@@ -883,10 +885,15 @@ locals {
         ]
         health_check_exprs = []
       }
+      # AuthzDocuments for surfaces whose images carry no document. Inputs to
+      # the IAM composition — the provisioning service validates the deployed
+      # roles against the full catalog before becoming ready — so they apply
+      # as soon as the namespaces exist, gated only on the CRD the iam chart
+      # installs (retryInterval covers that window).
       "hub-iam-config" = {
         enabled            = local.is_hub
         path               = "./hub-iam-config"
-        depends_on         = ["hub-iam"]
+        depends_on         = ["hub"]
         timeout            = "10m"
         wait               = false
         health_checks      = []
@@ -906,7 +913,7 @@ locals {
         health_check_exprs = []
       }
       "hub-observability-agent" = {
-        enabled            = local.is_hub
+        enabled            = local.is_hub && var.observability.enabled
         path               = "./hub-observability-agent"
         depends_on         = ["platform-config"]
         timeout            = "5m"
@@ -1006,8 +1013,12 @@ resource "kubectl_manifest" "kustomization" {
     spec = merge(
       {
         interval = "10m"
-        path     = each.value.path
-        prune    = each.value.prune
+        # An apply can legitimately fail while an in-flight chart install is
+        # still registering the CRDs its resources need; a short retry keeps
+        # that window from costing a full interval.
+        retryInterval = "1m"
+        path          = each.value.path
+        prune         = each.value.prune
         sourceRef = {
           kind = "OCIRepository"
           name = "ml-gitops"
