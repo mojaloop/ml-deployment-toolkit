@@ -48,6 +48,15 @@ resource "kind_cluster" "this" {
       content {
         role   = node.value.role
         labels = node.value.labels
+
+        # The full hub on few nodes crosses the kubelet's 110-pod default
+        # while cpu and memory sit largely idle
+        kubeadm_config_patches = [
+          <<-EOT
+          kind: KubeletConfiguration
+          maxPods: 250
+          EOT
+        ]
       }
     }
   }
