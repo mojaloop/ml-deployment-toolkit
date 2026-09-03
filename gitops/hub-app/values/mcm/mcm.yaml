@@ -108,6 +108,26 @@ gateway:
       - name: gw-int
         namespace: platform-system
 
+# The hub server cert is signed by the pki server role, which only allows
+# names under the deployment domain
+config:
+  tlsServerCSRParametersData: |-
+    {
+      "subject": {
+        "CN": "mcm.int.${DOMAIN}",
+        "O": "Mojaloop Hub"
+      },
+      "extensions": {
+        "subjectAltName": {
+          "dns": [
+            "mcm.int.${DOMAIN}"
+          ],
+          "ips": [
+          ]
+        }
+      }
+    }
+
 # The migration job's vault and switch env comes from api.vault/api.switchId
 # through the chart
 migrations:
