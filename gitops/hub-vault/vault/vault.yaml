@@ -220,7 +220,7 @@ spec:
             secretsDefault: "${KRATOS_SECRETS_DEFAULT}"
             # Defaults keep the URI well-formed with no relay configured:
             # kratos boots and courier fails per-delivery instead.
-            smtpConnectionURI: "smtp://${SMTP_USER:-mail}:${SMTP_PASSWORD:-mail}@${SMTP_HOST:-localhost}:${SMTP_PORT:-25}/?skip_ssl_verify=true"
+            smtpConnectionURI: "smtp://${SMTP_USER:-mail}:${SMTP_PASSWORD:-mail}@${SMTP_HOST:-localhost}:${SMTP_PORT:-25}/?skip_ssl_verify=true&disable_starttls=${SMTP_DISABLE_STARTTLS:-false}"
       - type: kv
         path: secret/keto
         data:

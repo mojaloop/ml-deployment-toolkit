@@ -513,6 +513,11 @@
         "from": {
           "description": "Sender address, stated outright — must be a mailbox/domain the SMTP account may send as.",
           "type": "string"
+        },
+        "starttls": {
+          "description": "Whether the relay negotiates STARTTLS. A plain in-cluster catcher states false; internet relays keep the default.",
+          "type": "boolean",
+          "default": true
         }
       }
     },

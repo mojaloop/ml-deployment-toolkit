@@ -177,9 +177,10 @@ output "cert" {
 output "email" {
   description = "Transactional SMTP parameters (non-secret)"
   value = {
-    host = local.smtp_host
-    port = local.smtp_port
-    from = local.email_from
+    host     = local.smtp_host
+    port     = local.smtp_port
+    from     = local.email_from
+    starttls = local.smtp_starttls
   }
 }
 

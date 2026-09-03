@@ -95,11 +95,12 @@ variable "cert" {
 }
 
 variable "email" {
-  description = "Transactional SMTP parameters (non-secret): host, port, from"
+  description = "Transactional SMTP parameters (non-secret): host, port, from, starttls"
   type = object({
-    host = string
-    port = string
-    from = string
+    host     = string
+    port     = string
+    from     = string
+    starttls = bool
   })
 }
 

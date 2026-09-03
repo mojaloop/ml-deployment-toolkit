@@ -349,9 +349,10 @@ locals {
   # noreply@<dns.domain> — an invented sender that breaks SPF/DMARC silently.
   # The empty defaults below only exist for environments without the
   # capability (no email block at all).
-  smtp_host  = try(local.config.email.host, "")
-  smtp_port  = tostring(try(local.config.email.port, ""))
-  email_from = try(local.config.email.from, "")
+  smtp_host     = try(local.config.email.host, "")
+  smtp_port     = tostring(try(local.config.email.port, ""))
+  email_from    = try(local.config.email.from, "")
+  smtp_starttls = try(local.config.email.starttls, true)
 
   # --- alerting (delivery channels) ----------------------------------------
   # alerting.email.to used to default to alerts@example.invalid — alerts

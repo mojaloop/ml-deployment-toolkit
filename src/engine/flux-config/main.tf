@@ -230,9 +230,12 @@ locals {
       ACME_ACCOUNT_KEY_SECRET = var.cert.acme_account_key_secret
 
       # email + alerting capabilities (non-secret halves)
-      SMTP_HOST        = var.email.host
-      SMTP_PORT        = var.email.port
-      ALERT_EMAIL_FROM = var.email.from
+      SMTP_HOST = var.email.host
+      SMTP_PORT = var.email.port
+      # The kratos courier URI parameter: disable_starttls, so the value is
+      # the negation of the stated capability
+      SMTP_DISABLE_STARTTLS = var.email.starttls ? "false" : "true"
+      ALERT_EMAIL_FROM      = var.email.from
       ALERT_EMAIL_TO   = var.alerting.email_to
       TELEGRAM_CHAT_ID = var.alerting.telegram_chat_id
 
