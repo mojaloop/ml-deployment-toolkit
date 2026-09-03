@@ -203,6 +203,7 @@ kratos:
       courier:
         smtp:
           from_name: Mojaloop Hub
+          from_address: no-reply@${DOMAIN}
 
 keto:
   deployment:

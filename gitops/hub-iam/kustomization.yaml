@@ -6,7 +6,6 @@ resources:
   - iam/externalsecret-keto.yaml
   - iam/externalsecret-hydra.yaml
   - iam/roles.yaml
-  - iam/values-secret.yaml
   - iam/helmrelease.yaml
   - routes/referenceGrants.yaml
 

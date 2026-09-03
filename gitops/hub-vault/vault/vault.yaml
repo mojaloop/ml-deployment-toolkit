@@ -218,7 +218,9 @@ spec:
             secretsCookie: "${KRATOS_SECRETS_COOKIE}"
             secretsCSRFCookie: "${KRATOS_SECRETS_CSRF_COOKIE}"
             secretsDefault: "${KRATOS_SECRETS_DEFAULT}"
-            smtpConnectionURI: "smtp://${SMTP_USER}:${SMTP_PASSWORD}@${SMTP_HOST}:${SMTP_PORT}/?skip_ssl_verify=true"
+            # Defaults keep the URI well-formed with no relay configured:
+            # kratos boots and courier fails per-delivery instead.
+            smtpConnectionURI: "smtp://${SMTP_USER:-mail}:${SMTP_PASSWORD:-mail}@${SMTP_HOST:-localhost}:${SMTP_PORT:-25}/?skip_ssl_verify=true"
       - type: kv
         path: secret/keto
         data:
