@@ -12,3 +12,14 @@ oathkeeper:
 ml-iam-services:
   decision:
     replicaCount: 1
+
+# Mail catcher: the courier's SMTP target, with the invitation and recovery
+# mail readable over the internal gateway. Accepts whatever credentials the
+# seeded connection URI carries, over plain SMTP.
+mailpit:
+  enabled: true
+  extraEnvVars:
+    - name: MP_SMTP_AUTH_ACCEPT_ANY
+      value: "1"
+    - name: MP_SMTP_AUTH_ALLOW_INSECURE
+      value: "1"

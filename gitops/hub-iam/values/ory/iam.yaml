@@ -333,6 +333,8 @@ gateway:
   hosts:
     kratos: kratos.int.${DOMAIN}
     auth: auth.int.${DOMAIN}
+    # Renders only where the mail catcher is enabled (dev templates)
+    mailpit: mailpit.int.${DOMAIN}
     hydra:
       host: hydra.ext.${DOMAIN}
       parentRefs:
