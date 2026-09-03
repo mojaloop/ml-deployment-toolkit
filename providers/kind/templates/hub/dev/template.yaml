@@ -5,4 +5,4 @@
 # values/ and patches/ overlays.
 # -----------------------------------------------------------------------------
 version: 1
-description: "Development Mojaloop switch on kind: 1 control-plane + 3 general workers sharing the host"
+description: "Development Mojaloop switch on kind: one untainted mixed node, the host is the budget"
