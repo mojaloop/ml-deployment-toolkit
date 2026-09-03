@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=../../../../config/schemas/template.schema.json
+# -----------------------------------------------------------------------------
+# Deployment template — kind/hub/dev (whole hub on one workstation)
+# Provider-independent capacity template: identity only — tuning lives in
+# values/ and patches/ overlays.
+# -----------------------------------------------------------------------------
+version: 1
+description: "Development Mojaloop switch on kind: 1 control-plane + 3 general workers sharing the host"

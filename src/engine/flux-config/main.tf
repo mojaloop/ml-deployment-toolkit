@@ -25,7 +25,7 @@ locals {
   # matching gitops/ dir makes Flux chase a path that does not exist (the old
   # "gcp" entry was exactly that standing mismatch).
   is_talos    = var.infra_provider == "proxmox"
-  has_vendor  = contains(["proxmox", "aws"], var.infra_provider)
+  has_vendor  = contains(["proxmox", "aws", "kind"], var.infra_provider)
   is_hub      = var.cluster_role == "hub"
   is_tooling  = var.cluster_role == "tooling"
   vendor_name = local.is_talos ? "talos" : var.infra_provider
@@ -942,10 +942,11 @@ locals {
 resource "terraform_data" "obs_ingest_validation" {
   lifecycle {
     precondition {
-      # Tooling generates its pair; a hub must carry copied credentials —
-      # empty values would leave the telemetry push unauthenticated and
-      # rejected once the open ingest routes are gone.
-      condition     = var.cluster_role != "hub" || (lookup(local.s, "OBS_INGEST_USERNAME", "") != "" && lookup(local.s, "OBS_INGEST_PASSWORD", "") != "")
+      # Tooling generates its pair; a hub that ships telemetry must carry
+      # copied credentials — empty values would leave the push
+      # unauthenticated and rejected once the open ingest routes are gone. A
+      # hub with observability off ships nothing and needs none.
+      condition     = var.cluster_role != "hub" || !var.observability.enabled || (lookup(local.s, "OBS_INGEST_USERNAME", "") != "" && lookup(local.s, "OBS_INGEST_PASSWORD", "") != "")
       error_message = "OBS_INGEST_USERNAME and OBS_INGEST_PASSWORD must both be set in a hub environment's .env. Username = the account declared for this hub on the Tooling Cluster under observability.ingest_users; password from make secrets ENV=<your-cc-env> -> obs_ingest_<name>_password. For a third-party sink, use that sink's credentials."
     }
   }

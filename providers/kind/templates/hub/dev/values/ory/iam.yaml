@@ -1,0 +1,14 @@
+# Template overlay — asserts this capacity profile's tuning explicitly, so a
+# drift in the common defaults can never silently change a deployed profile.
+# Merged over the common layer via the <namespace>-<release>-values-template slot; the environment layer wins last.
+hydra:
+  replicaCount: 1
+kratos:
+  replicaCount: 1
+keto:
+  replicaCount: 1
+oathkeeper:
+  replicaCount: 1
+ml-iam-services:
+  decision:
+    replicaCount: 1

@@ -83,6 +83,7 @@ locals {
     proxmox      = length(module.proxmox) > 0 ? module.proxmox[0].kubeconfig_path : null
     digitalocean = length(module.digitalocean) > 0 ? module.digitalocean[0].kubeconfig_path : null
     aws          = length(module.aws) > 0 ? module.aws[0].kubeconfig_path : null
+    kind         = length(module.kind) > 0 ? module.kind[0].kubeconfig_path : null
   }
   kubeconfig_path = try(local.kubeconfig_paths[local.provider_name], null)
 
@@ -90,6 +91,7 @@ locals {
     proxmox      = length(module.proxmox) > 0 ? module.proxmox[0] : null
     digitalocean = length(module.digitalocean) > 0 ? module.digitalocean[0] : null
     aws          = length(module.aws) > 0 ? module.aws[0] : null
+    kind         = length(module.kind) > 0 ? module.kind[0] : null
   }
   active_provider = try(local.provider_outputs[local.provider_name], null)
 }
@@ -233,6 +235,37 @@ module "aws_bootstrap" {
   depends_on = [module.aws]
 }
 
+# kind Cluster (Kubernetes-in-Docker on the operator's host)
+module "kind" {
+  count  = local.provider_name == "kind" ? 1 : 0
+  source = "../../providers/kind/terraform/cluster"
+
+  cluster            = module.config.cluster
+  kubernetes_version = module.config.kubernetes_version
+  node_pools         = module.config.kind_node_pools
+  cilium_version     = "1.20.0"
+
+  artifacts_path       = local.artifacts_path
+  provider_config_path = "../../providers/kind/params.yaml"
+
+  # The in-module Cilium install dials the cluster through the static
+  # kubeconfig path — see the aliased provider's comment in providers.tf.
+  providers = {
+    helm = helm.bootstrap
+  }
+}
+
+# kind bootstrap — Gateway API CRDs through the root kubectl provider, whose
+# configuration defers until the cluster module has written the kubeconfig.
+module "kind_bootstrap" {
+  count  = local.provider_name == "kind" ? 1 : 0
+  source = "../../providers/kind/terraform/bootstrap"
+
+  gateway_api_crds_path = "../../gitops/kind/gateway-api/crds.yaml"
+
+  depends_on = [module.kind]
+}
+
 # FluxCD Bootstrap — install controllers (always)
 module "flux_bootstrap" {
   count  = local.provider_name != "" ? 1 : 0
@@ -244,6 +277,8 @@ module "flux_bootstrap" {
     module.proxmox,
     module.digitalocean,
     module.aws,
-    module.aws_bootstrap
+    module.aws_bootstrap,
+    module.kind,
+    module.kind_bootstrap
   ]
 }

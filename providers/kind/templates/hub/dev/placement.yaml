@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=../../../../config/schemas/template-placement.schema.json
+# -----------------------------------------------------------------------------
+# Template placement — the SHAPE this template deploys: node pools, sizing,
+# default topology. The environment owns the INSTANCE: its placement.yaml maps
+# pg-N groups to physical nodes and may override pools by name (count, sizes,
+# extra pools, enabled: false to drop one).
+# -----------------------------------------------------------------------------
+version: 1
+
+# --- Infrastructure topology ---
+# Each group expands to <count> nodes named <cluster>-<name>-<index>.
+# placement is index-aligned (node i -> placement[i]); shorter lists wrap around.
+node_groups:
+  - name: c
+    class: control-plane
+    count: 1
+    cores: 6
+    memory: 5120         # MB
+    disks: [32]          # GB
+    placement: [pg-1]
+
+  - name: w
+    class: worker-general
+    count: 3
+    cores: 6
+    memory: 11264        # MB
+    disks: [64, 64]      # GB
+    placement: [pg-3, pg-2, pg-1]

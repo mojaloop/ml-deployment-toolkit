@@ -166,7 +166,8 @@
           "enum": [
             "proxmox",
             "aws",
-            "digitalocean"
+            "digitalocean",
+            "kind"
           ]
         },
         "proxmox": {
