@@ -359,7 +359,7 @@ reporting-legacy-api:
   image:
     registry: docker.io
     repository: kirgene/reporting
-    tag: iam-document-authz
+    tag: iam-document-authz.2
   containerSecurityContext:
     enabled: false
   # Load-bearing: this is the Helm `condition` on the reporting-k8s-templates
