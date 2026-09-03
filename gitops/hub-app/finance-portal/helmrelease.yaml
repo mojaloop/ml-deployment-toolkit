@@ -8,10 +8,11 @@ spec:
   timeout: 10m
   chart:
     spec:
-      chart: mojaloop/finance-portal
+      chart: finance-portal
+      version: "5.1.6-iam-document-authz.4132"
       sourceRef:
-        kind: GitRepository
-        name: mojaloop-charts-git
+        kind: HelmRepository
+        name: mojaloop-charts
       interval: 12h
   releaseName: fin-portal
   # Dedicated namespace, as MCM has. releaseName is pinned above and must stay pinned:

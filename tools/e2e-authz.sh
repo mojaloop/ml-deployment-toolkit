@@ -110,6 +110,32 @@ print(m.group(0).replace("&amp;","&") if m else "")')
   t "operator session via the emailed link" 1 "$([ -n "$OP3_OK" ] && echo 1 || echo 0)"
 fi
 
+echo "== the courier delivers, every run =="
+# Self-service recovery for an identity that always exists: the same courier
+# and catcher the invitation rides, provable on a cluster of any age
+mailcount() {
+  curl -s $RI "$MAILPIT/api/v1/messages" | python3 -c '
+import sys,json
+ms=json.load(sys.stdin).get("messages",[])
+print(sum(1 for m in ms if any(a.get("Address")=="op1@example.com" for a in m.get("To",[]))))'
+}
+N0=$(mailcount)
+FLOW=$(curl -s $RI "https://kratos.int.$DOM/self-service/recovery/api")
+ACTION=$(echo "$FLOW" | python3 -c 'import sys,json; print(json.load(sys.stdin)["ui"]["action"])')
+METHOD=$(echo "$FLOW" | python3 -c '
+import sys,json
+f=json.load(sys.stdin)
+ms=[n["attributes"].get("value") for n in f["ui"]["nodes"] if n["attributes"].get("name")=="method"]
+print(ms[0] if ms else "link")')
+curl -s $RI -o /dev/null -X POST -H 'Content-Type: application/json' \
+  -d "{\"email\":\"op1@example.com\",\"method\":\"$METHOD\"}" "$ACTION"
+DELIVERED=0
+for _ in $(seq 1 12); do
+  [ "$(mailcount)" -gt "$N0" ] && { DELIVERED=1; break; }
+  sleep 5
+done
+t "recovery email delivered ($METHOD)" 1 "$DELIVERED"
+
 echo "== operator matrix =="
 session_for op1@example.com "$TMP/op1.jar" || { echo "op1 session failed"; exit 1; }
 OP1="-b $TMP/op1.jar"
