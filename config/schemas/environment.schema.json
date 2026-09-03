@@ -515,9 +515,8 @@
           "type": "string"
         },
         "starttls": {
-          "description": "Whether the relay negotiates STARTTLS. A plain in-cluster catcher states false; internet relays keep the default.",
-          "type": "boolean",
-          "default": true
+          "description": "Whether the relay negotiates STARTTLS; absent means it does. A plain in-cluster catcher states false.",
+          "type": "boolean"
         }
       }
     },
