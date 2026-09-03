@@ -662,13 +662,17 @@ locals {
   # shipping a backup config without a reachable endpoint deadlocks hub-app.
   backup_disabled_patches = {
     for k, v in {
+      # The storages blocks come out entirely, not just disabled: their
+      # endpoint/region substitute to null with no backup target, and the
+      # Percona CRD schemas reject null strings before enabled=false is even
+      # considered.
       "hub-data-mongodb" = [{
-        patch = yamlencode({
-          apiVersion = "psmdb.percona.com/v1"
-          kind       = "PerconaServerMongoDB"
-          metadata   = { name = "bulk-mongodb", namespace = "data" }
-          spec       = { backup = { enabled = false, pitr = { enabled = false } } }
-        })
+        patch = yamlencode([
+          { op = "replace", path = "/spec/backup/enabled", value = false },
+          { op = "remove", path = "/spec/backup/storages" },
+          { op = "remove", path = "/spec/backup/tasks" },
+          { op = "replace", path = "/spec/backup/pitr/enabled", value = false },
+        ])
         target = {
           group   = "psmdb.percona.com"
           version = "v1"
@@ -678,8 +682,10 @@ locals {
       }]
       "hub-data-mysql" = [{
         patch = yamlencode([
+          { op = "remove", path = "/spec/backup/storages" },
           { op = "remove", path = "/spec/backup/schedule" },
           { op = "replace", path = "/spec/backup/pitr/enabled", value = false },
+          { op = "remove", path = "/spec/backup/pitr/storageName" },
         ])
         target = {
           group   = "pxc.percona.com"
