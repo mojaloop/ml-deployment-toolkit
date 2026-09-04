@@ -8,7 +8,7 @@ spec:
   chart:
     spec:
       chart: mojaloop-iam
-      version: "17.2.2-iam-document-authz.24126"
+      version: "17.2.2-iam-document-authz.24183"
       sourceRef:
         kind: HelmRepository
         name: mojaloop
