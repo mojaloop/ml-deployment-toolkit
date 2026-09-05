@@ -1,12 +1,37 @@
 # Template overlay — asserts this capacity profile's tuning explicitly, so a
 # drift in the common defaults can never silently change a deployed profile.
 # Merged over the common layer via the <namespace>-<release>-values-template slot; the environment layer wins last.
+# No session check, token or permission is answered while one of these has no
+# ready replica, so each keeps a spare and holds one through a drain. Their
+# migrations run once as a release hook: pods migrating one schema at the same
+# time share no lock, and MySQL does not undo half of a statement.
 hydra:
-  replicaCount: 1
+  replicaCount: 2
+  hydra:
+    automigration:
+      type: job
+  pdb:
+    enabled: true
+    spec:
+      minAvailable: 1
 kratos:
-  replicaCount: 1
+  replicaCount: 2
+  kratos:
+    automigration:
+      type: job
+  pdb:
+    enabled: true
+    spec:
+      minAvailable: 1
 keto:
-  replicaCount: 1
+  replicaCount: 2
+  keto:
+    automigration:
+      type: job
+  pdb:
+    enabled: true
+    spec:
+      minAvailable: 1
 # The gateway answers nothing while the authorization path has no ready
 # replica, so both members of it keep a spare and hold one through a drain.
 oathkeeper:
