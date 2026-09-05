@@ -7,7 +7,9 @@
 # Kustomization graph (Flux dependsOn, role-gated):
 #   platform -> dns/<provider> -> platform-config -> <vendor> -> <role>
 #   tooling: tooling -> tooling-config -> {tooling-routes, tooling-observability -> tooling-observability-routes}
-#   hub: hub -> hub-data-common -> hub-data-<store>... -> hub-vault -> hub-iam -> hub-iam-config -> hub-app
+#   hub: hub -> hub-data-common -> hub-data-<store>... -> hub-vault -> hub-iam -> hub-app
+#        hub-iam-config (after hub: the documents feed the IAM composition,
+#        which holds hub-iam readiness until the roles validate against it)
 #        hub-observability-agent (parallel, after platform-config)
 
 locals {
@@ -25,7 +27,7 @@ locals {
   # matching gitops/ dir makes Flux chase a path that does not exist (the old
   # "gcp" entry was exactly that standing mismatch).
   is_talos    = var.infra_provider == "proxmox"
-  has_vendor  = contains(["proxmox", "aws"], var.infra_provider)
+  has_vendor  = contains(["proxmox", "aws", "kind"], var.infra_provider)
   is_hub      = var.cluster_role == "hub"
   is_tooling  = var.cluster_role == "tooling"
   vendor_name = local.is_talos ? "talos" : var.infra_provider
@@ -327,6 +329,18 @@ resource "kubernetes_secret_v1" "cluster_secrets" {
       OCI_REPO_PASSWORD = lookup(local.s, "OCI_REPO_PASSWORD", "")
       SMTP_USER         = lookup(local.s, "SMTP_USER", "")
       SMTP_PASSWORD     = lookup(local.s, "SMTP_PASSWORD", "")
+      # The courier's connection URI, whole. The client offers AUTH only over
+      # an encrypted channel, so a relay without credentials takes a URI
+      # without userinfo, and one that negotiates no STARTTLS is told not to
+      # demand it. An environment with no email capability still needs a URI
+      # Kratos can parse to start, and localhost delivers to nothing.
+      SMTP_CONNECTION_URI = format(
+        "smtp://%s%s:%s/?skip_ssl_verify=true&disable_starttls=%s",
+        lookup(local.set_secrets, "SMTP_USER", "") != "" ? "${urlencode(local.s.SMTP_USER)}:${urlencode(lookup(local.s, "SMTP_PASSWORD", ""))}@" : "",
+        var.email.host != "" ? var.email.host : "localhost",
+        var.email.port != "" ? var.email.port : "25",
+        var.email.starttls ? "false" : "true",
+      )
       # Grafana Telegram contact point tolerates a dummy token; empty breaks provisioning
       TELEGRAM_BOT_TOKEN = lookup(local.set_secrets, "TELEGRAM_BOT_TOKEN", "unset")
     },
@@ -623,7 +637,7 @@ locals {
   # Auth needs MySQL (Ory/MCM databases); apps additionally need every other store.
   auth_depends = contains(local.in_cluster_stores, "mysql") ? ["hub-data-mysql"] : ["hub"]
   app_depends = concat(
-    ["hub-iam-config"],
+    ["hub-iam"],
     [for store in local.in_cluster_stores : "hub-data-${store}" if store != "mysql"],
   )
 
@@ -662,13 +676,17 @@ locals {
   # shipping a backup config without a reachable endpoint deadlocks hub-app.
   backup_disabled_patches = {
     for k, v in {
+      # The storages blocks come out entirely, not just disabled: their
+      # endpoint/region substitute to null with no backup target, and the
+      # Percona CRD schemas reject null strings before enabled=false is even
+      # considered.
       "hub-data-mongodb" = [{
-        patch = yamlencode({
-          apiVersion = "psmdb.percona.com/v1"
-          kind       = "PerconaServerMongoDB"
-          metadata   = { name = "bulk-mongodb", namespace = "data" }
-          spec       = { backup = { enabled = false, pitr = { enabled = false } } }
-        })
+        patch = yamlencode([
+          { op = "replace", path = "/spec/backup/enabled", value = false },
+          { op = "remove", path = "/spec/backup/storages" },
+          { op = "remove", path = "/spec/backup/tasks" },
+          { op = "replace", path = "/spec/backup/pitr/enabled", value = false },
+        ])
         target = {
           group   = "psmdb.percona.com"
           version = "v1"
@@ -678,8 +696,10 @@ locals {
       }]
       "hub-data-mysql" = [{
         patch = yamlencode([
+          { op = "remove", path = "/spec/backup/storages" },
           { op = "remove", path = "/spec/backup/schedule" },
           { op = "replace", path = "/spec/backup/pitr/enabled", value = false },
+          { op = "remove", path = "/spec/backup/pitr/storageName" },
         ])
         target = {
           group   = "pxc.percona.com"
@@ -873,16 +893,19 @@ locals {
         timeout    = "20m"
         wait       = false
         health_checks = [
-          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "kratos", namespace = var.flux_namespace },
-          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "keto", namespace = var.flux_namespace },
-          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "hydra", namespace = var.flux_namespace },
+          { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "iam", namespace = var.flux_namespace },
         ]
         health_check_exprs = []
       }
+      # AuthzDocuments for surfaces whose images carry no document. Inputs to
+      # the IAM composition — the provisioning service validates the deployed
+      # roles against the full catalog before becoming ready — so they apply
+      # as soon as the namespaces exist, gated only on the CRD the iam chart
+      # installs (retryInterval covers that window).
       "hub-iam-config" = {
         enabled            = local.is_hub
         path               = "./hub-iam-config"
-        depends_on         = ["hub-iam"]
+        depends_on         = ["hub"]
         timeout            = "10m"
         wait               = false
         health_checks      = []
@@ -902,7 +925,7 @@ locals {
         health_check_exprs = []
       }
       "hub-observability-agent" = {
-        enabled            = local.is_hub
+        enabled            = local.is_hub && var.observability.enabled
         path               = "./hub-observability-agent"
         depends_on         = ["platform-config"]
         timeout            = "5m"
@@ -944,10 +967,11 @@ locals {
 resource "terraform_data" "obs_ingest_validation" {
   lifecycle {
     precondition {
-      # Tooling generates its pair; a hub must carry copied credentials —
-      # empty values would leave the telemetry push unauthenticated and
-      # rejected once the open ingest routes are gone.
-      condition     = var.cluster_role != "hub" || (lookup(local.s, "OBS_INGEST_USERNAME", "") != "" && lookup(local.s, "OBS_INGEST_PASSWORD", "") != "")
+      # Tooling generates its pair; a hub that ships telemetry must carry
+      # copied credentials — empty values would leave the push
+      # unauthenticated and rejected once the open ingest routes are gone. A
+      # hub with observability off ships nothing and needs none.
+      condition     = var.cluster_role != "hub" || !var.observability.enabled || (lookup(local.s, "OBS_INGEST_USERNAME", "") != "" && lookup(local.s, "OBS_INGEST_PASSWORD", "") != "")
       error_message = "OBS_INGEST_USERNAME and OBS_INGEST_PASSWORD must both be set in a hub environment's .env. Username = the account declared for this hub on the Tooling Cluster under observability.ingest_users; password from make secrets ENV=<your-cc-env> -> obs_ingest_<name>_password. For a third-party sink, use that sink's credentials."
     }
   }
@@ -1001,8 +1025,12 @@ resource "kubectl_manifest" "kustomization" {
     spec = merge(
       {
         interval = "10m"
-        path     = each.value.path
-        prune    = each.value.prune
+        # An apply can legitimately fail while an in-flight chart install is
+        # still registering the CRDs its resources need; a short retry keeps
+        # that window from costing a full interval.
+        retryInterval = "1m"
+        path          = each.value.path
+        prune         = each.value.prune
         sourceRef = {
           kind = "OCIRepository"
           name = "ml-gitops"

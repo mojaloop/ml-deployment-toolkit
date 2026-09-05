@@ -1,6 +1,24 @@
 # Distribution values for the mcm HelmRelease.
 # Adopter overrides go in environments/<env>/values/mcm.yaml,
 # which is merged after this file and therefore wins.
+global:
+  iam:
+    hydra:
+      adminUrl: http://hydra-admin.ory.svc.cluster.local
+      publicUrl: http://hydra-public.ory.svc.cluster.local
+    kratos:
+      adminUrl: http://kratos-admin.ory.svc.cluster.local
+      publicUrl: http://kratos-public.ory.svc.cluster.local
+    provisioningUrl: http://iam-ml-iam-services-provisioning.ory.svc.cluster.local
+
+iam:
+  enabled: true
+  # DFSP onboarding: each DFSP is recorded as a Participant, the invited
+  # admin operates it, the machine client speaks for it
+  dfspResourceName: Participant
+  dfspAdminRole: dfsp-operator
+  dfspClientRole: dfsp-client
+
 db:
   user: mcm
   passwordSecret: mcm-db-secret
@@ -11,31 +29,12 @@ db:
 
 api:
   image:
-    name: ndelma/connection-manager-api
-    version: pr-202-v4
-  ports:
-    portName: api
-  url: "https://mcm.int.${DOMAIN}"
-  clientUrl: "https://mcm.int.${DOMAIN}"
+    name: kirgene/connection-manager-api
+    version: iam-document-authz
+  url: "https://mcm-api.ext.${DOMAIN}"
+  clientUrl: "https://mcm.int.${DOMAIN}/"
   switchFQDN: "${DOMAIN}"
   switchId: "${HUB_PARTICIPANT_NAME}"
-
-  env:
-    IAM_ENABLED: "true"
-    IAM_AUTO_CREATE_ACCOUNTS: "true"
-    HYDRA_ADMIN_URL: "http://hydra-admin.ory.svc.cluster.local:4445"
-    HYDRA_PUBLIC_URL: "http://hydra-public.ory.svc.cluster.local:4444"
-    KRATOS_ADMIN_URL: "http://kratos-admin.ory.svc.cluster.local:80"
-    KRATOS_PUBLIC_URL: "http://kratos-public.ory.svc.cluster.local:80"
-    KETO_READ_URL: "http://keto-read.ory.svc.cluster.local:80"
-    KETO_HUB_OBJECT: "${HUB_PARTICIPANT_NAME}"
-
-  openid:
-    enabled: false
-
-  keycloak:
-    enabled: false
-    autoCreateAccounts: false
 
   certManager:
     enabled: true
@@ -65,32 +64,75 @@ api:
     name: connection-manager-api
     externallyManaged: false
 
-  keto:
-    enabled: true
-    writeUrl: http://keto-write.ory.svc.cluster.local:80
-
 ui:
-  checkSessionUrl: "https://mcm.int.${DOMAIN}/kratos/sessions/whoami"
-  loginUrl: "https://auth.int.${DOMAIN}/kratos/self-service/login/browser"
+  authEnabled: true
+  image:
+    name: kirgene/connection-manager-ui
+    version: iam-document-authz
+  checkSessionUrl: "https://kratos.int.${DOMAIN}/sessions/whoami"
+  loginUrl: "https://kratos.int.${DOMAIN}/self-service/login/browser"
   loginProvider: kratos
-  logoutUrl: "/kratos/self-service/logout/browser"
-  oauth:
-    enabled: false
+  logoutUrl: "https://kratos.int.${DOMAIN}/self-service/logout/browser"
 
+gateway:
+  enabled: true
+  oathkeeper:
+    serviceNamespace: ory
+    serviceName: oathkeeper-api
+    servicePort: 4456
+  # The API host serves DFSP machines and the UI's browser calls; the tier
+  # is which gateway the name attaches to
+  api:
+    hosts:
+      - "mcm-api.ext.${DOMAIN}"
+    parentRefs:
+      - name: gw-ext
+        namespace: platform-system
+    cors:
+      allowOrigins:
+        - "https://mcm.int.${DOMAIN}"
+      allowMethods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+      allowHeaders:
+        - content-type
+        - authorization
+      allowCredentials: true
+  ui:
+    hosts:
+      - "mcm.int.${DOMAIN}"
+    parentRefs:
+      - name: gw-int
+        namespace: platform-system
+
+# The hub server cert is signed by the pki server role, which only allows
+# names under the deployment domain
+config:
+  tlsServerCSRParametersData: |-
+    {
+      "subject": {
+        "CN": "mcm.int.${DOMAIN}",
+        "O": "Mojaloop Hub"
+      },
+      "extensions": {
+        "subjectAltName": {
+          "dns": [
+            "mcm.int.${DOMAIN}"
+          ],
+          "ips": [
+          ]
+        }
+      }
+    }
+
+# The migration job's vault and switch env comes from api.vault/api.switchId
+# through the chart
 migrations:
   enabled: true
   deletePolicy: before-hook-creation
-  env:
-    VAULT_AUTH_METHOD: K8S
-    VAULT_K8S_TOKEN_FILE: /var/run/secrets/kubernetes.io/serviceaccount/token
-    VAULT_K8S_ROLE: mcm
-    VAULT_K8S_AUTH_MOUNT_POINT: kubernetes
-    VAULT_ENDPOINT: "http://vault.vault.svc.cluster.local:8200"
-    VAULT_MOUNT_PKI: pki
-    VAULT_MOUNT_KV: secret/mcm
-    VAULT_PKI_SERVER_ROLE: server-cert-role
-    VAULT_PKI_CLIENT_ROLE: client-cert-role
-    SWITCH_ID: "${HUB_PARTICIPANT_NAME}"
 
 ingress:
   enabled: false

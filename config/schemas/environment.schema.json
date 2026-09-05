@@ -166,7 +166,8 @@
           "enum": [
             "proxmox",
             "aws",
-            "digitalocean"
+            "digitalocean",
+            "kind"
           ]
         },
         "proxmox": {
@@ -512,6 +513,10 @@
         "from": {
           "description": "Sender address, stated outright — must be a mailbox/domain the SMTP account may send as.",
           "type": "string"
+        },
+        "starttls": {
+          "description": "Whether the relay negotiates STARTTLS; absent means it does. A plain in-cluster catcher states false.",
+          "type": "boolean"
         }
       }
     },

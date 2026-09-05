@@ -1,0 +1,351 @@
+# Distribution values for the iam HelmRelease (mojaloop-iam chart: Ory and
+# the IAM services that compose every registered OpenAPI document into the
+# deployment's gateway rules, Keto model and catalog).
+# Adopter overrides go in environments/<env>/values/iam.yaml,
+# which is merged after this file and therefore wins.
+global:
+  iamImage: docker.io/kirgene/ml-iam-services:iam-document-authz.2
+
+  # One real thing under several services' names: a DFSP is `dfsps` where
+  # the connection manager routes it and `participants` where the switch
+  # and the reporting services return its rows.
+  resourceNames:
+    Participant:
+      label: Participant
+      description: A financial institution connected to the hub
+      members:
+        - { service: mcm, type: dfsps }
+        - { service: reports, type: participants }
+        - { service: trxreporting, type: participants }
+        - { service: ledger, type: participants }
+        - { service: settlement, type: participants }
+      # The switch's registry is authoritative for who participates
+      source:
+        url: http://moja-centralledger-service.mojaloop.svc.cluster.local/participants
+        id: /name
+    Report:
+      label: Report
+      description: A report this deployment has defined
+      members:
+        - { service: reports, type: reports }
+
+  # Every service whose image carries its OpenAPI document. Surfaces whose
+  # images carry none (Flux, Goldilocks, Hubble, the intapi mirror) declare
+  # theirs as AuthzDocument resources in hub-iam-config.
+  authz:
+    - name: connection-manager-api
+      image: docker.io/kirgene/connection-manager-api:iam-document-authz
+      spec: /opt/app/src/api/openapi.yaml
+      url:
+        host: mcm-api.ext.${DOMAIN}
+    - name: connection-manager-ui
+      image: docker.io/kirgene/connection-manager-ui:iam-document-authz
+      spec: /opt/app/src/api/openapi.yaml
+      url:
+        host: mcm.int.${DOMAIN}
+    - name: role-assignment-service
+      image: docker.io/kirgene/role-assignment-service:iam-document-authz
+      spec: /opt/app/src/interface/api.yaml
+      url:
+        host: iam-api.int.${DOMAIN}
+    - name: reporting
+      image: docker.io/kirgene/reporting:iam-document-authz
+      spec: /opt/app/src/api/openapi.yaml
+      url:
+        host: reports-api.int.${DOMAIN}
+    - name: central-settlement
+      image: docker.io/kirgene/central-settlement:iam-document-authz
+      spec: /opt/app/src/interface/openapi.json
+      url:
+        host: settlements-api.int.${DOMAIN}
+    - name: ml-testing-toolkit
+      image: docker.io/kirgene/ml-testing-toolkit:iam-document-authz
+      spec: /opt/app/src/api/openapi.yaml
+      url:
+        host: ttk-backend.int.${DOMAIN}
+    - name: ml-testing-toolkit-ui
+      image: docker.io/kirgene/ml-testing-toolkit-ui:iam-document-authz
+      spec: /opt/app/src/api/openapi.yaml
+      url:
+        host: ttk.int.${DOMAIN}
+    - name: reporting-hub-bop-api-svc
+      image: docker.io/kirgene/reporting-hub-bop-api-svc:iam-document-authz
+      spec: /opt/app/src/api/openapi.yaml
+      url:
+        host: transfers-api.int.${DOMAIN}
+    - name: reporting-hub-bop-experience-api-svc
+      image: docker.io/kirgene/reporting-hub-bop-experience-api-svc:iam-document-authz
+      spec: /opt/app/src/api/openapi.yaml
+      url:
+        host: portal-api.int.${DOMAIN}
+    - name: reporting-hub-bop-shell
+      image: docker.io/kirgene/reporting-hub-bop-shell:iam-document-authz
+      spec: /opt/app/src/api/openapi.yaml
+      url:
+        host: portal.int.${DOMAIN}
+    - name: reporting-hub-bop-role-ui
+      image: docker.io/kirgene/reporting-hub-bop-role-ui:iam-document-authz
+      spec: /opt/app/src/api/openapi.yaml
+      url:
+        host: portal-iam.int.${DOMAIN}
+      portal:
+        path: /iam
+        label: Roles
+        scope: reporting_hub_bop_role_ui
+    - name: reporting-hub-bop-trx-ui
+      image: docker.io/kirgene/reporting-hub-bop-trx-ui:iam-document-authz
+      spec: /opt/app/src/api/openapi.yaml
+      url:
+        host: portal-transfers.int.${DOMAIN}
+      portal:
+        path: /transfers
+        label: Transfers
+        scope: reporting_hub_bop_trx_ui
+    - name: reporting-hub-bop-settlements-ui
+      image: docker.io/kirgene/reporting-hub-bop-settlements-ui:iam-document-authz
+      spec: /opt/app/src/api/openapi.yaml
+      url:
+        host: portal-settlements.int.${DOMAIN}
+      portal:
+        path: /settlements
+        label: Settlements
+        scope: reporting_hub_bop_settlements_ui
+    - name: reporting-hub-bop-positions-ui
+      image: docker.io/kirgene/reporting-hub-bop-positions-ui:iam-document-authz
+      spec: /opt/app/src/api/openapi.yaml
+      url:
+        host: portal-positions.int.${DOMAIN}
+      portal:
+        path: /positions
+        label: Financial Positions
+        scope: reporting_hub_bop_positions_ui
+
+  # The first identity a fresh deployment logs in with: created while the
+  # roles are applied and invited by email to set its password, the same
+  # courier flow every other operator onboards through.
+  iamAdmin:
+    email: ${HUB_ADMIN_EMAIL}
+    role: hub-admin
+
+kratos:
+  deployment:
+    extraInitContainers: |
+      - name: wait-for-db
+        image: percona/percona-xtradb-cluster:8.0.44-35.1
+        command: [sh, -c]
+        args:
+          - |
+            # DSN format: mysql://user:pass@tcp(host:port)/db?params
+            DB_USER=$(echo "$DSN" | sed 's|mysql://\([^:]*\):.*|\1|')
+            DB_PASS=$(echo "$DSN" | sed 's|mysql://[^:]*:\([^@]*\)@.*|\1|')
+            HOST=$(echo "$DSN" | sed 's|.*tcp(\([^:]*\):.*|\1|')
+            PORT=$(echo "$DSN" | sed 's|.*tcp([^:]*:\([^)]*\)).*|\1|')
+            DB=$(echo "$DSN" | sed 's|.*/\([^?]*\).*|\1|')
+            echo "Waiting for MySQL connectivity to $DB..."
+            until mysql -h "$HOST" -P "$PORT" -u "$DB_USER" -p"$DB_PASS" -e "SELECT 1" "$DB" 2>/dev/null; do
+              echo "Waiting for $DB database..."
+              sleep 5
+            done
+            echo "MySQL reachable. Verifying DDL readiness..."
+            STABLE=0
+            while [ $STABLE -lt 3 ]; do
+              if mysql -h "$HOST" -P "$PORT" -u "$DB_USER" -p"$DB_PASS" "$DB" \
+                -e "CREATE TABLE IF NOT EXISTS __init_check (id INT PRIMARY KEY) ENGINE=InnoDB; DROP TABLE IF EXISTS __init_check;" 2>/dev/null; then
+                STABLE=$((STABLE + 1))
+                echo "DDL check passed ($STABLE/3)"
+              else
+                STABLE=0
+                echo "DDL not ready, retrying..."
+              fi
+              sleep 2
+            done
+            echo "Database ready!"
+        env:
+          - name: DSN
+            valueFrom:
+              secretKeyRef:
+                name: kratos-secret
+                key: dsn
+  kratos:
+    config:
+      serve:
+        public:
+          base_url: https://kratos.int.${DOMAIN}/
+          cors:
+            enabled: true
+            allow_credentials: true
+            allowed_origins:
+              - https://*.${DOMAIN}
+      cookies:
+        domain: ${DOMAIN}
+        same_site: Lax
+      session:
+        cookie:
+          domain: ${DOMAIN}
+          same_site: Lax
+      selfservice:
+        default_browser_return_url: https://portal.int.${DOMAIN}/
+        allowed_return_urls:
+          - https://*.${DOMAIN}
+        flows:
+          login:
+            ui_url: https://auth.int.${DOMAIN}/login
+          error:
+            ui_url: https://auth.int.${DOMAIN}/error
+          recovery:
+            ui_url: https://auth.int.${DOMAIN}/recovery
+          settings:
+            ui_url: https://auth.int.${DOMAIN}/settings
+            # The invitation link chains recovery into settings and this
+            # redirect completes it after the save
+            after:
+              default_browser_return_url: https://portal.int.${DOMAIN}/
+      courier:
+        smtp:
+          from_name: Mojaloop Hub
+          from_address: no-reply@${DOMAIN}
+
+keto:
+  deployment:
+    extraInitContainers: |
+      - name: wait-for-db
+        image: percona/percona-xtradb-cluster:8.0.44-35.1
+        command: [sh, -c]
+        args:
+          - |
+            # DSN format: mysql://user:pass@tcp(host:port)/db?params
+            DB_USER=$(echo "$DSN" | sed 's|mysql://\([^:]*\):.*|\1|')
+            DB_PASS=$(echo "$DSN" | sed 's|mysql://[^:]*:\([^@]*\)@.*|\1|')
+            HOST=$(echo "$DSN" | sed 's|.*tcp(\([^:]*\):.*|\1|')
+            PORT=$(echo "$DSN" | sed 's|.*tcp([^:]*:\([^)]*\)).*|\1|')
+            DB=$(echo "$DSN" | sed 's|.*/\([^?]*\).*|\1|')
+            echo "Waiting for MySQL connectivity to $DB..."
+            until mysql -h "$HOST" -P "$PORT" -u "$DB_USER" -p"$DB_PASS" -e "SELECT 1" "$DB" 2>/dev/null; do
+              echo "Waiting for $DB database..."
+              sleep 5
+            done
+            echo "MySQL reachable. Verifying DDL readiness..."
+            STABLE=0
+            while [ $STABLE -lt 3 ]; do
+              if mysql -h "$HOST" -P "$PORT" -u "$DB_USER" -p"$DB_PASS" "$DB" \
+                -e "CREATE TABLE IF NOT EXISTS __init_check (id INT PRIMARY KEY) ENGINE=InnoDB; DROP TABLE IF EXISTS __init_check;" 2>/dev/null; then
+                STABLE=$((STABLE + 1))
+                echo "DDL check passed ($STABLE/3)"
+              else
+                STABLE=0
+                echo "DDL not ready, retrying..."
+              fi
+              sleep 2
+            done
+            echo "Database ready!"
+        env:
+          - name: DSN
+            valueFrom:
+              secretKeyRef:
+                name: keto-secret
+                key: dsn
+
+hydra:
+  deployment:
+    extraInitContainers: |
+      - name: wait-for-db
+        image: percona/percona-xtradb-cluster:8.0.44-35.1
+        command: [sh, -c]
+        args:
+          - |
+            DB_USER=$(echo "$DSN" | sed 's|mysql://\([^:]*\):.*|\1|')
+            DB_PASS=$(echo "$DSN" | sed 's|mysql://[^:]*:\([^@]*\)@.*|\1|')
+            HOST=$(echo "$DSN" | sed 's|.*tcp(\([^:]*\):.*|\1|')
+            PORT=$(echo "$DSN" | sed 's|.*tcp([^:]*:\([^)]*\)).*|\1|')
+            DB=$(echo "$DSN" | sed 's|.*/\([^?]*\).*|\1|')
+            echo "Waiting for MySQL connectivity to $DB..."
+            until mysql -h "$HOST" -P "$PORT" -u "$DB_USER" -p"$DB_PASS" -e "SELECT 1" "$DB" 2>/dev/null; do
+              echo "Waiting for $DB database..."
+              sleep 5
+            done
+            echo "MySQL reachable. Verifying DDL readiness..."
+            STABLE=0
+            while [ $STABLE -lt 3 ]; do
+              if mysql -h "$HOST" -P "$PORT" -u "$DB_USER" -p"$DB_PASS" "$DB" \
+                -e "CREATE TABLE IF NOT EXISTS __init_check (id INT PRIMARY KEY) ENGINE=InnoDB; DROP TABLE IF EXISTS __init_check;" 2>/dev/null; then
+                STABLE=$((STABLE + 1))
+                echo "DDL check passed ($STABLE/3)"
+              else
+                STABLE=0
+                echo "DDL not ready, retrying..."
+              fi
+              sleep 2
+            done
+            echo "Database ready!"
+        env:
+          - name: DSN
+            valueFrom:
+              secretKeyRef:
+                name: hydra-secret
+                key: dsn
+  hydra:
+    config:
+      serve:
+        public:
+          cors:
+            allowed_origins:
+              - https://*.${DOMAIN}
+      urls:
+        self:
+          issuer: https://hydra.ext.${DOMAIN}
+
+# Browsers (accept text/html) get the Kratos login redirect, machines the
+# json 401
+oathkeeper:
+  oathkeeper:
+    config:
+      authorizers:
+        remote_json:
+          config:
+            remote: http://iam-ml-iam-services-decision/
+      errors:
+        fallback:
+          - redirect
+          - json
+        handlers:
+          redirect:
+            enabled: true
+            config:
+              to: https://kratos.int.${DOMAIN}/self-service/login/browser
+              return_to_query_param: return_to
+
+# Kratos self-service UI at auth.<domain>, the browser talks to kratos.<domain>
+kratos-ui:
+  enabled: true
+  kratosPublicUrl: http://kratos-public
+  kratosBrowserUrl: https://kratos.int.${DOMAIN}
+  projectName: Mojaloop Hub
+  config:
+    csrfCookieName: hub_csrf_token
+
+# IdP surfaces: humans on the internal gateway, hydra (machine tokens) on
+# the external one; these routes authenticate so they bypass Oathkeeper
+gateway:
+  enabled: true
+  parentRefs:
+    - name: gw-int
+      namespace: platform-system
+  hosts:
+    kratos: kratos.int.${DOMAIN}
+    auth: auth.int.${DOMAIN}
+    # Renders only where the mail catcher is enabled (dev templates)
+    mailpit: mailpit.int.${DOMAIN}
+    hydra:
+      host: hydra.ext.${DOMAIN}
+      parentRefs:
+        - name: gw-ext
+          namespace: platform-system
+  # Every namespace whose HTTPRoutes delegate auth to Oathkeeper through the
+  # ExternalAuth filter
+  oathkeeperConsumerNamespaces:
+    - mcm
+    - finance-portal
+    - mojaloop
+    - flux-system
+    - goldilocks
+    - cilium

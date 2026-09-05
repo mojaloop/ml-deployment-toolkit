@@ -89,6 +89,11 @@ output "do_node_pools" {
   value       = local.do_node_pools
 }
 
+output "kind_node_pools" {
+  description = "kind worker pools derived from template node groups"
+  value       = local.kind_node_pools
+}
+
 output "workload_classes" {
   description = "Workload class IDENTITY (names, intent, talos_type) from config/definitions/workload-classes.yaml"
   value       = local.workload_classes.classes
@@ -152,6 +157,7 @@ output "object_storage" {
 output "observability" {
   description = "Telemetry push sink URLs + served ingest accounts (resolved)"
   value = {
+    enabled      = local.observability_active
     loki_url     = local.loki_url
     mimir_url    = local.mimir_url
     tempo_url    = local.tempo_url
@@ -171,9 +177,10 @@ output "cert" {
 output "email" {
   description = "Transactional SMTP parameters (non-secret)"
   value = {
-    host = local.smtp_host
-    port = local.smtp_port
-    from = local.email_from
+    host     = local.smtp_host
+    port     = local.smtp_port
+    from     = local.email_from
+    starttls = local.smtp_starttls
   }
 }
 

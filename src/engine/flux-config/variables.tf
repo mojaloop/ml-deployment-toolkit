@@ -95,11 +95,12 @@ variable "cert" {
 }
 
 variable "email" {
-  description = "Transactional SMTP parameters (non-secret): host, port, from"
+  description = "Transactional SMTP parameters (non-secret): host, port, from, starttls"
   type = object({
-    host = string
-    port = string
-    from = string
+    host     = string
+    port     = string
+    from     = string
+    starttls = bool
   })
 }
 
@@ -112,8 +113,9 @@ variable "alerting" {
 }
 
 variable "observability" {
-  description = "Telemetry push sink URLs (loki_url, mimir_url, tempo_url) + ingest_users, tooling-only: ingest accounts to provision in the obs-ingest front, each with a generated password."
+  description = "Telemetry push sink: whether this cluster ships at all, the push URLs (loki_url, mimir_url, tempo_url) + ingest_users, tooling-only: ingest accounts to provision in the obs-ingest front, each with a generated password."
   type = object({
+    enabled      = bool
     loki_url     = string
     mimir_url    = string
     tempo_url    = string

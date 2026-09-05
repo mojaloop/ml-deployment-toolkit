@@ -1,0 +1,26 @@
+# Template overlay — asserts this capacity profile's tuning explicitly, so a
+# drift in the common defaults can never silently change a deployed profile.
+# Merged over the common layer via the <namespace>-<release>-values-template slot; the environment layer wins last.
+centralledger:
+  centralledger-service: { replicaCount: 1 }
+  centralledger-handler-transfer-prepare: { replicaCount: 1 }
+  centralledger-handler-transfer-position-batch: { replicaCount: 1 }
+  centralledger-handler-transfer-get: { replicaCount: 1 }
+  centralledger-handler-transfer-fulfil: { replicaCount: 1 }
+  centralledger-handler-timeout: { replicaCount: 1 }
+  centralledger-handler-admin-transfer: { replicaCount: 1 }
+quoting-service:
+  quoting-service: { replicaCount: 1 }
+  quoting-service-handler: { replicaCount: 3 }
+centralsettlement:
+  centralsettlement-service: { replicaCount: 1 }
+  centralsettlement-handler-deferredsettlement: { replicaCount: 1 }
+  centralsettlement-handler-rules: { replicaCount: 1 }
+account-lookup-service:
+  account-lookup-service: { replicaCount: 1 }
+  account-lookup-service-admin: { replicaCount: 1 }
+als-msisdn-oracle: { replicaCount: 1 }
+transaction-requests-service: { replicaCount: 1 }
+ml-api-adapter:
+  ml-api-adapter-service: { replicaCount: 1 }
+  ml-api-adapter-handler-notification: { replicaCount: 6 }

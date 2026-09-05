@@ -1,0 +1,51 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: iam
+  namespace: flux-system
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: mojaloop-iam
+      version: "17.2.2-iam-document-authz.24183"
+      sourceRef:
+        kind: HelmRepository
+        name: mojaloop
+      interval: 12h
+  releaseName: iam
+  targetNamespace: ory
+  timeout: 20m
+  install:
+    createNamespace: false
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      retries: -1
+      strategy: uninstall
+  valuesFrom:
+    # Distribution defaults. Adopter override is merged last and wins.
+    - kind: ConfigMap
+      name: iam-values
+      valuesKey: values.yaml
+    # The deployment's role document
+    - kind: ConfigMap
+      name: iam-roles-values
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: ory-iam-values-provider
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
+      name: ory-iam-values-template
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
+      name: ory-iam-values-override
+      valuesKey: values.yaml
+      optional: true
+    - kind: Secret
+      name: ory-iam-values-override
+      valuesKey: values.yaml
+      optional: true

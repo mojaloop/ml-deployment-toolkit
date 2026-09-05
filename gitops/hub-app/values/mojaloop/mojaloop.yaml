@@ -263,6 +263,14 @@ centralsettlement:
       db_port: ${MYSQL_PORT}
       db_user: central_ledger
       db_database: central_ledger
+    gateway:
+      enabled: true
+      host: settlements-api.int.${DOMAIN}
+      parentRefs:
+        - name: gw-int
+          namespace: platform-system
+      oathkeeper:
+        serviceNamespace: ory
   centralsettlement-handler-deferredsettlement:
     replicaCount: 1
     metrics:
@@ -559,10 +567,32 @@ ml-testing-toolkit:
           verify: false
           caSecret: {}
           clientCert: {}
+    image:
+      repository: kirgene/ml-testing-toolkit
+      tag: iam-document-authz
+    gateway:
+      enabled: true
+      host: ttk-backend.int.${DOMAIN}
+      parentRefs:
+        - name: gw-int
+          namespace: platform-system
+      oathkeeper:
+        serviceNamespace: ory
 
   ml-testing-toolkit-frontend:
     config:
       API_BASE_URL: https://ttk-backend.int.${DOMAIN}
+    image:
+      repository: kirgene/ml-testing-toolkit-ui
+      tag: iam-document-authz
+    gateway:
+      enabled: true
+      host: ttk.int.${DOMAIN}
+      parentRefs:
+        - name: gw-int
+          namespace: platform-system
+      oathkeeper:
+        serviceNamespace: ory
 
   ml-testing-toolkit-cli:
     enabled: false

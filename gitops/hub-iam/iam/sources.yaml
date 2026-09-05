@@ -1,0 +1,19 @@
+# Chart sources for the platform: both published chart repositories, whose CI
+# packages per-branch pre-releases every HelmRelease pins by version.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: mojaloop
+  namespace: flux-system
+spec:
+  interval: 12h
+  url: https://mojaloop.github.io/helm/repo
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: mojaloop-charts
+  namespace: flux-system
+spec:
+  interval: 12h
+  url: https://mojaloop.github.io/charts/repo

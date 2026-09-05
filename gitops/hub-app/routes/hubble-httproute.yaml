@@ -1,6 +1,6 @@
-# Hub-only (moved from the shared layers in P4): the tooling cluster has no
-# IAM to gate this UI behind, so it exposes no route — operators
-# port-forward there. Here it rides oathkeeper (cookie_session + Keto).
+# Hub-only: the tooling cluster has no IAM to gate this UI behind, so it
+# exposes no route — operators port-forward there. Auth delegates to
+# Oathkeeper against the hubbleUi document (hub-iam-config).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -13,11 +13,27 @@ spec:
   hostnames:
     - "hubble.int.${DOMAIN}"
   rules:
-    # Through oathkeeper (cookie_session + Keto opsui permission) — the
-    # matching Rule in hub-app/ops-ui/oathkeeper-rules.yaml carries the
-    # upstream; this route only decides that NOTHING reaches the backend
-    # without passing the proxy.
-    - backendRefs:
-        - name: oathkeeper-proxy
-          namespace: ory
-          port: 4455
+    - filters:
+        # The scope is the decision endpoint's word, so a client's own copy is
+        # removed at the edge and cannot reach anything behind it
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            remove:
+              - X-Scope
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              name: oathkeeper-api
+              namespace: ory
+              port: 4456
+            http:
+              path: /decisions
+              allowedHeaders:
+                - cookie
+                - accept
+              allowedResponseHeaders:
+                - x-scope
+      backendRefs:
+        - name: hubble-ui
+          port: 80
