@@ -230,12 +230,9 @@ locals {
       ACME_ACCOUNT_KEY_SECRET = var.cert.acme_account_key_secret
 
       # email + alerting capabilities (non-secret halves)
-      SMTP_HOST = var.email.host
-      SMTP_PORT = var.email.port
-      # The kratos courier URI parameter: disable_starttls, so the value is
-      # the negation of the stated capability
-      SMTP_DISABLE_STARTTLS = var.email.starttls ? "false" : "true"
-      ALERT_EMAIL_FROM      = var.email.from
+      SMTP_HOST        = var.email.host
+      SMTP_PORT        = var.email.port
+      ALERT_EMAIL_FROM = var.email.from
       ALERT_EMAIL_TO   = var.alerting.email_to
       TELEGRAM_CHAT_ID = var.alerting.telegram_chat_id
 
@@ -332,10 +329,18 @@ resource "kubernetes_secret_v1" "cluster_secrets" {
       OCI_REPO_PASSWORD = lookup(local.s, "OCI_REPO_PASSWORD", "")
       SMTP_USER         = lookup(local.s, "SMTP_USER", "")
       SMTP_PASSWORD     = lookup(local.s, "SMTP_PASSWORD", "")
-      # The connection URI's userinfo, whole: a mail client offers AUTH only
-      # over an encrypted channel, so a relay without credentials must see a
-      # URI without userinfo rather than empty credentials
-      SMTP_USERINFO = lookup(local.set_secrets, "SMTP_USER", "") != "" ? "${urlencode(local.s.SMTP_USER)}:${urlencode(lookup(local.s, "SMTP_PASSWORD", ""))}@" : ""
+      # The courier's connection URI, whole. The client offers AUTH only over
+      # an encrypted channel, so a relay without credentials takes a URI
+      # without userinfo, and one that negotiates no STARTTLS is told not to
+      # demand it. An environment with no email capability still needs a URI
+      # Kratos can parse to start, and localhost delivers to nothing.
+      SMTP_CONNECTION_URI = format(
+        "smtp://%s%s:%s/?skip_ssl_verify=true&disable_starttls=%s",
+        lookup(local.set_secrets, "SMTP_USER", "") != "" ? "${urlencode(local.s.SMTP_USER)}:${urlencode(lookup(local.s, "SMTP_PASSWORD", ""))}@" : "",
+        var.email.host != "" ? var.email.host : "localhost",
+        var.email.port != "" ? var.email.port : "25",
+        var.email.starttls ? "false" : "true",
+      )
       # Grafana Telegram contact point tolerates a dummy token; empty breaks provisioning
       TELEGRAM_BOT_TOKEN = lookup(local.set_secrets, "TELEGRAM_BOT_TOKEN", "unset")
     },
