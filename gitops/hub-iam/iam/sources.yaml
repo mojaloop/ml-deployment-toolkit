@@ -1,5 +1,31 @@
-# Chart sources for the platform: both published chart repositories, whose CI
-# packages per-branch pre-releases every HelmRelease pins by version.
+# Chart sources for the platform.
+#
+# The two charts this work still changes are built from their branches, so a
+# chart fix reaches a cluster on the next reconcile instead of a publish. What
+# runs is then a commit rather than a version: both revert to the published
+# repositories below, pinned by version, once the charts settle.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: mojaloop-charts-git
+  namespace: flux-system
+spec:
+  interval: 2m
+  url: https://github.com/mojaloop/charts.git
+  ref:
+    branch: feat/iam-document-authz
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: mojaloop-helm-git
+  namespace: flux-system
+spec:
+  interval: 2m
+  url: https://github.com/mojaloop/helm.git
+  ref:
+    branch: feat/iam-document-authz
+---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
