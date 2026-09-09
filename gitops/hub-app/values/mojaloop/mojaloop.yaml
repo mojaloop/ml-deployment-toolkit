@@ -576,6 +576,19 @@ ml-testing-toolkit:
       parentRefs:
         - name: gw-int
           namespace: platform-system
+      cors:
+        allowOrigins:
+          - "https://ttk.int.${DOMAIN}"
+        allowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        allowHeaders:
+          - content-type
+          - authorization
+        allowCredentials: true
       oathkeeper:
         serviceNamespace: ory
 
