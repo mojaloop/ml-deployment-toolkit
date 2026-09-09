@@ -12,7 +12,7 @@ spec:
       # their own file:// dependencies, and Flux resolves only one level, so a
       # git-sourced build renders without mojaloop-common and fails outright.
       chart: mojaloop
-      version: "17.2.1-iam-document-authz.24126"
+      version: "17.2.1-iam-document-authz.24248"
       sourceRef:
         kind: HelmRepository
         name: mojaloop
