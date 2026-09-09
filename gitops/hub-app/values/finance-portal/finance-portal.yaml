@@ -126,6 +126,9 @@ reporting-hub-bop-shell:
       LOGIN_URL: "https://kratos.int.${DOMAIN}/self-service/login/browser"
       LOGOUT_URL: "https://kratos.int.${DOMAIN}/self-service/logout/browser"
       REMOTE_API_BASE_URL: "/"
+      # The session endpoint above is absolute, so the client prefixes it with
+      # nothing. Left unset, the shell prefixes the string "undefined".
+      AUTH_API_BASE_URL: ""
   gateway:
     enabled: true
     host: portal.int.${DOMAIN}
