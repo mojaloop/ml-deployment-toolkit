@@ -102,6 +102,23 @@ role-assignment-service:
     parentRefs:
       - name: gw-int
         namespace: platform-system
+    cors:
+      allowOrigins:
+        - "https://portal.int.${DOMAIN}"
+        - "https://portal-iam.int.${DOMAIN}"
+      allowMethods:
+        - GET
+        - POST
+        - PATCH
+        - PUT
+        - DELETE
+        - OPTIONS
+      allowHeaders:
+        - content-type
+        - authorization
+        - accept
+        - x-requested-with
+      allowCredentials: true
     oathkeeper:
       serviceNamespace: ory
 
@@ -300,6 +317,22 @@ reporting-hub-bop-experience-api-svc:
     parentRefs:
       - name: gw-int
         namespace: platform-system
+    cors:
+      allowOrigins:
+        - "https://portal.int.${DOMAIN}"
+      allowMethods:
+        - GET
+        - POST
+        - PATCH
+        - PUT
+        - DELETE
+        - OPTIONS
+      allowHeaders:
+        - content-type
+        - authorization
+        - accept
+        - x-requested-with
+      allowCredentials: true
     oathkeeper:
       serviceNamespace: ory
 
@@ -317,6 +350,22 @@ reporting-hub-bop-api-svc:
     parentRefs:
       - name: gw-int
         namespace: platform-system
+    cors:
+      allowOrigins:
+        - "https://portal.int.${DOMAIN}"
+      allowMethods:
+        - GET
+        - POST
+        - PATCH
+        - PUT
+        - DELETE
+        - OPTIONS
+      allowHeaders:
+        - content-type
+        - authorization
+        - accept
+        - x-requested-with
+      allowCredentials: true
     oathkeeper:
       serviceNamespace: ory
 
@@ -408,6 +457,22 @@ reporting-legacy-api:
     parentRefs:
       - name: gw-int
         namespace: platform-system
+    cors:
+      allowOrigins:
+        - "https://portal.int.${DOMAIN}"
+      allowMethods:
+        - GET
+        - POST
+        - PATCH
+        - PUT
+        - DELETE
+        - OPTIONS
+      allowHeaders:
+        - content-type
+        - authorization
+        - accept
+        - x-requested-with
+      allowCredentials: true
     oathkeeper:
       serviceNamespace: ory
 

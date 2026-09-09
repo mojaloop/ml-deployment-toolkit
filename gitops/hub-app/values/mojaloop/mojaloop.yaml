@@ -269,6 +269,22 @@ centralsettlement:
       parentRefs:
         - name: gw-int
           namespace: platform-system
+      cors:
+        allowOrigins:
+          - "https://portal.int.${DOMAIN}"
+        allowMethods:
+          - GET
+          - POST
+          - PATCH
+          - PUT
+          - DELETE
+          - OPTIONS
+        allowHeaders:
+          - content-type
+          - authorization
+          - accept
+          - x-requested-with
+        allowCredentials: true
       oathkeeper:
         serviceNamespace: ory
   centralsettlement-handler-deferredsettlement:
