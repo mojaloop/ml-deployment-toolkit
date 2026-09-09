@@ -8,11 +8,10 @@ spec:
   chart:
     spec:
       chart: connection-manager
-      version: "17.2.1-iam-document-authz.24126"
       sourceRef:
-        kind: HelmRepository
-        name: mojaloop
-      interval: 12h
+        kind: GitRepository
+        name: mojaloop-helm-git
+      interval: 2m
   releaseName: mcm
   targetNamespace: mcm
   timeout: 10m

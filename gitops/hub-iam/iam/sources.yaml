@@ -1,9 +1,9 @@
 # Chart sources for the platform.
 #
-# The two charts this work still changes are built from their branches, so a
-# chart fix reaches a cluster on the next reconcile instead of a publish. What
-# runs is then a commit rather than a version: both revert to the published
-# repositories below, pinned by version, once the charts settle.
+# The charts this work still changes are built from their branches, so a chart
+# fix reaches a cluster on the next reconcile instead of a publish. What runs is
+# then a commit rather than a version: they revert to the published repositories
+# below, pinned by version, once the charts settle.
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
 metadata:
