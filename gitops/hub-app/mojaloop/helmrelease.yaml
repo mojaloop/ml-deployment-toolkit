@@ -8,11 +8,15 @@ spec:
   timeout: 30m
   chart:
     spec:
+      # Published artifact, not the branch: this umbrella's subcharts declare
+      # their own file:// dependencies, and Flux resolves only one level, so a
+      # git-sourced build renders without mojaloop-common and fails outright.
       chart: mojaloop
+      version: "17.2.1-iam-document-authz.24234"
       sourceRef:
-        kind: GitRepository
-        name: mojaloop-helm-git
-      interval: 2m
+        kind: HelmRepository
+        name: mojaloop
+      interval: 12h
   releaseName: moja
   targetNamespace: mojaloop
   storageNamespace: mojaloop
