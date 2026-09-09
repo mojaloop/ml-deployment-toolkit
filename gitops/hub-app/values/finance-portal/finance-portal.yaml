@@ -94,7 +94,7 @@ role-assignment-service:
           }
         },
         "CORS_WHITELIST": ["https://portal.int.${DOMAIN}", "https://portal-iam.int.${DOMAIN}"],
-        "ALLOW_CREDENTIALS": false
+        "ALLOW_CREDENTIALS": true
       }
   gateway:
     enabled: true
