@@ -93,8 +93,6 @@ role-assignment-service:
             }
           }
         },
-        # Origins are the gateway route's to state, so hapi is told to leave
-        # them alone; it rejects credentials alongside an ignored origin.
         "CORS_WHITELIST": "ignore",
         "ALLOW_CREDENTIALS": false
       }

@@ -8,10 +8,6 @@ spec:
   timeout: 10m
   chart:
     spec:
-      # Published artifact, not the branch: reporting-k8s-templates is a
-      # dependency of a dependency, and Flux resolves one level, so a
-      # git-sourced build renders without the report definitions and the
-      # report links answer 404.
       chart: finance-portal
       version: "5.1.8-iam-document-authz.4183"
       sourceRef:

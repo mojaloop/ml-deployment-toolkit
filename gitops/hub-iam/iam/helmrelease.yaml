@@ -11,9 +11,6 @@ spec:
       sourceRef:
         kind: GitRepository
         name: mojaloop-helm-git
-      # Every commit rebuilds the chart. The default keys the rebuild on the
-      # chart's version, so a branch that fixes a template without touching
-      # Chart.yaml keeps installing the artifact built before the fix.
       reconcileStrategy: Revision
       interval: 2m
   releaseName: iam
