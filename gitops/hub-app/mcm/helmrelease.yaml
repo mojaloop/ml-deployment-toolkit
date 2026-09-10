@@ -11,6 +11,9 @@ spec:
       sourceRef:
         kind: GitRepository
         name: mojaloop-helm-git
+      # Every commit rebuilds the chart; the default keys the rebuild on the
+      # chart's version, which a template fix need not touch.
+      reconcileStrategy: Revision
       interval: 2m
   releaseName: mcm
   targetNamespace: mcm
