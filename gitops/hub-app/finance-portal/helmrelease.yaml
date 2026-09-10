@@ -8,14 +8,16 @@ spec:
   timeout: 10m
   chart:
     spec:
-      chart: mojaloop/finance-portal
+      # Published artifact, not the branch: reporting-k8s-templates is a
+      # dependency of a dependency, and Flux resolves one level, so a
+      # git-sourced build renders without the report definitions and the
+      # report links answer 404.
+      chart: finance-portal
+      version: "5.1.8-iam-document-authz.4183"
       sourceRef:
-        kind: GitRepository
-        name: mojaloop-charts-git
-      # Every commit rebuilds the chart; the default keys the rebuild on the
-      # chart's version, which a template fix need not touch.
-      reconcileStrategy: Revision
-      interval: 2m
+        kind: HelmRepository
+        name: mojaloop-charts
+      interval: 12h
   releaseName: fin-portal
   # Dedicated namespace, as MCM has. releaseName is pinned above and must stay pinned:
   # without it helm-controller derives the release name from targetNamespace, so moving
