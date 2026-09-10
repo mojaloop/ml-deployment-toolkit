@@ -93,8 +93,10 @@ role-assignment-service:
             }
           }
         },
-        "CORS_WHITELIST": ["https://portal.int.${DOMAIN}", "https://portal-iam.int.${DOMAIN}"],
-        "ALLOW_CREDENTIALS": true
+        # Origins are the gateway route's to state, so hapi is told to leave
+        # them alone; it rejects credentials alongside an ignored origin.
+        "CORS_WHITELIST": "ignore",
+        "ALLOW_CREDENTIALS": false
       }
   gateway:
     enabled: true
