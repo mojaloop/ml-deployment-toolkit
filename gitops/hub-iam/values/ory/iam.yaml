@@ -49,7 +49,7 @@ global:
       url:
         host: iam-api.int.${DOMAIN}
     - name: reporting
-      image: docker.io/kirgene/reporting:iam-document-authz
+      image: docker.io/kirgene/reporting:iam-document-authz.3
       spec: /opt/app/src/api/openapi.yaml
       url:
         host: reports-api.int.${DOMAIN}
