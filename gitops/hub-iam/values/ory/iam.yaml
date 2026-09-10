@@ -64,7 +64,7 @@ global:
       url:
         host: ttk-backend.int.${DOMAIN}
     - name: ml-testing-toolkit-ui
-      image: docker.io/kirgene/ml-testing-toolkit-ui:iam-document-authz
+      image: docker.io/kirgene/ml-testing-toolkit-ui:iam-document-authz.2
       spec: /opt/app/src/api/openapi.yaml
       url:
         host: ttk.int.${DOMAIN}

@@ -213,7 +213,7 @@ reporting-hub-bop-settlements-ui:
     runtime-env.js: |
       window.settlementEnv = {
         CENTRAL_LEDGER_ENDPOINT: 'https://portal-api.int.${DOMAIN}',
-        CENTRAL_SETTLEMENTS_ENDPOINT: 'https://settlements-api.int.${DOMAIN}',
+        CENTRAL_SETTLEMENTS_ENDPOINT: 'https://settlements-api.int.${DOMAIN}/v2',
         REPORTING_API_ENDPOINT: 'https://transfers-api.int.${DOMAIN}',
         REPORTING_TEMPLATE_API_ENDPOINT: 'https://reports-api.int.${DOMAIN}/report-bilateral-settlement'
       };

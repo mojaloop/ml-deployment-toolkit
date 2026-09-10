@@ -613,7 +613,7 @@ ml-testing-toolkit:
       API_BASE_URL: https://ttk-backend.int.${DOMAIN}
     image:
       repository: kirgene/ml-testing-toolkit-ui
-      tag: iam-document-authz
+      tag: iam-document-authz.2
     gateway:
       enabled: true
       host: ttk.int.${DOMAIN}
