@@ -135,9 +135,9 @@ data:
               - { permission: settlement.getSettlementWindowById }
               - { permission: settlement.closeSettlementWindow }
               - { permission: settlement.getSettlementWindowsByParams }
-              - { permission: settlement.getSettlementsByParams }
+              - { permission: settlement.getSettlementsByParams, resources: { Participant: all } }
               - { permission: settlement.createSettlement }
-              - { permission: settlement.getSettlementById }
+              - { permission: settlement.getSettlementById, resources: { Participant: all } }
               - { permission: settlement.updateSettlementById }
               - { permission: settlement.getSettlementBySettlementParticipant, resources: { Participant: all } }
               - { permission: settlement.updateSettlementBySettlementParticipant, resources: { Participant: all } }
@@ -234,6 +234,14 @@ data:
               - { permission: mcm.uploadDfspStatesStatus }
               - { permission: mcm.getCredentials }
               - { permission: mcm.createCredentials }
+              - { permission: settlement.getSettlementWindowById }
+              - { permission: settlement.getSettlementWindowsByParams }
+              - { permission: settlement.getSettlementsByParams }
+              - { permission: settlement.getSettlementById }
+              - { permission: settlement.getSettlementBySettlementParticipant }
+              - { permission: settlement.updateSettlementBySettlementParticipant }
+              - { permission: settlement.getSettlementBySettlementParticipantAccount }
+              - { permission: settlement.updateSettlementBySettlementParticipantAccount }
               - { permission: mcmUi.viewMcmUi }
           dfsp-client:
             grants:
@@ -296,3 +304,11 @@ data:
               - { permission: mcm.deleteDfspJWSCerts }
               - { permission: mcm.getDfspStatus }
               - { permission: mcm.uploadDfspStatesStatus }
+              - { permission: settlement.getSettlementWindowById }
+              - { permission: settlement.getSettlementWindowsByParams }
+              - { permission: settlement.getSettlementsByParams }
+              - { permission: settlement.getSettlementById }
+              - { permission: settlement.getSettlementBySettlementParticipant }
+              - { permission: settlement.updateSettlementBySettlementParticipant }
+              - { permission: settlement.getSettlementBySettlementParticipantAccount }
+              - { permission: settlement.updateSettlementBySettlementParticipantAccount }
