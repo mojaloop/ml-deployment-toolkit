@@ -69,7 +69,9 @@ global:
       url:
         host: ttk.int.${DOMAIN}
     - name: reporting-hub-bop-api-svc
-      image: docker.io/kirgene/reporting-hub-bop-api-svc:iam-document-authz
+      # The document is read by mounting this image, and that mount pulls only
+      # what it does not already hold, so a document changes under a new tag.
+      image: docker.io/kirgene/reporting-hub-bop-api-svc:iam-document-authz.2
       spec: /opt/app/src/api/openapi.yaml
       url:
         host: transfers-api.int.${DOMAIN}

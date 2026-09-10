@@ -343,7 +343,7 @@ reporting-hub-bop-api-svc:
   image:
     registry: docker.io
     repository: kirgene/reporting-hub-bop-api-svc
-    tag: iam-document-authz
+    tag: iam-document-authz.2
   containerSecurityContext:
     enabled: false
   gateway:
