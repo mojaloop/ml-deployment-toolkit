@@ -191,7 +191,7 @@ reporting-hub-bop-trx-ui:
   configFiles:
     runtime-env.js: |
       window.transferEnv = {
-        REACT_APP_API_BASE_URL: 'https://transfers-api.int.${DOMAIN}',
+        REACT_APP_API_BASE_URL: 'https://transfers-api.int.${DOMAIN}/api/transfers',
         REACT_APP_MOCK_API: 'false'
       };
   gateway:
