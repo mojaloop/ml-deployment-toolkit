@@ -292,6 +292,9 @@ centralsettlement:
         serviceNamespace: ory
   centralsettlement-handler-deferredsettlement:
     replicaCount: 1
+    image:
+      repository: kirgene/central-settlement
+      tag: iam-document-authz.1
     metrics:
       enabled: true
     config:
@@ -302,6 +305,9 @@ centralsettlement:
       db_user: central_ledger
       db_database: central_ledger
   centralsettlement-handler-grosssettlement:
+    image:
+      repository: kirgene/central-settlement
+      tag: iam-document-authz.1
     config:
       kafka_host: "${KAFKA_HOST}"
       kafka_port: ${KAFKA_PORT}
@@ -312,6 +318,9 @@ centralsettlement:
     replicaCount: 0
   centralsettlement-handler-rules:
     replicaCount: 1
+    image:
+      repository: kirgene/central-settlement
+      tag: iam-document-authz.1
     metrics:
       enabled: true
     config:
