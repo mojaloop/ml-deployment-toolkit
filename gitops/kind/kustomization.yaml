@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - gateway-api/crds.yaml
+  - cilium/helmrelease.yaml
+  - lb-ipam/lb-ipam.yaml
+
+# Distribution values for each HelmRelease in this kustomization.
+# Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;
+# the adopter's <release>-values-override is merged after them and wins.
+configMapGenerator:
+  - name: cilium-values
+    namespace: flux-system
+    files:
+      - values.yaml=values/cilium/cilium.yaml
+generatorOptions:
+  disableNameSuffixHash: true

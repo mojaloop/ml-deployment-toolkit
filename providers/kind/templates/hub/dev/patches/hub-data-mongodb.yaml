@@ -1,0 +1,14 @@
+# Template patches — capacity tuning that lives in CRs, not Helm values.
+# Applied by the hub-data-mongodb Flux Kustomization after the distribution's own
+# patches and before the environment's. JSON 6902 is used where the target
+# sits inside a list (strategic merge would replace the whole list).
+- target:
+    group: psmdb.percona.com
+    version: v1
+    kind: PerconaServerMongoDB
+    name: bulk-mongodb
+    namespace: data
+  patch:
+    - op: replace
+      path: /spec/replsets/0/volumeSpec/persistentVolumeClaim/resources/requests/storage
+      value: 3Gi

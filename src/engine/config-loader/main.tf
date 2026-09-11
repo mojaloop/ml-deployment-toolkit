@@ -233,6 +233,21 @@ locals {
     }
   ]
 
+  # Only materialized on the kind provider — pools become node containers
+  # sharing the host, so classes carry no machine shape; the class identity
+  # decides the kind node role, and the node label still derives mechanically
+  # as <P_NODE_ROLE_LABEL_KEY>=<pool>, the same label every gitops selector
+  # keys on.
+  kind_node_pools = local.provider_name != "kind" ? [] : [
+    for g in local.node_groups : {
+      name   = g.name
+      count  = g.count
+      role   = local.workload_classes.classes[g.class].talos_type == "controlplane" ? "control-plane" : "worker"
+      labels = { (local.node_role_label_key) = g.name }
+      taints = try(g.taints, [])
+    }
+  ]
+
   # --- Dynamic label/taint patches per workload class (Talos only) ---------
   # Per-POOL machine-config patch: the node label derives MECHANICALLY from the
   # pool name (<P_NODE_ROLE_LABEL_KEY>=<pool>) — never typed by hand, so the
@@ -334,9 +349,10 @@ locals {
   # noreply@<dns.domain> — an invented sender that breaks SPF/DMARC silently.
   # The empty defaults below only exist for environments without the
   # capability (no email block at all).
-  smtp_host  = try(local.config.email.host, "")
-  smtp_port  = tostring(try(local.config.email.port, ""))
-  email_from = try(local.config.email.from, "")
+  smtp_host     = try(local.config.email.host, "")
+  smtp_port     = tostring(try(local.config.email.port, ""))
+  email_from    = try(local.config.email.from, "")
+  smtp_starttls = try(local.config.email.starttls, true)
 
   # --- alerting (delivery channels) ----------------------------------------
   # alerting.email.to used to default to alerts@example.invalid — alerts

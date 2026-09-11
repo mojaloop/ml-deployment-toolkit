@@ -1,0 +1,54 @@
+# Distribution values for the cilium HelmRelease on kind.
+# Adopter overrides go in environments/<env>/values/cilium.yaml,
+# which is merged after this file and therefore wins.
+# Every value the bootstrap install sets
+# (providers/kind/terraform/cluster/values/cilium-bootstrap.yaml.tpl) must
+# agree with this file — the HelmRelease adopts that exact release, and a
+# disagreement rolls the datapath on takeover.
+
+# Kube-proxy replacement (the cluster is created with kubeProxyMode none, so
+# kube-proxy never runs)
+kubeProxyReplacement: true
+
+# With kube-proxy absent the in-cluster Service VIP only works while Cilium's
+# own datapath is up — dial the control-plane container by its docker DNS name
+k8sServiceHost: ${CLUSTER_NAME}-control-plane
+k8sServicePort: "6443"
+
+# IPAM mode — use Kubernetes-assigned pod CIDRs
+ipam:
+  mode: kubernetes
+
+# Gateway API support (CRDs applied by the cluster module)
+gatewayAPI:
+  enabled: true
+
+# The gateway LB IPs: pools in lb-ipam/, announced over the kind docker
+# bridge so the host reaches them
+lbIPAM:
+  enabled: true
+l2announcements:
+  enabled: true
+
+# All nodes share one machine; there is no wire to encrypt
+encryption:
+  enabled: false
+
+rollOutCiliumPods: true
+
+prometheus:
+  enabled: true
+
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+  ui:
+    enabled: true
+
+envoy:
+  enabled: true
+
+operator:
+  replicas: 1
+  rollOutPods: true

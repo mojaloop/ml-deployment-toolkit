@@ -1,0 +1,55 @@
+# The Hubble UI's document, declared by the deployment: a third-party image
+# that carries none. The IAM composes it like any registered service's.
+apiVersion: mojaloop.io/v1
+kind: AuthzDocument
+metadata:
+  name: hubble-ui
+  namespace: ory
+spec:
+  url:
+    host: hubble.int.${DOMAIN}
+  document: |
+    openapi: 3.1.0
+    info:
+      title: Hubble UI
+      version: '1.0'
+      description: >-
+        The network flow observability UI. Its backend answers the queries
+        the page posts, so the mount carries a read and a query permission.
+    servers:
+      - url: /
+    x-authz:
+      service: hubbleUi
+    paths:
+      /:
+        get:
+          operationId: view
+          summary: Opens the UI
+          x-authz:
+            scopedBy: []
+          security:
+            - session: []
+          responses:
+            '200':
+              description: The application
+              content:
+                text/html:
+                  schema:
+                    type: string
+        post:
+          operationId: create
+          summary: Runs the flow queries the page posts
+          x-authz:
+            scopedBy: []
+          security:
+            - session: []
+          responses:
+            '200':
+              description: The flows
+    components:
+      securitySchemes:
+        session:
+          type: apiKey
+          in: cookie
+          name: ory_kratos_session
+          description: A human's browser session

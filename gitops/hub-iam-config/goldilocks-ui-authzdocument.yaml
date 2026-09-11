@@ -1,0 +1,46 @@
+# The Goldilocks dashboard's document, declared by the deployment: a
+# third-party image that carries none. The IAM composes it like any
+# registered service's.
+apiVersion: mojaloop.io/v1
+kind: AuthzDocument
+metadata:
+  name: goldilocks-ui
+  namespace: ory
+spec:
+  url:
+    host: goldilocks.int.${DOMAIN}
+  document: |
+    openapi: 3.1.0
+    info:
+      title: Goldilocks dashboard
+      version: '1.0'
+      description: >-
+        A read-only dashboard of resource recommendations, one permission
+        wide.
+    servers:
+      - url: /
+    x-authz:
+      service: goldilocksUi
+    paths:
+      /:
+        get:
+          operationId: view
+          summary: Opens the dashboard
+          x-authz:
+            scopedBy: []
+          security:
+            - session: []
+          responses:
+            '200':
+              description: The application
+              content:
+                text/html:
+                  schema:
+                    type: string
+    components:
+      securitySchemes:
+        session:
+          type: apiKey
+          in: cookie
+          name: ory_kratos_session
+          description: A human's browser session

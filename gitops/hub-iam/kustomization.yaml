@@ -1,52 +1,21 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - ory/kratos-email-templates.yaml
-  - ory/externalsecret-kratos.yaml
-  - ory/externalsecret-keto.yaml
-  - ory/externalsecret-hydra.yaml
-  # Secret halves of the Ory distribution values (DSNs)
-  - ory/values-secrets.yaml
-  - ory/helmrelease-kratos.yaml
-  - ory/helmrelease-oathkeeper.yaml
-  - ory/helmrelease-keto.yaml
-  - ory/keto-opl.yaml
-  - ory/helmrelease-hydra.yaml
-  - ory/keto-metrics-service.yaml
-  - ory/helmrelease-selfservice-ui.yaml
-  - ory/helmrelease-bof.yaml
-  - routes/auth-httproute.yaml
-  - routes/mcm-httproute.yaml
-  - routes/finance-portal-httproute.yaml
+  - iam/sources.yaml
+  - iam/externalsecret-kratos.yaml
+  - iam/externalsecret-keto.yaml
+  - iam/externalsecret-hydra.yaml
+  - iam/roles.yaml
+  - iam/helmrelease.yaml
   - routes/referenceGrants.yaml
 
-# Distribution values for each HelmRelease in this kustomization.
-# Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;
-# the adopter's <release>-values-override is merged after them and wins.
+# Distribution values for the iam HelmRelease, rendered into a ConfigMap it
+# references first in valuesFrom; the adopter's override is merged after and
+# wins.
 configMapGenerator:
-  - name: bof-values
+  - name: iam-values
     namespace: flux-system
     files:
-      - values.yaml=values/ory/bof.yaml
-  - name: hydra-values
-    namespace: flux-system
-    files:
-      - values.yaml=values/ory/hydra.yaml
-  - name: keto-values
-    namespace: flux-system
-    files:
-      - values.yaml=values/ory/keto.yaml
-  - name: kratos-values
-    namespace: flux-system
-    files:
-      - values.yaml=values/ory/kratos.yaml
-  - name: kratos-selfservice-ui-values
-    namespace: flux-system
-    files:
-      - values.yaml=values/ory/kratos-selfservice-ui.yaml
-  - name: oathkeeper-values
-    namespace: flux-system
-    files:
-      - values.yaml=values/ory/oathkeeper.yaml
+      - values.yaml=values/ory/iam.yaml
 generatorOptions:
   disableNameSuffixHash: true
