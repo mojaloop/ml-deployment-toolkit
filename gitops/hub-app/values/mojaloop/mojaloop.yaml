@@ -256,7 +256,7 @@ centralsettlement:
     replicaCount: 1
     image:
       repository: kirgene/central-settlement
-      tag: iam-document-authz.1
+      tag: iam-document-authz.2
     metrics:
       enabled: true
     config:
@@ -294,7 +294,7 @@ centralsettlement:
     replicaCount: 1
     image:
       repository: kirgene/central-settlement
-      tag: iam-document-authz.1
+      tag: iam-document-authz.2
     metrics:
       enabled: true
     config:
@@ -307,7 +307,7 @@ centralsettlement:
   centralsettlement-handler-grosssettlement:
     image:
       repository: kirgene/central-settlement
-      tag: iam-document-authz.1
+      tag: iam-document-authz.2
     config:
       kafka_host: "${KAFKA_HOST}"
       kafka_port: ${KAFKA_PORT}
@@ -320,7 +320,7 @@ centralsettlement:
     replicaCount: 1
     image:
       repository: kirgene/central-settlement
-      tag: iam-document-authz.1
+      tag: iam-document-authz.2
     metrics:
       enabled: true
     config:

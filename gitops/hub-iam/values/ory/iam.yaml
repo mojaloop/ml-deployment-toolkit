@@ -54,7 +54,7 @@ global:
       url:
         host: reports-api.int.${DOMAIN}
     - name: central-settlement
-      image: docker.io/kirgene/central-settlement:iam-document-authz.1
+      image: docker.io/kirgene/central-settlement:iam-document-authz.2
       spec: /opt/app/src/interface/openapi.json
       url:
         host: settlements-api.int.${DOMAIN}
