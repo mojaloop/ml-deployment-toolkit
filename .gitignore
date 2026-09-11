@@ -9,6 +9,7 @@ todo.md
 *.tfstate.*
 tfplan
 crash.log
+src/infra/*-config
 override.tf
 override.tf.json
 *_override.tf
