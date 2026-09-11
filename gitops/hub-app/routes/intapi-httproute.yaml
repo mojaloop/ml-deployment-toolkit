@@ -22,12 +22,6 @@ spec:
             type: PathPrefix
             value: /parties
       filters:
-        # The scope is the decision endpoint's word, so a client's own copy is
-        # removed at the edge and cannot reach anything behind it
-        - type: RequestHeaderModifier
-          requestHeaderModifier:
-            remove:
-              - X-Scope
         - type: ExternalAuth
           externalAuth:
             protocol: HTTP
@@ -40,8 +34,6 @@ spec:
               allowedHeaders:
                 - authorization
                 - accept
-              allowedResponseHeaders:
-                - x-scope
       backendRefs:
         - name: moja-account-lookup-service
           port: 80
@@ -53,10 +45,6 @@ spec:
             type: PathPrefix
             value: /fxQuotes
       filters:
-        - type: RequestHeaderModifier
-          requestHeaderModifier:
-            remove:
-              - X-Scope
         - type: ExternalAuth
           externalAuth:
             protocol: HTTP
@@ -69,8 +57,6 @@ spec:
               allowedHeaders:
                 - authorization
                 - accept
-              allowedResponseHeaders:
-                - x-scope
       backendRefs:
         - name: moja-quoting-service
           port: 80
@@ -82,10 +68,6 @@ spec:
             type: PathPrefix
             value: /fxTransfers
       filters:
-        - type: RequestHeaderModifier
-          requestHeaderModifier:
-            remove:
-              - X-Scope
         - type: ExternalAuth
           externalAuth:
             protocol: HTTP
@@ -98,8 +80,6 @@ spec:
               allowedHeaders:
                 - authorization
                 - accept
-              allowedResponseHeaders:
-                - x-scope
       backendRefs:
         - name: moja-ml-api-adapter-service
           port: 80
@@ -111,10 +91,6 @@ spec:
             type: PathPrefix
             value: /authorizations
       filters:
-        - type: RequestHeaderModifier
-          requestHeaderModifier:
-            remove:
-              - X-Scope
         - type: ExternalAuth
           externalAuth:
             protocol: HTTP
@@ -127,8 +103,6 @@ spec:
               allowedHeaders:
                 - authorization
                 - accept
-              allowedResponseHeaders:
-                - x-scope
       backendRefs:
         - name: moja-transaction-requests-service
           port: 80
@@ -143,10 +117,6 @@ spec:
             type: PathPrefix
             value: /settlementModels
       filters:
-        - type: RequestHeaderModifier
-          requestHeaderModifier:
-            remove:
-              - X-Scope
         - type: ExternalAuth
           externalAuth:
             protocol: HTTP
@@ -159,8 +129,6 @@ spec:
               allowedHeaders:
                 - authorization
                 - accept
-              allowedResponseHeaders:
-                - x-scope
       backendRefs:
         - name: moja-centralsettlement-service
           port: 80

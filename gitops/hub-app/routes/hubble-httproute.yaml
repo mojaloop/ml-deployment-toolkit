@@ -14,12 +14,6 @@ spec:
     - "hubble.int.${DOMAIN}"
   rules:
     - filters:
-        # The scope is the decision endpoint's word, so a client's own copy is
-        # removed at the edge and cannot reach anything behind it
-        - type: RequestHeaderModifier
-          requestHeaderModifier:
-            remove:
-              - X-Scope
         - type: ExternalAuth
           externalAuth:
             protocol: HTTP
@@ -32,8 +26,6 @@ spec:
               allowedHeaders:
                 - cookie
                 - accept
-              allowedResponseHeaders:
-                - x-scope
       backendRefs:
         - name: hubble-ui
           port: 80
