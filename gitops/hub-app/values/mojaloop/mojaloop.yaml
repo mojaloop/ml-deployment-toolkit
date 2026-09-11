@@ -254,6 +254,9 @@ quoting-service:
 centralsettlement:
   centralsettlement-service:
     replicaCount: 1
+    image:
+      repository: kirgene/central-settlement
+      tag: iam-document-authz.1
     metrics:
       enabled: true
     config:

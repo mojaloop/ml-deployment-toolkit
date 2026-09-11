@@ -206,7 +206,7 @@ reporting-hub-bop-settlements-ui:
   image:
     registry: docker.io
     repository: kirgene/reporting-hub-bop-settlements-ui
-    tag: iam-document-authz
+    tag: iam-document-authz.1
   ingress:
     enabled: false
   configFiles:
@@ -411,7 +411,7 @@ reporting-legacy-api:
   image:
     registry: docker.io
     repository: kirgene/reporting
-    tag: iam-document-authz.3
+    tag: iam-document-authz.4
   containerSecurityContext:
     enabled: false
   # Load-bearing: this is the Helm `condition` on the reporting-k8s-templates

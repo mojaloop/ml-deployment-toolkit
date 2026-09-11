@@ -4,7 +4,7 @@
 # Adopter overrides go in environments/<env>/values/iam.yaml,
 # which is merged after this file and therefore wins.
 global:
-  iamImage: docker.io/kirgene/ml-iam-services:iam-document-authz.5
+  iamImage: docker.io/kirgene/ml-iam-services:iam-document-authz.6
 
   # One real thing under several services' names: a DFSP is `dfsps` where
   # the connection manager routes it and `participants` where the switch
@@ -49,12 +49,12 @@ global:
       url:
         host: iam-api.int.${DOMAIN}
     - name: reporting
-      image: docker.io/kirgene/reporting:iam-document-authz.3
+      image: docker.io/kirgene/reporting:iam-document-authz.4
       spec: /opt/app/src/api/openapi.yaml
       url:
         host: reports-api.int.${DOMAIN}
     - name: central-settlement
-      image: docker.io/kirgene/central-settlement:iam-document-authz
+      image: docker.io/kirgene/central-settlement:iam-document-authz.1
       spec: /opt/app/src/interface/openapi.json
       url:
         host: settlements-api.int.${DOMAIN}
