@@ -26,8 +26,14 @@ resources:
   - observability/trace-bridge.yaml
   - observability/instrumentation.yaml
   # gw-intapi (operator-tool machine APIs behind oauth2 — dedicated gateway
-  # and IP; the route and its authorization come from the iam release)
+  # and IP). The mirror spans several of the switch's services, so its route
+  # is declared here beside the AuthzDocument in hub-iam-config.
   - routes/gateway-intapi.yaml
+  - routes/intapi-httproute.yaml
+  # Surfaces whose own charts render no route
+  - routes/flux-httproute.yaml
+  - routes/goldilocks-httproute.yaml
+  - routes/hubble-httproute.yaml
 
 # Distribution values for each HelmRelease in this kustomization.
 # Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;

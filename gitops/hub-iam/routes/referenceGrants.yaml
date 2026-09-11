@@ -21,6 +21,15 @@ spec:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       namespace: finance-portal
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: flux-system
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: goldilocks
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: cilium
   to:
     - group: gateway.networking.k8s.io
       kind: Gateway
