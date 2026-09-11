@@ -133,6 +133,3 @@ config:
 migrations:
   enabled: true
   deletePolicy: before-hook-creation
-
-ingress:
-  enabled: false

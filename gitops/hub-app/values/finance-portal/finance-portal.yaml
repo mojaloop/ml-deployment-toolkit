@@ -128,8 +128,6 @@ reporting-hub-bop-shell:
     registry: docker.io
     repository: kirgene/reporting-hub-bop-shell
     tag: iam-document-authz
-  ingress:
-    enabled: false
   configFiles:
     config.json:
       # Header branding — TITLE uses Flux substitution so each
@@ -161,8 +159,6 @@ reporting-hub-bop-role-ui:
     registry: docker.io
     repository: kirgene/reporting-hub-bop-role-ui
     tag: iam-document-authz
-  ingress:
-    enabled: false
   configFiles:
     runtime-env.js: |
       window.roleEnv = {
@@ -184,8 +180,6 @@ reporting-hub-bop-trx-ui:
     registry: docker.io
     repository: kirgene/reporting-hub-bop-trx-ui
     tag: iam-document-authz
-  ingress:
-    enabled: false
   configFiles:
     runtime-env.js: |
       window.transferEnv = {
@@ -207,8 +201,6 @@ reporting-hub-bop-settlements-ui:
     registry: docker.io
     repository: kirgene/reporting-hub-bop-settlements-ui
     tag: iam-document-authz.1
-  ingress:
-    enabled: false
   configFiles:
     runtime-env.js: |
       window.settlementEnv = {
@@ -232,8 +224,6 @@ reporting-hub-bop-positions-ui:
     registry: docker.io
     repository: kirgene/reporting-hub-bop-positions-ui
     tag: iam-document-authz
-  ingress:
-    enabled: false
   configFiles:
     runtime-env.js: |
       window.positionsEnv = {

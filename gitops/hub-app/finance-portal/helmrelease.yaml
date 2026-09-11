@@ -8,12 +8,12 @@ spec:
   timeout: 10m
   chart:
     spec:
-      chart: finance-portal
-      version: "5.1.8-iam-document-authz.4183"
+      chart: mojaloop/finance-portal
       sourceRef:
-        kind: HelmRepository
-        name: mojaloop-charts
-      interval: 12h
+        kind: GitRepository
+        name: mojaloop-charts-git
+      reconcileStrategy: Revision
+      interval: 2m
   releaseName: fin-portal
   # Dedicated namespace, as MCM has. releaseName is pinned above and must stay pinned:
   # without it helm-controller derives the release name from targetNamespace, so moving
