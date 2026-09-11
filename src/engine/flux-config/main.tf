@@ -1025,9 +1025,9 @@ resource "kubectl_manifest" "kustomization" {
     spec = merge(
       {
         interval = "10m"
-        # A dependent requeues on this interval while its dependsOn is
-        # unready, and the graph is ten deep, so the retry is what decides how
-        # long a change takes to reach the leaves.
+        # An apply can legitimately fail while an in-flight chart install is
+        # still registering the CRDs its resources need; a short retry keeps
+        # that window from costing a full interval.
         retryInterval = "10s"
         path          = each.value.path
         prune         = each.value.prune

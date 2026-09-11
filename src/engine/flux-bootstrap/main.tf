@@ -49,6 +49,18 @@ resource "kubectl_manifest" "flux_instance" {
       cluster = {
         type = "kubernetes"
       }
+      kustomize = {
+        patches = [
+          {
+            target = { kind = "Deployment", name = "(kustomize-controller|helm-controller)" }
+            patch  = <<-EOT
+              - op: add
+                path: /spec/template/spec/containers/0/args/-
+                value: --requeue-dependency=5s
+            EOT
+          },
+        ]
+      }
     }
   })
 
