@@ -64,7 +64,7 @@ global:
       url:
         host: ttk-backend.int.${DOMAIN}
     - name: ml-testing-toolkit-ui
-      image: docker.io/kirgene/ml-testing-toolkit-ui:iam-document-authz.2
+      image: docker.io/kirgene/ml-testing-toolkit-ui:iam-document-authz.3
       spec: /opt/app/src/api/openapi.yaml
       url:
         host: ttk.int.${DOMAIN}
@@ -79,12 +79,12 @@ global:
       url:
         host: portal-api.int.${DOMAIN}
     - name: reporting-hub-bop-shell
-      image: docker.io/kirgene/reporting-hub-bop-shell:iam-document-authz
+      image: docker.io/kirgene/reporting-hub-bop-shell:iam-document-authz.1
       spec: /opt/app/src/api/openapi.yaml
       url:
         host: portal.int.${DOMAIN}
     - name: reporting-hub-bop-role-ui
-      image: docker.io/kirgene/reporting-hub-bop-role-ui:iam-document-authz
+      image: docker.io/kirgene/reporting-hub-bop-role-ui:iam-document-authz.1
       spec: /opt/app/src/api/openapi.yaml
       url:
         host: portal-iam.int.${DOMAIN}
@@ -93,7 +93,7 @@ global:
         label: Roles
         scope: reporting_hub_bop_role_ui
     - name: reporting-hub-bop-trx-ui
-      image: docker.io/kirgene/reporting-hub-bop-trx-ui:iam-document-authz
+      image: docker.io/kirgene/reporting-hub-bop-trx-ui:iam-document-authz.1
       spec: /opt/app/src/api/openapi.yaml
       url:
         host: portal-transfers.int.${DOMAIN}
@@ -102,7 +102,7 @@ global:
         label: Transfers
         scope: reporting_hub_bop_trx_ui
     - name: reporting-hub-bop-settlements-ui
-      image: docker.io/kirgene/reporting-hub-bop-settlements-ui:iam-document-authz
+      image: docker.io/kirgene/reporting-hub-bop-settlements-ui:iam-document-authz.2
       spec: /opt/app/src/api/openapi.yaml
       url:
         host: portal-settlements.int.${DOMAIN}
@@ -111,7 +111,7 @@ global:
         label: Settlements
         scope: reporting_hub_bop_settlements_ui
     - name: reporting-hub-bop-positions-ui
-      image: docker.io/kirgene/reporting-hub-bop-positions-ui:iam-document-authz
+      image: docker.io/kirgene/reporting-hub-bop-positions-ui:iam-document-authz.1
       spec: /opt/app/src/api/openapi.yaml
       url:
         host: portal-positions.int.${DOMAIN}
