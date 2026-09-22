@@ -42,7 +42,7 @@ infra:
 dns:
   provider: "route53"                 # digitalocean | cloudflare | route53
   domain: "sw1.lab1.example.com"
-
+  public_ip : ""		     # optional
 # Certificates (ACME). email is the ACME account contact.
 cert:
   email: "ops@example.com"

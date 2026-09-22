@@ -108,6 +108,8 @@ Each `lan` address must sit outside the local DHCP scope. Overlap produces inter
 
 Setting `wan` on a pool declares that the border firewall 1:1-DNATs that outside address to the gateway's `lan` address. external-dns then publishes the `wan` address for everything attached to that gateway (via the `external-dns.alpha.kubernetes.io/target` annotation) instead of the LAN address. Caveat: LAN clients — DFSP VMs included — then resolve the public address too, and need hairpin NAT or split DNS to reach the gateway.
 
+
+When one public address fronts every gateway through a reverse proxy that routes by hostname (TLS SNI), set `dns.public_ip` in the environment config instead of repeating the same `wan` on each pool (which plan-time validation rejects). All `GW_*_DNS_TARGET` substitution values then point at that address while each gateway keeps its own `lan` LoadBalancer IP.
 ## DNS
 
 `external-dns` watches HTTPRoutes and Services and reconciles records automatically. The operator never pre-creates records for Hub services — hand-created records cause ownership conflicts.

@@ -225,7 +225,11 @@
         "domain": {
           "description": "Base domain for this cluster",
           "type": "string"
-        }
+        },
+	"public_ip": {
+	  "description": "Optional fixed address for external-dns on all gateway. Use when a single border reverse proxy (SNI) fronts multiple private LoadBalancer IPs; orverides per-pool wan for DNS only.", 
+	  "type" : "string"
+	}
       }
     },
     "cert": {

@@ -112,7 +112,7 @@ State and generated artifacts land under `../artifacts/<env>/` — a sibling of 
 | `cluster` | yes | `name`, `role`, `vip`, `lb_ipam.pools` (per-gateway `lan`/`wan`), `flux.version` | Flux `2.9.3` |
 | `template` | yes | a name under `providers/<provider>/templates/<role>/` | — |
 | `infra` | yes | `provider` (`proxmox` \| `aws` \| `digitalocean`), `aws.region`, `digitalocean` — placement, bridge, storage, and the Talos node OS facts live in the sidecar files `placement.yaml`, `proxmox/proxmox.yaml`, and `talos.yaml`, not here | — |
-| `dns` | yes | `provider` (`digitalocean` \| `cloudflare` \| `route53`), `domain` | — |
+| `dns` | yes | `provider` (`digitalocean` \| `cloudflare` \| `route53`), `domain`, optional `public_ip` | — |
 | `cert` | yes | `email` (ACME contact), `server` (ACME directory URL) — both required, neither defaulted | — |
 | `artifact` | no | `url`, `version` (a pinned `vX.Y.Z` tag — `latest` is rejected by the schema), `active` — the gitops OCI artifact Flux reconciles | none — no Kustomizations created; `active` defaults to true once `url` is set |
 | `registry` | yes | `enabled` + `url`; on a Tooling Cluster also `robots[]` | — |
@@ -166,7 +166,7 @@ infra:
 dns:
   provider: "route53"                 # digitalocean | cloudflare | route53
   domain: "cc1.lab1.example.com"
-
+  public_ip : ""
 cert:
   email: "ops@example.com"            # the ACME account contact
   server: "https://acme-v02.api.letsencrypt.org/directory"   # selects the CA
