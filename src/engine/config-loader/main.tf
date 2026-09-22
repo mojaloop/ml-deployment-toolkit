@@ -88,13 +88,15 @@ locals {
 
   # --- LB IPAM (on-prem): one dedicated single-IP pool per gateway ----------
   # dns_target is what external-dns publishes for everything attached to the
-  # gateway: the wan side of the border 1:1 DNAT when set, the lan IP otherwise.
+  # gateway: dns.public_ip when set (one border nginx/SNI front), else the wan
+  # side of a 1:1 DNAT when set, otherwise the lan IP.
+  dns_public_ip = try(local.config.dns.public_ip, "")
   lb_ipam_pools = {
     for name, pool in try(local.cluster.lb_ipam.pools, {}) :
     name => {
       lan        = pool.lan
       wan        = try(pool.wan, "")
-      dns_target = try(pool.wan, pool.lan)
+      dns_target = local.dns_public_ip != "" ? local.dns_public_ip : try(pool.wan, pool.lan)
     }
   }
   hub_only_pools = ["gw-extapi", "gw-intapi"]
