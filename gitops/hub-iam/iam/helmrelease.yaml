@@ -16,8 +16,6 @@ spec:
   releaseName: iam
   targetNamespace: ory
   timeout: 20m
-  # The AuthzDocument CRD ships in the chart's crds/, which Helm leaves alone
-  # on upgrade; the release owns its schema
   install:
     createNamespace: false
     crds: CreateReplace

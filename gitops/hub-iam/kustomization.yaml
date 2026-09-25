@@ -7,8 +7,6 @@ resources:
   - iam/externalsecret-hydra.yaml
   - iam/roles.yaml
   - iam/helmrelease.yaml
-  # Who reaches the provisioning process; its CRD comes with the vendor layer
-  # this one follows
   - iam/provisioning-networkpolicy.yaml
   - routes/referenceGrants.yaml
 
