@@ -47,8 +47,8 @@ spec:
                 kubernetes.io/metadata.name: mcm
             podSelector:
               matchLabels:
-                app.kubernetes.io/name: connection-manager
-                app.kubernetes.io/component: api
+                app.kubernetes.io/name: mcm-connection-manager-api
+                app.kubernetes.io/instance: mcm
     - name: nothing-else
       action: Deny
       from:
