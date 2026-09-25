@@ -1,11 +1,15 @@
 # Hub-only: the tooling cluster has no IAM to gate this UI behind, so it
 # exposes no route — operators port-forward there. Auth delegates to
-# Oathkeeper against the goldilocksUi document (hub-iam-config).
+# Oathkeeper, which checks the goldilocksUi permissions of
+# goldilocks-authzdocument.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: goldilocks
   namespace: goldilocks
+  annotations:
+    iam.mojaloop.io/goldilocks-goldilocks-dashboard.service: goldilocksUi
+    iam.mojaloop.io/goldilocks-goldilocks-dashboard.schema: goldilocks-ui
 spec:
   parentRefs:
     - name: gw-int

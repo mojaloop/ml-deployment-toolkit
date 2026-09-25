@@ -1,14 +1,12 @@
-# The Hubble UI's document, declared by the deployment: a third-party image
-# that carries none. The IAM composes it like any registered service's.
+# The Hubble UI's document: a third-party image that serves none, so the
+# hubble route names this one for its backend.
 apiVersion: mojaloop.io/v1
 kind: AuthzDocument
 metadata:
   name: hubble-ui
-  namespace: ory
+  namespace: cilium
 spec:
-  url:
-    host: hubble.int.${DOMAIN}
-  document: |
+  document:
     openapi: 3.1.0
     info:
       title: Hubble UI
@@ -18,8 +16,6 @@ spec:
         the page posts, so the mount carries a read and a query permission.
     servers:
       - url: /
-    x-authz:
-      service: hubbleUi
     paths:
       /:
         get:

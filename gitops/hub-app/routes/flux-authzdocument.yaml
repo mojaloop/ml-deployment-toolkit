@@ -1,14 +1,12 @@
-# The Flux UI's document, declared by the deployment: a third-party image
-# that carries none. The IAM composes it like any registered service's.
+# The Flux UI's document: a third-party image that serves none, so the flux
+# route names this one for its backend.
 apiVersion: mojaloop.io/v1
 kind: AuthzDocument
 metadata:
   name: flux-ui
-  namespace: ory
+  namespace: flux-system
 spec:
-  url:
-    host: flux.int.${DOMAIN}
-  document: |
+  document:
     openapi: 3.1.0
     info:
       title: Flux UI
@@ -19,8 +17,6 @@ spec:
         the dashboard offers.
     servers:
       - url: /
-    x-authz:
-      service: fluxUi
     paths:
       /:
         get:

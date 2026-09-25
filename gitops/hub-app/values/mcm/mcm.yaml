@@ -30,7 +30,7 @@ db:
 api:
   image:
     name: kirgene/connection-manager-api
-    version: iam-document-authz
+    version: iam-document-authz.1
   url: "https://mcm-api.ext.${DOMAIN}"
   clientUrl: "https://mcm.int.${DOMAIN}/"
   switchFQDN: "${DOMAIN}"
@@ -64,7 +64,12 @@ api:
     name: connection-manager-api
     externallyManaged: false
 
+  authz:
+    service: mcm
+
 ui:
+  authz:
+    service: mcmUi
   authEnabled: true
   image:
     name: kirgene/connection-manager-ui

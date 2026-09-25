@@ -8,8 +8,6 @@
 #   platform -> dns/<provider> -> platform-config -> <vendor> -> <role>
 #   tooling: tooling -> tooling-config -> {tooling-routes, tooling-observability -> tooling-observability-routes}
 #   hub: hub -> hub-data-common -> hub-data-<store>... -> hub-vault -> hub-iam -> hub-app
-#        hub-iam-config (after hub: the documents feed the IAM composition,
-#        which holds hub-iam readiness until the roles validate against it)
 #        hub-observability-agent (parallel, after platform-config)
 
 locals {
@@ -895,20 +893,6 @@ locals {
         health_checks = [
           { apiVersion = "helm.toolkit.fluxcd.io/v2", kind = "HelmRelease", name = "iam", namespace = var.flux_namespace },
         ]
-        health_check_exprs = []
-      }
-      # AuthzDocuments for surfaces whose images carry no document. Inputs to
-      # the IAM composition — the provisioning service validates the deployed
-      # roles against the full catalog before becoming ready — so they apply
-      # as soon as the namespaces exist, gated only on the CRD the iam chart
-      # installs (retryInterval covers that window).
-      "hub-iam-config" = {
-        enabled            = local.is_hub
-        path               = "./hub-iam-config"
-        depends_on         = ["hub"]
-        timeout            = "10m"
-        wait               = false
-        health_checks      = []
         health_check_exprs = []
       }
       "hub-app" = {

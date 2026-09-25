@@ -1,15 +1,12 @@
-# The Goldilocks dashboard's document, declared by the deployment: a
-# third-party image that carries none. The IAM composes it like any
-# registered service's.
+# The Goldilocks dashboard's document: a third-party image that serves none,
+# so the goldilocks route names this one for its backend.
 apiVersion: mojaloop.io/v1
 kind: AuthzDocument
 metadata:
   name: goldilocks-ui
-  namespace: ory
+  namespace: goldilocks
 spec:
-  url:
-    host: goldilocks.int.${DOMAIN}
-  document: |
+  document:
     openapi: 3.1.0
     info:
       title: Goldilocks dashboard
@@ -19,8 +16,6 @@ spec:
         wide.
     servers:
       - url: /
-    x-authz:
-      service: goldilocksUi
     paths:
       /:
         get:

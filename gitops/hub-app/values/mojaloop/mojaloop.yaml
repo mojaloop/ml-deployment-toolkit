@@ -256,7 +256,7 @@ centralsettlement:
     replicaCount: 1
     image:
       repository: kirgene/central-settlement
-      tag: iam-document-authz.2
+      tag: iam-document-authz.3
     metrics:
       enabled: true
     config:
@@ -290,11 +290,13 @@ centralsettlement:
         allowCredentials: true
       oathkeeper:
         serviceNamespace: ory
+    authz:
+      service: settlement
   centralsettlement-handler-deferredsettlement:
     replicaCount: 1
     image:
       repository: kirgene/central-settlement
-      tag: iam-document-authz.2
+      tag: iam-document-authz.3
     metrics:
       enabled: true
     config:
@@ -307,7 +309,7 @@ centralsettlement:
   centralsettlement-handler-grosssettlement:
     image:
       repository: kirgene/central-settlement
-      tag: iam-document-authz.2
+      tag: iam-document-authz.3
     config:
       kafka_host: "${KAFKA_HOST}"
       kafka_port: ${KAFKA_PORT}
@@ -320,7 +322,7 @@ centralsettlement:
     replicaCount: 1
     image:
       repository: kirgene/central-settlement
-      tag: iam-document-authz.2
+      tag: iam-document-authz.3
     metrics:
       enabled: true
     config:
@@ -597,7 +599,7 @@ ml-testing-toolkit:
           clientCert: {}
     image:
       repository: kirgene/ml-testing-toolkit
-      tag: iam-document-authz
+      tag: iam-document-authz.1
     gateway:
       enabled: true
       host: ttk-backend.int.${DOMAIN}
@@ -619,6 +621,8 @@ ml-testing-toolkit:
         allowCredentials: true
       oathkeeper:
         serviceNamespace: ory
+    authz:
+      service: ttkBackend
 
   ml-testing-toolkit-frontend:
     config:
@@ -634,6 +638,8 @@ ml-testing-toolkit:
           namespace: platform-system
       oathkeeper:
         serviceNamespace: ory
+    authz:
+      service: ttkUi
 
   ml-testing-toolkit-cli:
     enabled: false

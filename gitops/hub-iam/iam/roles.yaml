@@ -1,7 +1,8 @@
 # The deployment's role document, fed to the iam HelmRelease as a values
-# fragment. The provisioning service validates every permission id here
-# against the catalog the rollout composed, so a typo or a permission no
-# service offers stops the install.
+# fragment. A role goes live once every service it names is routed, and the
+# provisioning service validates its permission ids against that service's
+# catalog, so a typo or an operation the service does not offer stops the
+# install.
 #
 # A grant either names the resources of a scoped resource name
 # (resources: { Participant: all }) or leaves the name open, and every open
@@ -143,12 +144,12 @@ data:
               - { permission: settlement.updateSettlementBySettlementParticipant, resources: { Participant: all } }
               - { permission: settlement.getSettlementBySettlementParticipantAccount, resources: { Participant: all } }
               - { permission: settlement.updateSettlementBySettlementParticipantAccount, resources: { Participant: all } }
-              - { permission: portalShell.viewShell }
-              - { permission: portalRoles.viewRoles }
-              - { permission: portalTransfers.viewTransfers }
-              - { permission: portalSettlements.viewSettlements }
-              - { permission: portalPositions.viewPositions }
-              - { permission: mcmUi.viewMcmUi }
+              - { permission: portalShell.view }
+              - { permission: portalRoles.view }
+              - { permission: portalTransfers.view }
+              - { permission: portalSettlements.view }
+              - { permission: portalPositions.view }
+              - { permission: mcmUi.view }
               - { permission: ttkUi.view }
               - { permission: ttkBackend.view }
               - { permission: ttkBackend.create }
@@ -163,11 +164,31 @@ data:
               - { permission: hubbleUi.create }
           intapi-client:
             grants:
-              - { permission: intapi.view }
-              - { permission: intapi.create }
-              - { permission: intapi.update }
-              - { permission: intapi.remove }
-              - { permission: intapi.amend }
+              - { permission: lookup.view }
+              - { permission: lookup.create }
+              - { permission: lookup.update }
+              - { permission: lookup.remove }
+              - { permission: lookup.amend }
+              - { permission: quotes.view }
+              - { permission: quotes.create }
+              - { permission: quotes.update }
+              - { permission: quotes.remove }
+              - { permission: quotes.amend }
+              - { permission: transfers.view }
+              - { permission: transfers.create }
+              - { permission: transfers.update }
+              - { permission: transfers.remove }
+              - { permission: transfers.amend }
+              - { permission: transactionRequests.view }
+              - { permission: transactionRequests.create }
+              - { permission: transactionRequests.update }
+              - { permission: transactionRequests.remove }
+              - { permission: transactionRequests.amend }
+              - { permission: intapiSettlements.view }
+              - { permission: intapiSettlements.create }
+              - { permission: intapiSettlements.update }
+              - { permission: intapiSettlements.remove }
+              - { permission: intapiSettlements.amend }
           dfsp-operator:
             grants:
               - { permission: mcm.getDFSPs }
@@ -242,7 +263,7 @@ data:
               - { permission: settlement.updateSettlementBySettlementParticipant }
               - { permission: settlement.getSettlementBySettlementParticipantAccount }
               - { permission: settlement.updateSettlementBySettlementParticipantAccount }
-              - { permission: mcmUi.viewMcmUi }
+              - { permission: mcmUi.view }
           dfsp-client:
             grants:
               - { permission: mcm.getAllDfspJWSCerts }

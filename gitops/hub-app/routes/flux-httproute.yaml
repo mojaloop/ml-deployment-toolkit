@@ -1,11 +1,14 @@
 # Hub-only: the tooling cluster has no IAM to gate this UI behind, so it
 # exposes no route — operators port-forward there. Auth delegates to
-# Oathkeeper against the fluxUi document (hub-iam-config).
+# Oathkeeper, which checks the fluxUi permissions of flux-authzdocument.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: flux
   namespace: flux-system
+  annotations:
+    iam.mojaloop.io/flux-operator.service: fluxUi
+    iam.mojaloop.io/flux-operator.schema: flux-ui
 spec:
   parentRefs:
     - name: gw-int

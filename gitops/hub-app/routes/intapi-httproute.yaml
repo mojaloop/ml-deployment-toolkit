@@ -1,12 +1,25 @@
 # gw-intapi — operator-tool machine APIs behind oauth2 (Hydra
-# client-credentials). Auth delegates to Oathkeeper against the intapi
-# document (hub-iam-config); the route carries the path dispatch to the
-# mirror's services.
+# client-credentials). The route carries the path dispatch to the mirror's
+# services, each keyed with its own prefix over intapi-authzdocument, so a
+# grant on one service's paths reaches no other's. Central settlement also
+# answers on its own route under settlement with the document it serves, so
+# its mount here is a prefix of its own.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: intapi
   namespace: mojaloop
+  annotations:
+    iam.mojaloop.io/moja-account-lookup-service.service: lookup
+    iam.mojaloop.io/moja-account-lookup-service.schema: intapi
+    iam.mojaloop.io/moja-quoting-service.service: quotes
+    iam.mojaloop.io/moja-quoting-service.schema: intapi
+    iam.mojaloop.io/moja-ml-api-adapter-service.service: transfers
+    iam.mojaloop.io/moja-ml-api-adapter-service.schema: intapi
+    iam.mojaloop.io/moja-transaction-requests-service.service: transactionRequests
+    iam.mojaloop.io/moja-transaction-requests-service.schema: intapi
+    iam.mojaloop.io/moja-centralsettlement-service.service: intapiSettlements
+    iam.mojaloop.io/moja-centralsettlement-service.schema: intapi
 spec:
   parentRefs:
     - name: gw-intapi

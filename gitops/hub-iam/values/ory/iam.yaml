@@ -1,10 +1,10 @@
 # Distribution values for the iam HelmRelease (mojaloop-iam chart: Ory and
-# the IAM services that compose every registered OpenAPI document into the
-# deployment's gateway rules, Keto model and catalog).
+# the IAM services that compose the document of every backend a route keys
+# into the deployment's gateway rules, Keto model and catalog).
 # Adopter overrides go in environments/<env>/values/iam.yaml,
 # which is merged after this file and therefore wins.
 global:
-  iamImage: docker.io/kirgene/ml-iam-services:iam-document-authz.6
+  iamImage: docker.io/kirgene/ml-iam-services:iam-document-authz.7
 
   # One real thing under several services' names: a DFSP is `dfsps` where
   # the connection manager routes it and `participants` where the switch
@@ -28,97 +28,6 @@ global:
       description: A report this deployment has defined
       members:
         - { service: reports, type: reports }
-
-  # Every service whose image carries its OpenAPI document. Surfaces whose
-  # images carry none (Flux, Goldilocks, Hubble, the intapi mirror) declare
-  # theirs as AuthzDocument resources in hub-iam-config.
-  authz:
-    - name: connection-manager-api
-      image: docker.io/kirgene/connection-manager-api:iam-document-authz
-      spec: /opt/app/src/api/openapi.yaml
-      url:
-        host: mcm-api.ext.${DOMAIN}
-    - name: connection-manager-ui
-      image: docker.io/kirgene/connection-manager-ui:iam-document-authz
-      spec: /opt/app/src/api/openapi.yaml
-      url:
-        host: mcm.int.${DOMAIN}
-    - name: role-assignment-service
-      image: docker.io/kirgene/role-assignment-service:iam-document-authz
-      spec: /opt/app/src/interface/api.yaml
-      url:
-        host: iam-api.int.${DOMAIN}
-    - name: reporting
-      image: docker.io/kirgene/reporting:iam-document-authz.4
-      spec: /opt/app/src/api/openapi.yaml
-      url:
-        host: reports-api.int.${DOMAIN}
-    - name: central-settlement
-      image: docker.io/kirgene/central-settlement:iam-document-authz.2
-      spec: /opt/app/src/interface/openapi.json
-      url:
-        host: settlements-api.int.${DOMAIN}
-    - name: ml-testing-toolkit
-      image: docker.io/kirgene/ml-testing-toolkit:iam-document-authz
-      spec: /opt/app/src/api/openapi.yaml
-      url:
-        host: ttk-backend.int.${DOMAIN}
-    - name: ml-testing-toolkit-ui
-      image: docker.io/kirgene/ml-testing-toolkit-ui:iam-document-authz.3
-      spec: /opt/app/src/api/openapi.yaml
-      url:
-        host: ttk.int.${DOMAIN}
-    - name: reporting-hub-bop-api-svc
-      image: docker.io/kirgene/reporting-hub-bop-api-svc:iam-document-authz.2
-      spec: /opt/app/src/api/openapi.yaml
-      url:
-        host: transfers-api.int.${DOMAIN}
-    - name: reporting-hub-bop-experience-api-svc
-      image: docker.io/kirgene/reporting-hub-bop-experience-api-svc:iam-document-authz
-      spec: /opt/app/src/api/openapi.yaml
-      url:
-        host: portal-api.int.${DOMAIN}
-    - name: reporting-hub-bop-shell
-      image: docker.io/kirgene/reporting-hub-bop-shell:iam-document-authz.1
-      spec: /opt/app/src/api/openapi.yaml
-      url:
-        host: portal.int.${DOMAIN}
-    - name: reporting-hub-bop-role-ui
-      image: docker.io/kirgene/reporting-hub-bop-role-ui:iam-document-authz.1
-      spec: /opt/app/src/api/openapi.yaml
-      url:
-        host: portal-iam.int.${DOMAIN}
-      portal:
-        path: /iam
-        label: Roles
-        scope: reporting_hub_bop_role_ui
-    - name: reporting-hub-bop-trx-ui
-      image: docker.io/kirgene/reporting-hub-bop-trx-ui:iam-document-authz.1
-      spec: /opt/app/src/api/openapi.yaml
-      url:
-        host: portal-transfers.int.${DOMAIN}
-      portal:
-        path: /transfers
-        label: Transfers
-        scope: reporting_hub_bop_trx_ui
-    - name: reporting-hub-bop-settlements-ui
-      image: docker.io/kirgene/reporting-hub-bop-settlements-ui:iam-document-authz.2
-      spec: /opt/app/src/api/openapi.yaml
-      url:
-        host: portal-settlements.int.${DOMAIN}
-      portal:
-        path: /settlements
-        label: Settlements
-        scope: reporting_hub_bop_settlements_ui
-    - name: reporting-hub-bop-positions-ui
-      image: docker.io/kirgene/reporting-hub-bop-positions-ui:iam-document-authz.1
-      spec: /opt/app/src/api/openapi.yaml
-      url:
-        host: portal-positions.int.${DOMAIN}
-      portal:
-        path: /positions
-        label: Financial Positions
-        scope: reporting_hub_bop_positions_ui
 
   # The first identity a fresh deployment logs in with: created while the
   # roles are applied and invited by email to set its password, the same
