@@ -1,0 +1,55 @@
+# Who may reach the provisioning process.
+#
+# It holds the platform's only Keto write URL and Kratos admin credentials, and
+# its API carries role assignment, so reachability is the whole of its access
+# control: it authenticates nothing and is fronted by no gateway. Two workloads
+# call it — the role administration service that fronts it for operators, and a
+# service naming a resource it has created.
+#
+# Admin tier, so no namespaced NetworkPolicy can widen this. The callers Pass
+# rather than Accept: Accept would end evaluation here and stop a service's own
+# chart from narrowing them further, while Pass hands them to the NetworkPolicy
+# tier with that option intact. Everything else is denied in the one tier
+# nothing overrides.
+apiVersion: policy.networking.k8s.io/v1alpha2
+kind: ClusterNetworkPolicy
+metadata:
+  name: iam-provisioning-callers
+spec:
+  tier: Admin
+  priority: 10
+  subject:
+    pods:
+      namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ory
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ml-iam-services
+          app.kubernetes.io/component: provisioning
+  ingress:
+    - name: role-administration
+      action: Pass
+      from:
+        - pods:
+            namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: finance-portal
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/name: role-assignment-service
+    - name: resource-provisioning
+      action: Pass
+      from:
+        - pods:
+            namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: mcm
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/name: connection-manager
+                app.kubernetes.io/component: api
+    - name: nothing-else
+      action: Deny
+      from:
+        - namespaces: {}

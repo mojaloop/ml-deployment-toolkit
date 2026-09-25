@@ -36,6 +36,11 @@ encryption:
 
 rollOutCiliumPods: true
 
+# ClusterNetworkPolicy (policy.networking.k8s.io/v1alpha2), so the sim
+# enforces the same Admin-tier denies the real substrates do.
+k8sClusterNetworkPolicy:
+  enabled: true
+
 prometheus:
   enabled: true
 
