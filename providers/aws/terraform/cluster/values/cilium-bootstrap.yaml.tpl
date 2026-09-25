@@ -55,3 +55,5 @@ rollOutCiliumPods: true
 operator:
   replicas: 1
   rollOutPods: true
+  image:
+    override: "docker.io/kirgene/operator-generic:v1.20.0-extauthz-contentlength"
