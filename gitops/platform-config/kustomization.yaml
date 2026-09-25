@@ -9,6 +9,3 @@ resources:
   # The networkpolicy stays: it restricts flux-operator ingress to its UI
   # port on every cluster, route or no route.
   - flux-networkpolicy.yaml
-  # Admin-tier reachability for the one endpoint that authenticates nothing.
-  # Harmless where the IAM is not installed: it selects pods that are not there.
-  - iam-provisioning-networkpolicy.yaml
