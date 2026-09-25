@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - gateway-api/crds.yaml
+  - network-policy-api/crds.yaml
   - cilium/helmrelease.yaml
   - lb-ipam/lb-ipam.yaml
   - openebs/helmrelease.yaml

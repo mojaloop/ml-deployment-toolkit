@@ -1,0 +1,21 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: mojaloop-charts-git
+  namespace: flux-system
+spec:
+  interval: 2m
+  url: https://github.com/mojaloop/charts.git
+  ref:
+    branch: feat/iam-document-authz
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: mojaloop-helm-git
+  namespace: flux-system
+spec:
+  interval: 2m
+  url: https://github.com/mojaloop/helm.git
+  ref:
+    branch: feat/iam-document-authz
