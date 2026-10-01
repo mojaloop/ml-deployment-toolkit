@@ -71,7 +71,7 @@
                       "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
                     },
                     "wan": {
-                      "description": "Optional outside address the border firewall 1:1-DNATs to lan. Becomes the external-dns target for everything attached to the gateway; LAN clients then need hairpin NAT or split DNS.",
+		      "description": "Optional border address that reaches this gateway's lan — either a 1:1 DNAT on the firewall or a shared reverse proxy (TLS SNI). Becomes the external-dns target for everything attached to the gateway when set; LAN clients then need hairpin NAT or split DNS.",
                       "type": "string",
                       "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
                     }
@@ -85,12 +85,12 @@
                   "additionalProperties": false,
                   "properties": {
                     "lan": {
-                      "description": "Address the pool hands to this gateway's LoadBalancer Service, announced via L2 on the LAN",
+		      "description": "Optional border address that reaches this gateway's lan — either a 1:1 DNAT on the firewall or a shared reverse proxy (TLS SNI). Becomes the external-dns target for everything attached to the gateway when set; LAN clients then need hairpin NAT or split DNS.",
                       "type": "string",
                       "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
                     },
                     "wan": {
-                      "description": "Optional outside address the border firewall 1:1-DNATs to lan. Becomes the external-dns target for everything attached to the gateway; LAN clients then need hairpin NAT or split DNS.",
+                      "description": "Optional border address that reaches this gateway's lan — either a 1:1 DNAT on the firewall or a shared reverse proxy (TLS SNI). Becomes the external-dns target for everything attached to the gateway when set; LAN clients then need hairpin NAT or split DNS.",
                       "type": "string",
                       "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
                     }
@@ -225,7 +225,7 @@
         "domain": {
           "description": "Base domain for this cluster",
           "type": "string"
-        }
+	}
       }
     },
     "cert": {

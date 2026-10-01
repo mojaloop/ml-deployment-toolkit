@@ -39,3 +39,9 @@ A pool may also declare a `wan` address, stating that the border firewall 1:1-DN
 - **The pools are the cluster's entire LB address supply.** A LoadBalancer Service that matches no pool stays `Pending` — new gateways need a new pool, deliberately.
 - **A Hub needs four addresses, a Tooling Cluster two.** Breaking change against ADR-008's three; environments written for three fail the plan until `gw-intapi` is added.
 - **`wan` shifts DNS, not routing.** LAN clients resolve the public address too and need hairpin NAT or split DNS to reach the gateway.
+
+## Amendment (2026-09-30)
+**Status:** accepted — amends the plan-time rule and the meaning of `wan` in [Decision](#decision) above.
+Several gateways may share the **same** `wan` address. The original decision required duplicate `wan` values to be rejected at plan time; that precondition is removed. Repeating `wan` supports a single border reverse proxy (TLS SNI) that fronts multiple private LoadBalancer IPs while each pool keeps its own `lan`.
+`wan` is the **border address that reaches the gateway's `lan`**, not only a 1:1 DNAT mapping. Adopters set `wan` **per pool** on the gateways that should appear in public DNS; pools without `wan` continue to publish `lan` as the DNS target (internal-only gateways).
+When pools share a `wan`, the border proxy must route each public hostname (by SNI or equivalent) to the correct gateway `lan`. The hairpin / split-DNS caveat for LAN clients still applies to every pool that has `wan` set.

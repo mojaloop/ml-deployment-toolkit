@@ -11,8 +11,8 @@ metadata:
     lb-pool: gw-extapi
   annotations:
     external-dns.alpha.kubernetes.io/hostname: "extapi.${DOMAIN}"
-    # The wan side of the border DNAT when cluster.lb_ipam.pools.gw-extapi.wan
-    # is set, the lan IP otherwise.
+    # Pool wan when cluster.ib_ipam.pools.gw-extapi.wan is set (1:1 DNAT or
+    # shared SNI proxy ), the lan IP otherwise
     external-dns.alpha.kubernetes.io/target: "${GW_EXTAPI_DNS_TARGET}"
     # Consumed only where a cloud controller provisions the Service (AWS —
     # Classic ELB otherwise); inert on-prem, where LB-IPAM assigns the
