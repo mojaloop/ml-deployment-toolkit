@@ -1,0 +1,41 @@
+# The Goldilocks dashboard's document: a third-party image that serves none,
+# so the goldilocks route names this one for its backend.
+apiVersion: mojaloop.io/v1
+kind: AuthzDocument
+metadata:
+  name: goldilocks-ui
+  namespace: goldilocks
+spec:
+  document:
+    openapi: 3.1.0
+    info:
+      title: Goldilocks dashboard
+      version: '1.0'
+      description: >-
+        A read-only dashboard of resource recommendations, one permission
+        wide.
+    servers:
+      - url: /
+    paths:
+      /:
+        get:
+          operationId: view
+          summary: Opens the dashboard
+          x-authz:
+            scopedBy: []
+          security:
+            - session: []
+          responses:
+            '200':
+              description: The application
+              content:
+                text/html:
+                  schema:
+                    type: string
+    components:
+      securitySchemes:
+        session:
+          type: apiKey
+          in: cookie
+          name: ory_kratos_session
+          description: A human's browser session

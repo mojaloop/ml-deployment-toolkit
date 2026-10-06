@@ -1,0 +1,46 @@
+# yaml-language-server: $schema=../../config/schemas/params.schema.json
+# -----------------------------------------------------------------------------
+# Provider parameters — kind (Kubernetes-in-Docker)
+#
+# A single-machine provider: the cluster is docker containers on the operator's
+# host, provisioned by the kind CLI's Terraform provider. It exists for local
+# development and full-platform testing — the whole hub, IAM included, on one
+# workstation, reachable through gateway IPs on the kind docker bridge.
+#
+# `params` is the provider interface (see proxmox/params.yaml for the model).
+# `infra` is Terraform-consumed provider configuration.
+# -----------------------------------------------------------------------------
+version: 1
+# Contract version implemented — must equal config/definitions/provider-contract.yaml
+# (plain equality assert, one contract version per DTK release).
+contract_version: 1
+description: "kind local Kubernetes-in-Docker (single-host development)"
+
+# The point of this provider is everything on one machine, data stores
+# included.
+capabilities:
+  in_cluster_data: true
+
+params:
+  P_GATEWAY_CLASS: "cilium"
+  # kind ships local-path-provisioner as the default StorageClass
+  P_STORAGE_CLASS: "standard"
+  P_NODE_ROLE_LABEL_KEY: "node-role"
+  # kind nodes attach to the docker bridge as eth0; L2 announcements on it
+  # make the gateway LB IPs reachable from the host
+  P_L2_INTERFACE_REGEX: "^eth0$"
+  # In-cluster API service endpoint. The vendor cilium values dial the
+  # control-plane container by its docker DNS name instead, since with
+  # kube-proxy absent the Service VIP is not routable until Cilium is up.
+  P_KUBE_API_HOST: "kubernetes.default.svc"
+  P_KUBE_API_PORT: "443"
+
+infra:
+  # The docker network kind attaches nodes to. The lb_ipam pool addresses in
+  # config.yaml must sit inside this network's subnet, outside the range
+  # docker assigns to containers.
+  network: "kind"
+  # kindest publishes per upstream patch release; this is the provider's
+  # materialization of the platform's kubernetes_version line — the nearest
+  # image that exists.
+  node_image: "kindest/node:v1.36.4"

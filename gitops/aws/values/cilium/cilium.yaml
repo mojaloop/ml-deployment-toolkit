@@ -52,6 +52,13 @@ gatewayAPI:
 # take effect on running nodes.
 rollOutCiliumPods: true
 
+# ClusterNetworkPolicy (policy.networking.k8s.io/v1alpha2), whose Admin tier
+# carries a Deny no namespaced NetworkPolicy can widen. The CRD is vendored
+# beside the Gateway API one in this substrate's kustomization; the agent
+# watches for it and finds nothing until it is applied.
+k8sClusterNetworkPolicy:
+  enabled: true
+
 # Cilium agent Prometheus metrics (port 9962)
 prometheus:
   enabled: true
@@ -87,6 +94,8 @@ envoy:
 operator:
   replicas: 1
   rollOutPods: true
+  image:
+    override: "docker.io/kirgene/operator-generic:v1.20.0-extauthz-contentlength"
 
 # Agent resource limits (prevent OOM during BPF compilation). CPU limit
 # must leave headroom for endpoint restore after a node reboot — see the

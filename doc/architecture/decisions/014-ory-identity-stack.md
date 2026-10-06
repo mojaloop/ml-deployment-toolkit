@@ -73,8 +73,8 @@ Three choices within that are load-bearing:
 
 The Ory stack originally shipped inside the combined `hub-auth` Kustomization,
 entangled with Vault. The gitops layer now splits it into `hub-vault` (secrets
-infrastructure) and `hub-iam` / `hub-iam-config` (the Ory stack and its
-bootstrap), a pure refactor with no workload change. The point is isolation:
+infrastructure) and `hub-iam` (the Ory stack and its bootstrap), a pure
+refactor with no workload change. The point is isolation:
 IAM is one swappable unit behind a Vault it merely consumes, so a later
 migration to the upstream `mojaloop-iam` chart — or any other IAM packaging —
 replaces `hub-iam` without touching secrets infrastructure. See

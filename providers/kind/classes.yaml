@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../config/schemas/provider-classes.schema.json
+# -----------------------------------------------------------------------------
+# Workload-class MATERIALIZATIONS — kind.
+#
+# Class IDENTITY lives in config/definitions/workload-classes.yaml (L1). kind
+# nodes are containers sharing the host kernel and its resources — there is no
+# machine shape to materialize, so every class is the empty materialization.
+# The node-role label still derives mechanically from the pool, which is what
+# the gitops selectors key on.
+# -----------------------------------------------------------------------------
+version: 1
+classes:
+  control-plane: {}
+  mixed-plane: {}
+  worker-general: {}
+  worker-kafka: {}
+  worker-db: {}
+  worker-hub: {}

@@ -9,6 +9,11 @@ data:
   values.yaml: |
     provider:
       name: aws
+    # The deployment domain is a child of the account's hosted zone, and the
+    # zone lookup honors the domain filter — parent matching lets records land
+    # in the zone that actually holds the domain
+    extraArgs:
+      - --aws-zone-match-parent
     env:
       - name: AWS_DEFAULT_REGION
         value: "${AWS_REGION}"
