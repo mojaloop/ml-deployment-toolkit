@@ -253,6 +253,15 @@ locals {
   # pool name (<P_NODE_ROLE_LABEL_KEY>=<pool>) — never typed by hand, so the
   # Talos side and the gitops selectors cannot drift. Taints are declared by
   # the pool itself in placement.yaml, once.
+  #
+  # Taints are set at kubelet REGISTRATION (registerWithTaints), not through
+  # machine.nodeTaints: Talos applies nodeTaints after the node has joined,
+  # with the kubelet's own identity, and the NodeRestriction admission plugin
+  # (always on in Talos) forbids a node from modifying its taints — the update
+  # fails ("not allowed to modify taints") and takes the node labels down with
+  # it. Registration-time taints only apply when the Node object is created:
+  # changing a pool's taints later needs `kubectl taint` with an admin
+  # identity, or the node re-created.
   # Direct reference, no fallback: P_NODE_ROLE_LABEL_KEY is schema-required in
   # every provider params.yaml — a try() default here would hide its absence.
   node_role_label_key = local.provider_params.P_NODE_ROLE_LABEL_KEY
@@ -261,12 +270,16 @@ locals {
     name => yamlencode({
       machine = merge(
         { nodeLabels = { (local.node_role_label_key) = name } },
-        # Talos machine.nodeTaints is <key>: "<value>:<effect>" (or just
-        # "<effect>" without a value); Talos rejects "<key>=<value>" as a key.
         length(try(g.taints, [])) > 0 ? {
-          nodeTaints = {
-            for taint in g.taints :
-            taint.key => try(taint.value, "") != "" ? "${taint.value}:${taint.effect}" : taint.effect
+          kubelet = {
+            extraConfig = {
+              registerWithTaints = [
+                for taint in g.taints : merge(
+                  { key = taint.key, effect = taint.effect },
+                  try(taint.value, "") != "" ? { value = taint.value } : {},
+                )
+              ]
+            }
           }
         } : {}
       )
