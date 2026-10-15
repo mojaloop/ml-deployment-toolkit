@@ -16,7 +16,7 @@
             requiredDuringSchedulingIgnoredDuringExecution:
               nodeSelectorTerms:
                 - matchExpressions:
-                    - key: ${P_NODE_ROLE_LABEL_KEY}
+                    - key: node-role
                       operator: In
                       values: ["db"]
     haproxy:
@@ -26,6 +26,6 @@
             requiredDuringSchedulingIgnoredDuringExecution:
               nodeSelectorTerms:
                 - matchExpressions:
-                    - key: ${P_NODE_ROLE_LABEL_KEY}
+                    - key: node-role
                       operator: In
                       values: ["db"]
