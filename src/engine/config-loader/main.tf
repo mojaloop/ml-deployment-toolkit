@@ -261,10 +261,12 @@ locals {
     name => yamlencode({
       machine = merge(
         { nodeLabels = { (local.node_role_label_key) = name } },
+        # Talos machine.nodeTaints is <key>: "<value>:<effect>" (or just
+        # "<effect>" without a value); Talos rejects "<key>=<value>" as a key.
         length(try(g.taints, [])) > 0 ? {
           nodeTaints = {
             for taint in g.taints :
-            "${taint.key}=${try(taint.value, "")}" => taint.effect
+            taint.key => try(taint.value, "") != "" ? "${taint.value}:${taint.effect}" : taint.effect
           }
         } : {}
       )
