@@ -67,12 +67,15 @@ The toolkit reads pool names from the environment's `proxmox/proxmox.yaml` — t
 version: 1
 network_bridge: "vmbr0"
 storage:
-  disks: "local-lvm"          # VM disks — must support raw images
+  disks: "local-lvm"          # OS disk (scsi0) and cloud-init volume — must support raw images
+  data_disks: "local-lvm"     # optional: data disks (scsi1 and above); defaults to `disks`
   images: "local"             # Talos image upload target
   snippets: "local"           # cloud-init snippets
 ```
 
-Confirm each pool exists with the right content type in **Datacenter → Storage**: `disks` needs `Disk image`, `images` needs `ISO image`, `snippets` needs `Snippets`.
+Confirm each pool exists with the right content type in **Datacenter → Storage**: `disks` and `data_disks` need `Disk image`, `images` needs `ISO image`, `snippets` needs `Snippets`.
+
+`data_disks` lets the OS disks stay on a redundant pool while the data disks of pools that replicate at the application level (MySQL, Kafka, OpenEBS volumes) go to a faster or larger one, for example a RAID0 thin pool. A pool's `disks:` list in `placement.yaml` is unchanged: its first entry is the OS disk, the rest are data disks. Pool changes apply to new VMs only; existing VM disks are left where they are.
 
 **`Snippets` is off by default on `local`, and deployment fails without it** when uploading cloud-init. Enable it on each node:
 
