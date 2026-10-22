@@ -1,0 +1,8 @@
+# Talos node OS facts — copy to talos.yaml. Single-consumer values moved out
+# of config.yaml: only the on-prem machine-config path reads them.
+version: 1
+nameservers:
+  - "8.8.8.8"
+  - "1.1.1.1"
+ntp_servers:
+  - "time.cloudflare.com"

@@ -1,0 +1,9 @@
+# Proxmox facts — single-consumer overrides of the provider defaults in
+# providers/proxmox/params.yaml. Copy to proxmox.yaml.
+version: 1
+network_bridge: "vmbr0"
+storage:
+  disks: "local-lvm"            # OS disk (scsi0) and cloud-init volume
+  # data_disks: "local-lvm"     # optional: data disks (scsi1+); defaults to disks
+  images: "local"
+  snippets: "local"

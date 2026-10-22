@@ -18,8 +18,8 @@ override.tf.json
 # Guard: adopter data lives OUTSIDE this clone (../environments, ../artifacts).
 # These rules exist only to catch accidental re-creation of the old in-clone
 # layout — the directories themselves must not exist here at all.
-artifacts/
-environments/
+/artifacts/
+/environments/
 
 # Secrets & Recovery
 recovery-kit/
