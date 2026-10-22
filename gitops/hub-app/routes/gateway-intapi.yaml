@@ -9,8 +9,9 @@ metadata:
   name: gw-intapi
   namespace: platform-system
   annotations:
-    # What external-dns publishes for every attached route: the wan side of the
-    # border DNAT when cluster.lb_ipam.pools.gw-intapi.wan is set, the lan IP otherwise.
+    # What external-dns publishes for every attached route: pool wan when
+    # cluster.lb_ipam.pools.gw-ext.wan is set (1:1 DNAT or shared SNI proxy),
+    # the lan IP otherwise.
     external-dns.alpha.kubernetes.io/target: "${GW_INTAPI_DNS_TARGET}"
 spec:
   gatewayClassName: ${P_GATEWAY_CLASS}

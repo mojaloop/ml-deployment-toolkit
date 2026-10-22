@@ -88,7 +88,7 @@ locals {
 
   # --- LB IPAM (on-prem): one dedicated single-IP pool per gateway ----------
   # dns_target is what external-dns publishes for everything attached to the
-  # gateway: the wan side of the border 1:1 DNAT when set, the lan IP otherwise.
+  # gateway: the pool's wan when set, the lan IP otherwise.
   lb_ipam_pools = {
     for name, pool in try(local.cluster.lb_ipam.pools, {}) :
     name => {
@@ -528,12 +528,6 @@ resource "terraform_data" "validation" {
         [tostring(try(local.cluster.vip, ""))],
       ))) == length(local.lb_ipam_pools) + 1
       error_message = "lb_ipam.pools lan addresses must be distinct from each other and from cluster.vip."
-    }
-    precondition {
-      condition = length(distinct([
-        for p in values(local.lb_ipam_pools) : p.wan if p.wan != ""
-      ])) == length([for p in values(local.lb_ipam_pools) : p.wan if p.wan != ""])
-      error_message = "lb_ipam.pools wan addresses must be unique — two gateways cannot share one outside IP on :443."
     }
 
     # The in-cluster data layer only exists where the provider declares the
