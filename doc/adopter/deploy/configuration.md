@@ -75,7 +75,8 @@ pools:
 version: 1
 network_bridge: "vmbr0"
 storage:
-  disks: "local-lvm"
+  disks: "local-lvm"          # OS disk (scsi0) and cloud-init volume
+  data_disks: "local-lvm"     # optional: scsi1 and above; defaults to `disks`
   images: "local"
   snippets: "local"
 ```

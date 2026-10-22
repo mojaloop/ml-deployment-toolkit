@@ -21,7 +21,11 @@
       "additionalProperties": false,
       "properties": {
         "disks": {
-          "description": "Pool for VM disks",
+          "description": "Pool for the OS disk (scsi0) and the cloud-init volume",
+          "type": "string"
+        },
+        "data_disks": {
+          "description": "Pool for data disks (scsi1 and above); defaults to disks",
           "type": "string"
         },
         "images": {

@@ -130,13 +130,15 @@ variable "network_bridge_override" {
 variable "storage_override" {
   description = "Override Proxmox storage locations (empty values = use provider config defaults)"
   type = object({
-    disks    = string
-    images   = string
-    snippets = string
+    disks      = string
+    data_disks = string # pool for scsi1+ (data disks); "" = same as disks
+    images     = string
+    snippets   = string
   })
   default = {
-    disks    = ""
-    images   = ""
-    snippets = ""
+    disks      = ""
+    data_disks = ""
+    images     = ""
+    snippets   = ""
   }
 }

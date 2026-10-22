@@ -177,9 +177,11 @@ module "proxmox" {
   ntp_servers             = try(local.talos_env.ntp_servers, [])
   network_bridge_override = try(local.proxmox_env.network_bridge, try(local.proxmox_template.network_bridge, ""))
   storage_override = {
-    disks    = try(local.proxmox_env.storage.disks, try(local.proxmox_template.storage.disks, ""))
-    images   = try(local.proxmox_env.storage.images, try(local.proxmox_template.storage.images, ""))
-    snippets = try(local.proxmox_env.storage.snippets, try(local.proxmox_template.storage.snippets, ""))
+    disks = try(local.proxmox_env.storage.disks, try(local.proxmox_template.storage.disks, ""))
+    # Pool for scsi1 and above (data disks); empty = same pool as `disks`.
+    data_disks = try(local.proxmox_env.storage.data_disks, try(local.proxmox_template.storage.data_disks, ""))
+    images     = try(local.proxmox_env.storage.images, try(local.proxmox_template.storage.images, ""))
+    snippets   = try(local.proxmox_env.storage.snippets, try(local.proxmox_template.storage.snippets, ""))
   }
 }
 
