@@ -52,3 +52,36 @@ spec:
   replicas: 3
   config:
     min.insync.replicas: 2
+---
+# Transfer-path topic declared explicitly so its partition count is owned by
+# the distribution and adjustable per environment (kustomize patch on this
+# resource), instead of being fixed by the broker default num.partitions at
+# the moment the first producer auto-creates it.
+#
+# partitions: 6 matches kafka.yaml's num.partitions, i.e. the count an
+# auto-created topic already has on an environment that did not change the
+# default, so adopting the existing topic changes nothing. The unidirectional
+# Topic Operator adopts an existing topic and applies a partition INCREASE in
+# place; a decrease is refused by Kafka (the resource reports NotReady, the
+# topic is untouched). An environment whose topic already has more
+# partitions must patch this value to at least that count.
+#
+# Keyed by participantCurrencyId: useful parallelism is bounded by the number
+# of participant-currency pairs, not TPS (ml-perf-whitepaper-ws). Keep
+# centralledger-handler-transfer-position-batch.replicaCount equal to this.
+#
+# Do not delete this resource while managed: with finalizers on, deleting a
+# managed KafkaTopic deletes the Kafka topic. Annotate
+# strimzi.io/managed="false" first to detach it instead.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: topic-transfer-position-batch
+  namespace: data
+  labels:
+    strimzi.io/cluster: mojaloop-kafka
+spec:
+  partitions: 6
+  replicas: 3
+  config:
+    min.insync.replicas: 2
