@@ -1,0 +1,13 @@
+# Example per-pool Talos machine-config fragment — copy to talos/<pool>.yaml,
+# where <pool> is a pool name from placement.yaml. Applied to every node of
+# that pool, AFTER the template's fragment for the same pool.
+#
+# Talos merge rules (different from Helm!): maps merge, LISTS APPEND.
+# Never restate a list — state only the additions, or remove entries with
+# `$patch: delete`. JSON6902 is not allowed here.
+#
+# Example: raise the kubelet's max pods on the general worker pool.
+machine:
+  kubelet:
+    extraConfig:
+      maxPods: 200
