@@ -129,6 +129,15 @@ spec:
             patch: *relaxProbe
           - target: {kind: Deployment, name: moja-ml-api-adapter-handler-notification}
             patch: *relaxProbe
+          # The quoting handler's /health takes 0.25-1 s under load (10-15 %
+          # of checks between 0.5 and 1 s at 200-300 TPS on mlf-lab1-perf1,
+          # 2026-10-27, from span metrics), against the chart's 1 s timeout.
+          # 3 s keeps a 3x margin over the measured ceiling.
+          - target: {kind: Deployment, name: moja-quoting-service-handler}
+            patch: |
+              - op: replace
+                path: /spec/template/spec/containers/0/livenessProbe/timeoutSeconds
+                value: 3
           # Consumer-loop tuning (perf campaign): notification handling is
           # fast (~35ms/msg) but topic-notification-event accumulates the
           # largest lag at 5 TPS — the batchSize:1/consumeTimeout:1000 poll
