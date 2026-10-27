@@ -66,5 +66,5 @@ variable "api_allowed_cidrs" {
 variable "cilium_version" {
   description = "Cilium chart version. Keep in lockstep with gitops/aws/cilium/helmrelease.yaml (and the Talos pins: Makefile CILIUM_VERSION, gitops/talos/cilium/helmrelease.yaml) — the Flux HelmRelease adopts this exact release."
   type        = string
-  default     = "1.20.0"
+  default     = "1.20.4"
 }

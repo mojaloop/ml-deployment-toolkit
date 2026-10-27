@@ -243,7 +243,7 @@ module "kind" {
   cluster            = module.config.cluster
   kubernetes_version = module.config.kubernetes_version
   node_pools         = module.config.kind_node_pools
-  cilium_version     = "1.20.0"
+  cilium_version     = "1.20.4"
 
   artifacts_path       = local.artifacts_path
   provider_config_path = "../../providers/kind/params.yaml"
