@@ -196,7 +196,7 @@ reporting-hub-bop-settlements-ui:
   image:
     registry: docker.io
     repository: kirgene/reporting-hub-bop-settlements-ui
-    tag: iam-document-authz.2
+    tag: iam-document-authz.3
   configFiles:
     runtime-env.js: |
       window.settlementEnv = {
