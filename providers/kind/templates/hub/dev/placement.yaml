@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=../../../../config/schemas/template-placement.schema.json
+# -----------------------------------------------------------------------------
+# Template placement — the SHAPE this template deploys. Every kind node is a
+# container sharing the host's kernel, CPU and disk, and each one keeps its
+# own image store — so one untainted mixed node is the whole cluster: no
+# duplicate image pulls, no topology theater. Pool scheduling across the
+# platform is soft (preferred affinity), so everything lands here. cores,
+# memory and disks are schema-shape only; the host is the budget.
+# -----------------------------------------------------------------------------
+version: 1
+
+node_groups:
+  - name: m
+    class: mixed-plane
+    count: 1
+    cores: 8
+    memory: 16384        # MB
+    disks: [64]          # GB
+    placement: [pg-1]

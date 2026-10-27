@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - gateway-api/crds.yaml
+  - network-policy-api/crds.yaml
   - cilium/helmrelease.yaml
   - storageclass/gp3.yaml
   # No lb-ipam (cloud LBs address the gateways) and no openebs (EBS CSI is

@@ -5,7 +5,7 @@ metadata:
   namespace: data
 spec:
   crVersion: "1.23.0"
-  image: percona/percona-server-mongodb:8.0
+  image: docker.io/kirgene/percona-server-mongodb:8.3.8-2.k7
   allowUnsafeConfigurations: true
   secrets:
     users: bulk-mongodb-secrets

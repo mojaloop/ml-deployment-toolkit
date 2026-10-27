@@ -8,11 +8,11 @@ spec:
   chart:
     spec:
       chart: connection-manager
-      version: "17.2.0"
       sourceRef:
-        kind: HelmRepository
-        name: mojaloop
-      interval: 12h
+        kind: GitRepository
+        name: mojaloop-helm-git
+      reconcileStrategy: Revision
+      interval: 2m
   releaseName: mcm
   targetNamespace: mcm
   timeout: 10m
@@ -23,7 +23,7 @@ spec:
   upgrade:
     remediation:
       retries: -1
-      strategy: uninstall
+      strategy: rollback
   valuesFrom:
     # Distribution defaults. Adopter override is merged last and wins.
     - kind: ConfigMap

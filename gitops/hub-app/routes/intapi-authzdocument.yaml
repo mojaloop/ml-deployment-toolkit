@@ -1,0 +1,79 @@
+# The operator machine API's document. The intapi route dispatches by path to
+# five of the switch's services, none of which serves this surface, and keys
+# each backend with its own prefix naming this document: one permission per
+# verb over the paths the route sends that service. A client is admitted by
+# creating its Hydra client and assigning it the intapi-client role.
+apiVersion: mojaloop.io/v1
+kind: AuthzDocument
+metadata:
+  name: intapi
+  namespace: mojaloop
+spec:
+  document:
+    openapi: 3.1.0
+    info:
+      title: Mojaloop operator machine API
+      version: '1.0'
+      description: >-
+        The FSPIOP mirror operator tools call with a Hydra machine token.
+    servers:
+      - url: /
+    paths:
+      /:
+        get:
+          operationId: view
+          summary: Reads through the mirror
+          x-authz:
+            scopedBy: []
+          security:
+            - machineToken: []
+          responses:
+            '200':
+              description: What was asked for
+        post:
+          operationId: create
+          summary: Creates through the mirror
+          x-authz:
+            scopedBy: []
+          security:
+            - machineToken: []
+          responses:
+            '200':
+              description: What was created
+        put:
+          operationId: update
+          summary: Updates through the mirror
+          x-authz:
+            scopedBy: []
+          security:
+            - machineToken: []
+          responses:
+            '200':
+              description: What was updated
+        delete:
+          operationId: remove
+          summary: Removes through the mirror
+          x-authz:
+            scopedBy: []
+          security:
+            - machineToken: []
+          responses:
+            '200':
+              description: What was removed
+        patch:
+          operationId: amend
+          summary: Amends through the mirror
+          x-authz:
+            scopedBy: []
+          security:
+            - machineToken: []
+          responses:
+            '200':
+              description: What was amended
+    components:
+      securitySchemes:
+        machineToken:
+          type: http
+          scheme: bearer
+          bearerFormat: JWT
+          description: A machine client's access token, issued by Ory Hydra

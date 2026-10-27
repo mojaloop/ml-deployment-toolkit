@@ -1,15 +1,25 @@
 # gw-intapi — operator-tool machine APIs behind oauth2 (Hydra
-# client-credentials, verified by oathkeeper's jwt authenticator; Keto
-# authorizes per client). The API surface — the FSPIOP mirror prefixes and
-# the settlement paths that joined it — is defined by the Rules in
-# hub-app/ops-api/oathkeeper-rules.yaml, which carry the upstreams; this
-# route only decides that NOTHING on this gateway reaches a backend
-# without passing the proxy. Unmatched paths die in oathkeeper with 404.
+# client-credentials). The route carries the path dispatch to the mirror's
+# services, each keyed with its own prefix over intapi-authzdocument, so a
+# grant on one service's paths reaches no other's. Central settlement also
+# answers on its own route under settlement with the document it serves, so
+# its mount here is a prefix of its own.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: intapi
   namespace: mojaloop
+  annotations:
+    iam.mojaloop.io/moja-account-lookup-service.service: lookup
+    iam.mojaloop.io/moja-account-lookup-service.schema: intapi
+    iam.mojaloop.io/moja-quoting-service.service: quotes
+    iam.mojaloop.io/moja-quoting-service.schema: intapi
+    iam.mojaloop.io/moja-ml-api-adapter-service.service: transfers
+    iam.mojaloop.io/moja-ml-api-adapter-service.schema: intapi
+    iam.mojaloop.io/moja-transaction-requests-service.service: transactionRequests
+    iam.mojaloop.io/moja-transaction-requests-service.schema: intapi
+    iam.mojaloop.io/moja-centralsettlement-service.service: intapiSettlements
+    iam.mojaloop.io/moja-centralsettlement-service.schema: intapi
 spec:
   parentRefs:
     - name: gw-intapi
@@ -17,7 +27,121 @@ spec:
   hostnames:
     - "intapi.int.${DOMAIN}"
   rules:
-    - backendRefs:
-        - name: oathkeeper-proxy
-          namespace: ory
-          port: 4455
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /participants
+        - path:
+            type: PathPrefix
+            value: /parties
+      filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              name: oathkeeper-api
+              namespace: ory
+              port: 4456
+            http:
+              path: /decisions
+              allowedHeaders:
+                - authorization
+                - accept
+      backendRefs:
+        - name: moja-account-lookup-service
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /quotes
+        - path:
+            type: PathPrefix
+            value: /fxQuotes
+      filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              name: oathkeeper-api
+              namespace: ory
+              port: 4456
+            http:
+              path: /decisions
+              allowedHeaders:
+                - authorization
+                - accept
+      backendRefs:
+        - name: moja-quoting-service
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /transfers
+        - path:
+            type: PathPrefix
+            value: /fxTransfers
+      filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              name: oathkeeper-api
+              namespace: ory
+              port: 4456
+            http:
+              path: /decisions
+              allowedHeaders:
+                - authorization
+                - accept
+      backendRefs:
+        - name: moja-ml-api-adapter-service
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /transactionRequests
+        - path:
+            type: PathPrefix
+            value: /authorizations
+      filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              name: oathkeeper-api
+              namespace: ory
+              port: 4456
+            http:
+              path: /decisions
+              allowedHeaders:
+                - authorization
+                - accept
+      backendRefs:
+        - name: moja-transaction-requests-service
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /settlements
+        - path:
+            type: PathPrefix
+            value: /settlementWindows
+        - path:
+            type: PathPrefix
+            value: /settlementModels
+      filters:
+        - type: ExternalAuth
+          externalAuth:
+            protocol: HTTP
+            backendRef:
+              name: oathkeeper-api
+              namespace: ory
+              port: 4456
+            http:
+              path: /decisions
+              allowedHeaders:
+                - authorization
+                - accept
+      backendRefs:
+        - name: moja-centralsettlement-service
+          port: 80
