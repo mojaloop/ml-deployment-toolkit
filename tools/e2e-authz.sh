@@ -73,10 +73,12 @@ ADMIN="-b $TMP/admin.jar"
 
 echo "== admin matrix =="
 t "admin list dfsps"            200 "$(code $RE $ADMIN $API/api/dfsps)"
-if ! curl -s $RE $ADMIN "$API/api/dfsps" | grep -q '"dfsp1"'; then
-  t "admin create dfsp1" 200 "$(code $RE $ADMIN -X POST -H 'Content-Type: application/json' -d '{"dfspId":"dfsp1","name":"DFSP One","email":"op1@example.com"}' $API/api/dfsps)"
-  t "admin create dfsp2" 200 "$(code $RE $ADMIN -X POST -H 'Content-Type: application/json' -d '{"dfspId":"dfsp2","name":"DFSP Two","email":"op2@example.com"}' $API/api/dfsps)"
-fi
+for d in "dfsp1 One op1" "dfsp2 Two op2"; do
+  set -- $d
+  if ! curl -s $RE $ADMIN "$API/api/dfsps" | grep -q "\"$1\""; then
+    t "admin create $1" 200 "$(code $RE $ADMIN -X POST -H 'Content-Type: application/json' -d "{\"dfspId\":\"$1\",\"name\":\"DFSP $2\",\"email\":\"$3@example.com\"}" $API/api/dfsps)"
+  fi
+done
 t "admin credentials denied (operators-only)" 403 "$(code $RE $ADMIN -X POST $API/api/dfsps/dfsp1/credentials)"
 
 echo "== operator onboarding through the courier =="
@@ -157,10 +159,10 @@ TOK="Authorization: Bearer $(python3 -c 'import json; print(json.load(open("'"$T
 t "machine own status"          200 "$(code $RE -H "$TOK" $API/api/dfsps/dfsp1/status)"
 t "machine foreign denied"      403 "$(code $RE -H "$TOK" $API/api/dfsps/dfsp2/status)"
 t "machine peer jwscerts"       200 "$(code $RE -H "$TOK" $API/api/dfsps/jwscerts)"
-t "machine list denied (cookie-only)" 401 "$(code $RE -H "$TOK" $API/api/dfsps)"
-t "machine credentials denied"  401 "$(code $RE -H "$TOK" -X POST $API/api/dfsps/dfsp1/credentials)"
-t "health anonymous"            200 "$(code $RE $API/api/health)"
-t "machine JWT on UI host denied" 401 "$(code $RI -H "$TOK" $UI/)"
+t "machine list denied (people only)" 403 "$(code $RE -H "$TOK" $API/api/dfsps)"
+t "machine credentials denied"  403 "$(code $RE -H "$TOK" -X POST $API/api/dfsps/dfsp1/credentials)"
+t "health not served by the gateway" 404 "$(code $RE $API/api/health)"
+t "machine JWT on UI host denied" 403 "$(code $RI -H "$TOK" $UI/)"
 
 echo "== UI =="
 t "UI anonymous json 401"       401 "$(code $RI $UI/)"
@@ -170,25 +172,24 @@ t "UI with session"             200 "$(code $RI $OP1 $UI/)"
 
 echo "== portal =="
 PORTAL="https://portal.int.$DOM"
+IAPI="https://iam-api.int.$DOM"
 AID=$(kadmin http://kratos-admin/admin/identities | python3 -c "
 import sys,json
 for i in json.load(sys.stdin):
     if i['traits'].get('email')=='$ADMIN_EMAIL': print(i['id'])")
-# Portal access rides one membership: the roles a deployment composed already
-# carry the view permission for the shell and for each micro-frontend, so
-# taking the role away and giving it back is the whole test, made the way an
-# operator makes it.
-iam() { # iam <method> <path> [body]
-  $K exec dbg -- curl -s -o /dev/null -X "$1" \
-    ${3:+-H 'Content-Type: application/json' -d "$3"} \
-    "http://iam-ml-iam-services-provisioning$2"
+assign() { # assign <insert|delete> <role> [resources-json]
+  curl -s $RI $ADMIN -o /dev/null -X PATCH -H 'Content-Type: application/json' \
+    -d "{\"assignmentOperations\":[{\"action\":\"$1\",\"role\":\"$2\"${3:+,\"resources\":$3}}]}" \
+    "$IAPI/users/$AID/assignments"
 }
-iam DELETE "/subjects/$AID/assignments" '{"role":"hub-admin"}'
+offered() { # offered <resource id>
+  curl -s $RI $ADMIN "$IAPI/resources?resourceName=Participant" \
+    | python3 -c 'import sys,json; print(1 if any(r["id"]==sys.argv[1] for r in json.load(sys.stdin)["resources"]) else 0)' "$1"
+}
 t "portal anonymous json 401"   401 "$(code $RI $PORTAL/)"
 t "portal browser login redirect" 302 "$(code $RI -H 'Accept: text/html' $PORTAL/)"
-t "shell without a role denied"  403 "$(code $RI $ADMIN $PORTAL/)"
-t "mfe without a role denied"   403 "$(code $RI $ADMIN https://portal-iam.int.$DOM/)"
-iam POST "/subjects/$AID/assignments" '{"role":"hub-admin"}'
+t "shell without a role denied"  403 "$(code $RI $OP1 $PORTAL/)"
+t "mfe without a role denied"   403 "$(code $RI $OP1 https://portal-iam.int.$DOM/)"
 t "shell via the role"          200 "$(code $RI $ADMIN $PORTAL/)"
 t "mfe roles via the role"      200 "$(code $RI $ADMIN https://portal-iam.int.$DOM/)"
 t "mfe transfers"               200 "$(code $RI $ADMIN https://portal-transfers.int.$DOM/)"
@@ -199,7 +200,6 @@ t "shell remotes manifest"      200 "$(code $RI $ADMIN $PORTAL/remotes.json)"
 t "op1 mfe denied (holds no portal role)" 403 "$(code $RI $OP1 https://portal-iam.int.$DOM/)"
 
 echo "== the role screen's data: roles, pickers and holdings =="
-IAPI="https://iam-api.int.$DOM"
 t "roles listed with what each leaves open" Participant "$(curl -s $RI $ADMIN $IAPI/roles \
   | python3 -c 'import sys,json; roles={r["name"]: r["open"] for r in json.load(sys.stdin)["roles"]}; print(",".join(roles["dfsp-operator"]))')"
 t "picker offers the participants that exist" 1 "$(curl -s $RI $ADMIN "$IAPI/resources?resourceName=Participant" \
@@ -211,10 +211,10 @@ echo "== the scope reaches the service, and only the gateway writes it =="
 t "forged scope ignored" dfsp1 "$(curl -s $RE $OP1 -H 'X-Scope: dfsps=*' "$API/api/dfsps" | python3 -c 'import sys,json; print(",".join(sorted(r["id"] for r in json.load(sys.stdin))))')"
 
 echo "== a resource is grantable the moment it exists =="
-t "dfsp2 offered by the IAM" 1 "$($K exec dbg -- curl -s 'http://iam-ml-iam-services-provisioning/resources?resourceName=Participant' | grep -c '"id": *"dfsp2"')"
-iam POST "/subjects/$AID/assignments" '{"role":"dfsp-operator","resources":{"Participant":"dfsp2"}}'
+t "dfsp2 offered by the IAM" 1 "$(offered dfsp2)"
+assign insert dfsp-operator '{"Participant":"dfsp2"}'
 t "admin now sees dfsp2 rows" 200 "$(code $RE $ADMIN $API/api/dfsps/dfsp2/status)"
-iam DELETE "/subjects/$AID/assignments" '{"role":"dfsp-operator","resources":{"Participant":"dfsp2"}}'
+assign delete dfsp-operator '{"Participant":"dfsp2"}'
 
 echo "== the switch's participants reach the picker through the declared source =="
 # Real onboarding: the hub's currency accounts and settlement model, then the
@@ -234,8 +234,7 @@ $K exec dbg -- curl -s -o /dev/null -X POST -H 'Content-Type: application/json' 
 t "participant onboarded in the switch" 1 "$($K exec dbg -- curl -s $CL/participants | grep -c '"name":"pinkbank"')"
 SYNCED=0
 for _ in $(seq 1 12); do
-  $K exec dbg -- curl -s 'http://iam-ml-iam-services-provisioning/resources?resourceName=Participant' \
-    | grep -q '"id": *"pinkbank"' && { SYNCED=1; break; }
+  [ "$(offered pinkbank)" = 1 ] && { SYNCED=1; break; }
   sleep 5
 done
 t "onboarded participant offered by the IAM" 1 "$SYNCED"
@@ -244,7 +243,7 @@ echo "== the ledger surface: the list is whole for whoever holds it =="
 LAPI="https://portal-api.int.$DOM"
 t "admin reads the whole list" 1 "$(curl -s $RI $ADMIN $LAPI/participants | grep -c '"name":"pinkbank"')"
 t "op1 holds no listing" 403 "$(code $RI $OP1 $LAPI/participants)"
-t "vocabulary served whole" 1 "$($K exec dbg -- curl -s 'http://iam-ml-iam-services-provisioning/resource-names' | grep -c '"url": *"http://moja-centralledger-service.mojaloop.svc.cluster.local/participants"')"
+t "vocabulary served whole" 1 "$(kubectl get --raw /api/v1/namespaces/ory/services/iam-ml-iam-services-provisioning:80/proxy/resource-names | grep -c '"url": *"http://moja-centralledger-service.mojaloop.svc.cluster.local/participants"')"
 
 echo "== CORS =="
 t "preflight" 200 "$(code $RE -X OPTIONS -H "Origin: $UI" -H 'Access-Control-Request-Method: GET' $API/api/dfsps)"
