@@ -56,7 +56,6 @@ metadata:
   labels:
     app.kubernetes.io/part-of: mojaloop
     mojaloop.io/layer: hub
-    iam.mojaloop.io/provisioning-client: "true"
 ---
 apiVersion: v1
 kind: Namespace
@@ -65,4 +64,3 @@ metadata:
   labels:
     app.kubernetes.io/part-of: mojaloop
     mojaloop.io/layer: hub
-    iam.mojaloop.io/provisioning-client: "true"
