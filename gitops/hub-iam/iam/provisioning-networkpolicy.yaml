@@ -2,9 +2,11 @@
 #
 # It holds the platform's only Keto write URL and Kratos admin credentials, and
 # its API carries role assignment, so reachability is the whole of its access
-# control: it authenticates nothing and is fronted by no gateway. Two workloads
-# call it — the role administration service that fronts it for operators, and a
-# service naming a resource it has created.
+# control: it authenticates nothing and is fronted by no gateway. Its callers —
+# the role administration service that fronts it for operators, and a service
+# naming a resource it has created — carry iam.mojaloop.io/provisioning-client
+# on their pods, set by their charts, and run in a namespace the deployment
+# labels the same, so both the workload and the deployment consent.
 #
 # Admin tier, so no namespaced NetworkPolicy can widen this. The callers Pass
 # rather than Accept: Accept would end evaluation here and stop a service's own
@@ -28,27 +30,16 @@ spec:
           app.kubernetes.io/name: ml-iam-services
           app.kubernetes.io/component: provisioning
   ingress:
-    - name: role-administration
+    - name: provisioning-clients
       action: Pass
       from:
         - pods:
             namespaceSelector:
               matchLabels:
-                kubernetes.io/metadata.name: finance-portal
+                iam.mojaloop.io/provisioning-client: "true"
             podSelector:
               matchLabels:
-                app.kubernetes.io/name: role-assignment-service
-    - name: resource-provisioning
-      action: Pass
-      from:
-        - pods:
-            namespaceSelector:
-              matchLabels:
-                kubernetes.io/metadata.name: mcm
-            podSelector:
-              matchLabels:
-                app.kubernetes.io/name: mcm-connection-manager-api
-                app.kubernetes.io/instance: mcm
+                iam.mojaloop.io/provisioning-client: "true"
     - name: nothing-else
       action: Deny
       from:
