@@ -5,7 +5,6 @@ resources:
   - iam/externalsecret-kratos.yaml
   - iam/externalsecret-keto.yaml
   - iam/externalsecret-hydra.yaml
-  - iam/roles.yaml
   - iam/helmrelease.yaml
   - iam/provisioning-networkpolicy.yaml
   - routes/referenceGrants.yaml

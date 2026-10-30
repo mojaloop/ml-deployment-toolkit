@@ -13,9 +13,9 @@ global:
 
 iam:
   enabled: true
-  # DFSP onboarding: each DFSP is recorded as a Participant, the invited
+  # DFSP onboarding: each DFSP is recorded as a participant, the invited
   # admin operates it, the machine client speaks for it
-  dfspResourceName: Participant
+  dfspResourceName: participant
   dfspAdminRole: dfsp-operator
   dfspClientRole: dfsp-client
 

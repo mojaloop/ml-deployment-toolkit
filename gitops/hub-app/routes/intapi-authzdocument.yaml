@@ -3,7 +3,7 @@
 # each backend with its own prefix naming this document: one permission per
 # verb over the paths the route sends that service. A client is admitted by
 # creating its Hydra client and assigning it the intapi-client role.
-apiVersion: mojaloop.io/v1
+apiVersion: iam.mojaloop.io/v1
 kind: AuthzDocument
 metadata:
   name: intapi

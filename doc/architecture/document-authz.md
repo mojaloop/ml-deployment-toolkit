@@ -23,11 +23,11 @@ The model and its rules are documented with the chart (mojaloop/helm):
 
 - `gitops/hub-iam/iam/sources.yaml` — the chart sources
 - `gitops/hub-iam/values/ory/iam.yaml` — the `mojaloop-iam` release's
-  distribution values: the resource vocabulary (`global.resourceNames`), Ory
-  configuration and the IdP hosts
-- `gitops/hub-iam/iam/roles.yaml` — the deployment's role document. A role
-  goes live once every service it names is routed; until then it waits, listed
-  under `pending` in the IAM's `/state`
+  distribution values: Ory configuration and the IdP hosts
+- `gitops/hub-app/iam/` — the deployment's roles (`AuthzRole`) and resource
+  names (`AuthzResourceName`, `participant` and `report`), applied after the
+  IAM installs their kinds. A role goes live once every service it names is
+  routed; until then it is `Waiting`, as `kubectl get authzrole -A` shows
 - `gitops/hub-iam/iam/externalsecret-*.yaml` — Ory DSNs and secrets from
   Vault
 - the permission prefix of each service this platform ships, set in its

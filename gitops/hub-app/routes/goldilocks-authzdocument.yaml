@@ -1,6 +1,6 @@
 # The Goldilocks dashboard's document: a third-party image that serves none,
 # so the goldilocks route names this one for its backend.
-apiVersion: mojaloop.io/v1
+apiVersion: iam.mojaloop.io/v1
 kind: AuthzDocument
 metadata:
   name: goldilocks-ui

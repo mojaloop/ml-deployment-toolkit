@@ -1,0 +1,32 @@
+# One real thing under several services' names: a DFSP is `dfsps` where the
+# connection manager routes it and `participants` where the switch and the
+# reporting services return its rows.
+apiVersion: iam.mojaloop.io/v1
+kind: AuthzResourceName
+metadata:
+  name: participant
+  namespace: ory
+spec:
+  label: Participant
+  description: A financial institution connected to the hub
+  members:
+    - { service: mcm, type: dfsps }
+    - { service: reports, type: participants }
+    - { service: trxreporting, type: participants }
+    - { service: ledger, type: participants }
+    - { service: settlement, type: participants }
+  # The switch's registry is authoritative for who participates
+  source:
+    url: http://moja-centralledger-service.mojaloop.svc.cluster.local/participants
+    id: /name
+---
+apiVersion: iam.mojaloop.io/v1
+kind: AuthzResourceName
+metadata:
+  name: report
+  namespace: ory
+spec:
+  label: Report
+  description: A report this deployment has defined
+  members:
+    - { service: reports, type: reports }

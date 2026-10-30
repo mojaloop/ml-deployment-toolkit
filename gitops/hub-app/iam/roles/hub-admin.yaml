@@ -1,0 +1,285 @@
+# Leaves nothing open. It never mints a DFSP's client credentials: those
+# belong to whoever operates that DFSP.
+apiVersion: iam.mojaloop.io/v1
+kind: AuthzRole
+metadata:
+  name: hub-admin
+  namespace: ory
+spec:
+  title: Hub administrator
+  description: Runs the hub, every portal surface and the operations UIs
+  grants:
+    - permission: mcm.getHubEndpoints
+    - permission: mcm.getHubIngressIps
+    - permission: mcm.createHubIngressIp
+    - permission: mcm.getHubIngressIpEndpoint
+    - permission: mcm.updateHubIngressIpEndpoint
+    - permission: mcm.deleteHubIngressIpEndpoint
+    - permission: mcm.getHubIngressUrls
+    - permission: mcm.createHubIngressUrl
+    - permission: mcm.getHubIngressUrlEndpoint
+    - permission: mcm.updateHubIngressUrlEndpoint
+    - permission: mcm.deleteHubIngressUrlEndpoint
+    - permission: mcm.getHubEgressIps
+    - permission: mcm.createHubEgressIp
+    - permission: mcm.getHubEgressIpEndpoint
+    - permission: mcm.updateHubEgressIpEndpoint
+    - permission: mcm.deleteHubEgressIpEndpoint
+    - permission: mcm.getHubEndpoint
+    - permission: mcm.updateHubEndpoint
+    - permission: mcm.deleteHubEndpoint
+    - permission: mcm.getHubServerCerts
+    - permission: mcm.createHubServerCerts
+    - permission: mcm.deleteHubServerCerts
+    - permission: mcm.getHubCA
+    - permission: mcm.createExternalHubCA
+    - permission: mcm.createInternalHubCA
+    - permission: mcm.deleteHubCA
+    - permission: mcm.getHubJWSCerts
+    - permission: mcm.setHubJWSCerts
+    - permission: mcm.rotateHubJWSCerts
+    - permission: mcm.getAllDfspJWSCerts
+    - permission: mcm.createDfspExternalJWSCerts
+      resources:
+        participant: all
+    - permission: mcm.getDFSPs
+      resources:
+        participant: all
+    - permission: mcm.createDFSP
+    - permission: mcm.handleGetDfspsStatesStatus
+      resources:
+        participant: all
+    - permission: mcm.getUnprocessedEndpointItems
+      resources:
+        participant: all
+    - permission: mcm.getAllDfspServerCerts
+    - permission: mcm.updateDFSP
+      resources:
+        participant: all
+    - permission: mcm.getDFSPca
+      resources:
+        participant: all
+    - permission: mcm.setDFSPca
+      resources:
+        participant: all
+    - permission: mcm.getDFSPInboundEnrollments
+      resources:
+        participant: all
+    - permission: mcm.createDFSPInboundEnrollment
+      resources:
+        participant: all
+    - permission: mcm.getDFSPInboundEnrollment
+      resources:
+        participant: all
+    - permission: mcm.signDFSPInboundEnrollment
+      resources:
+        participant: all
+    - permission: mcm.getDFSPOutboundEnrollments
+      resources:
+        participant: all
+    - permission: mcm.createCSRAndDFSPOutboundEnrollment
+      resources:
+        participant: all
+    - permission: mcm.onboardDFSP
+      resources:
+        participant: all
+    - permission: mcm.getDFSPOutboundEnrollment
+      resources:
+        participant: all
+    - permission: mcm.addDFSPOutboundEnrollmentCertificate
+      resources:
+        participant: all
+    - permission: mcm.validateDFSPOutboundEnrollmentCertificate
+      resources:
+        participant: all
+    - permission: mcm.getDFSPEndpoints
+      resources:
+        participant: all
+    - permission: mcm.getUnprocessedDfspItems
+      resources:
+        participant: all
+    - permission: mcm.getDFSPIngress
+      resources:
+        participant: all
+    - permission: mcm.createDFSPIngress
+      resources:
+        participant: all
+    - permission: mcm.getDFSPIngressIps
+      resources:
+        participant: all
+    - permission: mcm.createDFSPIngressIp
+      resources:
+        participant: all
+    - permission: mcm.getDFSPIngressIpEndpoint
+      resources:
+        participant: all
+    - permission: mcm.updateDFSPIngressIpEndpoint
+      resources:
+        participant: all
+    - permission: mcm.deleteDFSPIngressIpEndpoint
+      resources:
+        participant: all
+    - permission: mcm.getDFSPIngressUrls
+      resources:
+        participant: all
+    - permission: mcm.createDFSPIngressUrl
+      resources:
+        participant: all
+    - permission: mcm.getDFSPIngressUrlEndpoint
+      resources:
+        participant: all
+    - permission: mcm.updateDFSPIngressUrlEndpoint
+      resources:
+        participant: all
+    - permission: mcm.deleteDFSPIngressUrlEndpoint
+      resources:
+        participant: all
+    - permission: mcm.getDFSPEgress
+      resources:
+        participant: all
+    - permission: mcm.createDFSPEgress
+      resources:
+        participant: all
+    - permission: mcm.getDFSPEgressIps
+      resources:
+        participant: all
+    - permission: mcm.createDFSPEgressIp
+      resources:
+        participant: all
+    - permission: mcm.getDFSPEgressIpEndpoint
+      resources:
+        participant: all
+    - permission: mcm.updateDFSPEgressIpEndpoint
+      resources:
+        participant: all
+    - permission: mcm.deleteDFSPEgressIpEndpoint
+      resources:
+        participant: all
+    - permission: mcm.getDFSPEndpoint
+      resources:
+        participant: all
+    - permission: mcm.updateDFSPEndpoint
+      resources:
+        participant: all
+    - permission: mcm.deleteDFSPEndpoint
+      resources:
+        participant: all
+    - permission: mcm.confirmEndpointItem
+      resources:
+        participant: all
+    - permission: mcm.getDfspServerCerts
+      resources:
+        participant: all
+    - permission: mcm.updateDfspServerCerts
+      resources:
+        participant: all
+    - permission: mcm.createDfspServerCerts
+      resources:
+        participant: all
+    - permission: mcm.deleteDfspServerCerts
+      resources:
+        participant: all
+    - permission: mcm.getDfspJWSCerts
+      resources:
+        participant: all
+    - permission: mcm.createDfspJWSCerts
+      resources:
+        participant: all
+    - permission: mcm.deleteDfspJWSCerts
+      resources:
+        participant: all
+    - permission: mcm.getDfspStatus
+      resources:
+        participant: all
+    - permission: mcm.uploadDfspStatesStatus
+      resources:
+        participant: all
+    - permission: mcm.getMonetaryZones
+    - permission: mcm.getDfspsByMonetaryZones
+      resources:
+        participant: all
+    - permission: iam.UsersGet
+    - permission: iam.UsersIDGet
+    - permission: iam.ResourcesGet
+    - permission: iam.RolesGet
+    - permission: iam.UsersIDAssignmentsGet
+    - permission: iam.UsersIDAssignmentsPatch
+    - permission: reports.getReport
+      resources:
+        report: all
+        participant: all
+    - permission: trxreporting.query
+      resources:
+        participant: all
+    - permission: ledger.getParticipants
+    - permission: ledger.getParticipantsLimits
+    - permission: ledger.getParticipant
+      resources:
+        participant: all
+    - permission: ledger.getParticipantAccounts
+      resources:
+        participant: all
+    - permission: ledger.getParticipantEndpoints
+      resources:
+        participant: all
+    - permission: ledger.getParticipantLimits
+      resources:
+        participant: all
+    - permission: ledger.updateParticipantNetDebitCap
+      resources:
+        participant: all
+    - permission: ledger.getParticipantPositions
+      resources:
+        participant: all
+    - permission: ledger.toggleParticipantAccount
+      resources:
+        participant: all
+    - permission: ledger.recordParticipantFunds
+      resources:
+        participant: all
+    - permission: ledger.recordParticipantTransfer
+      resources:
+        participant: all
+    - permission: ledger.getSettlementModels
+    - permission: ledger.getSettlementModel
+    - permission: settlement.getSettlementWindowById
+    - permission: settlement.closeSettlementWindow
+    - permission: settlement.getSettlementWindowsByParams
+    - permission: settlement.getSettlementsByParams
+      resources:
+        participant: all
+    - permission: settlement.createSettlement
+    - permission: settlement.getSettlementById
+      resources:
+        participant: all
+    - permission: settlement.updateSettlementById
+    - permission: settlement.getSettlementBySettlementParticipant
+      resources:
+        participant: all
+    - permission: settlement.updateSettlementBySettlementParticipant
+      resources:
+        participant: all
+    - permission: settlement.getSettlementBySettlementParticipantAccount
+      resources:
+        participant: all
+    - permission: settlement.updateSettlementBySettlementParticipantAccount
+      resources:
+        participant: all
+    - permission: portalShell.view
+    - permission: portalRoles.view
+    - permission: portalTransfers.view
+    - permission: portalSettlements.view
+    - permission: portalPositions.view
+    - permission: mcmUi.view
+    - permission: ttkUi.view
+    - permission: ttkBackend.view
+    - permission: ttkBackend.create
+    - permission: ttkBackend.update
+    - permission: ttkBackend.remove
+    - permission: fluxUi.view
+    - permission: fluxUi.create
+    - permission: fluxUi.update
+    - permission: fluxUi.remove
+    - permission: goldilocksUi.view
+    - permission: hubbleUi.view
+    - permission: hubbleUi.create
