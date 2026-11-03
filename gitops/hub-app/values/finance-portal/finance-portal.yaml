@@ -96,7 +96,7 @@ reporting-hub-bop-role-ui:
   image:
     registry: docker.io
     repository: kirgene/reporting-hub-bop-role-ui
-    tag: iam-document-authz.5
+    tag: iam-document-authz.6
   configFiles:
     runtime-env.js: |
       window.roleEnv = {
@@ -119,7 +119,7 @@ reporting-hub-bop-trx-ui:
   image:
     registry: docker.io
     repository: kirgene/reporting-hub-bop-trx-ui
-    tag: iam-document-authz.1
+    tag: iam-document-authz.2
   configFiles:
     runtime-env.js: |
       window.transferEnv = {
@@ -142,7 +142,7 @@ reporting-hub-bop-settlements-ui:
   image:
     registry: docker.io
     repository: kirgene/reporting-hub-bop-settlements-ui
-    tag: iam-document-authz.3
+    tag: iam-document-authz.4
   configFiles:
     runtime-env.js: |
       window.settlementEnv = {
@@ -167,7 +167,7 @@ reporting-hub-bop-positions-ui:
   image:
     registry: docker.io
     repository: kirgene/reporting-hub-bop-positions-ui
-    tag: iam-document-authz.1
+    tag: iam-document-authz.2
   configFiles:
     runtime-env.js: |
       window.positionsEnv = {
