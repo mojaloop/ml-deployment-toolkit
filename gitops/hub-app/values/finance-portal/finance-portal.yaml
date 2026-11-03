@@ -63,7 +63,7 @@ reporting-hub-bop-shell:
   image:
     registry: docker.io
     repository: kirgene/reporting-hub-bop-shell
-    tag: iam-document-authz.2
+    tag: iam-document-authz.3
   configFiles:
     config.json:
       # Header branding — TITLE uses Flux substitution so each
