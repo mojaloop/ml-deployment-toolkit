@@ -6,7 +6,7 @@ variable "flux_version" {
 variable "operator_version" {
   description = "Flux Operator Helm chart version"
   type        = string
-  default     = "0.57.0"
+  default     = "0.62.1"
 }
 
 variable "flux_namespace" {

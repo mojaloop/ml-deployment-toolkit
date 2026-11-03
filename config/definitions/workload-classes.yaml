@@ -11,10 +11,9 @@
 # Global Talos/Kubernetes/Flux versions
 talos_version: "v1.13.7"
 kubernetes_version: "1.36.3"
-# Flux distribution version — a platform definition, not adopter config.
-# Moved here from the old cluster.flux.version silent default in config.yaml:
+# Flux distribution version — a platform definition, not adopter config;
 # versions are single-sourced in this file ("stated, never derived").
-flux_version: "2.9.3"
+flux_version: "2.10.0"
 
 # Talos image factory schematic (extensions baked into the image)
 talos_image:
