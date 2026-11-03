@@ -64,3 +64,5 @@ configMapGenerator:
       - values.yaml=values/mojaloop/mojaloop.yaml
 generatorOptions:
   disableNameSuffixHash: true
+  labels:
+    reconcile.fluxcd.io/watch: Enabled

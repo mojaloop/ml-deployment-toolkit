@@ -18,3 +18,5 @@ configMapGenerator:
       - values.yaml=values/ory/iam.yaml
 generatorOptions:
   disableNameSuffixHash: true
+  labels:
+    reconcile.fluxcd.io/watch: Enabled

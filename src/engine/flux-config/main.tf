@@ -455,6 +455,10 @@ resource "kubernetes_secret_v1" "minio_buckets_values" {
   type = "Opaque"
 }
 
+locals {
+  watched_by_helm_controller = { "reconcile.fluxcd.io/watch" = "Enabled" }
+}
+
 # Provider-wide gitops delta values — one ConfigMap per
 # values/<namespace>/<release>.yaml under providers/<p>/gitops-delta/, named
 # <namespace>-<release>-values-provider. The provider slot of the valuesFrom
@@ -467,6 +471,7 @@ resource "kubernetes_config_map_v1" "helm_value_providers" {
   metadata {
     name      = "${each.key}-values-provider"
     namespace = var.flux_namespace
+    labels    = local.watched_by_helm_controller
   }
 
   data = {
@@ -486,6 +491,7 @@ resource "kubernetes_config_map_v1" "helm_value_templates" {
   metadata {
     name      = "${each.key}-values-template"
     namespace = var.flux_namespace
+    labels    = local.watched_by_helm_controller
   }
 
   data = {
@@ -504,6 +510,7 @@ resource "kubernetes_config_map_v1" "helm_value_overrides" {
   metadata {
     name      = "${each.key}-values-override"
     namespace = var.flux_namespace
+    labels    = local.watched_by_helm_controller
   }
 
   data = {
@@ -519,6 +526,7 @@ resource "kubernetes_secret_v1" "helm_value_overrides" {
   metadata {
     name      = "${each.key}-values-override"
     namespace = var.flux_namespace
+    labels    = local.watched_by_helm_controller
   }
 
   data = {

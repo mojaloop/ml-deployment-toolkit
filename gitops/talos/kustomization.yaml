@@ -24,3 +24,5 @@ configMapGenerator:
       - values.yaml=values/openebs-system/openebs.yaml
 generatorOptions:
   disableNameSuffixHash: true
+  labels:
+    reconcile.fluxcd.io/watch: Enabled
