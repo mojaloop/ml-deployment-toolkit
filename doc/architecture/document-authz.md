@@ -60,12 +60,12 @@ The model and its rules are documented with the chart (mojaloop/helm):
 | Portal shell / micro-frontends | `portalShell`, `portalRoles`, `portalTransfers`, `portalSettlements`, `portalPositions` | chart |
 | Testing toolkit UI / backend | `ttkUi` / `ttkBackend` | chart / served |
 | Flux / Goldilocks / Hubble | `fluxUi` / `goldilocksUi` / `hubbleUi` | `gitops/hub-app/routes` |
-| Operator machine API | `lookup`, `quotes`, `transfers`, `transactionRequests`, `intapiSettlements` | `gitops/hub-app/routes` |
+| Operator machine API | `lookup`, `quotes`, `transfers`, `transactionRequests`, `settlement` | `gitops/hub-app/routes` |
 
 The intapi route dispatches by path to five services, so each is keyed with
-its own prefix over one document. Central settlement also answers on its own
-route as `settlement`, with the document it serves, so its intapi mount has a
-prefix of its own.
+its own prefix. Central settlement is keyed `settlement` with the document it
+serves, the same as on its own route, so one permission covers an operation
+on either host.
 
 ## Hosts
 

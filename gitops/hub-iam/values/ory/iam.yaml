@@ -4,7 +4,7 @@
 # Adopter overrides go in environments/<env>/values/iam.yaml,
 # which is merged after this file and therefore wins.
 global:
-  iamImage: docker.io/kirgene/ml-iam-services:iam-document-authz.13
+  iamImage: docker.io/kirgene/ml-iam-services:iam-document-authz.16
 
   # The first identity a fresh deployment logs in with: created while the
   # roles are applied and invited by email to set its password, the same

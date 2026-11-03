@@ -29,6 +29,7 @@ spec:
               allowedHeaders:
                 - cookie
                 - accept
+                - x-forwarded-proto
       backendRefs:
         - name: flux-operator
           port: 9080

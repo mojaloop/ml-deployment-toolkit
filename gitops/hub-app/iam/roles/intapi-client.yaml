@@ -29,26 +29,26 @@ spec:
     - permission: transactionRequests.update
     - permission: transactionRequests.remove
     - permission: transactionRequests.amend
-    - permission: intapiSettlements.getSettlementWindowById
-    - permission: intapiSettlements.closeSettlementWindow
-    - permission: intapiSettlements.getSettlementWindowsByParams
-    - permission: intapiSettlements.getSettlementsByParams
+    - permission: settlement.getSettlementWindowById
+    - permission: settlement.closeSettlementWindow
+    - permission: settlement.getSettlementWindowsByParams
+    - permission: settlement.getSettlementsByParams
       resources:
         participant: $all
-    - permission: intapiSettlements.createSettlement
-    - permission: intapiSettlements.getSettlementById
+    - permission: settlement.createSettlement
+    - permission: settlement.getSettlementById
       resources:
         participant: $all
-    - permission: intapiSettlements.updateSettlementById
-    - permission: intapiSettlements.getSettlementBySettlementParticipant
+    - permission: settlement.updateSettlementById
+    - permission: settlement.getSettlementBySettlementParticipant
       resources:
         participant: $all
-    - permission: intapiSettlements.updateSettlementBySettlementParticipant
+    - permission: settlement.updateSettlementBySettlementParticipant
       resources:
         participant: $all
-    - permission: intapiSettlements.getSettlementBySettlementParticipantAccount
+    - permission: settlement.getSettlementBySettlementParticipantAccount
       resources:
         participant: $all
-    - permission: intapiSettlements.updateSettlementBySettlementParticipantAccount
+    - permission: settlement.updateSettlementBySettlementParticipantAccount
       resources:
         participant: $all

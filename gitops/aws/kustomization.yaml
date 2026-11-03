@@ -9,6 +9,8 @@ resources:
   # No lb-ipam (cloud LBs address the gateways) and no openebs (EBS CSI is
   # installed as a managed addon by aws-bootstrap; gp3.yaml is its default
   # class) — the two on-prem gap fillers this vendor layer does not need.
+components:
+  - ../cilium-hubble-route
 
 # Distribution values for each HelmRelease in this kustomization.
 # Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;

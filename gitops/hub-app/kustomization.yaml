@@ -41,9 +41,9 @@ resources:
   # document
   - routes/flux-httproute.yaml
   - routes/flux-authzdocument.yaml
-  - routes/goldilocks-httproute.yaml
+  # The Goldilocks and Cilium charts render the dashboard's and Hubble UI's
+  # routes; their images serve no document
   - routes/goldilocks-authzdocument.yaml
-  - routes/hubble-httproute.yaml
   - routes/hubble-authzdocument.yaml
 
 # Distribution values for each HelmRelease in this kustomization.
@@ -62,6 +62,16 @@ configMapGenerator:
     namespace: flux-system
     files:
       - values.yaml=values/mojaloop/mojaloop.yaml
+  # Read by the substrate's Cilium HelmRelease (gitops/cilium-hubble-route)
+  - name: cilium-hubble-route-values
+    namespace: flux-system
+    files:
+      - values.yaml=values/cilium/hubble-route.yaml
+  # Read by the platform's Goldilocks HelmRelease (gitops/goldilocks-dashboard-route)
+  - name: goldilocks-dashboard-route-values
+    namespace: flux-system
+    files:
+      - values.yaml=values/goldilocks/dashboard-route.yaml
 generatorOptions:
   disableNameSuffixHash: true
   labels:

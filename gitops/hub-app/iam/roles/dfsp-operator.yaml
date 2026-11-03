@@ -8,7 +8,7 @@ metadata:
   namespace: ory
 spec:
   title: DFSP operator
-  description: Operates one DFSP in MCM and follows its settlements
+  description: Operates one DFSP in MCM and follows its transfers, positions and settlements in the portal
   grants:
     - permission: mcm.getDFSPs
     - permission: mcm.handleGetDfspsStatesStatus
@@ -83,3 +83,14 @@ spec:
     - permission: settlement.getSettlementBySettlementParticipantAccount
     - permission: settlement.updateSettlementBySettlementParticipantAccount
     - permission: mcmUi.view
+    - permission: portalShell.view
+    - permission: portalTransfers.view
+    - permission: trxreporting.query
+    - permission: portalPositions.view
+    - permission: ledger.getParticipant
+    - permission: ledger.getParticipantAccounts
+    - permission: ledger.getParticipantLimits
+    - permission: ledger.getParticipantPositions
+    - permission: portalSettlements.view
+    - permission: ledger.getSettlementModels
+    - permission: ledger.getSettlementModel

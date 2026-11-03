@@ -12,6 +12,8 @@ resources:
   - goldilocks/helmrelease.yaml
   - reloader/helmrelease.yaml
   - opentelemetry-operator/helmrelease.yaml
+components:
+  - ../goldilocks-dashboard-route
 
 # Distribution values for each HelmRelease in this kustomization.
 # Rendered into ConfigMaps that the HelmRelease references first in valuesFrom;
