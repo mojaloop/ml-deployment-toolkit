@@ -96,12 +96,12 @@ reporting-hub-bop-role-ui:
   image:
     registry: docker.io
     repository: kirgene/reporting-hub-bop-role-ui
-    tag: iam-document-authz.2
+    tag: iam-document-authz.3
   configFiles:
     runtime-env.js: |
       window.roleEnv = {
         REACT_APP_API_BASE_URL: 'https://iam-api.int.${DOMAIN}',
-        REACT_APP_MOCK_API: 'false'
+        REACT_APP_IAM_SERVICE: 'iam'
       };
   gateway:
     enabled: true
