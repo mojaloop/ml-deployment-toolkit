@@ -23,6 +23,8 @@ spec:
         name: cilium
       interval: 12h
   targetNamespace: cilium
+  releaseName: cilium
+  storageNamespace: cilium
   install:
     crds: Create
     remediation:

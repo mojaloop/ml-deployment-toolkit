@@ -22,10 +22,12 @@ spec:
   # is safe here because the chart carries no PVCs; all state is in MySQL, Mongo and Kafka.
   targetNamespace: finance-portal
   install:
+    crds: Create
     createNamespace: false
     remediation:
       retries: -1
   upgrade:
+    crds: CreateReplace
     remediation:
       retries: -1
       strategy: rollback
