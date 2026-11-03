@@ -29,8 +29,26 @@ spec:
     - permission: transactionRequests.update
     - permission: transactionRequests.remove
     - permission: transactionRequests.amend
-    - permission: intapiSettlements.view
-    - permission: intapiSettlements.create
-    - permission: intapiSettlements.update
-    - permission: intapiSettlements.remove
-    - permission: intapiSettlements.amend
+    - permission: intapiSettlements.getSettlementWindowById
+    - permission: intapiSettlements.closeSettlementWindow
+    - permission: intapiSettlements.getSettlementWindowsByParams
+    - permission: intapiSettlements.getSettlementsByParams
+      resources:
+        participant: $all
+    - permission: intapiSettlements.createSettlement
+    - permission: intapiSettlements.getSettlementById
+      resources:
+        participant: $all
+    - permission: intapiSettlements.updateSettlementById
+    - permission: intapiSettlements.getSettlementBySettlementParticipant
+      resources:
+        participant: $all
+    - permission: intapiSettlements.updateSettlementBySettlementParticipant
+      resources:
+        participant: $all
+    - permission: intapiSettlements.getSettlementBySettlementParticipantAccount
+      resources:
+        participant: $all
+    - permission: intapiSettlements.updateSettlementBySettlementParticipantAccount
+      resources:
+        participant: $all

@@ -1,9 +1,10 @@
 # gw-intapi — operator-tool machine APIs behind oauth2 (Hydra
-# client-credentials). The route carries the path dispatch to the mirror's
-# services, each keyed with its own prefix and its own document from
-# intapi-authzdocument, so a grant on one service's paths reaches no other's.
-# Central settlement also answers on its own route under settlement with the
-# document it serves, so its mount here is a prefix of its own.
+# client-credentials). The route carries the path dispatch to the switch's
+# services, each keyed with its own prefix, so a grant on one service's paths
+# reaches no other's. Central settlement serves its own document, under /v2,
+# and answers on its own route under settlement too, so its mount here is a
+# prefix of its own; the other four serve none and name theirs from
+# intapi-authzdocument.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -19,7 +20,6 @@ metadata:
     iam.mojaloop.io/moja-transaction-requests-service.service: transactionRequests
     iam.mojaloop.io/moja-transaction-requests-service.schema: intapi-transaction-requests
     iam.mojaloop.io/moja-centralsettlement-service.service: intapiSettlements
-    iam.mojaloop.io/moja-centralsettlement-service.schema: intapi-settlements
 spec:
   parentRefs:
     - name: gw-intapi
@@ -122,13 +122,10 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /settlements
+            value: /v2/settlements
         - path:
             type: PathPrefix
-            value: /settlementWindows
-        - path:
-            type: PathPrefix
-            value: /settlementModels
+            value: /v2/settlementWindows
       filters:
         - type: ExternalAuth
           externalAuth:

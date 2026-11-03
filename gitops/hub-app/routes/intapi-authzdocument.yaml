@@ -1,8 +1,8 @@
-# The operator machine API's documents. The intapi route dispatches by path to
-# five of the switch's services, none of which serves this surface, and keys
-# each backend with its own prefix and its own document here: one permission
-# per verb over the paths the route sends that service. A client is admitted by
-# creating its Hydra client and assigning it the intapi-client role.
+# The operator machine API's documents for the four switch services the intapi
+# route sends to that serve no document of their own: each backend has its own
+# prefix and its own document here, one permission per verb over the paths the
+# route sends that service. A client is admitted by creating its Hydra client
+# and assigning it the intapi-client role.
 apiVersion: iam.mojaloop.io/v1
 kind: AuthzDocument
 metadata:
@@ -245,81 +245,6 @@ spec:
       description: >-
         The FSPIOP transaction requests mirror operator tools call with a Hydra
         machine token.
-    servers:
-      - url: /
-    paths:
-      /:
-        get:
-          operationId: view
-          summary: Reads through the mirror
-          x-authz:
-            scopedBy: []
-          security:
-            - machineToken: []
-          responses:
-            '200':
-              description: What was asked for
-        post:
-          operationId: create
-          summary: Creates through the mirror
-          x-authz:
-            scopedBy: []
-          security:
-            - machineToken: []
-          responses:
-            '200':
-              description: What was created
-        put:
-          operationId: update
-          summary: Updates through the mirror
-          x-authz:
-            scopedBy: []
-          security:
-            - machineToken: []
-          responses:
-            '200':
-              description: What was updated
-        delete:
-          operationId: remove
-          summary: Removes through the mirror
-          x-authz:
-            scopedBy: []
-          security:
-            - machineToken: []
-          responses:
-            '200':
-              description: What was removed
-        patch:
-          operationId: amend
-          summary: Amends through the mirror
-          x-authz:
-            scopedBy: []
-          security:
-            - machineToken: []
-          responses:
-            '200':
-              description: What was amended
-    components:
-      securitySchemes:
-        machineToken:
-          type: http
-          scheme: bearer
-          bearerFormat: JWT
-          description: A machine client's access token, issued by Ory Hydra
----
-apiVersion: iam.mojaloop.io/v1
-kind: AuthzDocument
-metadata:
-  name: intapi-settlements
-  namespace: mojaloop
-spec:
-  document:
-    openapi: 3.1.0
-    info:
-      title: Operator machine API · Settlements
-      version: '1.0'
-      description: >-
-        The settlement mirror operator tools call with a Hydra machine token.
     servers:
       - url: /
     paths:
