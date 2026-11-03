@@ -96,7 +96,7 @@ reporting-hub-bop-role-ui:
   image:
     registry: docker.io
     repository: kirgene/reporting-hub-bop-role-ui
-    tag: iam-document-authz.4
+    tag: iam-document-authz.5
   configFiles:
     runtime-env.js: |
       window.roleEnv = {
