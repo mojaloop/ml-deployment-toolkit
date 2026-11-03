@@ -1,0 +1,54 @@
+# What an operator-tool machine client holds: create its Hydra client, then
+# assign this role to the client id.
+apiVersion: iam.mojaloop.io/v1
+kind: AuthzRole
+metadata:
+  name: intapi-client
+  namespace: ory
+spec:
+  title: Internal API client
+  description: An operator tool calling the switch through the internal API gateway
+  grants:
+    - permission: lookup.view
+    - permission: lookup.create
+    - permission: lookup.update
+    - permission: lookup.remove
+    - permission: lookup.amend
+    - permission: quotes.view
+    - permission: quotes.create
+    - permission: quotes.update
+    - permission: quotes.remove
+    - permission: quotes.amend
+    - permission: transfers.view
+    - permission: transfers.create
+    - permission: transfers.update
+    - permission: transfers.remove
+    - permission: transfers.amend
+    - permission: transactionRequests.view
+    - permission: transactionRequests.create
+    - permission: transactionRequests.update
+    - permission: transactionRequests.remove
+    - permission: transactionRequests.amend
+    - permission: intapiSettlements.getSettlementWindowById
+    - permission: intapiSettlements.closeSettlementWindow
+    - permission: intapiSettlements.getSettlementWindowsByParams
+    - permission: intapiSettlements.getSettlementsByParams
+      resources:
+        participant: $all
+    - permission: intapiSettlements.createSettlement
+    - permission: intapiSettlements.getSettlementById
+      resources:
+        participant: $all
+    - permission: intapiSettlements.updateSettlementById
+    - permission: intapiSettlements.getSettlementBySettlementParticipant
+      resources:
+        participant: $all
+    - permission: intapiSettlements.updateSettlementBySettlementParticipant
+      resources:
+        participant: $all
+    - permission: intapiSettlements.getSettlementBySettlementParticipantAccount
+      resources:
+        participant: $all
+    - permission: intapiSettlements.updateSettlementBySettlementParticipantAccount
+      resources:
+        participant: $all

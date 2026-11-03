@@ -115,3 +115,5 @@ configMapGenerator:
       - values.yaml=values/t7y-backend/tempo.yaml
 generatorOptions:
   disableNameSuffixHash: true
+  labels:
+    reconcile.fluxcd.io/watch: Enabled

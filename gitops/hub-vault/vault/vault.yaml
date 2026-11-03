@@ -218,7 +218,7 @@ spec:
             secretsCookie: "${KRATOS_SECRETS_COOKIE}"
             secretsCSRFCookie: "${KRATOS_SECRETS_CSRF_COOKIE}"
             secretsDefault: "${KRATOS_SECRETS_DEFAULT}"
-            smtpConnectionURI: "smtp://${SMTP_USER}:${SMTP_PASSWORD}@${SMTP_HOST}:${SMTP_PORT}/?skip_ssl_verify=true"
+            smtpConnectionURI: "${SMTP_CONNECTION_URI}"
       - type: kv
         path: secret/keto
         data:

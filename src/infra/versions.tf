@@ -30,6 +30,10 @@ terraform {
       source  = "alekc/kubectl"
       version = "~> 2.1"
     }
+    kind = {
+      source  = "tehcyx/kind"
+      version = "~> 0.9"
+    }
     local = {
       source  = "hashicorp/local"
       version = "~> 2.0"

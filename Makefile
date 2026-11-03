@@ -456,7 +456,7 @@ render-diff:
 # Vendored manifest generation (Jsonnet -> YAML)
 # --------------------------------------------------------------------------
 
-CILIUM_VERSION ?= 1.20.0
+CILIUM_VERSION ?= 1.20.4
 CILIUM_MANIFEST := config/manifests/cilium-$(CILIUM_VERSION).yaml
 
 render-vendored: render-thanos render-cilium

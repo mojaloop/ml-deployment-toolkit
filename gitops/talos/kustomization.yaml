@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - gateway-api/crds.yaml
+  - network-policy-api/crds.yaml
   - cilium/helmrelease.yaml
   - lb-ipam/lb-ipam.yaml
   - openebs/helmrelease.yaml
@@ -23,3 +24,5 @@ configMapGenerator:
       - values.yaml=values/openebs-system/openebs.yaml
 generatorOptions:
   disableNameSuffixHash: true
+  labels:
+    reconcile.fluxcd.io/watch: Enabled

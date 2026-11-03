@@ -1,0 +1,85 @@
+# Leaves participant open: each assignment names the one DFSP it is about.
+# MCM makes those assignments at onboarding, with the resource name and role
+# names it is configured with.
+apiVersion: iam.mojaloop.io/v1
+kind: AuthzRole
+metadata:
+  name: dfsp-operator
+  namespace: ory
+spec:
+  title: DFSP operator
+  description: Operates one DFSP in MCM and follows its settlements
+  grants:
+    - permission: mcm.getDFSPs
+    - permission: mcm.handleGetDfspsStatesStatus
+    - permission: mcm.getMonetaryZones
+    - permission: mcm.getDfspsByMonetaryZones
+    - permission: mcm.getAllDfspJWSCerts
+    - permission: mcm.getHubEndpoints
+    - permission: mcm.getHubIngressIps
+    - permission: mcm.getHubIngressIpEndpoint
+    - permission: mcm.getHubIngressUrls
+    - permission: mcm.getHubIngressUrlEndpoint
+    - permission: mcm.getHubEgressIps
+    - permission: mcm.getHubEgressIpEndpoint
+    - permission: mcm.getHubEndpoint
+    - permission: mcm.getHubServerCerts
+    - permission: mcm.getHubCA
+    - permission: mcm.getHubJWSCerts
+    - permission: mcm.getDFSPca
+    - permission: mcm.setDFSPca
+    - permission: mcm.getDFSPInboundEnrollments
+    - permission: mcm.createDFSPInboundEnrollment
+    - permission: mcm.getDFSPInboundEnrollment
+    - permission: mcm.signDFSPInboundEnrollment
+    - permission: mcm.getDFSPOutboundEnrollments
+    - permission: mcm.createCSRAndDFSPOutboundEnrollment
+    - permission: mcm.onboardDFSP
+    - permission: mcm.getDFSPOutboundEnrollment
+    - permission: mcm.addDFSPOutboundEnrollmentCertificate
+    - permission: mcm.validateDFSPOutboundEnrollmentCertificate
+    - permission: mcm.getDFSPEndpoints
+    - permission: mcm.getUnprocessedDfspItems
+    - permission: mcm.getDFSPIngress
+    - permission: mcm.createDFSPIngress
+    - permission: mcm.getDFSPIngressIps
+    - permission: mcm.createDFSPIngressIp
+    - permission: mcm.getDFSPIngressIpEndpoint
+    - permission: mcm.updateDFSPIngressIpEndpoint
+    - permission: mcm.deleteDFSPIngressIpEndpoint
+    - permission: mcm.getDFSPIngressUrls
+    - permission: mcm.createDFSPIngressUrl
+    - permission: mcm.getDFSPIngressUrlEndpoint
+    - permission: mcm.updateDFSPIngressUrlEndpoint
+    - permission: mcm.deleteDFSPIngressUrlEndpoint
+    - permission: mcm.getDFSPEgress
+    - permission: mcm.createDFSPEgress
+    - permission: mcm.getDFSPEgressIps
+    - permission: mcm.createDFSPEgressIp
+    - permission: mcm.getDFSPEgressIpEndpoint
+    - permission: mcm.updateDFSPEgressIpEndpoint
+    - permission: mcm.deleteDFSPEgressIpEndpoint
+    - permission: mcm.getDFSPEndpoint
+    - permission: mcm.updateDFSPEndpoint
+    - permission: mcm.deleteDFSPEndpoint
+    - permission: mcm.confirmEndpointItem
+    - permission: mcm.getDfspServerCerts
+    - permission: mcm.updateDfspServerCerts
+    - permission: mcm.createDfspServerCerts
+    - permission: mcm.deleteDfspServerCerts
+    - permission: mcm.getDfspJWSCerts
+    - permission: mcm.createDfspJWSCerts
+    - permission: mcm.deleteDfspJWSCerts
+    - permission: mcm.getDfspStatus
+    - permission: mcm.uploadDfspStatesStatus
+    - permission: mcm.getCredentials
+    - permission: mcm.createCredentials
+    - permission: settlement.getSettlementWindowById
+    - permission: settlement.getSettlementWindowsByParams
+    - permission: settlement.getSettlementsByParams
+    - permission: settlement.getSettlementById
+    - permission: settlement.getSettlementBySettlementParticipant
+    - permission: settlement.updateSettlementBySettlementParticipant
+    - permission: settlement.getSettlementBySettlementParticipantAccount
+    - permission: settlement.updateSettlementBySettlementParticipantAccount
+    - permission: mcmUi.view
