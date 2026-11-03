@@ -6,7 +6,6 @@ resources:
   - iam/externalsecret-keto.yaml
   - iam/externalsecret-hydra.yaml
   - iam/helmrelease.yaml
-  - iam/provisioning-networkpolicy.yaml
   - routes/referenceGrants.yaml
 
 # Distribution values for the iam HelmRelease, rendered into a ConfigMap it

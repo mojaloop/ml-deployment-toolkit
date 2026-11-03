@@ -20,6 +20,7 @@ resources:
   - iam/roles/intapi-client.yaml
   - iam/roles/dfsp-operator.yaml
   - iam/roles/dfsp-client.yaml
+  - iam/roles/signed-in.yaml
   # gw-ext routes (DFSP-facing — SIMPLE TLS via Cilium Gateway)
   - routes/referencegrant-ext.yaml
   # hub-only LB pools (gw-extapi + gw-intapi; gw-int/gw-ext live in the talos layer)

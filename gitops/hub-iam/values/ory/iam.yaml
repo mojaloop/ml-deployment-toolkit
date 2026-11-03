@@ -4,7 +4,7 @@
 # Adopter overrides go in environments/<env>/values/iam.yaml,
 # which is merged after this file and therefore wins.
 global:
-  iamImage: docker.io/kirgene/ml-iam-services:iam-document-authz.10
+  iamImage: docker.io/kirgene/ml-iam-services:iam-document-authz.13
 
   # The first identity a fresh deployment logs in with: created while the
   # roles are applied and invited by email to set its password, the same
@@ -12,6 +12,52 @@ global:
   iamAdmin:
     email: ${HUB_ADMIN_EMAIL}
     role: hub-admin
+
+# The IAM's own API at iam-api.int, for the portal's role UI and the shell;
+# its operations answer under the iam prefix
+ml-iam-services:
+  gateway:
+    enabled: true
+    host: iam-api.int.${DOMAIN}
+    parentRefs:
+      - name: gw-int
+        namespace: platform-system
+    cors:
+      allowOrigins:
+        - "https://portal.int.${DOMAIN}"
+        - "https://portal-iam.int.${DOMAIN}"
+        - "https://mcm.int.${DOMAIN}"
+      allowMethods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+      allowHeaders:
+        - content-type
+        - authorization
+        - accept
+        - x-requested-with
+        - last-event-id
+      # The resource names a picker's list may be stale for
+      exposeHeaders:
+        - stale-sources
+      allowCredentials: true
+  authz:
+    service: iam
+  networkPolicy:
+    # gw-int is a Cilium gateway, which reaches a backend from Cilium's
+    # ingress identity rather than from a pod: no pod selector names it, and
+    # the deny on every other pod leaves it.
+    gateway: []
+    # MCM provisions each DFSP it onboards, with its accounts, its machine
+    # client and their roles
+    internalCallers:
+      - namespace: mcm
+        podSelector:
+          matchLabels:
+            app.kubernetes.io/name: mcm-connection-manager-api
+            app.kubernetes.io/instance: mcm
 
 kratos:
   deployment:
@@ -185,10 +231,6 @@ hydra:
 oathkeeper:
   oathkeeper:
     config:
-      authorizers:
-        remote_json:
-          config:
-            remote: http://iam-ml-iam-services-decision/
       errors:
         fallback:
           - redirect

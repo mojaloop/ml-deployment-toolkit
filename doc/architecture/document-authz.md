@@ -23,13 +23,22 @@ The model and its rules are documented with the chart (mojaloop/helm):
 
 - `gitops/hub-iam/iam/sources.yaml` — the chart sources
 - `gitops/hub-iam/values/ory/iam.yaml` — the `mojaloop-iam` release's
-  distribution values: Ory configuration and the IdP hosts
-- `gitops/hub-app/iam/` — the deployment's roles (`AuthzRole`) and resource
-  names (`AuthzResourceName`, `participant` and `report`), applied after the
-  IAM installs their kinds. A role goes live once every service it names is
+  distribution values: Ory configuration, the IdP hosts, the IAM's own API
+  route at `iam-api.int` and the services its network rule admits to the
+  internal API (MCM's API pods). The chart ships the IAM's network rules and
+  the rule that keeps Ory's admin APIs to its namespace
+- `gitops/hub-app/iam/` — the deployment's roles (`AuthzRole`, `signed-in`
+  held by every signed-in subject) and resource names (`AuthzResourceName`:
+  `participant`, `report`, and `role` and `permission`, which the IAM's own
+  operations are scoped by and the IAM records itself), applied after the IAM
+  installs their kinds. A role goes live once every service it names is
   routed; until then it is `Waiting`, as `kubectl get authzrole -A` shows
 - `gitops/hub-iam/iam/externalsecret-*.yaml` — Ory DSNs and secrets from
   Vault
+- `global.iam.enabled` in every release with an IAM integration (mojaloop,
+  mcm, finance-portal): routes carry the ExternalAuth filter and key their
+  backends only with it on. The mojaloop release sets `mojaloop-iam.enabled`
+  false, since the IAM is its own release here
 - the permission prefix of each service this platform ships, set in its
   release values as `authz.service` (per surface for MCM: `api.authz`,
   `ui.authz`); the charts render the route annotations from it
@@ -43,7 +52,7 @@ The model and its rules are documented with the chart (mojaloop/helm):
 | --- | --- | --- |
 | MCM API | `mcm` | served |
 | MCM UI | `mcmUi` | chart |
-| Role administration API | `iam` | served |
+| IAM API | `iam` | served |
 | Reporting API | `reports` | served |
 | Transfers reporting API | `trxreporting` | served |
 | Experience API | `ledger` | served |
@@ -72,7 +81,7 @@ One label per surface under the gateway wildcards:
 | Portal shell | `portal.int.<domain>` | gw-int |
 | Portal micro-frontends | `portal-{iam,transfers,settlements,positions}.int.<domain>` | gw-int |
 | Experience API | `portal-api.int.<domain>` | gw-int |
-| Role administration API | `iam-api.int.<domain>` | gw-int |
+| IAM API | `iam-api.int.<domain>` | gw-int |
 | Reporting API | `reports-api.int.<domain>` | gw-int |
 | Transfers reporting API | `transfers-api.int.<domain>` | gw-int |
 | Settlement API | `settlements-api.int.<domain>` | gw-int |
@@ -84,8 +93,9 @@ One label per surface under the gateway wildcards:
 
 The first identity is `${HUB_ADMIN_EMAIL}` (role `hub-admin`); on first
 install it receives an invitation email and sets its password through the
-auth UI, the same courier flow every other operator onboards through. A
-DFSP's creation instantiates `dfsp-operator` (its invited human) and
-`dfsp-client` (its machine client) for that participant. An operator-tool
-machine client is admitted by creating its Hydra client and assigning the
-client id the `intapi-client` role.
+auth UI, the same courier flow every other operator onboards through. When
+MCM onboards a DFSP it asks the IAM's internal API to record the participant,
+create its invited human and its machine client, and assign them
+`dfsp-operator` and `dfsp-client` over that participant. An operator-tool
+machine client is admitted by creating it through the IAM's internal API
+(`POST /clients`) and assigning the client id the `intapi-client` role.

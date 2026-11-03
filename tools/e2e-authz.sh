@@ -177,14 +177,14 @@ AID=$(kadmin http://kratos-admin/admin/identities | python3 -c "
 import sys,json
 for i in json.load(sys.stdin):
     if i['traits'].get('email')=='$ADMIN_EMAIL': print(i['id'])")
-assign() { # assign <insert|delete> <role> [resources-json]
-  curl -s $RI $ADMIN -o /dev/null -X PATCH -H 'Content-Type: application/json' \
-    -d "{\"assignmentOperations\":[{\"action\":\"$1\",\"role\":\"$2\"${3:+,\"resources\":$3}}]}" \
-    "$IAPI/users/$AID/assignments"
+assign() { # assign <POST|DELETE> <role> [resources-json]
+  curl -s $RI $ADMIN -o /dev/null -X "$1" -H 'Content-Type: application/json' \
+    -d "{\"role\":\"$2\"${3:+,\"resources\":$3}}" \
+    "$IAPI/subjects/$AID/assignments"
 }
 offered() { # offered <resource id>
-  curl -s $RI $ADMIN "$IAPI/resources?resourceName=Participant" \
-    | python3 -c 'import sys,json; print(1 if any(r["id"]==sys.argv[1] for r in json.load(sys.stdin)["resources"]) else 0)' "$1"
+  curl -s $RI $ADMIN "$IAPI/resources?resourceName=participant" \
+    | python3 -c 'import sys,json; print(1 if any(r["id"]==sys.argv[1] for r in json.load(sys.stdin)) else 0)' "$1"
 }
 t "portal anonymous json 401"   401 "$(code $RI $PORTAL/)"
 t "portal browser login redirect" 302 "$(code $RI -H 'Accept: text/html' $PORTAL/)"
@@ -200,21 +200,23 @@ t "shell remotes manifest"      200 "$(code $RI $ADMIN $PORTAL/remotes.json)"
 t "op1 mfe denied (holds no portal role)" 403 "$(code $RI $OP1 https://portal-iam.int.$DOM/)"
 
 echo "== the role screen's data: roles, pickers and holdings =="
-t "roles listed with what each leaves open" Participant "$(curl -s $RI $ADMIN $IAPI/roles \
-  | python3 -c 'import sys,json; roles={r["name"]: r["open"] for r in json.load(sys.stdin)["roles"]}; print(",".join(roles["dfsp-operator"]))')"
-t "picker offers the participants that exist" 1 "$(curl -s $RI $ADMIN "$IAPI/resources?resourceName=Participant" \
-  | python3 -c 'import sys,json; rows=json.load(sys.stdin)["resources"]; print(1 if {"resourceName":"Participant","id":"dfsp1"} in rows else 0)')"
-t "holdings answer with the resources each names" hub-admin "$(curl -s $RI $ADMIN $IAPI/users/$AID/assignments \
-  | python3 -c 'import sys,json; held=json.load(sys.stdin)["assignments"]; print(",".join(a["role"] for a in held if a["resources"]=={}))')"
+t "roles listed with what each leaves open" participant "$(curl -s $RI $ADMIN $IAPI/roles \
+  | python3 -c 'import sys,json; roles={r["name"]: r["open"] for r in json.load(sys.stdin)}; print(",".join(roles["dfsp-operator"]))')"
+t "picker offers the participants that exist" 1 "$(curl -s $RI $ADMIN "$IAPI/resources?resourceName=participant" \
+  | python3 -c 'import sys,json; rows=json.load(sys.stdin); print(1 if {"resourceName":"participant","id":"dfsp1"} in rows else 0)')"
+t "holdings answer with the resources each names" hub-admin "$(curl -s $RI $ADMIN $IAPI/subjects/$AID/assignments \
+  | python3 -c 'import sys,json; held=json.load(sys.stdin); print(",".join(a["role"] for a in held if a["through"]=="assigned" and a["resources"]=={}))')"
+t "every signed-in subject holds signed-in" signed-in "$(curl -s $RI $ADMIN $IAPI/subjects/$AID/assignments \
+  | python3 -c 'import sys,json; print(",".join(a["role"] for a in json.load(sys.stdin) if a["through"]=="authenticated"))')"
 
 echo "== the scope reaches the service, and only the gateway writes it =="
 t "forged scope ignored" dfsp1 "$(curl -s $RE $OP1 -H 'X-Scope: dfsps=*' "$API/api/dfsps" | python3 -c 'import sys,json; print(",".join(sorted(r["id"] for r in json.load(sys.stdin))))')"
 
 echo "== a resource is grantable the moment it exists =="
 t "dfsp2 offered by the IAM" 1 "$(offered dfsp2)"
-assign insert dfsp-operator '{"Participant":"dfsp2"}'
+assign POST dfsp-operator '{"participant":"dfsp2"}'
 t "admin now sees dfsp2 rows" 200 "$(code $RE $ADMIN $API/api/dfsps/dfsp2/status)"
-assign delete dfsp-operator '{"Participant":"dfsp2"}'
+assign DELETE dfsp-operator '{"participant":"dfsp2"}'
 
 echo "== the switch's participants reach the picker through the declared source =="
 # Real onboarding: the hub's currency accounts and settlement model, then the
@@ -243,7 +245,7 @@ echo "== the ledger surface: the list is whole for whoever holds it =="
 LAPI="https://portal-api.int.$DOM"
 t "admin reads the whole list" 1 "$(curl -s $RI $ADMIN $LAPI/participants | grep -c '"name":"pinkbank"')"
 t "op1 holds no listing" 403 "$(code $RI $OP1 $LAPI/participants)"
-t "vocabulary served whole" 1 "$(kubectl get --raw /api/v1/namespaces/ory/services/iam-ml-iam-services-provisioning:80/proxy/resource-names | grep -c '"url": *"http://moja-centralledger-service.mojaloop.svc.cluster.local/participants"')"
+t "vocabulary served whole" 1 "$(kubectl get --raw /api/v1/namespaces/ory/services/ml-iam-services-api:80/proxy/resource-names | grep -c '"url": *"http://moja-centralledger-service.mojaloop.svc.cluster.local/participants"')"
 
 echo "== CORS =="
 t "preflight" 200 "$(code $RE -X OPTIONS -H "Origin: $UI" -H 'Access-Control-Request-Method: GET' $API/api/dfsps)"

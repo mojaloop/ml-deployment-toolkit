@@ -41,205 +41,243 @@ spec:
     - permission: mcm.getAllDfspJWSCerts
     - permission: mcm.createDfspExternalJWSCerts
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDFSPs
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.createDFSP
     - permission: mcm.handleGetDfspsStatesStatus
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getUnprocessedEndpointItems
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getAllDfspServerCerts
     - permission: mcm.updateDFSP
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDFSPca
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.setDFSPca
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDFSPInboundEnrollments
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.createDFSPInboundEnrollment
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDFSPInboundEnrollment
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.signDFSPInboundEnrollment
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDFSPOutboundEnrollments
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.createCSRAndDFSPOutboundEnrollment
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.onboardDFSP
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDFSPOutboundEnrollment
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.addDFSPOutboundEnrollmentCertificate
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.validateDFSPOutboundEnrollmentCertificate
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDFSPEndpoints
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getUnprocessedDfspItems
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDFSPIngress
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.createDFSPIngress
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDFSPIngressIps
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.createDFSPIngressIp
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDFSPIngressIpEndpoint
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.updateDFSPIngressIpEndpoint
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.deleteDFSPIngressIpEndpoint
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDFSPIngressUrls
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.createDFSPIngressUrl
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDFSPIngressUrlEndpoint
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.updateDFSPIngressUrlEndpoint
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.deleteDFSPIngressUrlEndpoint
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDFSPEgress
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.createDFSPEgress
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDFSPEgressIps
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.createDFSPEgressIp
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDFSPEgressIpEndpoint
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.updateDFSPEgressIpEndpoint
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.deleteDFSPEgressIpEndpoint
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDFSPEndpoint
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.updateDFSPEndpoint
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.deleteDFSPEndpoint
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.confirmEndpointItem
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDfspServerCerts
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.updateDfspServerCerts
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.createDfspServerCerts
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.deleteDfspServerCerts
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDfspJWSCerts
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.createDfspJWSCerts
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.deleteDfspJWSCerts
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getDfspStatus
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.uploadDfspStatesStatus
       resources:
-        participant: all
+        participant: $all
     - permission: mcm.getMonetaryZones
     - permission: mcm.getDfspsByMonetaryZones
       resources:
-        participant: all
-    - permission: iam.UsersGet
-    - permission: iam.UsersIDGet
-    - permission: iam.ResourcesGet
-    - permission: iam.RolesGet
-    - permission: iam.UsersIDAssignmentsGet
-    - permission: iam.UsersIDAssignmentsPatch
+        participant: $all
+    - permission: iam.getCatalog
+    - permission: iam.getResourceNames
+    - permission: iam.listResources
+      resources:
+        participant: $all
+        report: $all
+        role: $all
+        permission: $all
+    - permission: iam.listRoles
+      resources:
+        role: $all
+    - permission: iam.createRole
+      resources:
+        permission: $all
+        participant: $all
+        report: $all
+        role: $all
+    - permission: iam.getRole
+      resources:
+        role: $all
+    - permission: iam.updateRole
+      resources:
+        role: $all
+        permission: $all
+        participant: $all
+        report: $all
+    - permission: iam.deleteRole
+      resources:
+        role: $all
+    - permission: iam.listSubjects
+    - permission: iam.getAssignments
+    - permission: iam.assignRole
+      resources:
+        role: $all
+        participant: $all
+        report: $all
+        permission: $all
+    - permission: iam.unassignRole
+      resources:
+        role: $all
+        participant: $all
+        report: $all
+        permission: $all
+    - permission: iam.getState
     - permission: reports.getReport
       resources:
-        report: all
-        participant: all
+        report: $all
+        participant: $all
     - permission: trxreporting.query
       resources:
-        participant: all
+        participant: $all
     - permission: ledger.getParticipants
     - permission: ledger.getParticipantsLimits
     - permission: ledger.getParticipant
       resources:
-        participant: all
+        participant: $all
     - permission: ledger.getParticipantAccounts
       resources:
-        participant: all
+        participant: $all
     - permission: ledger.getParticipantEndpoints
       resources:
-        participant: all
+        participant: $all
     - permission: ledger.getParticipantLimits
       resources:
-        participant: all
+        participant: $all
     - permission: ledger.updateParticipantNetDebitCap
       resources:
-        participant: all
+        participant: $all
     - permission: ledger.getParticipantPositions
       resources:
-        participant: all
+        participant: $all
     - permission: ledger.toggleParticipantAccount
       resources:
-        participant: all
+        participant: $all
     - permission: ledger.recordParticipantFunds
       resources:
-        participant: all
+        participant: $all
     - permission: ledger.recordParticipantTransfer
       resources:
-        participant: all
+        participant: $all
     - permission: ledger.getSettlementModels
     - permission: ledger.getSettlementModel
     - permission: settlement.getSettlementWindowById
@@ -247,24 +285,24 @@ spec:
     - permission: settlement.getSettlementWindowsByParams
     - permission: settlement.getSettlementsByParams
       resources:
-        participant: all
+        participant: $all
     - permission: settlement.createSettlement
     - permission: settlement.getSettlementById
       resources:
-        participant: all
+        participant: $all
     - permission: settlement.updateSettlementById
     - permission: settlement.getSettlementBySettlementParticipant
       resources:
-        participant: all
+        participant: $all
     - permission: settlement.updateSettlementBySettlementParticipant
       resources:
-        participant: all
+        participant: $all
     - permission: settlement.getSettlementBySettlementParticipantAccount
       resources:
-        participant: all
+        participant: $all
     - permission: settlement.updateSettlementBySettlementParticipantAccount
       resources:
-        participant: all
+        participant: $all
     - permission: portalShell.view
     - permission: portalRoles.view
     - permission: portalTransfers.view

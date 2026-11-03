@@ -5,6 +5,14 @@ global:
   kafka:
     host: "${KAFKA_HOST}"
     port: ${KAFKA_PORT}
+  # The switch's routes key their backends for the IAM and carry its
+  # ExternalAuth filter
+  iam:
+    enabled: true
+
+# The IAM runs as a release of its own (hub-iam)
+mojaloop-iam:
+  enabled: false
 
 # --- Central Ledger ---
 # Event SDK (configOverride.EVENT_SDKrc) enables audit event production to

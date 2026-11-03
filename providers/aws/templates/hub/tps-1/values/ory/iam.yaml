@@ -46,3 +46,10 @@ ml-iam-services:
     pdb:
       enabled: true
       minAvailable: 1
+  # The IAM's API, which onboarding and the role screens call, keeps one
+  # replica through a drain the same way
+  api:
+    replicaCount: 2
+    pdb:
+      enabled: true
+      minAvailable: 1

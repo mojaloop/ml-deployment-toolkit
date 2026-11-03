@@ -29,95 +29,41 @@ global:
       key: mongodb-password
 
   # The micro-frontends the shell loads, one menu entry each; hosts match
-  # each UI's gateway.host below
+  # each UI's gateway.host below, and each is offered when the caller holds
+  # the permission that opens it, its authz.service below with `view`
   portalRemotes:
     - host: portal-iam.int.${DOMAIN}
       path: /iam
       label: Roles
       scope: reporting_hub_bop_role_ui
+      permission: portalRoles.view
     - host: portal-transfers.int.${DOMAIN}
       path: /transfers
       label: Transfers
       scope: reporting_hub_bop_trx_ui
+      permission: portalTransfers.view
     - host: portal-settlements.int.${DOMAIN}
       path: /settlements
       label: Settlements
       scope: reporting_hub_bop_settlements_ui
+      permission: portalSettlements.view
     - host: portal-positions.int.${DOMAIN}
       path: /positions
       label: Financial Positions
       scope: reporting_hub_bop_positions_ui
+      permission: portalPositions.view
 
-role-assignment-service:
-  enabled: true
-  image:
-    registry: docker.io
-    repository: kirgene/role-assignment-service
-    tag: iam-document-authz.2
-  # Users come from Kratos, roles and assignments from Keto, and the authz
-  # model from the IAM that composed it
-  configFiles:
-    default.json: {
-        "PORT": 3008,
-        "HOST": "0.0.0.0",
-        "INSPECT": { "DEPTH": 4, "SHOW_HIDDEN": false, "COLOR": true },
-        "ENDPOINT_CACHE_CONFIG": { "expiresIn": 180000, "generateTimeout": 30000 },
-        "CENTRAL_SERVICE_ADMIN_URL": "http://moja-centralledger-service.mojaloop.svc.cluster.local",
-        "ORY_KETO_READ_SERVICE_URL": "http://keto-read.ory.svc.cluster.local",
-        "ORY_KETO_WRITE_SERVICE_URL": "http://keto-write.ory.svc.cluster.local",
-        "ORY_KRATOS_ADMIN_SERVICE_URL": "http://kratos-admin.ory.svc.cluster.local",
-        "IAM_SERVICE_URL": "http://iam-ml-iam-services-provisioning.ory.svc.cluster.local",
-        "AUTHZ_MODELS_DIR": "http://iam-ml-iam-services-provisioning.ory.svc.cluster.local/keto-namespaces.ts",
-        "SCOPE_SIZE_ALARM": 1000,
-        "ERROR_HANDLING": { "includeCauseExtension": true, "truncateExtensions": true },
-        "INSTRUMENTATION": {
-          "METRICS": {
-            "DISABLED": false,
-            "labels": { "eventId": "*" },
-            "config": {
-              "timeout": 5000,
-              "prefix": "moja_ra_api",
-              "defaultLabels": { "serviceName": "role-assignment-service" }
-            }
-          }
-        },
-        "CORS_WHITELIST": "ignore",
-        "ALLOW_CREDENTIALS": false
-      }
-  gateway:
+  # The portal's routes key their backends for the IAM and carry its
+  # ExternalAuth filter
+  iam:
     enabled: true
-    host: iam-api.int.${DOMAIN}
-    parentRefs:
-      - name: gw-int
-        namespace: platform-system
-    cors:
-      allowOrigins:
-        - "https://portal.int.${DOMAIN}"
-        - "https://portal-iam.int.${DOMAIN}"
-      allowMethods:
-        - GET
-        - POST
-        - PATCH
-        - PUT
-        - DELETE
-        - OPTIONS
-      allowHeaders:
-        - content-type
-        - authorization
-        - accept
-        - x-requested-with
-      allowCredentials: true
-    oathkeeper:
-      serviceNamespace: ory
-  authz:
-    service: iam
 
 reporting-hub-bop-shell:
   enabled: true
   image:
     registry: docker.io
     repository: kirgene/reporting-hub-bop-shell
-    tag: iam-document-authz.1
+    tag: iam-document-authz.2
   configFiles:
     config.json:
       # Header branding — TITLE uses Flux substitution so each
@@ -150,7 +96,7 @@ reporting-hub-bop-role-ui:
   image:
     registry: docker.io
     repository: kirgene/reporting-hub-bop-role-ui
-    tag: iam-document-authz.1
+    tag: iam-document-authz.2
   configFiles:
     runtime-env.js: |
       window.roleEnv = {
@@ -405,7 +351,7 @@ reporting-legacy-api:
   image:
     registry: docker.io
     repository: kirgene/reporting
-    tag: iam-document-authz.5
+    tag: iam-document-authz.6
   containerSecurityContext:
     enabled: false
   # Load-bearing: this is the Helm `condition` on the reporting-k8s-templates
@@ -417,7 +363,6 @@ reporting-legacy-api:
   # subchart's crds/ even when its condition is false), so `kubectl get crd`
   # looks healthy while `get mojaloopreports -A` is empty.
   install-templates: true
-  auth: false
   config:
     env:
       VALIDATION_RETRY_COUNT: "10"

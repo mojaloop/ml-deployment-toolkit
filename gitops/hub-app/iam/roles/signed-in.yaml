@@ -1,0 +1,13 @@
+# Held by every signed-in subject, never assigned: a UI hears when the roles
+# or the catalog change.
+apiVersion: iam.mojaloop.io/v1
+kind: AuthzRole
+metadata:
+  name: signed-in
+  namespace: ory
+spec:
+  title: Signed in
+  description: What every signed-in person and machine client holds
+  heldBy: authenticated
+  grants:
+    - permission: iam.getChanges
