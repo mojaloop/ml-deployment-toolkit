@@ -206,8 +206,6 @@ t "picker offers the participants that exist" 1 "$(curl -s $RI $ADMIN "$IAPI/res
   | python3 -c 'import sys,json; rows=json.load(sys.stdin); print(1 if {"resourceName":"participant","id":"dfsp1"} in rows else 0)')"
 t "holdings answer with the resources each names" hub-admin "$(curl -s $RI $ADMIN $IAPI/subjects/$AID/assignments \
   | python3 -c 'import sys,json; held=json.load(sys.stdin); print(",".join(a["role"] for a in held if a["through"]=="assigned" and a["resources"]=={}))')"
-t "every signed-in subject holds signed-in" signed-in "$(curl -s $RI $ADMIN $IAPI/subjects/$AID/assignments \
-  | python3 -c 'import sys,json; print(",".join(a["role"] for a in json.load(sys.stdin) if a["through"]=="authenticated"))')"
 
 echo "== the scope reaches the service, and only the gateway writes it =="
 t "forged scope ignored" dfsp1 "$(curl -s $RE $OP1 -H 'X-Scope: dfsps=*' "$API/api/dfsps" | python3 -c 'import sys,json; print(",".join(sorted(r["id"] for r in json.load(sys.stdin))))')"

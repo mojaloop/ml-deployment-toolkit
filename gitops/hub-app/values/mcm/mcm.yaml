@@ -25,7 +25,7 @@ db:
 api:
   image:
     name: kirgene/connection-manager-api
-    version: iam-document-authz.3
+    version: iam-document-authz.4
   url: "https://mcm-api.ext.${DOMAIN}"
   switchFQDN: "${DOMAIN}"
   switchId: "${HUB_PARTICIPANT_NAME}"

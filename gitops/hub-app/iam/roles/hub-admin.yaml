@@ -242,6 +242,7 @@ spec:
         report: $all
         permission: $all
     - permission: iam.getState
+    - permission: iam.getChanges
     - permission: reports.getReport
       resources:
         report: $all

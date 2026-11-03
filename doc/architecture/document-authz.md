@@ -27,8 +27,8 @@ The model and its rules are documented with the chart (mojaloop/helm):
   route at `iam-api.int` and the services its network rule admits to the
   internal API (MCM's API pods). The chart ships the IAM's network rules and
   the rule that keeps Ory's admin APIs to its namespace
-- `gitops/hub-app/iam/` — the deployment's roles (`AuthzRole`, `signed-in`
-  held by every signed-in subject) and resource names (`AuthzResourceName`:
+- `gitops/hub-app/iam/` — the deployment's roles (`AuthzRole`) and resource
+  names (`AuthzResourceName`:
   `participant`, `report`, and `role` and `permission`, which the IAM's own
   operations are scoped by and the IAM records itself), applied after the IAM
   installs their kinds. A role goes live once every service it names is
