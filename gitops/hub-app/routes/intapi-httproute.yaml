@@ -1,9 +1,9 @@
 # gw-intapi — operator-tool machine APIs behind oauth2 (Hydra
 # client-credentials). The route carries the path dispatch to the mirror's
-# services, each keyed with its own prefix over intapi-authzdocument, so a
-# grant on one service's paths reaches no other's. Central settlement also
-# answers on its own route under settlement with the document it serves, so
-# its mount here is a prefix of its own.
+# services, each keyed with its own prefix and its own document from
+# intapi-authzdocument, so a grant on one service's paths reaches no other's.
+# Central settlement also answers on its own route under settlement with the
+# document it serves, so its mount here is a prefix of its own.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -11,15 +11,15 @@ metadata:
   namespace: mojaloop
   annotations:
     iam.mojaloop.io/moja-account-lookup-service.service: lookup
-    iam.mojaloop.io/moja-account-lookup-service.schema: intapi
+    iam.mojaloop.io/moja-account-lookup-service.schema: intapi-lookup
     iam.mojaloop.io/moja-quoting-service.service: quotes
-    iam.mojaloop.io/moja-quoting-service.schema: intapi
+    iam.mojaloop.io/moja-quoting-service.schema: intapi-quotes
     iam.mojaloop.io/moja-ml-api-adapter-service.service: transfers
-    iam.mojaloop.io/moja-ml-api-adapter-service.schema: intapi
+    iam.mojaloop.io/moja-ml-api-adapter-service.schema: intapi-transfers
     iam.mojaloop.io/moja-transaction-requests-service.service: transactionRequests
-    iam.mojaloop.io/moja-transaction-requests-service.schema: intapi
+    iam.mojaloop.io/moja-transaction-requests-service.schema: intapi-transaction-requests
     iam.mojaloop.io/moja-centralsettlement-service.service: intapiSettlements
-    iam.mojaloop.io/moja-centralsettlement-service.schema: intapi
+    iam.mojaloop.io/moja-centralsettlement-service.schema: intapi-settlements
 spec:
   parentRefs:
     - name: gw-intapi
