@@ -24,9 +24,11 @@ spec:
       interval: 12h
   targetNamespace: external-dns
   install:
+    crds: Create
     remediation:
       retries: 3
   upgrade:
+    crds: CreateReplace
     remediation:
       retries: 3
   # Provider-specific values (provider name, credential env vars) come from the

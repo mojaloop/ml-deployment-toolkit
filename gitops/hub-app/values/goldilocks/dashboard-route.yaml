@@ -1,0 +1,13 @@
+# Hub-only: a tooling cluster has no IAM to check the Goldilocks dashboard
+# behind, so it renders no route.
+dashboard:
+  httpRoute:
+    enabled: true
+    hostnames:
+      - goldilocks.int.${DOMAIN}
+    parentRefs:
+      - name: gw-int
+        namespace: platform-system
+    annotations:
+      iam.mojaloop.io/goldilocks-goldilocks-dashboard.service: goldilocksUi
+      iam.mojaloop.io/goldilocks-goldilocks-dashboard.schema: goldilocks-ui

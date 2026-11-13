@@ -8,12 +8,12 @@ spec:
   timeout: 10m
   chart:
     spec:
-      chart: finance-portal
-      version: "5.1.4"
+      chart: mojaloop/finance-portal
       sourceRef:
-        kind: HelmRepository
-        name: mojaloop-charts
-      interval: 12h
+        kind: GitRepository
+        name: mojaloop-charts-git
+      reconcileStrategy: Revision
+      interval: 2m
   releaseName: fin-portal
   # Dedicated namespace, as MCM has. releaseName is pinned above and must stay pinned:
   # without it helm-controller derives the release name from targetNamespace, so moving
@@ -22,13 +22,15 @@ spec:
   # is safe here because the chart carries no PVCs; all state is in MySQL, Mongo and Kafka.
   targetNamespace: finance-portal
   install:
+    crds: Create
     createNamespace: false
     remediation:
       retries: -1
   upgrade:
+    crds: CreateReplace
     remediation:
       retries: -1
-      strategy: uninstall
+      strategy: rollback
   valuesFrom:
     # Distribution defaults. Adopter override is merged last and wins.
     - kind: ConfigMap

@@ -31,3 +31,5 @@ configMapGenerator:
       - values.yaml=values/t7y-agents/node-exporter.yaml
 generatorOptions:
   disableNameSuffixHash: true
+  labels:
+    reconcile.fluxcd.io/watch: Enabled

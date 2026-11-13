@@ -49,7 +49,7 @@ On a Tooling Cluster only the natively-authenticated UIs are routed: `harbor.int
 
 ### `gw-intapi` — operator machine APIs (OAuth2)
 
-`gw-intapi` carries cluster APIs consumed by the scheme's own tooling — test harnesses, provisioning scripts, back-office integrations — over server TLS without a client certificate. A single host, `intapi.int`, routes everything through Oathkeeper: callers present a Hydra client-credentials token (`hydra.ext`), and Keto authorizes the client (`intapi` role — membership is granted per `client_id`, so a DFSP's MCM machine client has no access here). Settlement rides this host as a path prefix (`/settlements`, `/settlementWindows`, `/settlementModels`); the FSPIOP mirror prefixes remain part of the surface, behind the same OAuth2 gate.
+`gw-intapi` carries cluster APIs consumed by the scheme's own tooling — test harnesses, provisioning scripts, back-office integrations — over server TLS without a client certificate. A single host, `intapi.int`, routes everything through Oathkeeper: callers present a Hydra client-credentials token (`hydra.ext`), and Keto authorizes the client (`intapi-client` role — membership is granted per `client_id`, so a DFSP's MCM machine client has no access here). Settlement rides this host under the paths central settlement serves (`/v2/settlements`, `/v2/settlementWindows`); the FSPIOP mirror prefixes remain part of the surface, behind the same OAuth2 gate.
 
 It still sits on its own gateway with its own dedicated address so it can be firewalled independently of the ops UIs, and it shares `gw-int`'s wildcard certificate.
 

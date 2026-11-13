@@ -1,0 +1,35 @@
+# Index 3 is the first override layer, so an adopter's override still wins
+- op: add
+  path: /spec/valuesFrom/3
+  value:
+    kind: ConfigMap
+    name: cilium-hubble-route-values
+    valuesKey: values.yaml
+    optional: true
+- op: add
+  path: /spec/postRenderers
+  value:
+    - kustomize:
+        patches:
+          - target:
+              group: gateway.networking.k8s.io
+              version: v1
+              kind: HTTPRoute
+              name: hubble-ui
+            patch: |
+              - op: add
+                path: /spec/rules/0/filters
+                value:
+                  - type: ExternalAuth
+                    externalAuth:
+                      protocol: HTTP
+                      backendRef:
+                        name: oathkeeper-api
+                        namespace: ory
+                        port: 4456
+                      http:
+                        path: /decisions
+                        allowedHeaders:
+                          - cookie
+                          - accept
+                          - x-forwarded-proto

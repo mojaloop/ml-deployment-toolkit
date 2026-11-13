@@ -1,0 +1,62 @@
+# One real thing under several services' names: a DFSP is `dfsps` where the
+# connection manager routes it and `participants` where the switch and the
+# reporting services return its rows.
+apiVersion: iam.mojaloop.io/v1
+kind: AuthzResourceName
+metadata:
+  name: participant
+  namespace: ory
+spec:
+  label: Participant
+  description: A financial institution connected to the hub
+  members:
+    - { service: mcm, type: dfsps }
+    - { service: reports, type: participants }
+    - { service: trxreporting, type: participants }
+    - { service: ledger, type: participants }
+    - { service: settlement, type: participants }
+  # The switch's registry is authoritative for who participates
+  source:
+    url: http://moja-centralledger-service.mojaloop.svc.cluster.local/participants
+    id: /name
+---
+apiVersion: iam.mojaloop.io/v1
+kind: AuthzResourceName
+metadata:
+  name: report
+  namespace: ory
+spec:
+  label: Report
+  description: A report this deployment has defined
+  members:
+    - { service: reports, type: reports }
+  source:
+    url: http://fin-portal-reporting-legacy-api.finance-portal.svc.cluster.local/reports
+    id: /id
+    label: /name
+---
+# What the IAM's own operations are scoped by: an administrator may hand out,
+# change or delete only the roles, and compose roles only from the
+# permissions, a grant names. The IAM records both itself, as it applies
+# roles and composes the catalog.
+apiVersion: iam.mojaloop.io/v1
+kind: AuthzResourceName
+metadata:
+  name: role
+  namespace: ory
+spec:
+  label: Role
+  description: A role the deployment or an administrator has composed
+  members:
+    - { service: iam, type: roles }
+---
+apiVersion: iam.mojaloop.io/v1
+kind: AuthzResourceName
+metadata:
+  name: permission
+  namespace: ory
+spec:
+  label: Permission
+  description: An operation of a service, as the catalog lists it
+  members:
+    - { service: iam, type: permissions }

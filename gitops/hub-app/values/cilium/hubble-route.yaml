@@ -1,0 +1,14 @@
+# Hub-only: a tooling cluster has no IAM to check Hubble UI behind, so it
+# renders no route and operators port-forward there.
+hubble:
+  ui:
+    httpRoute:
+      enabled: true
+      hostnames:
+        - hubble.int.${DOMAIN}
+      parentRefs:
+        - name: gw-int
+          namespace: platform-system
+      annotations:
+        iam.mojaloop.io/hubble-ui.service: hubbleUi
+        iam.mojaloop.io/hubble-ui.schema: hubble-ui
