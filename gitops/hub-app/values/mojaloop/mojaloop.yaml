@@ -512,7 +512,7 @@ ml-testing-toolkit:
   ml-testing-toolkit-backend:
     initContainers: |
       - name: wait-for-mongodb
-        image: bitnamilegacy/mongodb:6.0.1
+        image: percona/percona-server-mongodb:8.3.17-5
         imagePullPolicy: IfNotPresent
         command:
           - sh
