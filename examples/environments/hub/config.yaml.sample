@@ -17,7 +17,7 @@ cluster:
   role: "hub"                         # tooling | hub | bare
   vip: "192.168.0.214"                # Kubernetes API floating IP (on-prem only)
   lb_ipam:
-    pools:                            # one single-IP pool per gateway; optional wan = border-DNAT outside IP
+    pools:             � # one single-IP pool per gateway; optional wan = border address (DNAT or shared SNI proxy)
       gw-int:
         lan: "192.168.0.215"
       gw-ext:
@@ -42,7 +42,6 @@ infra:
 dns:
   provider: "route53"                 # digitalocean | cloudflare | route53
   domain: "sw1.lab1.example.com"
-
 # Certificates (ACME). email is the ACME account contact.
 cert:
   email: "ops@example.com"

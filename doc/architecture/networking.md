@@ -106,7 +106,10 @@ Every pool selects its gateway's Service by label (`lb-pool: <gateway>`), delive
 
 Each `lan` address must sit outside the local DHCP scope. Overlap produces intermittent, hard-to-diagnose failures as addresses are handed out twice.
 
-Setting `wan` on a pool declares that the border firewall 1:1-DNATs that outside address to the gateway's `lan` address. external-dns then publishes the `wan` address for everything attached to that gateway (via the `external-dns.alpha.kubernetes.io/target` annotation) instead of the LAN address. Caveat: LAN clients — DFSP VMs included — then resolve the public address too, and need hairpin NAT or split DNS to reach the gateway.
+Setting `wan` on a pool declares the **border address that reaches** that gateway's `lan` — either a **1:1 DNAT** on the firewall or the listener on a **shared reverse proxy** (TLS SNI). external-dns publishes the `wan` address for everything attached to that gateway (via the `external-dns.alpha.kubernetes.io/target` annotation) instead of the LAN address. Omit `wan` on a pool to keep its DNS target on `lan` (typical for internal-only gateways).
+
+Several pools may repeat the **same** `wan` when one public IP fronts multiple gateways: set `wan` only on the gateways that should be reachable from the public DNS (for example `gw-ext` and `gw-extapi`), and leave `gw-int` / `gw-intapi` without `wan`. The border proxy must route **each hostname by SNI** (or equivalent) to the correct gateway `lan` address.
+Caveat: for any pool with `wan` set, LAN clients — DFSP VMs included — resolve the public address for those hostnames too, and need hairpin NAT or split DNS to reach the gateway.
 
 ## DNS
 
