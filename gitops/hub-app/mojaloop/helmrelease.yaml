@@ -138,6 +138,42 @@ spec:
               - op: replace
                 path: /spec/template/spec/containers/0/livenessProbe/timeoutSeconds
                 value: 3
+          # Kafka-consumer handlers roll without surge. /health (readiness and
+          # liveness) fails unless the pod holds a partition
+          # (central-services-stream Consumer.isHealthy: isAssigned). With the
+          # chart's maxSurge 20 % a rollout runs more members than partitions:
+          # the extra pods never get one, liveness kills them after 8 x 15 s,
+          # each kill rebalances the group, and the rollout loops (three times
+          # on mlf-lab1-perf1, 2026-10-27). maxSurge 0 keeps members <=
+          # partitions; readiness then paces the rollout on real assignment.
+          - target: {kind: Deployment, name: moja-quoting-service-handler}
+            patch: &noSurge |
+              - op: replace
+                path: /spec/strategy
+                value: {type: RollingUpdate, rollingUpdate: {maxSurge: 0, maxUnavailable: 20%}}
+          - target: {kind: Deployment, name: moja-centralledger-handler-transfer-prepare}
+            patch: *noSurge
+          - target: {kind: Deployment, name: moja-centralledger-handler-transfer-position}
+            patch: *noSurge
+          - target: {kind: Deployment, name: moja-handler-pos-batch}
+            patch: *noSurge
+          - target: {kind: Deployment, name: moja-centralledger-handler-transfer-fulfil}
+            patch: *noSurge
+          - target: {kind: Deployment, name: moja-ml-api-adapter-handler-notification}
+            patch: *noSurge
+          # Single replica on a 1-partition topic: replace the pod, never run
+          # two (perf-upstream-findings #8).
+          - target: {kind: Deployment, name: moja-cl-handler-bulk-transfer-prepare}
+            patch: &noSurgeSingle |
+              - op: replace
+                path: /spec/strategy
+                value: {type: RollingUpdate, rollingUpdate: {maxSurge: 0, maxUnavailable: 1}}
+          - target: {kind: Deployment, name: moja-cl-handler-bulk-transfer-fulfil}
+            patch: *noSurgeSingle
+          - target: {kind: Deployment, name: moja-cl-handler-bulk-transfer-get}
+            patch: *noSurgeSingle
+          - target: {kind: Deployment, name: moja-cl-handler-bulk-transfer-processing}
+            patch: *noSurgeSingle
           # Consumer-loop tuning (perf campaign): notification handling is
           # fast (~35ms/msg) but topic-notification-event accumulates the
           # largest lag at 5 TPS — the batchSize:1/consumeTimeout:1000 poll
