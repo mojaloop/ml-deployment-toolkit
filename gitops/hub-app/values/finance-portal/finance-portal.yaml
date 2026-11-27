@@ -61,8 +61,8 @@ global:
 reporting-hub-bop-shell:
   enabled: true
   image:
-    registry: docker.io
-    repository: kirgene/reporting-hub-bop-shell
+    registry: ghcr.io
+    repository: mojaloop/ml-deployment-toolkit/iam-document-authz/reporting-hub-bop-shell
     tag: iam-document-authz.3
   configFiles:
     config.json:
@@ -94,8 +94,8 @@ reporting-hub-bop-shell:
 reporting-hub-bop-role-ui:
   enabled: true
   image:
-    registry: docker.io
-    repository: kirgene/reporting-hub-bop-role-ui
+    registry: ghcr.io
+    repository: mojaloop/ml-deployment-toolkit/iam-document-authz/reporting-hub-bop-role-ui
     tag: iam-document-authz.6
   configFiles:
     runtime-env.js: |
@@ -117,8 +117,8 @@ reporting-hub-bop-role-ui:
 reporting-hub-bop-trx-ui:
   enabled: true
   image:
-    registry: docker.io
-    repository: kirgene/reporting-hub-bop-trx-ui
+    registry: ghcr.io
+    repository: mojaloop/ml-deployment-toolkit/iam-document-authz/reporting-hub-bop-trx-ui
     tag: iam-document-authz.2
   configFiles:
     runtime-env.js: |
@@ -140,8 +140,8 @@ reporting-hub-bop-trx-ui:
 reporting-hub-bop-settlements-ui:
   enabled: true
   image:
-    registry: docker.io
-    repository: kirgene/reporting-hub-bop-settlements-ui
+    registry: ghcr.io
+    repository: mojaloop/ml-deployment-toolkit/iam-document-authz/reporting-hub-bop-settlements-ui
     tag: iam-document-authz.6
   configFiles:
     runtime-env.js: |
@@ -166,8 +166,8 @@ reporting-hub-bop-settlements-ui:
 reporting-hub-bop-positions-ui:
   enabled: true
   image:
-    registry: docker.io
-    repository: kirgene/reporting-hub-bop-positions-ui
+    registry: ghcr.io
+    repository: mojaloop/ml-deployment-toolkit/iam-document-authz/reporting-hub-bop-positions-ui
     tag: iam-document-authz.3
   configFiles:
     runtime-env.js: |
@@ -190,8 +190,8 @@ reporting-hub-bop-positions-ui:
 reporting-hub-bop-experience-api-svc:
   enabled: true
   image:
-    registry: docker.io
-    repository: kirgene/reporting-hub-bop-experience-api-svc
+    registry: ghcr.io
+    repository: mojaloop/ml-deployment-toolkit/iam-document-authz/reporting-hub-bop-experience-api-svc
     tag: iam-document-authz.1
   configOverride:
     .EVENT_SDKrc:
@@ -279,8 +279,8 @@ reporting-hub-bop-experience-api-svc:
 reporting-hub-bop-api-svc:
   enabled: true
   image:
-    registry: docker.io
-    repository: kirgene/reporting-hub-bop-api-svc
+    registry: ghcr.io
+    repository: mojaloop/ml-deployment-toolkit/iam-document-authz/reporting-hub-bop-api-svc
     tag: iam-document-authz.6
   containerSecurityContext:
     enabled: false
@@ -351,8 +351,8 @@ reporting-events-processor-svc:
 reporting-legacy-api:
   enabled: true
   image:
-    registry: docker.io
-    repository: kirgene/reporting
+    registry: ghcr.io
+    repository: mojaloop/ml-deployment-toolkit/iam-document-authz/reporting
     tag: iam-document-authz.6
   containerSecurityContext:
     enabled: false

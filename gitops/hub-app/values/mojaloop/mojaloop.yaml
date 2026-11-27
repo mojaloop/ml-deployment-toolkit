@@ -263,7 +263,7 @@ centralsettlement:
   centralsettlement-service:
     replicaCount: 1
     image:
-      repository: kirgene/central-settlement
+      repository: ghcr.io/mojaloop/ml-deployment-toolkit/iam-document-authz/central-settlement
       tag: iam-document-authz.5
     metrics:
       enabled: true
@@ -303,7 +303,7 @@ centralsettlement:
   centralsettlement-handler-deferredsettlement:
     replicaCount: 1
     image:
-      repository: kirgene/central-settlement
+      repository: ghcr.io/mojaloop/ml-deployment-toolkit/iam-document-authz/central-settlement
       tag: iam-document-authz.5
     metrics:
       enabled: true
@@ -316,7 +316,7 @@ centralsettlement:
       db_database: central_ledger
   centralsettlement-handler-grosssettlement:
     image:
-      repository: kirgene/central-settlement
+      repository: ghcr.io/mojaloop/ml-deployment-toolkit/iam-document-authz/central-settlement
       tag: iam-document-authz.5
     config:
       kafka_host: "${KAFKA_HOST}"
@@ -329,7 +329,7 @@ centralsettlement:
   centralsettlement-handler-rules:
     replicaCount: 1
     image:
-      repository: kirgene/central-settlement
+      repository: ghcr.io/mojaloop/ml-deployment-toolkit/iam-document-authz/central-settlement
       tag: iam-document-authz.5
     metrics:
       enabled: true
@@ -606,7 +606,7 @@ ml-testing-toolkit:
           caSecret: {}
           clientCert: {}
     image:
-      repository: kirgene/ml-testing-toolkit
+      repository: ghcr.io/mojaloop/ml-deployment-toolkit/iam-document-authz/ml-testing-toolkit
       tag: iam-document-authz.1
     gateway:
       enabled: true
@@ -636,7 +636,7 @@ ml-testing-toolkit:
     config:
       API_BASE_URL: https://ttk-backend.int.${DOMAIN}
     image:
-      repository: kirgene/ml-testing-toolkit-ui
+      repository: ghcr.io/mojaloop/ml-deployment-toolkit/iam-document-authz/ml-testing-toolkit-ui
       tag: iam-document-authz.3
     gateway:
       enabled: true
