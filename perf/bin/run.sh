@@ -60,6 +60,26 @@ restarts_now() {
 }
 PRE_RESTARTS="$(restarts_now || echo "")"
 
+# The Helm releases as installed when load starts: revision, status and
+# deploy time per release, so a result names the exact rollout it ran
+# against (the values files alone do not say whether Flux had applied them).
+# Optional like the rest of this section.
+if [ -n "$KUBECONFIG_PATH" ] && [ -f "$KUBECONFIG_PATH" ] \
+  && kubectl --kubeconfig "$KUBECONFIG_PATH" get helmreleases.helm.toolkit.fluxcd.io -A -o json 2>/dev/null \
+     | jq '{observed: true, releases: [.items[] | {
+              name: .metadata.name, namespace: .metadata.namespace,
+              revision: (.status.history[0].version // null),
+              status: (.status.history[0].status // null),
+              deployed: (.status.history[0].lastDeployed // null),
+              chart: (.status.history[0].chartVersion // null),
+              ready: ([.status.conditions[]? | select(.type == "Ready") | .status][0] // null)}]}' \
+       > "$OUT_DIR/deployment/helmreleases.json" 2>/dev/null; then
+  :
+else
+  jq -n '{observed: false, note: "no cluster access — Helm release revisions unknown"}' \
+    > "$OUT_DIR/deployment/helmreleases.json"
+fi
+
 # --- telemetry sinks -------------------------------------------------------
 # All optional: without them the run still produces a complete result, only
 # the live dashboards go dark. Declared in the topology because they are a

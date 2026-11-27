@@ -192,11 +192,17 @@ capture_deployment() {
   #
   # Both directories are optional: an environment that overrides nothing is
   # not an error, and an absent directory must not abort a run.
-  local d
+  #
+  # Recursive: values are laid out per release (values/<release>/<release>.yaml),
+  # which a flat values/*.yaml glob silently missed. Backups such as
+  # *.yaml.bak-<date> do not end in .yaml and are not copied.
+  local d f
   for d in values patches; do
-    compgen -G "$ENV_ROOT/$env/$d/*.yaml" >/dev/null 2>&1 || continue
-    mkdir -p "$out/$d"
-    cp "$ENV_ROOT/$env/$d"/*.yaml "$out/$d/"
+    [ -d "$ENV_ROOT/$env/$d" ] || continue
+    while IFS= read -r f; do
+      mkdir -p "$out/$d/$(dirname "$f")"
+      cp "$ENV_ROOT/$env/$d/$f" "$out/$d/$f"
+    done < <(cd "$ENV_ROOT/$env/$d" && find . -type f -name '*.yaml' | sed 's|^\./||' | sort)
   done
 }
 
