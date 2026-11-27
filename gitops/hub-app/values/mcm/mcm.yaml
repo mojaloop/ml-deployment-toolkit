@@ -24,7 +24,7 @@ db:
 
 api:
   image:
-    name: kirgene/connection-manager-api
+    name: ghcr.io/mojaloop/ml-deployment-toolkit/iam-document-authz/connection-manager-api
     version: iam-document-authz.4
   url: "https://mcm-api.ext.${DOMAIN}"
   switchFQDN: "${DOMAIN}"
@@ -66,7 +66,7 @@ ui:
     service: mcmUi
   authEnabled: true
   image:
-    name: kirgene/connection-manager-ui
+    name: ghcr.io/mojaloop/ml-deployment-toolkit/iam-document-authz/connection-manager-ui
     version: iam-document-authz.1
   checkSessionUrl: "https://kratos.int.${DOMAIN}/sessions/whoami"
   loginUrl: "https://kratos.int.${DOMAIN}/self-service/login/browser"
