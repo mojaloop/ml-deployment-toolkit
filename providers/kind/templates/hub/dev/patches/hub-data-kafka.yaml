@@ -1,0 +1,23 @@
+# Template patches — capacity tuning that lives in CRs, not Helm values.
+# Applied by the hub-data-kafka Flux Kustomization after the distribution's own
+# patches and before the environment's. JSON 6902 is used where the target
+# sits inside a list (strategic merge would replace the whole list).
+- target:
+    group: kafka.strimzi.io
+    version: v1
+    kind: KafkaNodePool
+    name: dual-role
+    namespace: data
+  patch:
+    - op: replace
+      path: /spec/storage/volumes/0/size
+      value: 8Gi
+- apiVersion: kafka.strimzi.io/v1
+  kind: Kafka
+  metadata:
+    name: mojaloop-kafka
+    namespace: data
+  spec:
+    kafka:
+      config:
+        num.partitions: 6

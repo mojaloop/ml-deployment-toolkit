@@ -24,10 +24,12 @@ spec:
       interval: 12h
   targetNamespace: vpa
   install:
+    crds: Create
     createNamespace: true
     remediation:
       retries: 3
   upgrade:
+    crds: CreateReplace
     remediation:
       retries: 3
   valuesFrom:

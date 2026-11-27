@@ -49,7 +49,6 @@ gitops/
                              #   mongodb/, redis/
   hub-vault/                 #   Vault (secrets infra, backup, PKI issuer)
   hub-iam/                   #   Ory IAM (Kratos, Hydra, Keto, Oathkeeper)
-  hub-iam-config/            #   Bootstrap jobs, Oathkeeper maester seed
   hub-app/                   #   Mojaloop, MCM, Finance Portal, extapi Envoy,
                              #   Oathkeeper access rules (apps, ops UIs, intapi)
   hub-observability-agent/   #   Alloy, kube-state-metrics, node-exporter
@@ -126,6 +125,6 @@ Kustomizations declare `dependsOn` and health gates rather than applying in para
 | vendor before role layers | CNI and storage exist before workloads schedule |
 | `hub-data-mysql` before `hub-vault` | Ory migrations further down the chain need their databases and users to exist — the gate is the MySQL cluster reporting `ready`, which the operator sets only once users do |
 | `hub-vault` before `hub-iam` | The Ory ExternalSecrets resolve through the Vault-backed ClusterSecretStore |
-| `hub-iam-config` before `hub-app` | Applications expect bootstrapped identities and the seeded Oathkeeper rule store |
+| `hub-iam` before `hub-app` | The authorization CRD and the published gateway rules exist before any route names a document or sends a request; roles naming an app's permissions wait until its route arrives |
 
 A stalled Kustomization blocks everything behind it. When diagnosing, find the **earliest** failing one — later failures are usually consequences, not causes.

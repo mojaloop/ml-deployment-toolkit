@@ -62,3 +62,6 @@ provider "helm" {
 provider "kubectl" {
   config_path = local.kubeconfig
 }
+
+# kind provider — drives the local docker daemon, no configuration
+provider "kind" {}

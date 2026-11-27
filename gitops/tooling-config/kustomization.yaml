@@ -32,9 +32,13 @@ configMapGenerator:
       - values.yaml=values/harbor/harbor.yaml
     options:
       disableNameSuffixHash: true
+      labels:
+        reconcile.fluxcd.io/watch: Enabled
   - name: minio-values
     namespace: flux-system
     files:
       - values.yaml=values/minio/minio.yaml
     options:
       disableNameSuffixHash: true
+      labels:
+        reconcile.fluxcd.io/watch: Enabled

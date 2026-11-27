@@ -14,3 +14,5 @@ configMapGenerator:
       - values.yaml=values/tooling-system/vault-operator.yaml
 generatorOptions:
   disableNameSuffixHash: true
+  labels:
+    reconcile.fluxcd.io/watch: Enabled

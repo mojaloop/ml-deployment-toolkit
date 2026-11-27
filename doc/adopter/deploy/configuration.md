@@ -109,7 +109,7 @@ State and generated artifacts land under `../artifacts/<env>/` — a sibling of 
 |---------|:---:|---------|---------|
 | `version` | yes | `1` | — |
 | `dtk_version` | no | the exact DTK release tag this environment is written against, e.g. `v0.19.0` | none — when set, the plan fails unless the clone is checked out at that tag |
-| `cluster` | yes | `name`, `role`, `vip`, `lb_ipam.pools` (per-gateway `lan`/`wan`), `flux.version` | Flux `2.9.3` |
+| `cluster` | yes | `name`, `role`, `vip`, `lb_ipam.pools` (per-gateway `lan`/`wan`) | — |
 | `template` | yes | a name under `providers/<provider>/templates/<role>/` | — |
 | `infra` | yes | `provider` (`proxmox` \| `aws` \| `digitalocean`), `aws.region`, `digitalocean` — placement, bridge, storage, and the Talos node OS facts live in the sidecar files `placement.yaml`, `proxmox/proxmox.yaml`, and `talos.yaml`, not here | — |
 | `dns` | yes | `provider` (`digitalocean` \| `cloudflare` \| `route53`), `domain` | — |

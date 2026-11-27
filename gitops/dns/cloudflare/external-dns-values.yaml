@@ -5,6 +5,8 @@ kind: ConfigMap
 metadata:
   name: external-dns-provider-values
   namespace: flux-system
+  labels:
+    reconcile.fluxcd.io/watch: Enabled
 data:
   values.yaml: |
     provider:

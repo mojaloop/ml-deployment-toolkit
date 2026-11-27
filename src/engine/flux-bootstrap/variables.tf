@@ -6,11 +6,17 @@ variable "flux_version" {
 variable "operator_version" {
   description = "Flux Operator Helm chart version"
   type        = string
-  default     = "0.57.0"
+  default     = "0.62.1"
 }
 
 variable "flux_namespace" {
   description = "Kubernetes namespace for Flux components"
   type        = string
   default     = "flux-system"
+}
+
+variable "cluster_generation" {
+  description = "Changes when the cluster is rebuilt, reinstalling Flux with it; stable on providers whose rebuilds keep state coherent themselves"
+  type        = string
+  default     = ""
 }

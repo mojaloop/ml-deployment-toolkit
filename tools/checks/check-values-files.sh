@@ -32,7 +32,6 @@ tooling-observability-routes
 hub
 hub-vault
 hub-iam
-hub-iam-config
 hub-app
 hub-observability-agent
 hub-data-common
