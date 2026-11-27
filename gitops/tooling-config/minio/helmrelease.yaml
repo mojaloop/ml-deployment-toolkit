@@ -1,11 +1,29 @@
+# TRANSITION SOLUTION (2026-10-15) — MinIO community edition is discontinued.
+# github.com/minio/minio is archived, quay.io/minio/* refuses anonymous pulls
+# (401) and docker.io/minio/* is deleted, so chart minio@5.4.0 can no longer
+# install; its last images also carry unpatched 2026 CVEs. This release runs
+# PGSTY Silo (github.com/pgsty/silo, AGPL-3.0), a maintained MinIO fork with the
+# same chart values, MINIO_* env, S3 API and on-disk format — a drop-in that
+# keeps every consumer (Harbor, Loki, Tempo, Thanos, hub backups) unchanged.
+# It is a stopgap, not the target: Silo is a young single-vendor fork. The
+# long-term object store (SeaweedFS is the lead candidate) is still to be
+# chosen and trialled; resource names stay "minio" until then.
+#
+# Silo publishes its chart only in Git, hence a GitRepository rather than a
+# HelmRepository. Pinned to a published release tag; bump the tag together
+# with the image tags in values/minio/minio.yaml (one release stack).
 apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
+kind: GitRepository
 metadata:
-  name: minio
+  name: silo
   namespace: flux-system
 spec:
   interval: 24h
-  url: https://charts.min.io/
+  url: https://github.com/pgsty/silo
+  ref:
+    tag: RELEASE.2026-09-16T00-00-00Z # commit 2a4d51406b7ed87af5fe6fe0f801f3290f96eb3c
+  sparseCheckout:
+    - helm/silo
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -16,11 +34,14 @@ spec:
   interval: 30m
   chart:
     spec:
-      chart: minio
-      version: "5.4.0"
+      # Silo chart 7.0.3 (renamed copy of minio/minio chart 5.x). A chart from
+      # Git has no version to pin; the GitRepository tag is the pin, and
+      # Revision makes a tag bump roll out even when Chart.yaml is unchanged.
+      chart: ./helm/silo
+      reconcileStrategy: Revision
       sourceRef:
-        kind: HelmRepository
-        name: minio
+        kind: GitRepository
+        name: silo
       interval: 12h
   releaseName: minio
   targetNamespace: minio
