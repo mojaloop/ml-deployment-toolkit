@@ -1,0 +1,4 @@
+# Secrets never enter git — even in your private environment repo.
+.env
+.env.*
+!.env.sample

@@ -1,0 +1,19 @@
+# Example Helm values override — copy to values/mojaloop/mojaloop.yaml.
+#
+# The path IS the binding: values/<namespace>/<release>.yaml overrides that
+# release, merged LAST over the distribution defaults (the file becomes the
+# mojaloop-mojaloop-values-override ConfigMap in the HelmRelease's valuesFrom
+# chain). Delete this file and the override disappears — presence or absence
+# is the complete answer to "does this environment override mojaloop?".
+#
+# Rules that matter here:
+# - Parameters are referenced, never repeated: write ${DOMAIN}, not the
+#   literal domain (the hardcoded-literal lint will flag the literal).
+# - A file referencing any .env secret key lands as a Secret instead of a
+#   ConfigMap, automatically. Everything else must not reference secrets.
+# - Lists REPLACE in Helm values. To append to a list the distribution
+#   defines, use a patch in patches/ instead of restating the list here.
+#
+# Example: trim quoting-service replicas on a small environment.
+quoting-service:
+  replicaCount: 1

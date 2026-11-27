@@ -11,9 +11,9 @@
 
 x-hub-placement:
   nodeSelector: &hubNodeSelector
-    ${P_NODE_ROLE_LABEL_KEY}: hub
+    node-role: hub
   tolerations: &hubTolerations
-    - key: ${P_NODE_ROLE_LABEL_KEY}
+    - key: node-role
       operator: Equal
       value: hub
       effect: NoSchedule

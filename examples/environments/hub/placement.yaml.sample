@@ -1,0 +1,24 @@
+# Placement — where each template placement group lands: a physical node on
+# on-prem providers, an availability zone on AWS (pg-1: "eu-west-1a").
+# Copy to placement.yaml. This is a fact about YOUR infrastructure; every
+# pg-N the selected template references must be mapped or the plan fails
+# (on AWS the file is optional — absent means best-effort ASG spread).
+version: 1
+placement:
+  pg-1: "pve-node-1"
+  pg-2: "pve-node-2"
+  pg-3: "pve-node-3"
+
+# Optional: override template pools BY NAME — partial keys inherit the rest.
+# pools:
+#   w:                     # bump the worker count; everything else inherited
+#     count: 4
+#   kafka:                 # drop a default pool — visible decision, greppable
+#     enabled: false
+#   w-extra:               # unknown name = extra pool; carry the full shape
+#     class: worker-general
+#     count: 1
+#     cores: 4
+#     memory: 8192
+#     disks: [64]
+#     placement: [pg-1]

@@ -5,15 +5,21 @@ locals {
   # Read Proxmox provider configuration from YAML
   provider_config = yamldecode(file(var.provider_config_path)).infra
 
+  # Storage pools. Disk 0 is the OS disk (and the cloud-init volume follows
+  # it); disks 1+ are data disks. Each comes from the storage_override
+  # (environment, then template proxmox.yaml), falling back to the provider
+  # default; data_disks falls back to the OS pool when unset.
+  os_pool   = var.storage_override.disks != "" ? var.storage_override.disks : local.provider_config.storage.default_pool
+  data_pool = var.storage_override.data_disks != "" ? var.storage_override.data_disks : local.os_pool
+
   # Process instances with storage config
   instances_with_specs = [
     for instance in var.instances : merge(instance, {
       storage_config = [
-        for storage_item in instance.storage : {
-          size      = storage_item.size
-          interface = storage_item.interface
-          storage_pool = try(storage_item.storage_pool,
-          var.storage_override.disks != "" ? var.storage_override.disks : local.provider_config.storage.default_pool)
+        for di, storage_item in instance.storage : {
+          size         = storage_item.size
+          interface    = storage_item.interface
+          storage_pool = try(storage_item.storage_pool, di == 0 ? local.os_pool : local.data_pool)
         }
       ]
     })

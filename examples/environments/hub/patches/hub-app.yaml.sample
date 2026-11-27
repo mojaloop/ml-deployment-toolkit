@@ -1,0 +1,29 @@
+# Example deployer patch — copy to patches/hub-app.yaml.
+#
+# The filename binds to the Flux Kustomization of the same name (hub-app);
+# entries are applied AFTER the distribution's own patches. Patches reach
+# what Helm values cannot: data-layer CRs and plain manifests.
+#
+# Each list entry is either a partial resource (strategic merge — kustomize
+# infers the target from apiVersion/kind/metadata.name) or an explicit
+# { patch, target } pair for JSON 6902 operations, which strategic merge
+# cannot express (list-item removal, appends with /-).
+#
+# Substitution: same ${UPPER_SNAKE} parameters as values files, applied by
+# Terraform at plan time; undefined parameters fail the plan. Secrets are
+# forbidden in patches.
+#
+# Example: strategic-merge a resource-limit bump onto one deployment.
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: moja-centralledger-service
+    namespace: mojaloop
+  spec:
+    template:
+      spec:
+        containers:
+          - name: centralledger-service
+            resources:
+              limits:
+                memory: "1Gi"
