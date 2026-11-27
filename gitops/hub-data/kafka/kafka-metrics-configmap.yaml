@@ -49,13 +49,25 @@ data:
           networkProcessor: "$5"
 
       # Per-listener metrics
-      - pattern: kafka.server<type=(.+), listener=(.+), networkProcessor=(.+)><>(.+-total)
+      #
+      # The trailing ":" is load-bearing — do not drop it. The exporter
+      # matches each pattern against "<bean><attrKeys>attrName: attrValue"
+      # and does NOT anchor the pattern, so a bare trailing (.+) captures
+      # the VALUE as well as the attribute name. That turns every scrape
+      # into a brand-new metric name, e.g.
+      #   kafka_server_socket_server_metrics_io_ratio:_2_533012991873396e_5
+      # ("io-ratio: 2.533012991873396E-5" sanitised; ":" is legal in a
+      # Prometheus metric name, so it survives). Measured cost when this
+      # colon was missing: ~810k one-sample series/day, socket-server
+      # metrics unusable, and Thanos compaction thrashing on the index.
+      # The KRaft rules below use the same ":" idiom for this reason.
+      - pattern: "kafka.server<type=(.+), listener=(.+), networkProcessor=(.+)><>(.+-total):"
         name: kafka_server_$1_$4
         type: COUNTER
         labels:
           listener: "$2"
           networkProcessor: "$3"
-      - pattern: kafka.server<type=(.+), listener=(.+), networkProcessor=(.+)><>(.+)
+      - pattern: "kafka.server<type=(.+), listener=(.+), networkProcessor=(.+)><>(.+):"
         name: kafka_server_$1_$4
         type: GAUGE
         labels:
